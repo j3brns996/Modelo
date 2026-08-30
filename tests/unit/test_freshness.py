@@ -31,7 +31,10 @@ class FreshnessTests(unittest.TestCase):
 
     def test_timestamp_parser_matches_strict_schema_contract(self) -> None:
         self.assertEqual(observed_utc_date("2026-08-30T23:30:00-01:00"), date(2026, 8, 31))
-        for value in ("2026-08-30 12:00:00Z", "2026-08-30T12:00:00", "2026-08-30T12:00:60Z", "2026-08-30T12:00:00+24:00"):
+        for value in ("2026-08-30T12:00:00Z", "2026-08-30T12:00:00+23:59", "2026-08-30T12:00:00-23:59"):
+            with self.subTest(value=value):
+                observed_utc_date(value)
+        for value in ("2026-08-30 12:00:00Z", "2026-08-30T12:00:00", "2026-08-30T12:00:60Z", "2026-08-30T12:00:00+24:00", "2026-08-30T12:00:00+01:60", "2026-08-30T12:00:00+00:99", "2026-08-30T12:00:00-01:60"):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 observed_utc_date(value)
 

@@ -9,8 +9,10 @@ state and measure explicit exit criteria.
 
 Codex Work is appropriate for planning, research coordination and preparing a
 reviewable branch. It is not the system of record, an enforcement boundary or
-an approval authority. Issues hold intent, one root agent owns writes, CI owns
-acceptance and humans approve the change request.
+an approval authority. Issues hold intent, one authoring agent owns writes, and CI is the technical
+acceptance arbiter. An eligible independent human or agent may approve the
+change request after inspecting successful trusted-CI evidence for the exact
+head commit.
 
 ## Required corrections to the original draft
 
@@ -44,6 +46,9 @@ acceptance and humans approve the change request.
     content-addressed and immutable.
 14. Make all bootstrap paths config-owned, require API operation provenance,
     and define evidence hashing with RFC 8785 canonical JSON plus SHA-256.
+15. Make CI the technical acceptance arbiter. Permit agent approval only for a
+    distinct eligible reviewer that did not contribute to the change and
+    records successful trusted-CI evidence for the exact head commit.
 
 ## Repository comparison
 

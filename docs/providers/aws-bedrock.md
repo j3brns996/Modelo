@@ -21,6 +21,7 @@ Credentials and ephemeral tokens must never be retained.
 | [`GetFoundationModel`](https://docs.aws.amazon.com/cli/latest/reference/bedrock/get-foundation-model.html) | The same first-party model summary for one AWS model ID | Does not prove that a workload can invoke the model |
 | [`GetFoundationModelAvailability`](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_GetFoundationModelAvailability.html) | Agreement, authorisation, entitlement and Region-availability status for the observed account and Region | Does not establish enterprise approval or effective IAM permission for a workload |
 | [`ListInferenceProfiles`](https://docs.aws.amazon.com/cli/latest/reference/bedrock/list-inference-profiles.html) | Inference-profile ID/ARN, type, status and referenced model ARNs | Profile identity is a route, not canonical model identity |
+| [`GetInferenceProfile`](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_GetInferenceProfile.html) | One profile's ID/ARN, type, status and model destinations | The profile remains an opaque route; account-owned application profiles are deferred in v0.1 |
 | [`ListFoundationModelAgreementOffers`](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_ListFoundationModelAgreementOffers.html) | Official legal-term links and returned rate-card dimensions when safe to retain | Never retain or publish `offerToken`; private terms never enter a public Pages artefact |
 
 The Bedrock model-access guide explains provider access differences and why
@@ -44,6 +45,9 @@ aws bedrock get-foundation-model-availability \
   --region <region> \
   --model-id <foundation-model-id>
 aws bedrock list-inference-profiles --region <region>
+aws bedrock get-inference-profile \
+  --region <region> \
+  --inference-profile-identifier <profile-id-or-arn>
 ```
 
 The adapter stores a durable redacted canonical projection beneath the globally

@@ -25,20 +25,27 @@ enhancement. Node, npm and `npx` are not required.
 | `home` | `/` | Purpose, revision, explicit `as_of`, counts, search, recent changes |
 | `catalogue` | `/catalogue/` | Searchable/filterable Models and Offerings views |
 | `model` | `/models/{model_id}/` | Intrinsic facts, evidence and approved offerings |
-| `offering` | `/offerings/{operator_id}/{offering_id}/` | Routes, price, conditions, evidence and approval receipt |
-| `changes` | `/changes/` | Add/change/revoke history from release receipts |
+| `offering` | `/offerings/{inference_service_id}/{offering_id}/` | Routes, price, conditions, evidence and approval receipt |
+| `changes` | `/changes/` | Add/change/revoke history from local Git first-parent deltas |
 | `process` | `/process/` | MAC, CI, approval and evidence rules |
 | `propose` | `/propose/` | Links to configured provider add/change/revoke/move intake |
 | `docs` | `/docs/` | Specification, contract, schemas and clone commands |
 | `not_found` | `/404.html` | Recovery navigation |
 
-One route resolver owns every internal URL and Git receipt link. Templates must
-not concatenate `github.com`, `gitlab.com`, repository names or project base
-paths. CI tests both `/` and a non-root base such as `/Modelo/`.
+One route resolver owns every internal URL and Git receipt link. Its inputs are
+the configured repository web base; commit, issue, change-request, tag and
+release templates; four MAC intake templates; and the effective build
+`base_url`/`base_path`. CI adapter overrides are explicit receipt-bound inputs.
+Templates must not concatenate provider hosts, repository names or project base
+paths. CI tests both `/` and a non-root base such as `/Modelo/` and rejects
+placeholder mismatch, collision, traversal, scheme-relative output, invalid
+percent encoding and non-canonical trailing slashes.
 
 The browser supports text search, a Models/Offerings pivot, deterministic sort,
-and filters for vendor, inference service, geography, capability, modality,
-licence, lifecycle and condition. It remains usable without JavaScript.
+and filters for vendor, inference service, AWS source Region and route type,
+capability, modality, licence, lifecycle and condition. It does not invent a
+cross-cloud geography facet. Every entity/detail link remains usable without
+JavaScript; filters are progressive enhancement.
 
 ## Publication profiles
 
@@ -67,21 +74,41 @@ downgrade private output to public.
   `rel="noopener noreferrer"` for external links.
 - Publish only a profile allowlist; private-marker canaries must be absent from
   synthetic output.
-- Supply a restrictive CSP, referrer policy, semantic landmarks, skip link,
+- Supply a restrictive CSP and referrer policy through HTML meta elements in the
+  common Pages artefact; host headers may strengthen them. Supply semantic landmarks, skip link,
   visible focus, labelled filters, proper tables, reduced-motion support and
-  colour-independent status. Target WCAG 2.2 AA and require a human keyboard
-  and screen-reader smoke test before first launch.
+colour-independent status. Target WCAG 2.2 AA and record a human keyboard and
+screen-reader smoke-test result as first-launch evidence.
+- `site/content/*.md` is non-normative presentation copy checked for drift
+  against canonical documents. Its trusted renderer disables raw HTML.
+- Every public HTML and JSON file comes from the same publication projection;
+  a full private object must never reach `dist/site/`.
 
 ## Determinism and gates
 
 The generator performs no network calls. Its inputs are validated catalogue
-state, release deltas, publication profile, routes, templates/assets, locked
-tooling and explicit `SOURCE_DATE_EPOCH`/`as_of`. It emits a site manifest with
-the source commit, revision, profile, `as_of`, tool version and every file hash.
+state, local Git first-parent history and base/head deltas, publication profile,
+routes, templates/assets, locked tooling, explicit `as_of` and the source-date
+epoch deterministically derived from the exact source-commit author timestamp
+(or a recorded explicit override). It emits a site manifest with source commit,
+revision, effective base URL/path, profile, `as_of`, tool version and every file
+hash.
+
+CI checks out complete first-parent history for release builds. A shallow clone
+must fetch the missing history or the `/changes/` build fails rather than
+silently publishing an incomplete ledger.
+
+Pre-merge CI builds and validates a candidate artefact. Post-merge CI first
+proves the merge tree equals the accepted head tree, then builds the final
+merge-aware artefact once, validates it, creates a detached release receipt that
+hashes it, and deploys that exact final artefact without rebuilding. The receipt
+is not stored inside the artefact whose digest it records.
 
 CI must prove canonical detail-page coverage, link integrity at both base paths,
 deterministic rebuilds, manifest integrity, search/filter behaviour, stable
 ordering including zero prices, revoke history, inert malicious fixtures,
 publication non-leakage, accessibility automation and that GitHub/GitLab deploy
-the exact checked artefact without rebuilding it.
-
+the exact post-merge checked artefact without rebuilding it. The private
+restricted fallback is a digest-verified release artefact retained for the same
+period as its protected release; expiry must be explicit and cannot remove the
+only durable consumer copy.

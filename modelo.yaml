@@ -54,7 +54,14 @@ platform:
     direct_push: false
     change_request_required: true
     required_check: modelo/check
+    ci_is_technical_arbiter: true
+    required_check_matches_exact_head_sha: true
+    independent_approved_review: true
     code_owner_review: true
+    agent_approval_allowed: true
+    agent_approval_requires_distinct_platform_identity: true
+    contributor_self_approval: false
+    approval_requires_successful_head_ci_evidence: true
     stale_review_dismissal: true
     resolved_conversations: true
     force_push: false

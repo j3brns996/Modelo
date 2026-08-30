@@ -33,11 +33,18 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("usage:", result.stdout)
 
-    def test_build_remains_unavailable(self) -> None:
-        result = self.run_cli("build", "--as-of", "2026-08-30")
+    def test_final_build_remains_unavailable(self) -> None:
+        result = self.run_cli(
+            "build", "--kind", "final", "--base-commit", "a" * 40,
+            "--source-commit", "b" * 40, "--source-tree", "c" * 40,
+            "--as-of", "2026-08-30", "--source-date-epoch", "0",
+            "--mac-metadata", "metadata.json", "--profile", "synthetic",
+            "--base-url", "https://example.invalid/Modelo/", "--base-path", "/Modelo/",
+            "--output", "dist/final",
+        )
         self.assertEqual(result.returncode, 2)
         self.assertEqual(result.stdout, "")
-        self.assertIn("is not implemented in the current repository slice", result.stderr)
+        self.assertIn("final builds remain unavailable until T6", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
     def test_check_succeeds_for_exact_local_commits(self) -> None:

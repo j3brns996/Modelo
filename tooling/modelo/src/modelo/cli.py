@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Sequence
 
 from modelo.config import ConfigError, load_config
+from modelo.build import BuildError, BuildRequest, build_candidate
 from modelo.diagnostics import Diagnostic, diagnostics_json
 from modelo.freshness import parse_as_of
 from modelo.validators import CheckSystemError, check_repository
@@ -29,8 +30,20 @@ def _parser() -> argparse.ArgumentParser:
     check.add_argument("--as-of", required=True)
     check.add_argument("--format", choices=("text", "json"), default="text")
 
-    build = subparsers.add_parser("build", help="build static artefacts (unavailable in T1)")
+    build = subparsers.add_parser("build", help="build deterministic candidate artefacts")
+    build.add_argument("--kind", required=True, choices=("candidate", "final"))
+    build.add_argument("--base-commit", required=True)
+    build.add_argument("--source-commit", required=True)
+    build.add_argument("--source-tree", required=True)
     build.add_argument("--as-of", required=True)
+    build.add_argument("--source-date-epoch", required=True, type=int)
+    build.add_argument("--mac-metadata", required=True, type=Path)
+    build.add_argument("--profile", required=True, choices=("synthetic", "private"))
+    choice = build.add_mutually_exclusive_group(required=True)
+    choice.add_argument("--base-url")
+    choice.add_argument("--no-base-url", action="store_true")
+    build.add_argument("--base-path", required=True)
+    build.add_argument("--output", required=True)
     return parser
 
 
@@ -56,10 +69,26 @@ def main(argv: Sequence[str] | None = None) -> int:
                     print(_render_text(diagnostic))
             return 1
         return 0
-    try:
-        load_config(arguments.root)
-    except ConfigError as exc:
-        parser.exit(exc.exit_code, f"{exc.render()}\n")
+    if arguments.command == "build":
+        try:
+            as_of = parse_as_of(arguments.as_of)
+            build_candidate(BuildRequest(
+                root=arguments.root,
+                kind=arguments.kind,
+                base_commit=arguments.base_commit,
+                source_commit=arguments.source_commit,
+                source_tree=arguments.source_tree,
+                as_of=as_of,
+                source_date_epoch=arguments.source_date_epoch,
+                mac_metadata=arguments.mac_metadata,
+                profile=arguments.profile,
+                base_url=None if arguments.no_base_url else arguments.base_url,
+                base_path=arguments.base_path,
+                output=arguments.output,
+            ))
+            return 0
+        except (ValueError, ConfigError, BuildError) as exc:
+            parser.exit(2, f"modelo: {exc}\n")
     parser.exit(2, f"{UNAVAILABLE.format(command=arguments.command)}\n")
     return 2
 

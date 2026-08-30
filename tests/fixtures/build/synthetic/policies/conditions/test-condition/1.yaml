@@ -1,0 +1,5 @@
+id: test-condition
+version: 1
+title: Synthetic condition
+description: Synthetic enterprise policy for build tests.
+owner: Test policy owner

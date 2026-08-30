@@ -14,8 +14,16 @@ Cloud APIs change independently and may be queried much more frequently.
 ## Decision
 
 Use the Git protected default branch as the v0.1.0 approval ledger. Use issues
-for MAC intake, change requests for review, CI for validation, Pages for static
-publication and protected releases for portable receipts.
+for MAC intake, change requests for review, CI as the technical acceptance
+arbiter, Pages for static publication and protected releases for portable
+receipts.
+
+An eligible independent reviewer may be a human or an agent. An agent may
+approve only when it has a distinct platform identity from the author, made no
+commit or modification to the change, and records the successful trusted-CI
+evidence for the exact change-request head commit. No approval can override a
+missing, stale or failed required check. A new commit invalidates both CI
+acceptance and approval.
 
 The selected Git provider API is the only workflow and control-plane API.
 Modelo exposes no application API. Consumers use static Pages, release
@@ -43,6 +51,10 @@ adapter.
   bus is introduced in v0.1.0.
 - Git history is described as tamper-evident, not absolutely immutable or WORM.
 - Remote protections must be verified separately by `modelo platform check`.
+- CI owns technical acceptance; review attests independence and evidence
+  inspection rather than reimplementing validation.
+- A review agent sharing the author's platform identity can report findings but
+  cannot supply formal independent approval.
 - A GitHub plan that cannot provide private Pages must use synthetic/public data
   or a private CI artefact; it does not justify an authentication proxy.
 - Approval throughput is measured so review capacity, not Git mechanics, can be

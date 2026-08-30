@@ -20,10 +20,15 @@ present and passing, do not add or merge catalogue records.
 - Do not create a Modelo application API. All workflow writes use the selected
   Git provider API; cloud provider APIs and MCP tools are read-only evidence
   sources.
-- One root agent owns writes. Research and review agents are read-only unless a
-  human explicitly grants a narrower write scope.
-- Agents may prepare commits and change requests. They may not approve, merge,
-  bypass a required check or push to a protected branch.
+- One authoring agent owns writes for a change. An independent review agent must
+  not have authored, committed or modified that change.
+- CI is the technical acceptance arbiter. Only the required checks for the exact
+  change-request head commit determine whether the executable contract passes.
+- Agents may prepare commits and change requests. An independent agent may
+  approve only after verifying successful trusted-CI evidence for that exact
+  head commit and recording the evidence it inspected. It may not approve work
+  it authored, approve a stale commit, override a missing or failed check,
+  merge, bypass controls or push to a protected branch.
 
 ## Facts
 
@@ -57,6 +62,10 @@ present and passing, do not add or merge catalogue records.
 
 Use open Agent Skills under `.agents/skills/` for portable workflows. `.codex/`
 and `.kiro/` may provide thin adapters, but must not contain the only copy of a
-rule. Modelo cloud adapters, CLI commands and MCP access are always read-only.
+rule. Skills guide authorship and review; they are not validation evidence and
+cannot change CI outcomes. A review skill may produce a formal approval only
+under the independent, exact-head and successful-CI conditions above.
+
+Modelo cloud adapters, cloud CLI commands and MCP access are always read-only.
 A separately governed cloud change is outside Modelo and cannot be performed by
 its agents or adapters.

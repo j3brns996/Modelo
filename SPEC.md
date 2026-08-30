@@ -231,7 +231,11 @@ core-schema changes.
 
 The portable release receipt contains base, source and merge commits; explicit
 `as_of`; contract, tool and lock versions; catalogue, site and manifest digests;
-the exact CI result; linked issue and request; reviewer; and change delta. The
+the exact CI result; linked issue and request; and change delta. Approval
+evidence includes reviewer platform identity, approved head SHA, approval time,
+actor-policy digest, independence/eligibility result and provider
+approval/check reference; stale-head, self-authored or ineligible approval is
+invalid. The
 portable release is a protected annotated `catalogue-YYYYMMDD.N` tag at the
 exact merge commit. Optional signatures may strengthen it.
 
@@ -284,6 +288,14 @@ routes:
   - id: <stable-route-id>
     adapter: aws-bedrock
     reference: <opaque-first-party-reference>
+    model_binding:
+      kind: foundation-model
+      model_evidence:
+        id: <evidence-id>
+        id_pointer: /modelId
+        arn_pointer: /modelArn
+        name_pointer: /modelName
+        provider_pointer: /providerName
 pricing: []
 condition_refs:
   - id: <condition-id>
@@ -304,11 +316,35 @@ routes:
   - id: <stable-route-id>
     adapter: <provider-adapter-id>
     reference: <opaque-first-party-reference>
+    model_binding: <provider-adapter-owned-object>
 ```
 
 The core validates structure and references. The inference-service adapter validates
 provider-specific values. Route IDs are internal and stable; provider references
 may change through an evidenced MAC change.
+
+For an AWS system inference profile, the adapter-owned object contains the
+profile evidence reference and one entry per destination:
+
+```yaml
+model_binding:
+  kind: system-inference-profile
+  profile_evidence:
+    id: <profile-evidence-id>
+    projection_pointer: /
+  destinations:
+    - destination_pointer: /models/0/modelArn
+      model_evidence:
+        id: <foundation-model-evidence-id>
+        arn_pointer: /modelArn
+        name_pointer: /modelName
+        provider_pointer: /providerName
+```
+
+CI requires the destination ARN to equal `arn_pointer`, and the reported model
+and provider names to equal the canonical model name and governed vendor name.
+All references are explicit; the validator never searches globally for a
+plausible or freshest evidence record.
 
 ### Dimensional pricing
 
@@ -408,8 +444,9 @@ non-reversible opaque `scope_ref`; account aliases, IDs and fingerprints are not
 stored.
 
 AWS routes must also bind to the offering's canonical `model_id`. A direct route
-retains evidenced model ID/ARN, model name and provider name and requires those
-reported identity facts to equal the canonical model's evidenced facts. A
+requires its reference to equal the evidenced model ID/ARN, then requires the
+reported model name and provider name to equal the canonical model name and
+governed vendor name. A
 system inference profile retains every destination model ARN; CI resolves each
 through evidenced `GetFoundationModel` facts and requires all destinations to
 bind to that same canonical model. Mappings needing transformation or

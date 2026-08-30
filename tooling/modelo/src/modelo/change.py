@@ -218,16 +218,20 @@ def _load_historical_mapping(root: Path, object_id: str, display_path: str) -> d
 
 
 def validate_condition_history(
-    root: Path, head: str, conditions_root: str, offerings_root: str
+    root: Path, base: str, head: str, conditions_root: str, offerings_root: str
 ) -> tuple[Diagnostic, ...]:
-    """Reject any condition identity whose canonical meaning ever changed."""
+    """Reject changes after a condition becomes an accepted or referenced fact."""
 
     root_path = PurePosixPath(conditions_root)
-    observed: dict[tuple[str, int], tuple[str, str]] = {}
+    commits = tuple(reversed(_history_commits(root, head)))
+    if base not in commits:
+        raise GitError("accepted base is not in the complete first-parent history")
+    locked: dict[tuple[str, int], tuple[str, str]] = {}
     changed: dict[tuple[str, int], str] = {}
     missing_references: set[tuple[str, str, int]] = set()
-    # Oldest-to-newest makes the retained canonical value the first merged one.
-    for commit in reversed(_history_commits(root, head)):
+    # A condition is frozen by its accepted-base presence or its first reference.
+    # Candidate-only drafts remain mutable until one of those events occurs.
+    for commit in commits:
         current: dict[tuple[str, int], tuple[str, str]] = {}
         for path, object_id in _tree_blobs(root, commit, conditions_root):
             document = _load_historical_mapping(root, object_id, path)
@@ -241,10 +245,8 @@ def validate_condition_history(
             canonical = canonical_json(document)
             key = (identifier, version)
             current[key] = (canonical, path)
-            previous = observed.get(key)
-            if previous is None:
-                observed[key] = (canonical, path)
-            elif previous[0] != canonical:
+            previous = locked.get(key)
+            if previous is not None and previous[0] != canonical:
                 changed[key] = path
         for path, object_id in _tree_blobs(root, commit, offerings_root):
             offering = _load_historical_mapping(root, object_id, path)
@@ -261,8 +263,11 @@ def validate_condition_history(
                 key = (identifier, version)
                 if key not in current:
                     missing_references.add((path, identifier, version))
-                elif key not in observed:
-                    observed[key] = current[key]
+                elif key not in locked:
+                    locked[key] = current[key]
+        if commit == base:
+            for key, value in current.items():
+                locked.setdefault(key, value)
     diagnostics = [
         Diagnostic(
             "CHANGE_INVALID", Severity.ERROR, changed[key], "",

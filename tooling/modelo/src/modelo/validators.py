@@ -343,6 +343,7 @@ def check_repository(root: Path, base: str, head: str, as_of: date) -> tuple[Dia
     try:
         diagnostics.extend(validate_condition_history(
             root,
+            base_commit,
             head_commit,
             head_state.config.paths["conditions"].as_posix(),
             head_state.config.paths["offerings"].as_posix(),

@@ -23,6 +23,7 @@ repository:
       change: /issues/new?template=mac-change.yml
       revoke: /issues/new?template=mac-revoke.yml
       move: /issues/new?template=mac-move.yml
+      batch: /issues/new?template=mac-batch.yml
 
 paths:
   catalogue: catalogue
@@ -62,6 +63,7 @@ paths:
   kiro_adapter: .kiro
   github_adapter: .github
   gitlab_adapter: .gitlab
+  gitlab_ci: .gitlab-ci.yml
 
 toolchain:
   language: python
@@ -160,6 +162,13 @@ artifact_identity:
   release_receipt_is_detached_from_hashed_artifact: true
   deploy_exact_premerge_artifact: false
   merge_queue_or_train: deferred_until_candidate_tree_contract
+  final_receipt_approval_evidence:
+    - reviewer_platform_identity
+    - approved_head_sha
+    - approval_timestamp
+    - actor_policy_digest
+    - independence_and_eligibility_result
+    - provider_approval_and_check_reference
 
 determinism:
   source_date_epoch: derive_from_exact_source_commit_author_timestamp

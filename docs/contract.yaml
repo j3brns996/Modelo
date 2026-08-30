@@ -63,16 +63,12 @@ approval:
   new_commit_invalidates_check_and_review: true
   agent_approval:
     allowed_for: data_only_mac
+    allowed_paths: [catalogue/models/**, catalogue/offerings/**, catalogue/evidence/**]
+    every_other_path_requires_human_codeowner: true
     requires_distinct_eligible_platform_identity: true
     author_committer_or_modifier_may_approve: false
     successful_trusted_exact_head_ci_evidence_required: true
-  human_codeowner_required_for:
-    - ci_and_platform_adapters
-    - validator_and_build_tooling
-    - schemas_and_dependency_locks
-    - modelo_config
-    - governance_and_publication
-    - agent_skills
+  human_codeowner_required_for: every_path_outside_agent_approval_allowlist
 
 evidence:
   schema_annotation:
@@ -89,6 +85,11 @@ evidence:
     - official_provider_documentation
     - official_vendor_documentation
   required_metadata: [source, observed_at, retrieved_by, scope, projection, visibility]
+  api_source_required_fields: [provider, service, operation, partition, region, sanitised_parameters, documentation_uri]
+  documentation_source_required_fields: [uri]
+  yaml_date_and_timestamp_scalars_remain_strings: true
+  canonical_number_domain: signed_64_bit_integer_or_decimal_string
+  non_finite_or_binary_float_values: forbidden
   content_address:
     canonicalisation: RFC_8785_JCS
     digest: sha256
@@ -106,6 +107,9 @@ freshness:
     intrinsic_model_fact: 365
   stale_fact_fails_next_check_or_scheduled_audit: true
   stale_fact_automatically_revokes_current_offering: false
+  calendar_rule: stale_when_as_of_date_minus_utc_observed_date_is_greater_than_class_days
+  future_observation: error
+  scheduled_main_audit: modelo_check_with_base_equal_head_equal_main_and_explicit_as_of
 
 pricing:
   optional: true
@@ -128,9 +132,20 @@ provider_boundary:
       - ListInferenceProfiles
       - GetInferenceProfile
       - ListFoundationModelAgreementOffers
-    observation_scope: [account_fingerprint, partition, region, operation, parameters, observed_at]
+    admissible_catalogue_evidence_operations:
+      - ListFoundationModels
+      - GetFoundationModel
+      - ListInferenceProfiles
+      - GetInferenceProfile
+      - ListFoundationModelAgreementOffers
+    discovery_only_operations: [GetFoundationModelAvailability]
+    observation_scope: [opaque_scope_ref, partition, region, operation, parameters, observed_at]
     sensitive_fields_never_retained: [credentials, offerToken]
     deferred_route_types: [application-profile, provisioned, custom, imported]
+    model_binding:
+      foundation_model: evidenced_model_id_arn_name_and_provider_equal_canonical_model_evidence
+      system_inference_profile: every_evidenced_destination_resolves_through_get_foundation_model_to_same_canonical_model
+      transformed_or_ambiguous_mapping: deferred
   gcp_vertex_ai: deferred_until_first_party_fixtures
   azure_ai_foundry: deferred_until_first_party_fixtures
 
@@ -139,11 +154,17 @@ mac:
   initiation: git_provider_issue
   operations: [add, change, revoke, move, batch]
   change_preserves_identity: true
-  move: atomic_add_destination_and_revoke_source
+  move:
+    subject_kind: offering_only
+    action: atomic_add_destination_and_revoke_source
+  revoke_subject_kind: offering_only
   batch_max_subjects: 25
+  batch_requires_homogeneous_item_operation: [add, change, revoke]
   issue_payload_digest_bound_to_change_and_release_receipt: true
-  dedupe_key: hash_of_sorted_reservations_operation_family_and_purpose
-  idempotency_key: hash_of_complete_canonical_intent
+  hash_canonicalisation: RFC_8785_JCS
+  hash_input_omits: [dedupe_key, idempotency_key]
+  dedupe_key: hash_of_typed_sorted_reservations_effective_operation_and_purpose
+  idempotency_key: hash_of_complete_canonical_intent_also_omitting_request_id
   candidate_issue_evidence_is_accepted_catalogue_evidence: false
   revoke:
     deletes_current_record: true
@@ -164,17 +185,47 @@ diagnostics:
   fields: [code, severity, path, json_pointer, message, remediation]
   code_rename_remove_or_semantic_change_is_breaking: true
   adding_error_code_requires_contract_change: true
+  exit_codes: {success: 0, validation_failure: 1, usage_or_system_error: 2}
+  baseline_codes:
+    - YAML_PARSE_ERROR
+    - YAML_DUPLICATE_KEY
+    - YAML_ALIAS_OR_ANCHOR
+    - YAML_CUSTOM_TAG
+    - YAML_MULTI_DOCUMENT
+    - YAML_INVALID_ROOT
+    - YAML_LIMIT_EXCEEDED
+    - FILE_OR_PATH_ERROR
+    - SCHEMA_VIOLATION
+    - PATH_IDENTITY_MISMATCH
+    - UNKNOWN_REFERENCE
+    - EVIDENCE_MISSING
+    - EVIDENCE_VALUE_MISMATCH
+    - EVIDENCE_ID_MISMATCH
+    - EVIDENCE_IMMUTABLE
+    - EVIDENCE_STALE
+    - EVIDENCE_FUTURE
+    - CHANGE_INVALID
+    - MAC_INVALID
+    - BUILD_NONDETERMINISTIC
+    - RELEASE_RECEIPT_INVALID
+    - PLATFORM_CONTROL_MISSING
 
 toolchain:
   required_runtime: python
+  python_version: "3.12.13"
+  uv_version: "0.11.33"
   environment_and_lock: uv
   required_ci_uses_npx: false
   clean_clone_commands:
     - uv sync --locked
-    - uv run --locked modelo check
-    - uv run --locked modelo build
+    - uv run --locked modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
+    - uv run --locked modelo build --as-of YYYY-MM-DD
   solution_tooling_and_publication_are_services: false
   agent_skills_are_build_inputs: false
+  network:
+    core_validation_and_build: disabled
+    platform_adapter: read_only_same_repository_git_provider_only
+    platform_adapter_output: bounded_canonical_mac_input
 
 site:
   contract_config_key: paths.site_contract
@@ -186,7 +237,9 @@ site:
   profiles: [synthetic, private]
   production_public_field_redaction: deferred
   private_to_public_fallback: forbidden
-  github_or_gitlab_adapter_deploys_checked_artifact_without_rebuild: true
+  change_history_source: local_git_first_parent_deltas
+  release_receipt_is_site_build_input: false
+  final_postmerge_artifact_is_validated_then_deployed_without_rebuild: true
 
 validation:
   command: modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
@@ -210,6 +263,19 @@ validation:
     - exact_ci_run_check_and_result
     - issue_and_change_request_refs
     - change_delta
+    - head_and_merge_tree_shas
+    - source_date_epoch
+  premerge_artifact:
+    records_head_tree_sha: true
+    protected_branch_must_be_up_to_date: true
+    merge_gate_requires_current_base_equal_receipt_base: true
+    purpose: candidate_content_validation_not_release
+  postmerge_publication:
+    merge_tree_must_equal_accepted_head_tree: true
+    builds_final_merge_aware_artifact_once: true
+    validates_and_deploys_that_exact_artifact_without_rebuild: true
+    detached_receipt_hashes_final_artifact: true
+    receipt_is_not_inside_hashed_artifact: true
 
 platform:
   neutral_terms: [issue, change_request, required_check, protected_default_branch, static_site, release]
@@ -219,6 +285,14 @@ platform:
   platform_check: modelo platform check
   missing_required_capability: fail_closed
   private_pages_missing: restricted_artifact_not_public_pages
+  merge_queue_or_train: deferred_until_candidate_tree_contract
+  actor_policy_config_key: paths.actor_policy
+  unconfigured_agent_identity_mode: human_only
+
+recovery:
+  git_mirror_alone_is_complete_operational_backup: false
+  bundle_requires: [git_mirror, host_metadata_export, control_manifest, releases_and_receipts, locked_dependency_archive]
+  restore_rehearsal_required: true
 
 agents:
   canonical_rules_config_key: paths.agent_rules
@@ -241,4 +315,3 @@ deferred:
   - account_owned_provider_routes
   - gcp_and_azure_adapters
   - live_telemetry_and_runtime_health
-

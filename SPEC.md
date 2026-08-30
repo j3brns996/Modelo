@@ -59,7 +59,7 @@ Version `0.1.0` does not:
 | Repository paths, relative public routes and selected host adapter | `modelo.yaml` |
 | Entity structure and allowed values | `schemas/` |
 | Path, reference, evidence and change rules | Validator |
-| Technical acceptance | Required CI check running `modelo check` at the exact change-request head SHA |
+| Acceptance command | `modelo check` |
 | Remote branch, review and publication controls | Platform adapter and host settings |
 | Human rationale | `SPEC.md` and ADRs |
 | Compact agent context | `docs/contract.yaml` |
@@ -143,17 +143,10 @@ it is never committed back to the source branch.
 
 ### 1. Protected-default-branch presence is approval
 
-Approval applies only to valid records beneath `catalogue/`. It requires a
-linked MAC issue, successful trusted CI for the exact change-request head
-commit, an eligible independent approved review, and merge to the protected
-default branch.
-
-CI is the technical arbiter: a missing, stale or failed required check is a
-rejection that no human or agent approval can override. Review is a separate
-attestation that the diff and CI evidence were independently examined. The
-reviewer may be a human or an agent, but must have a distinct eligible platform
-identity and must not have authored, committed or modified the change. Any new
-commit invalidates the prior CI result and approval.
+Accepted catalogue records beneath `catalogue/` require a linked MAC issue, a
+reviewed change request, required checks and merge to the protected default
+branch. Only a current offering grants consumption; accepted evidence,
+conditions, models and governance records grant no consumption by themselves.
 
 The issue is intake. The merged files and commit are the approved state.
 
@@ -161,7 +154,7 @@ The issue is intake. The merged files and commit are the approved state.
 
 ```text
 catalogue/models/{model_id}.yaml
-catalogue/offerings/{operator_id}/{offering_id}.yaml
+catalogue/offerings/{inference_service_id}/{offering_id}.yaml
 ```
 
 The offering path does not contain geography, cloud region, account, project,
@@ -180,10 +173,10 @@ residency suitability or suitability for a workload.
 
 ### 4. Every externally sourced assertion has evidence
 
-Every externally sourced leaf in a model, offering or external governance
-record must be linked by JSON Pointer to an evidence record. A pointer may name
-an ancestor object or array only when every externally sourced leaf beneath it
-came from the same evidence record.
+Schemas classify leaves with `x-modelo-provenance` (`external`, `internal` or
+`policy`) and, where applicable, `x-modelo-freshness-class`. Every external leaf
+must link to an evidence record and projection pointer. CI resolves both
+pointers and requires canonical deep equality. Transformed claims are deferred.
 
 Internal IDs and references are validated against repository structure.
 Enterprise-authored conditions are approved policy, not claims about an
@@ -197,7 +190,7 @@ Each evidence record contains:
 - source type;
 - observation date and time;
 - retrieval method and scope;
-- a required digest of its redacted canonical projection.
+- a redacted canonical projection.
 
 If a fact cannot be evidenced and tested, omit it. Do not infer context windows,
 reasoning support, licensing or approval from model names.
@@ -224,7 +217,7 @@ The catalogue, schemas, validator, builder and tests use neutral terms:
 - change request;
 - protected default branch;
 - required check;
-- independent review, with code ownership where configured;
+- code-owner review;
 - static-site publication;
 - protected release.
 
@@ -235,10 +228,11 @@ core-schema changes.
 
 ### 7. Git is tamper-evident, not absolutely immutable
 
-The portable release receipt contains the source commit, catalogue revision,
-manifest digest, validation result, linked issue and change request, and a
-protected signed or annotated tag. Host-native immutable releases may strengthen
-this on GitHub; they are not a portable WORM guarantee.
+The portable release receipt contains base, source and merge commits; explicit
+`as_of`; contract, tool and lock versions; catalogue, site and manifest digests;
+the exact CI result; linked issue and request; reviewer; and change delta. The
+portable release is a protected annotated `catalogue-YYYYMMDD.N` tag at the
+exact merge commit. Optional signatures may strengthen it.
 
 ### 8. Deterministic input produces deterministic output
 
@@ -261,8 +255,9 @@ id: <stable-canonical-model-id>
 vendor_id: <vendor-id>
 name: <official-name>
 evidence_refs:
-  /vendor_id: <evidence-id>
-  /name: <evidence-id>
+  /name:
+    id: <evidence-id>
+    projection_pointer: /modelName
 ```
 
 Capabilities, modalities, context limits, licence, lifecycle and descriptions
@@ -280,22 +275,20 @@ The exact shape belongs to `schemas/offering.schema.json`. The minimum shape is:
 
 ```yaml
 id: <stable-offering-id>
-operator_id: aws
+inference_service_id: aws-bedrock
 model_id: <stable-canonical-model-id>
 routes:
   - id: <stable-route-id>
-    operator_reference: <opaque-first-party-reference>
-    resource_type: <provider-adapter-value>
-    scope:
-      kind: region
-      values: [<provider-region>]
-    consumption: <provider-adapter-value>
+    adapter: aws-bedrock
+    reference: <opaque-first-party-reference>
 pricing: []
 condition_refs:
   - id: <condition-id>
     version: 1
 evidence_refs:
-  /routes/0: <evidence-id>
+  /routes/0/reference:
+    id: <evidence-id>
+    projection_pointer: /modelId
 ```
 
 An offering must have at least one valid route to be consumable. Empty pricing
@@ -306,12 +299,8 @@ means that no price assertion is made; it does not imply zero or free usage.
 ```yaml
 routes:
   - id: <stable-route-id>
-    operator_reference: <opaque-first-party-reference>
-    resource_type: <provider-adapter-value>
-    scope:
-      kind: region | geography | global
-      values: []
-    consumption: <provider-adapter-value>
+    adapter: <provider-adapter-id>
+    reference: <opaque-first-party-reference>
 ```
 
 The core validates structure and references. The operator adapter validates
@@ -333,7 +322,9 @@ pricing:
     currency: USD
     route_ids: [<route-id>]
 evidence_refs:
-  /pricing/0: <evidence-id>
+  /pricing/0:
+    id: <evidence-id>
+    projection_pointer: /price
 ```
 
 The schema admits only explicit units and dimensions. Unsupported commercial
@@ -353,21 +344,20 @@ retrieved_by: cli | mcp | manual
 observed_at: <RFC-3339-timestamp>
 scope: {}
 projection: {}
-content_sha256: <lowercase-hex-of-canonical-projection>
 visibility: internal
 ```
 
-Entity `evidence_refs` map JSON Pointers to evidence IDs. One evidence record may
-support several facts. CI expands ancestor pointers, checks that every externally
-sourced leaf is covered, verifies that pointers resolve, checks the projection
-digest, and verifies that the filename and `id` equal the SHA-256 of the
-canonical evidence envelope with `id` omitted.
+Entity `evidence_refs` map fact JSON Pointers to an evidence ID and a projection
+JSON Pointer. One evidence record may support several facts. CI uses schema
+provenance annotations to check coverage, verifies both pointers, requires
+canonical deep equality and verifies that filename and `id` equal the SHA-256
+of the canonical evidence envelope with `id` omitted.
 
 Canonical means: parse the restricted YAML into the JSON data model, omit the
 root `id`, serialise with the
 [JSON Canonicalization Scheme (RFC 8785)](https://www.rfc-editor.org/rfc/rfc8785),
 hash the UTF-8 bytes with SHA-256, and prefix the lowercase digest with
-`sha256-`. `content_sha256` applies the same process to `projection` alone.
+`sha256-`.
 
 A referenced evidence record is immutable once it has ever been merged to the
 protected default branch. A correction or refreshed observation creates a new
@@ -376,10 +366,9 @@ content-addressed evidence ID and migrates fact references through MAC review.
 The redacted projection is durable Git source, not an expiring CI artefact. It
 contains only the first-party response fields needed to reproduce validation.
 Credentials, tokens, private prices, account identifiers and unrelated response
-fields are excluded. Private Pages may include redacted internal evidence. A
-public or synthetic build may include a fact only if it also includes admissible
-public evidence and the reference. Otherwise the builder removes the fact and
-its reference together; dangling or unsupported published facts are errors.
+fields are excluded. v0.1 publishes either a complete validated catalogue
+privately or a separate synthetic fixture publicly. Production field-level
+redaction is deferred because removing facts can silently change meaning.
 
 ## AWS-first provider reasoning
 
@@ -402,23 +391,21 @@ The exact commands and evidence boundaries are documented in
 The following contains placeholders, not catalogue facts:
 
 ```yaml
-operator_id: aws
+inference_service_id: aws-bedrock
 model_id: <canonical-model-id>
 routes:
   - id: london-direct
-    operator_reference: <bedrock-foundation-model-id>
-    resource_type: foundation-model
-    scope:
-      kind: region
-      values: [eu-west-2]
-    consumption: managed-on-demand
+    adapter: aws-bedrock
+    reference: <bedrock-foundation-model-id>
+    aws:
+      resource_type: foundation-model
+      source_region: eu-west-2
   - id: eu-cross-region
-    operator_reference: <bedrock-inference-profile-id>
-    resource_type: inference-profile
-    scope:
-      kind: geography
-      values: [eu]
-    consumption: managed-on-demand
+    adapter: aws-bedrock
+    reference: <bedrock-system-inference-profile-id>
+    aws:
+      resource_type: system-inference-profile
+      source_region: eu-west-2
 ```
 
 `uk` is not an AWS inference geography. London is `eu-west-2`. AWS geography
@@ -451,23 +438,23 @@ Scheduled native CI
   -> compare factual fields with approved state
   -> open or update one MAC issue
   -> human or agent prepares a branch and change request
-  -> trusted CI runs modelo check for the exact head commit
-  -> independent human or agent inspects the diff and CI evidence
-  -> eligible reviewer approves that exact head commit
+  -> modelo check
+  -> code-owner review
   -> protected-default-branch merge
   -> deterministic Pages artefact and protected release
 ```
 
-The neutral catalogue operations are `add`, `change` and `revoke`. `move` is an
-intake convenience compiled to atomic `add + revoke` in one change request. The
-issue captures target identity,
-requested outcome, official evidence, observation time, reason and acceptance
-criteria. Its mutable body is not authoritative data.
+The neutral operations are `add`, `change`, `revoke`, `move` and `batch`.
+`change` preserves identity. `move` compiles to atomic add-destination and
+revoke-source. The issue contains a schema-valid neutral payload whose canonical
+digest is bound into the change request and release receipt.
 
-One open MAC is permitted per logical identity. Ordinary changes affect one
-identity or one model plus its initial offerings. A batch is allowed only for
-one source, observation time, operator and semantic purpose, with a default
-limit of 25 identities.
+A dedupe key hashes the sorted identity reservation set, operation family and
+purpose. An idempotency key hashes the full canonical intent. Exact retries
+return the existing issue; a conflicting open reservation fails closed. Move
+reserves source and destination. A batch reserves at most 25 identities and has
+one source, observation scope, inference service and purpose. Candidate issue
+evidence is never accepted catalogue evidence. See `docs/mac-contract.md`.
 
 ## Git-platform implementation
 
@@ -477,20 +464,22 @@ limit of 25 identities.
 | Change review | Pull request | Merge request |
 | Validation | Actions | GitLab CI |
 | Concurrency | Merge queue | Merge train |
-| Independent review | Required review, CODEOWNERS and ruleset | Approval rules, CODEOWNERS and contributor restrictions |
+| Ownership | CODEOWNERS and ruleset | CODEOWNERS and approval rules |
 | Publication | Pages Actions artefact | Pages CI artefact |
 | Release | Protected tag and release | Protected tag and release |
 
 Pages serves static HTML and JSON only. It has no write API and no custom auth.
-If the selected GitHub plan cannot publish a private Pages site, v0.1.0 must use
-synthetic/public data or stop at a private CI artefact. It must not acquire an
+The current personal GitHub repository cannot satisfy the private Pages
+capability. It therefore publishes only the synthetic fixture profile to public
+Pages, or stops at a restricted CI/release artefact for the private catalogue.
+It must not acquire an
 authentication proxy merely to compensate for a hosting-plan limitation.
 
 `modelo platform check` will verify the remote control profile: protected
-default branch, no direct or force pushes, required validation at the exact
-head commit, independent-review eligibility, prevention of contributor
-self-approval where the platform supports it, stale-review dismissal, resolved
-conversations, protected tags and appropriate Pages visibility. Repository
+default branch, no direct or force pushes, trusted exact-head validation,
+independent approval, stale-review dismissal, resolved conversations, protected
+tags and appropriate Pages visibility. Human CODEOWNER approval is mandatory
+for control-plane paths; agent approval is optional and data-only. Repository
 files alone cannot prove those remote settings are active.
 
 There is no Modelo service endpoint to port. Switching from GitHub to GitLab
@@ -509,9 +498,9 @@ Target clone acceptance, once the executable slice is present:
 ```bash
 git clone <repository-url>
 cd Modelo
-uv sync --frozen
-uv run modelo check
-uv run modelo build
+uv sync --locked
+uv run --locked modelo check --base <protected-base-sha> --head <head-sha> --as-of <YYYY-MM-DD>
+uv run --locked modelo build --as-of <YYYY-MM-DD>
 ```
 
 Codespaces, GitLab Workspaces, Kiro and IDE settings are optional conveniences.
@@ -524,17 +513,16 @@ not as the planning system of record or an approval authority.
 
 - The MAC issue records intent and acceptance criteria.
 - Read-only specialist agents may research independent questions in parallel.
-- One authoring agent owns writes for a change.
-- A separate review agent may approve only when it has a distinct eligible
-  platform identity, did not contribute to the change, and verifies successful
-  trusted-CI evidence for the exact head commit.
-- Every write receives targeted validation; trusted CI reruns `modelo check`.
-- The platform change request exposes the diff and immutable test evidence for
-  independent human or agent review.
+- One root agent owns writes.
+- Every write receives targeted validation; `modelo check` runs before hand-off.
+- The platform change request exposes the diff for human review.
 
 `AGENTS.md` and `.agents/skills/` are the portable workflow layer. Skills follow
-the open Agent Skills format. `.codex/` and `.kiro/` are optional adapters and
-must not redefine catalogue rules.
+the open Agent Skills format. They guide authors and reviewers; CI may lint
+their metadata but never executes skill prose or treats agent output as
+acceptance. `.codex/` and `.kiro/` are optional adapters and must not redefine
+catalogue rules. `npx` may be an optional skill-import convenience, never a
+required build or CI runtime.
 
 The project-scoped Codex configuration declares the official AWS Documentation
 MCP server as a pinned, read-only dependency. Hosted ChatGPT Work does not load
@@ -543,27 +531,20 @@ evidence, but neither is a source of approval.
 
 ## Validation contract
 
-One command, `modelo check`, owns acceptance. Its externally visible outcomes
-are:
+One change-aware command, `modelo check --base BASE --head HEAD --as-of DATE`,
+owns pre-merge technical acceptance. Its externally visible outcomes are:
 
 1. `schema-and-facts`: schema, path, reference and evidence validation;
 2. `tests`: unit and fixture tests;
 3. `build-and-site`: deterministic catalogue and static-site build with smoke tests;
-4. `release-and-clean-tree`: release-contract and clean-tree verification.
+4. `receipt-and-clean-tree`: release-contract simulation and clean-tree verification.
 
-The required CI check `modelo/check` is the technical acceptance arbiter. Its
-evidence binds `head_sha`, provider workflow or pipeline ID, check name,
-completion time, result, test summary, and manifest or artefact digests. Only a
-successful result for the current change-request head is admissible. A skipped,
-neutral, missing, cancelled, stale or failed result does not establish Modelo
-acceptance, even if a Git platform would otherwise describe some of those
-states as mergeable.
-
-Approval is not a second implementation of validation. An eligible independent
-reviewer inspects the diff and this CI evidence, records the evidence identifiers
-in the review, and may then approve. An agent using the author's platform
-identity is not independent and may only leave a review report. Any new commit
-requires both CI and approval again.
+The trusted final `modelo/check` job runs even when dependencies fail and
+explicitly rejects missing, skipped, neutral, cancelled, stale or failed
+prerequisites. Its receipt binds the exact base/head, trusted workflow identity,
+tool/lock digests, test results and built artefacts. Post-merge publication then
+creates the release receipt and deploys that already checked artefact; it does
+not rebuild it.
 
 Lint, dependency lock, secret scanning and document-drift checks are internal
 stages of those outcomes, not eleven independently promised products. A control
@@ -593,8 +574,6 @@ The initial explicit contracts are:
 - **Platform:** core code contains no GitHub or GitLab URL logic.
 - **Schema:** shape changes include compatibility, migration and rollback.
 - **Audit:** claim tamper evidence, not WORM immutability.
-- **Arbiter:** CI decides technical acceptance; independent review attests that
-  the exact-head diff and evidence were examined.
 - **Exit:** measure when Git stops fitting.
 
 ## Sustainability exit criteria
@@ -615,3 +594,16 @@ these persist for four weeks:
 
 Until those conditions exist, adding services would be anticipatory complexity,
 not architecture.
+
+## Implementation and verification
+
+The detailed static-site, MAC, security and staged implementation contracts are
+`docs/site-contract.md`, `docs/mac-contract.md`,
+`docs/security-contract.md` and `docs/implementation-plan.md`. The dated
+repository comparison is
+`docs/reviews/catalogue-repositories-2026-08-30.md`.
+
+No implementation swarm starts until those contracts and `modelo.yaml` agree.
+No production catalogue launches until the executable validator, schemas,
+fixtures, templates, GitHub/GitLab adapters, synthetic Pages build, protected
+host controls, release receipt and mirror-restore rehearsal all pass.

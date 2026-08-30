@@ -36,6 +36,8 @@ acceptance and humans approve the change request.
     approval unit; do not maintain a duplicate `proposals/` state tree.
 11. Expose no Modelo application API. Use the selected Git provider API for all
     workflow writes and static artefacts for consumers.
+12. Retain a redacted canonical evidence projection in Git. A digest of an
+    expiring CI artefact is insufficient to reproduce factual validation.
 
 ## Repository comparison
 

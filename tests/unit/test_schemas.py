@@ -32,11 +32,19 @@ class SchemaRuntimeTests(unittest.TestCase):
         self.assertTrue(any("format" in finding.message for finding in findings))
 
     def test_date_time_is_strict_rfc3339(self) -> None:
-        valid = "2026-08-30T12:34:56.123+05:30"
+        valid = (
+            "2026-08-30T12:34:56.123+05:30",
+            "2026-08-30T12:34:56+23:59",
+            "2026-08-30T12:34:56-23:59",
+            "2026-08-30T12:34:56Z",
+        )
         invalid = (
             "2026-08-30 12:34:56Z",
             "2026-08-30T12:34:56",
             "2026-08-30T12:34:56+24:00",
+            "2026-08-30T12:34:56+01:60",
+            "2026-08-30T12:34:56+00:99",
+            "2026-08-30T12:34:56-01:60",
             "2026-08-30T12:34:60Z",
             "2026-08-30t12:34:56z",
             "2026-02-30T12:34:56Z",
@@ -45,10 +53,12 @@ class SchemaRuntimeTests(unittest.TestCase):
         base = {
             "id": "sha256-" + "a" * 64,
             "source": {"type": "official-vendor-documentation", "uri": "https://example.invalid/x"},
-            "retrieved_by": "manual", "observed_at": valid,
+            "retrieved_by": "manual", "observed_at": valid[0],
             "scope": {}, "projection": {}, "visibility": "public",
         }
-        self.assertEqual(list(validator.iter_errors(base)), [])
+        for value in valid:
+            with self.subTest(value=value):
+                self.assertEqual(list(validator.iter_errors(dict(base, observed_at=value))), [])
         for value in invalid:
             with self.subTest(value=value):
                 candidate = dict(base, observed_at=value)

@@ -19,15 +19,26 @@ paths:
   evidence: catalogue/evidence
   governance: catalogue/governance
   conditions: catalogue/policies/conditions
+  publication_profiles: publication
   schemas: schemas
+  provider_schemas: schemas/providers
+  mac_schema: schemas/mac.schema.json
   tests: tests
-  implementation: scripts
+  fixtures: tests/fixtures
+  implementation: tooling/modelo
   site_source: site
+  site_templates: site/templates
+  site_assets: site/assets
+  site_content: site/content
   build: dist
   site_output: dist/site
   docs: docs
   human_specification: SPEC.md
   machine_contract: docs/contract.yaml
+  implementation_plan: docs/implementation-plan.md
+  site_contract: docs/site-contract.md
+  mac_contract: docs/mac-contract.md
+  security_contract: docs/security-contract.md
   agent_rules: AGENTS.md
   provider_docs: docs/providers
   decisions: docs/adr
@@ -38,35 +49,90 @@ paths:
   github_adapter: .github
   gitlab_adapter: .gitlab
 
-routes:
-  catalogue: data/catalogue.json
-  manifest: data/manifest.json
-  schemas: data/schemas
-  contract: docs/contract.yaml
+toolchain:
+  language: python
+  environment_manager: uv
+  lock_file: uv.lock
+  package_config: pyproject.toml
+  required_runtime_is_node: false
+  npx_allowed_in_required_ci: false
+  skills_are_build_inputs: false
+  clean_clone:
+    sync: uv sync --locked
+    check: uv run --locked modelo check
+    build: uv run --locked modelo build
+
+site:
+  base_url: null
+  base_path: /
+  routes:
+    home: /
+    catalogue: /catalogue/
+    model: /models/{model_id}/
+    offering: /offerings/{operator_id}/{offering_id}/
+    changes: /changes/
+    process: /process/
+    propose: /propose/
+    docs: /docs/
+    not_found: /404.html
+  data_routes:
+    catalogue: /data/catalogue.json
+    manifest: /data/manifest.json
+    release_receipt: /data/release-receipt.json
+    schemas: /data/schemas/
+  urls_resolved_from_config_only: true
 
 publication:
-  visibility: private
-  public_data_allowed: false
+  active_profile: synthetic
+  profiles:
+    synthetic:
+      source: tests/fixtures/publication/synthetic
+      delivery: pages
+      visibility: public
+      production_catalogue: false
+    private:
+      source: catalogue
+      delivery: restricted_artifact_or_capability_checked_pages
+      visibility: private
+      fail_if_requested_pages_access_control_is_missing: true
+  production_field_level_public_redaction: deferred
+  silent_private_to_public_downgrade: false
 
 platform:
   required_capabilities:
     protected_default_branch: true
     direct_push: false
     change_request_required: true
-    required_check: modelo/check
-    ci_is_technical_arbiter: true
-    required_check_matches_exact_head_sha: true
+    required_check:
+      name: modelo/check
+      trusted_source_required: true
+      exact_head_sha: true
+      skipped_or_neutral_is_failure: true
     independent_approved_review: true
-    code_owner_review: true
-    agent_approval_allowed: true
-    agent_approval_requires_distinct_platform_identity: true
-    contributor_self_approval: false
-    approval_requires_successful_head_ci_evidence: true
     stale_review_dismissal: true
+    last_pusher_cannot_supply_required_approval: true
     resolved_conversations: true
     force_push: false
     branch_deletion: false
     protected_release_tags: true
-    pages_visibility: private
+  conditional_capabilities:
+    code_owner_review:
+      required_for_control_plane: true
+      control_plane_paths:
+        - modelo.yaml
+        - schemas/**
+        - tooling/**
+        - pyproject.toml
+        - uv.lock
+        - .github/**
+        - .gitlab/**
+        - .agents/**
+        - publication/**
+        - catalogue/governance/**
+    private_pages:
+      required_only_for_profile: private
+      fallback: restricted_ci_or_release_artifact
   optional_capabilities:
+    agent_approval: data_only_mac
     serialised_merge: merge_queue_or_merge_train
+

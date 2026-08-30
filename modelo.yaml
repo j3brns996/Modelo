@@ -11,6 +11,18 @@ repository:
   host: github.com
   namespace: j3brns
   name: Modelo
+  web_base: https://github.com/j3brns/Modelo
+  web_routes:
+    issue: /issues/{issue_number}
+    change_request: /pull/{change_request_number}
+    commit: /commit/{commit_sha}
+    tag: /releases/tag/{tag_name}
+    release: /releases/tag/{tag_name}
+    mac_intake:
+      add: /issues/new?template=mac-add.yml
+      change: /issues/new?template=mac-change.yml
+      revoke: /issues/new?template=mac-revoke.yml
+      move: /issues/new?template=mac-move.yml
 
 paths:
   catalogue: catalogue
@@ -18,11 +30,13 @@ paths:
   offerings: catalogue/offerings
   evidence: catalogue/evidence
   governance: catalogue/governance
+  actor_policy: catalogue/governance/actors.yaml
   conditions: catalogue/policies/conditions
   publication_profiles: publication
   schemas: schemas
   provider_schemas: schemas/providers
   mac_schema: schemas/mac.schema.json
+  release_receipt_schema: schemas/release-receipt.schema.json
   tests: tests
   fixtures: tests/fixtures
   implementation: tooling/modelo
@@ -54,22 +68,27 @@ toolchain:
   environment_manager: uv
   lock_file: uv.lock
   package_config: pyproject.toml
+  python_version_file: .python-version
+  python_version: "3.12.13"
+  uv_version: "0.11.33"
   required_runtime_is_node: false
   npx_allowed_in_required_ci: false
   skills_are_build_inputs: false
+  core_check_network: disabled
+  platform_adapter_network: same_repository_git_provider_read_only
   clean_clone:
     sync: uv sync --locked
-    check: uv run --locked modelo check
-    build: uv run --locked modelo build
+    check: uv run --locked modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
+    build: uv run --locked modelo build --as-of YYYY-MM-DD
 
 site:
   base_url: null
-  base_path: /
+  base_path: /Modelo/
   routes:
     home: /
     catalogue: /catalogue/
     model: /models/{model_id}/
-    offering: /offerings/{operator_id}/{offering_id}/
+    offering: /offerings/{inference_service_id}/{offering_id}/
     changes: /changes/
     process: /process/
     propose: /propose/
@@ -78,9 +97,10 @@ site:
   data_routes:
     catalogue: /data/catalogue.json
     manifest: /data/manifest.json
-    release_receipt: /data/release-receipt.json
     schemas: /data/schemas/
   urls_resolved_from_config_only: true
+  effective_base_url_and_path_are_receipt_inputs: true
+  ci_requires_explicit_base_url: true
 
 publication:
   active_profile: synthetic
@@ -95,6 +115,7 @@ publication:
       delivery: restricted_artifact_or_capability_checked_pages
       visibility: private
       fail_if_requested_pages_access_control_is_missing: true
+      restricted_artifact_retention: protected_release_lifetime
   production_field_level_public_redaction: deferred
   silent_private_to_public_downgrade: false
 
@@ -111,28 +132,46 @@ platform:
     independent_approved_review: true
     stale_review_dismissal: true
     last_pusher_cannot_supply_required_approval: true
+    branch_must_be_up_to_date: true
     resolved_conversations: true
     force_push: false
     branch_deletion: false
     protected_release_tags: true
   conditional_capabilities:
     code_owner_review:
-      required_for_control_plane: true
-      control_plane_paths:
-        - modelo.yaml
-        - schemas/**
-        - tooling/**
-        - pyproject.toml
-        - uv.lock
-        - .github/**
-        - .gitlab/**
-        - .agents/**
-        - publication/**
-        - catalogue/governance/**
+      required_for_everything_outside_agent_data_allowlist: true
+      agent_approvable_data_paths:
+        - catalogue/models/**
+        - catalogue/offerings/**
+        - catalogue/evidence/**
     private_pages:
       required_only_for_profile: private
       fallback: restricted_ci_or_release_artifact
   optional_capabilities:
     agent_approval: data_only_mac
-    serialised_merge: merge_queue_or_merge_train
+    serialised_merge: manual_one_at_a_time
 
+artifact_identity:
+  premerge_receipt_records: [head_sha, head_tree_sha, base_sha, source_date_epoch, as_of, candidate_artifact_digests]
+  postmerge_requires_merge_tree_equal_head_tree: true
+  merge_gate_requires_current_base_equal_accepted_base: true
+  postmerge_builds_final_artifact_once: true
+  postmerge_validates_and_deploys_that_exact_artifact: true
+  release_receipt_is_detached_from_hashed_artifact: true
+  deploy_exact_premerge_artifact: false
+  merge_queue_or_train: deferred_until_candidate_tree_contract
+
+determinism:
+  source_date_epoch: derive_from_exact_source_commit_author_timestamp
+  explicit_override_must_be_recorded: true
+  change_history: local_git_first_parent_deltas
+  site_build_requires_complete_first_parent_history: true
+
+recovery:
+  bundle_contents:
+    - git_mirror
+    - issues_change_requests_reviews_and_ci_receipts_export
+    - host_control_manifest
+    - release_assets_and_receipts
+    - locked_dependency_archive
+  restore_verification_required: true

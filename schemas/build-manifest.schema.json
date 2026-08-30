@@ -2,6 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://modelo.invalid/schemas/build-manifest.schema.json",
   "title": "Modelo non-recursive publication manifest",
+  "x-modelo-executable-completeness-owner": "T6",
+  "x-modelo-executable-completeness": "files_keys_equal_contract_fixed_union_projection_derived_excluding_manifest",
   "$defs": {
     "canonicalBaseUrl": {
       "type": "string",

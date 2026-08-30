@@ -27,6 +27,15 @@ It adds the site bytes and complete `data/manifest.json` defined by
 except itself. T8 supplies trusted provider metadata and creates the detached
 check receipt; only post-merge publication may create the final receipt.
 
+T6 owns an executable exact-set completeness rule. Manifest `files` keys must
+equal the fixed list in `docs/contract.yaml`—base route HTML, two local assets,
+`data/catalogue.json` and all sixteen schema copies—union
+`models/{model_id}/index.html` for every projected model and
+`offerings/{inference_service_id}/{offering_id}/index.html` for every projected
+offering. `data/manifest.json` is deliberately excluded. Missing fixed files,
+missing detail pages and unexpected extra files each fail dedicated negative
+tests; JSON Schema validates the wire shape but does not derive this inventory.
+
 ## Required routes
 
 | Route key | Default route | Content |
@@ -114,7 +123,8 @@ hashes it, and deploys that exact final artefact without rebuilding. The receipt
 is not stored inside the artefact whose digest it records.
 
 Each build exclusively acquires the fail-fast writer lock, journals its phase,
-creates a same-filesystem sibling staging name from 128 OS-CSPRNG bits, fsyncs
+creates `dist/candidate.<id>.staging` or `dist/final.<id>.staging` beside its
+target using 128 OS-CSPRNG bits, with the matching `<target>.<id>.backup`, fsyncs
 and validates the staged tree, renames the old target to a backup, renames the
 stage to target, fsyncs and verifies it, then removes the backup and lock.
 Handled failure restores the backup. Crash recovery is explicit and

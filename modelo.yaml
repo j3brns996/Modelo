@@ -140,7 +140,7 @@ build:
   ambient_git_or_environment_inference: false
   candidate_root: dist/candidate
   final_root: dist/final
-  staging_parent: dist/.staging
+  target_parent: dist
   receipts_root: dist/receipts
   publication_subdir: site
   catalogue_path: data/catalogue.json
@@ -153,8 +153,8 @@ build:
   manifest_hashes_itself: false
   writer_lock: dist/.modelo-build.lock
   lock_acquire: exclusive_create_or_fail_fast
-  staging_name: sibling_target_dot_128_bit_csprng_hex
-  backup_name: sibling_target_dot_backup_dot_invocation_id
+  staging_name: target_name_dot_128_bit_csprng_hex_dot_staging
+  backup_name: target_name_dot_same_128_bit_csprng_hex_dot_backup
   journal: bounded_fsync_state_file_in_lock
   promotion_state_machine: [lock, stage, fsync_stage, validate_stage, backup_old, promote_new, fsync_parent, verify_target, remove_backup, unlock]
   crash_recovery: explicit_recover_from_journal_or_fail_closed_on_ambiguity

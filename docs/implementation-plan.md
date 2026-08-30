@@ -39,9 +39,9 @@ The build is split logically, not into services:
 | T3 | Core/AWS/entity/receipt schemas and schema-only fixtures under `schemas/` and `tests/fixtures/schema/` | T1 | Every structural invariant has passing and failing fixtures |
 | T4 | `tooling/modelo/src/modelo/{schemas,evidence,freshness,change,validators}.py`, `tests/fixtures/semantic/` and matching `tests/unit/test_{schemas,evidence,freshness,change,validators}.py` | T2, T3, T7 | Base/head, model binding, equality, immutability, move and revoke tests pass |
 | T5 | `tooling/modelo/src/modelo/{build,receipt}.py`, build/receipt fixtures and tests | T4 | Deterministic canonical catalogue/delta bytes and receipt primitives verify; exact inputs only, no provider reads |
-| T6 | `tooling/modelo/src/modelo/site.py`, `site/`, `tests/fixtures/publication/` and `tests/site/` | T5 | Complete non-recursive manifest; route, base-path, XSS, leakage, static accessibility, history and reproducibility gates pass |
+| T6 | `tooling/modelo/src/modelo/site.py`, `site/`, `tests/fixtures/publication/` and `tests/site/` | T5 | Exact manifest keys equal fixed routes/assets/data/schema inventory plus every projection-derived model/offering page; missing/extra, base-path, XSS, leakage, accessibility, history and reproducibility gates pass |
 | T7 | `tooling/modelo/src/modelo/mac.py`, MAC schema/examples, GitHub/GitLab issue and change-request template directories, MAC tests | T1, T0 | Adapter fixtures round-trip to identical canonical MAC objects |
-| T8 | `tooling/modelo/src/modelo/platform.py`, `.github/workflows/`, `paths.gitlab_ci`, and `tests/contract/platform/` | T4, T6, T7 | Assemble the trusted exact-head check receipt; skipped/failed/stale checks and untrusted GitLab pipelines fail closed |
+| T8 | `tooling/modelo/src/modelo/platform.py`, `.github/workflows/`, `paths.gitlab_ci`, and `tests/contract/platform/` | T4, T6, T7 | Correlate every trusted provider input with the receipt, including current base/head/tree, provider/workflow/run/check/result and internal head/provider equalities; skipped/failed/stale or drifted checks fail closed |
 | T9 | `.agents/skills/{modelo-change,modelo-review,modelo-discover}/` and static skill lint | T7, T8 | Skill commands and paths resolve; no skill is a build/runtime input |
 | T10 | Remote platform check, synthetic Pages deployment, release and mirror-restore rehearsal | T1–T9 | Protection/capability report, exact artefact deployment, verified receipt and restore log |
 
@@ -103,7 +103,8 @@ The T5 CLI has no ambient defaults: common required flags are `--kind`,
 receipt correlation mismatch.
 
 T5 also owns the single-writer publication state machine: exclusive fail-fast
-lock, same-filesystem CSPRNG staging, fsynced staged validation, old-target
+lock, same-filesystem sibling `dist/{candidate|final}.<id>.staging` and matching
+`.backup`, fsynced staged validation, old-target
 backup, promoted-target verification and explicit journal recovery. The two
 renames are not claimed as one transaction; the target can be complete-old,
 complete-new or temporarily absent, never partial. Final builds fail closed

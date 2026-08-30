@@ -269,7 +269,7 @@ build:
   output_roots:
     candidate: dist/candidate
     final: dist/final
-    staging: dist/.staging
+    target_parent: dist
     detached_receipts: dist/receipts
   publication_subdir: site
   catalogue_path: data/catalogue.json
@@ -280,19 +280,51 @@ build:
   canonical_json: rfc8785_utf8_plus_single_lf
   canonical_sha256_scope: exact_rfc8785_bytes_including_single_lf
   catalogue_sort_keys:
-    models: [id]
-    offerings: [inference_service_id, id]
-    evidence: [id]
-    conditions: [id, version]
-    routes: [id]
-    route_destinations: [destination_pointer]
-    pricing: [dimension, unit, quantity, amount, currency, sorted_route_ids]
-    condition_refs: [id, version]
+    models: [id, canonical_json_bytes]
+    offerings: [inference_service_id, id, canonical_json_bytes]
+    evidence: [id, canonical_json_bytes]
+    conditions: [id, version, canonical_json_bytes]
+    routes: [id, canonical_json_bytes]
+    route_destinations: [destination_pointer, canonical_json_bytes]
+    pricing: [dimension, unit, quantity, amount, currency, sorted_route_ids, canonical_json_bytes]
+    condition_refs: [id, version, canonical_json_bytes]
     id_arrays: ascii_id
-  change_delta_sort: [operation_rank_add_change_revoke_move, primary_path, destination_path, before, after]
+    total_tie_breaker: canonical_json_bytes
+  change_delta_sort: [operation_rank_add_change_revoke_move, primary_path, destination_path, before, after, canonical_json_bytes]
+  manifest_required_fixed_files:
+    - 404.html
+    - assets/catalogue.js
+    - assets/site.css
+    - catalogue/index.html
+    - changes/index.html
+    - data/catalogue.json
+    - docs/index.html
+    - index.html
+    - process/index.html
+    - propose/index.html
+    - schemas/actors-registry.schema.json
+    - schemas/build-manifest.schema.json
+    - schemas/catalogue-output.schema.json
+    - schemas/check-receipt.schema.json
+    - schemas/common.schema.json
+    - schemas/condition.schema.json
+    - schemas/evidence.schema.json
+    - schemas/freshness-policy.schema.json
+    - schemas/inference-services-registry.schema.json
+    - schemas/mac.schema.json
+    - schemas/model.schema.json
+    - schemas/modelo.schema.json
+    - schemas/offering.schema.json
+    - schemas/providers/aws-bedrock-route.schema.json
+    - schemas/release-receipt.schema.json
+    - schemas/vendors-registry.schema.json
+  manifest_required_derived_files: ["models/{model_id}/index.html", "offerings/{inference_service_id}/{offering_id}/index.html"]
+  manifest_completeness: files_keys_equal_fixed_union_projection_derived_excluding_manifest
+  manifest_completeness_executable_owner: t6
   semantic_evidence_projection_arrays_preserve_source_order: true
   writer_lock: exclusive_create_or_fail_fast
-  staging: same_filesystem_sibling_exclusive_128_bit_csprng_name
+  staging: dist/{candidate_or_final}.{128_bit_csprng_hex}.staging
+  backup: dist/{candidate_or_final}.{128_bit_csprng_hex}.backup
   promotion: [lock, stage, fsync_stage, validate_stage, backup_old, promote_new, fsync_parent, verify_target, remove_backup, unlock]
   atomicity_scope: each_same_filesystem_rename_not_whole_multi_rename_transaction
   observable_target: complete_old_complete_new_or_temporarily_absent_never_partial
@@ -370,7 +402,9 @@ validation:
     - named_artifact_paths_and_digests
     - tool_and_lock_digests
     - actors_registry_digest_and_actor_eligibility
-    - trusted_workflow_identity_result_and_exact_head
+    - trusted_ci_provider_workflow_run_check_result_and_exact_head
+  t8_trusted_input_equality: [repository, current_base_sha, current_head_sha, current_head_tree_sha, as_of, source_date_epoch, profile, base_url, base_path, mac_issue, mac_payload_digest, canonical_change_delta, named_artifacts_and_digests, tool_digest, lock_digest, actors_registry_digest, ci_provider, workflow_identity, run_id, check_name, success_result]
+  t8_internal_receipt_equalities: [ci_head_equals_top_level_head, ci_provider_equals_repository_provider]
   accepted_check_receipt_digest: sha256_of_complete_rfc8785_utf8_plus_single_lf
   postmerge_publication:
     merge_tree_must_equal_accepted_head_tree: true

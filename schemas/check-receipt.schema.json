@@ -2,6 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://modelo.invalid/schemas/check-receipt.schema.json",
   "title": "Modelo detached pre-merge check receipt",
+  "x-modelo-executable-correlations": [
+    "ci.head_sha==head_sha",
+    "ci.provider==repository.provider",
+    "receipt_fields==trusted_t8_inputs"
+  ],
   "$defs": {
     "canonicalBaseUrl": {
       "type": "string",

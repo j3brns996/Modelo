@@ -290,7 +290,7 @@
     },
     "build": {
       "type": "object",
-      "required": ["command", "required_cli_arguments", "final_required_cli_arguments", "base_url_choice", "ambient_git_or_environment_inference", "candidate_root", "final_root", "staging_parent", "receipts_root", "publication_subdir", "catalogue_path", "manifest_path", "check_receipt_path", "release_receipt_path", "digest_algorithm", "canonical_json", "publication_digest", "manifest_hashes_itself", "writer_lock", "lock_acquire", "staging_name", "backup_name", "journal", "promotion_state_machine", "crash_recovery", "atomic_publish", "observable_contract", "final_requires_fsync_durability", "failed_build_cleanup"],
+      "required": ["command", "required_cli_arguments", "final_required_cli_arguments", "base_url_choice", "ambient_git_or_environment_inference", "candidate_root", "final_root", "target_parent", "receipts_root", "publication_subdir", "catalogue_path", "manifest_path", "check_receipt_path", "release_receipt_path", "digest_algorithm", "canonical_json", "publication_digest", "manifest_hashes_itself", "writer_lock", "lock_acquire", "staging_name", "backup_name", "journal", "promotion_state_machine", "crash_recovery", "atomic_publish", "observable_contract", "final_requires_fsync_durability", "failed_build_cleanup"],
       "properties": {
         "command": { "const": "modelo build" },
         "required_cli_arguments": {
@@ -305,7 +305,7 @@
         "ambient_git_or_environment_inference": { "const": false },
         "candidate_root": { "const": "dist/candidate" },
         "final_root": { "const": "dist/final" },
-        "staging_parent": { "const": "dist/.staging" },
+        "target_parent": { "const": "dist" },
         "receipts_root": { "const": "dist/receipts" },
         "publication_subdir": { "const": "site" },
         "catalogue_path": { "const": "data/catalogue.json" },
@@ -318,8 +318,8 @@
         "manifest_hashes_itself": { "const": false },
         "writer_lock": { "const": "dist/.modelo-build.lock" },
         "lock_acquire": { "const": "exclusive_create_or_fail_fast" },
-        "staging_name": { "const": "sibling_target_dot_128_bit_csprng_hex" },
-        "backup_name": { "const": "sibling_target_dot_backup_dot_invocation_id" },
+        "staging_name": { "const": "target_name_dot_128_bit_csprng_hex_dot_staging" },
+        "backup_name": { "const": "target_name_dot_same_128_bit_csprng_hex_dot_backup" },
         "journal": { "const": "bounded_fsync_state_file_in_lock" },
         "promotion_state_machine": {
           "type": "array", "minItems": 10, "maxItems": 10, "uniqueItems": true,

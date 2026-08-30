@@ -278,7 +278,10 @@ Object members use RFC 8785 ordering. Before serialisation T5 sorts models by
 by `(id, version)`; model capabilities and modalities by ASCII ID; offering
 routes by `id`; route destinations by `destination_pointer`; pricing by
 `(dimension, unit, quantity, amount, currency, joined sorted route_ids)`;
-`route_ids` by ID; and condition references by `(id, version)`. When routes or
+`route_ids` by ID; and condition references by `(id, version)`. Every object
+array then uses its RFC 8785 canonical JSON bytes as the final bytewise
+tie-breaker; ID arrays and `route_ids` are schema-unique. Thus every key is
+total even before semantic duplicate-identity validation. When routes or
 pricing move, T5 deterministically rewrites the corresponding JSON Pointer keys
 in `evidence_refs` before RFC 8785 orders that object. Evidence projection
 arrays retain source order because provider order can be meaningful; that order
@@ -286,8 +289,9 @@ is therefore part of the evidence fact, not an unordered set.
 
 Canonical change-delta order is operation rank `add`, `change`, `revoke`,
 `move`, then primary path (ordinary `path`, or move source path), move
-destination path, `before`, then `after`, all compared as UTF-8 bytes with a
-missing component equal to the empty string. These rules apply before both
+destination path, `before`, then `after`, and finally the complete delta's RFC
+8785 canonical JSON bytes, all compared bytewise with a missing component equal
+to the empty string. These rules apply before both
 receipt serialisation and digesting; two otherwise-valid permutations cannot
 produce different canonical bytes. T6 consumes that projection and adds HTML, local
 assets and schema copies; it must not independently serialise raw or private
@@ -301,8 +305,10 @@ detached receipts are below `dist/receipts/`.
 
 Each invocation exclusively creates `dist/.modelo-build.lock` or fails fast;
 it never waits. The lock contains a bounded, fsynced phase journal. Staging is
-a same-filesystem sibling named from the target plus 128 bits from the OS CSPRNG
-and created exclusively; collision retries create a fresh name. After every
+a same-filesystem sibling under target parent `dist`: candidate uses
+`dist/candidate.<128-bit-CSPRNG-hex>.staging` and
+`dist/candidate.<same-id>.backup`; final uses the corresponding `final` names.
+Each path is created exclusively; collision retries create a fresh ID. After every
 file is closed, eligible builds fsync files and directories, validate the
 complete staged tree, rename an existing target to an invocation-specific
 backup, rename staging to target, fsync the parent, verify the promoted target,
@@ -328,14 +334,24 @@ file: path, NUL, lowercase `sha256:<hex>`, NUL, base-10 byte size, LF. The
 manifest digest is SHA-256 of its RFC 8785 UTF-8 bytes plus one LF. This removes
 recursive and archive-metadata ambiguity.
 
+T6's executable completeness check requires `files` keys to equal, not merely
+contain, the fixed inventory in `docs/contract.yaml` (base routes, local assets,
+canonical catalogue and all sixteen schema copies) union one model detail page
+per projected model and one offering detail page per projected offering. The
+manifest itself is excluded. Missing required files, missing projection-derived
+pages and undeclared extra files all fail; schema validation alone is not the
+completeness arbiter.
+
 `schemas/check-receipt.schema.json` is the detached pre-merge envelope. T8,
 not T5, supplies trusted Git-provider workflow identity, run and exact-head
 result and assembles it. Its digest is SHA-256 of the RFC 8785 serialisation of
 the complete receipt plus exactly one LF. T8 validates equality between the
-receipt and trusted inputs for repository identity, base/head/head-tree,
-`as_of`, source epoch, profile, canonical base URL/path, validated MAC payload
-and canonical delta, named artefact paths/digests, tool/lock digests and trusted
-workflow identity/result. Missing or unequal input is an error; there is no
+receipt and trusted inputs for repository identity, current base/head/head-tree,
+`as_of`, source epoch, profile, canonical base URL/path, validated MAC issue and
+payload, canonical delta, named artefact paths/digests, tool/lock and actor
+registry digests, plus CI provider, workflow identity, run ID, check name and
+successful result. It also requires `ci.head_sha == head_sha` and
+`ci.provider == repository.provider`. Missing or unequal input is an error; there is no
 field-by-field fallback.
 
 A change request has no final receipt. Post-merge CI dereferences the accepted

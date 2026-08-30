@@ -21,6 +21,20 @@ SCHEMAS = ROOT / "schemas"
 CASES = ROOT / "tests/fixtures/schema/cases.json"
 MAC_FIXTURES = ROOT / "tests/fixtures/mac"
 
+REQUIRED_PUBLICATION_FILES = {
+    "404.html",
+    "assets/catalogue.js",
+    "assets/site.css",
+    "catalogue/index.html",
+    "changes/index.html",
+    "data/catalogue.json",
+    "docs/index.html",
+    "index.html",
+    "process/index.html",
+    "propose/index.html",
+    *(f"schemas/{path.relative_to(SCHEMAS).as_posix()}" for path in SCHEMAS.rglob("*.schema.json")),
+}
+
 
 def _schemas() -> tuple[dict[str, dict[str, Any]], Registry[Any]]:
     documents: dict[str, dict[str, Any]] = {}
@@ -110,7 +124,14 @@ def _sort_delta(value: list[dict[str, Any]]) -> list[dict[str, Any]]:
             destination = ""
             before = item.get("before", "")
             after = item.get("after", "")
-        return rank[item["operation"]], primary.encode(), destination.encode(), before, after
+        return (
+            rank[item["operation"]],
+            primary.encode(),
+            destination.encode(),
+            before,
+            after,
+            canonical_json(item).encode("utf-8"),
+        )
 
     return sorted(value, key=key)
 
@@ -120,8 +141,83 @@ def _agent_paths_allowed(paths: list[str]) -> bool:
     return bool(paths) and all(path.startswith(prefixes) for path in paths)
 
 
-def _release_correlation_errors(check: dict[str, Any], release: dict[str, Any]) -> set[str]:
+def _expected_manifest_files(projection: dict[str, Any]) -> set[str]:
+    detail = {
+        *(f"models/{model['id']}/index.html" for model in projection["models"]),
+        *(
+            f"offerings/{offering['inference_service_id']}/{offering['id']}/index.html"
+            for offering in projection["offerings"]
+        ),
+    }
+    return REQUIRED_PUBLICATION_FILES | detail
+
+
+def _manifest_completeness_errors(
+    files: dict[str, Any], projection: dict[str, Any]
+) -> dict[str, set[str]]:
+    expected = _expected_manifest_files(projection)
+    actual = set(files)
+    return {"missing": expected - actual, "unexpected": actual - expected}
+
+
+def _trusted_context(check: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "repository": check["repository"],
+        "current_base_sha": check["base_sha"],
+        "current_head_sha": check["head_sha"],
+        "current_head_tree_sha": check["head_tree_sha"],
+        "as_of": check["as_of"],
+        "source_date_epoch": check["source_date_epoch"],
+        "profile": check["profile"],
+        "base_url": check["base_url"],
+        "base_path": check["base_path"],
+        "mac_issue": check["mac_issue"],
+        "mac_payload_digest": check["mac_payload_digest"],
+        "change_delta": check["change_delta"],
+        "artifacts": check["artifacts"],
+        "tool_digest": check["tool_digest"],
+        "lock_digest": check["lock_digest"],
+        "actors_registry_digest": check["actors_registry_digest"],
+        "ci": check["ci"],
+    }
+
+
+def _trusted_check_correlation_errors(check: dict[str, Any], trusted: dict[str, Any]) -> set[str]:
     errors: set[str] = set()
+    internal = {
+        "check-ci-head": (check["ci"]["head_sha"], check["head_sha"]),
+        "check-ci-provider": (check["ci"]["provider"], check["repository"]["provider"]),
+        "check-ci-name": (check["ci"]["check"], "modelo/check"),
+        "check-ci-result": (check["ci"]["result"], "success"),
+    }
+    errors.update(name for name, values in internal.items() if values[0] != values[1])
+    correlations = {
+        "trusted-repository": (check["repository"], trusted["repository"]),
+        "trusted-base": (check["base_sha"], trusted["current_base_sha"]),
+        "trusted-head": (check["head_sha"], trusted["current_head_sha"]),
+        "trusted-head-tree": (check["head_tree_sha"], trusted["current_head_tree_sha"]),
+        "trusted-as-of": (check["as_of"], trusted["as_of"]),
+        "trusted-epoch": (check["source_date_epoch"], trusted["source_date_epoch"]),
+        "trusted-profile": (check["profile"], trusted["profile"]),
+        "trusted-base-url": (check["base_url"], trusted["base_url"]),
+        "trusted-base-path": (check["base_path"], trusted["base_path"]),
+        "trusted-mac-issue": (check["mac_issue"], trusted["mac_issue"]),
+        "trusted-mac-payload": (check["mac_payload_digest"], trusted["mac_payload_digest"]),
+        "trusted-delta": (check["change_delta"], trusted["change_delta"]),
+        "trusted-artifacts": (check["artifacts"], trusted["artifacts"]),
+        "trusted-tool": (check["tool_digest"], trusted["tool_digest"]),
+        "trusted-lock": (check["lock_digest"], trusted["lock_digest"]),
+        "trusted-actors": (check["actors_registry_digest"], trusted["actors_registry_digest"]),
+        "trusted-ci": (check["ci"], trusted["ci"]),
+    }
+    errors.update(name for name, values in correlations.items() if values[0] != values[1])
+    return errors
+
+
+def _release_correlation_errors(
+    check: dict[str, Any], release: dict[str, Any], trusted: dict[str, Any]
+) -> set[str]:
+    errors = _trusted_check_correlation_errors(check, trusted)
     pairs = {
         "repository": (check["repository"], release["repository"]),
         "base": (check["base_sha"], release["base_sha"]),
@@ -140,7 +236,11 @@ def _release_correlation_errors(check: dict[str, Any], release: dict[str, Any]) 
         "tool": (check["tool_digest"], release["tool_digest"]),
         "lock": (check["lock_digest"], release["lock_digest"]),
         "actors": (check["actors_registry_digest"], release["approval"]["actors_registry_digest"]),
+        "ci-provider": (check["ci"]["provider"], release["ci"]["provider"]),
         "workflow": (check["ci"]["workflow_identity"], release["ci"]["workflow_identity"]),
+        "ci-run": (check["ci"]["run_id"], release["ci"]["run_id"]),
+        "ci-check": (check["ci"]["check"], release["ci"]["check"]),
+        "ci-result": (check["ci"]["result"], release["ci"]["result"]),
     }
     errors.update(name for name, values in pairs.items() if values[0] != values[1])
     expected_digest = "sha256:" + hashlib.sha256(_canonical_receipt_bytes(check)).hexdigest()
@@ -304,23 +404,65 @@ class SchemaFixtureTests(unittest.TestCase):
         self.assertEqual([item["operation"] for item in expected], ["add", "change", "revoke"])
         self.assertEqual(_canonical_receipt_bytes({"change_delta": expected}), _canonical_receipt_bytes({"change_delta": _sort_delta(values[1:] + values[:1])}))
 
+    def test_change_delta_sort_is_total_when_declared_keys_tie(self) -> None:
+        digest = "sha256:" + "a" * 64
+        tied = [
+            {"operation": "add", "path": "catalogue/models/a.yaml", "after": digest},
+            {"operation": "add", "path": "catalogue/models/a.yaml", "after": digest, "note": "tie"},
+        ]
+        self.assertEqual(_sort_delta(tied), _sort_delta(list(reversed(tied))))
+
     def test_catalogue_sort_contract_covers_unordered_arrays(self) -> None:
         contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
         self.assertEqual(
             contract["build"]["catalogue_sort_keys"],
             {
-                "models": ["id"],
-                "offerings": ["inference_service_id", "id"],
-                "evidence": ["id"],
-                "conditions": ["id", "version"],
-                "routes": ["id"],
-                "route_destinations": ["destination_pointer"],
-                "pricing": ["dimension", "unit", "quantity", "amount", "currency", "sorted_route_ids"],
-                "condition_refs": ["id", "version"],
+                "models": ["id", "canonical_json_bytes"],
+                "offerings": ["inference_service_id", "id", "canonical_json_bytes"],
+                "evidence": ["id", "canonical_json_bytes"],
+                "conditions": ["id", "version", "canonical_json_bytes"],
+                "routes": ["id", "canonical_json_bytes"],
+                "route_destinations": ["destination_pointer", "canonical_json_bytes"],
+                "pricing": ["dimension", "unit", "quantity", "amount", "currency", "sorted_route_ids", "canonical_json_bytes"],
+                "condition_refs": ["id", "version", "canonical_json_bytes"],
                 "id_arrays": "ascii_id",
+                "total_tie_breaker": "canonical_json_bytes",
             },
         )
         self.assertTrue(contract["build"]["semantic_evidence_projection_arrays_preserve_source_order"])
+
+    def test_t6_manifest_completeness_has_exact_fixed_and_derived_inventory(self) -> None:
+        contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
+        manifest_schema = self.schemas["build-manifest.schema.json"]
+        self.assertEqual(manifest_schema["x-modelo-executable-completeness-owner"], "T6")
+        self.assertEqual(
+            manifest_schema["x-modelo-executable-completeness"],
+            "files_keys_equal_contract_fixed_union_projection_derived_excluding_manifest",
+        )
+        configured = set(contract["build"]["manifest_required_fixed_files"])
+        self.assertEqual(configured, REQUIRED_PUBLICATION_FILES)
+        projection = {
+            "models": [{"id": "model-a"}, {"id": "model-b"}],
+            "offerings": [
+                {"inference_service_id": "aws-bedrock", "id": "offer-a"}
+            ],
+        }
+        expected = _expected_manifest_files(projection)
+        self.assertIn("models/model-a/index.html", expected)
+        self.assertIn("offerings/aws-bedrock/offer-a/index.html", expected)
+        complete = {path: {} for path in expected}
+        self.assertEqual(_manifest_completeness_errors(complete, projection), {"missing": set(), "unexpected": set()})
+        for missing in sorted(expected):
+            with self.subTest(missing=missing):
+                errors = _manifest_completeness_errors(
+                    {path: {} for path in expected - {missing}}, projection
+                )
+                self.assertEqual(errors["missing"], {missing})
+        errors = _manifest_completeness_errors(
+            {path: {} for path in expected | {"unexpected.html"}}, projection
+        )
+        self.assertEqual(errors["unexpected"], {"unexpected.html"})
+        self.assertNotIn("data/manifest.json", expected)
 
     def test_canonical_base_url_and_path_pairs(self) -> None:
         for url, path in (
@@ -365,6 +507,9 @@ class SchemaFixtureTests(unittest.TestCase):
             "lock": (check["lock_digest"], release["lock_digest"]),
             "actors": (check["actors_registry_digest"], release["approval"]["actors_registry_digest"]),
             "workflow": (check["ci"]["workflow_identity"], release["ci"]["workflow_identity"]),
+            "ci run": (check["ci"]["run_id"], release["ci"]["run_id"]),
+            "ci check": (check["ci"]["check"], release["ci"]["check"]),
+            "ci result": (check["ci"]["result"], release["ci"]["result"]),
         }
         for name, (accepted, final) in equalities.items():
             with self.subTest(name=name):
@@ -373,7 +518,63 @@ class SchemaFixtureTests(unittest.TestCase):
             release["accepted_check_receipt_digest"],
             "sha256:" + hashlib.sha256(_canonical_receipt_bytes(check)).hexdigest(),
         )
-        self.assertEqual(_release_correlation_errors(check, release), set())
+        trusted = _trusted_context(check)
+        self.assertEqual(_trusted_check_correlation_errors(check, trusted), set())
+        self.assertEqual(_release_correlation_errors(check, release, trusted), set())
+
+    def test_trusted_check_correlations_reject_digest_recomputed_drift(self) -> None:
+        by_schema = {case["schema"]: case for case in self.cases}
+        original = by_schema["check-receipt.schema.json"]["valid"][0]
+        release = by_schema["release-receipt.schema.json"]["valid"][0]
+        trusted = _trusted_context(original)
+        mutations = {
+            "trusted-head": (["head_sha"], "0" * 40),
+            "trusted-repository": (["repository", "provider"], "gitlab"),
+        }
+        for expected, (path, value) in mutations.items():
+            check = copy.deepcopy(original)
+            target = check
+            for component in path[:-1]:
+                target = target[component]
+            target[path[-1]] = value
+            if expected == "trusted-head":
+                check["ci"]["head_sha"] = value
+            else:
+                check["ci"]["provider"] = value
+            changed_release = copy.deepcopy(release)
+            changed_release["accepted_check_receipt_digest"] = (
+                "sha256:" + hashlib.sha256(_canonical_receipt_bytes(check)).hexdigest()
+            )
+            with self.subTest(expected=expected):
+                self.assertIn(expected, _release_correlation_errors(check, changed_release, trusted))
+
+    def test_trusted_check_correlations_reject_result_and_current_base_drift(self) -> None:
+        check = next(
+            case["valid"][0]
+            for case in self.cases
+            if case["schema"] == "check-receipt.schema.json"
+        )
+        trusted = _trusted_context(check)
+        failed = copy.deepcopy(check)
+        failed["ci"]["result"] = "failure"
+        self.assertIn("check-ci-result", _trusted_check_correlation_errors(failed, trusted))
+        advanced = copy.deepcopy(trusted)
+        advanced["current_base_sha"] = "0" * 40
+        self.assertIn("trusted-base", _trusted_check_correlation_errors(check, advanced))
+
+    def test_trusted_check_correlations_reject_internal_head_and_provider_mismatch(self) -> None:
+        check = next(
+            case["valid"][0]
+            for case in self.cases
+            if case["schema"] == "check-receipt.schema.json"
+        )
+        trusted = _trusted_context(check)
+        wrong_head = copy.deepcopy(check)
+        wrong_head["ci"]["head_sha"] = "0" * 40
+        self.assertIn("check-ci-head", _trusted_check_correlation_errors(wrong_head, trusted))
+        wrong_provider = copy.deepcopy(check)
+        wrong_provider["ci"]["provider"] = "gitlab"
+        self.assertIn("check-ci-provider", _trusted_check_correlation_errors(wrong_provider, trusted))
 
     def test_release_correlations_fail_independently(self) -> None:
         by_schema = {case["schema"]: case for case in self.cases}
@@ -393,6 +594,7 @@ class SchemaFixtureTests(unittest.TestCase):
             "tool": (["tool_digest"], "sha256:" + "0" * 64),
             "actors": (["approval", "actors_registry_digest"], "sha256:" + "0" * 64),
             "workflow": (["ci", "workflow_identity"], "untrusted"),
+            "ci-run": (["ci", "run_id"], "999"),
             "check-digest": (["accepted_check_receipt_digest"], "sha256:" + "0" * 64),
             "manifest-path": (["artifacts", "manifest", "path"], "site/other.json"),
         }
@@ -403,7 +605,7 @@ class SchemaFixtureTests(unittest.TestCase):
                 target = target[component]
             target[path[-1]] = value
             with self.subTest(expected=expected):
-                self.assertIn(expected, _release_correlation_errors(check, changed))
+                self.assertIn(expected, _release_correlation_errors(check, changed, _trusted_context(check)))
 
     def test_agent_approval_requires_every_path_to_be_data_only(self) -> None:
         self.assertTrue(_agent_paths_allowed(["catalogue/models/a.yaml", "catalogue/evidence/sha256-a.yaml"]))
@@ -421,6 +623,14 @@ class SchemaFixtureTests(unittest.TestCase):
     def test_contract_assigns_all_cross_document_checks_to_t8(self) -> None:
         contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
         self.assertEqual(
+            self.schemas["check-receipt.schema.json"]["x-modelo-executable-correlations"],
+            [
+                "ci.head_sha==head_sha",
+                "ci.provider==repository.provider",
+                "receipt_fields==trusted_t8_inputs",
+            ],
+        )
+        self.assertEqual(
             set(contract["validation"]["t8_check_receipt_correlations"]),
             {
                 "repository_identity",
@@ -430,8 +640,24 @@ class SchemaFixtureTests(unittest.TestCase):
                 "named_artifact_paths_and_digests",
                 "tool_and_lock_digests",
                 "actors_registry_digest_and_actor_eligibility",
-                "trusted_workflow_identity_result_and_exact_head",
+                "trusted_ci_provider_workflow_run_check_result_and_exact_head",
             },
+        )
+        self.assertEqual(
+            set(contract["validation"]["t8_trusted_input_equality"]),
+            {
+                "repository", "current_base_sha", "current_head_sha",
+                "current_head_tree_sha", "as_of", "source_date_epoch", "profile",
+                "base_url", "base_path", "mac_issue", "mac_payload_digest",
+                "canonical_change_delta", "named_artifacts_and_digests",
+                "tool_digest", "lock_digest", "actors_registry_digest",
+                "ci_provider", "workflow_identity", "run_id", "check_name",
+                "success_result",
+            },
+        )
+        self.assertEqual(
+            set(contract["validation"]["t8_internal_receipt_equalities"]),
+            {"ci_head_equals_top_level_head", "ci_provider_equals_repository_provider"},
         )
         self.assertEqual(
             set(contract["validation"]["postmerge_publication"]["final_only_digest_exceptions"]),
@@ -449,6 +675,9 @@ class SchemaFixtureTests(unittest.TestCase):
         self.assertEqual(set(build["final_required_cli_arguments"]), {"merge_commit", "merge_tree"})
         self.assertIs(build["ambient_git_or_environment_inference"], False)
         self.assertEqual(build["lock_acquire"], "exclusive_create_or_fail_fast")
+        self.assertEqual(build["target_parent"], "dist")
+        self.assertEqual(build["staging_name"], "target_name_dot_128_bit_csprng_hex_dot_staging")
+        self.assertEqual(build["backup_name"], "target_name_dot_same_128_bit_csprng_hex_dot_backup")
         self.assertEqual(build["atomic_publish"], "per_rename_same_filesystem_only")
         self.assertEqual(
             build["promotion_state_machine"],

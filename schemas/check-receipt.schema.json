@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/check-receipt.schema.json",
+  "title": "Modelo detached pre-merge check receipt",
+  "$defs": {
+    "artifactDigests": {
+      "type": "object",
+      "required": ["catalogue", "publication", "manifest"],
+      "properties": {
+        "catalogue": { "$ref": "common.schema.json#/$defs/sha256" },
+        "publication": { "$ref": "common.schema.json#/$defs/sha256" },
+        "manifest": { "$ref": "common.schema.json#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "ci": {
+      "type": "object",
+      "required": ["provider", "workflow_identity", "run_id", "check", "result", "head_sha"],
+      "properties": {
+        "provider": { "enum": ["github", "gitlab"] },
+        "workflow_identity": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "run_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "check": { "const": "modelo/check" },
+        "result": { "const": "success" },
+        "head_sha": { "$ref": "common.schema.json#/$defs/gitSha" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["contract_version", "base_sha", "head_sha", "head_tree_sha", "as_of", "source_date_epoch", "profile", "base_url", "base_path", "artifacts", "tool_digest", "lock_digest", "mac_issue", "mac_payload_digest", "change_delta", "ci"],
+  "properties": {
+    "contract_version": { "const": "0.1.0" },
+    "base_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "head_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "head_tree_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "as_of": { "type": "string", "format": "date" },
+    "source_date_epoch": { "type": "integer", "minimum": 0 },
+    "profile": { "enum": ["synthetic", "private"] },
+    "base_url": { "$ref": "common.schema.json#/$defs/httpsUri" },
+    "base_path": { "type": "string", "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~-]+/)*(?![\\s\\S])", "maxLength": 512 },
+    "artifacts": { "$ref": "#/$defs/artifactDigests" },
+    "tool_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "lock_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "mac_issue": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "mac_payload_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "change_delta": { "$ref": "release-receipt.schema.json#/$defs/changeDeltaList" },
+    "ci": { "$ref": "#/$defs/ci" }
+  },
+  "additionalProperties": false
+}

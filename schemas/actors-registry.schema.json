@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/actors-registry.schema.json",
+  "title": "Modelo eligible agent actor registry",
+  "$defs": {
+    "identity": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,254}[A-Za-z0-9])?(?![\\s\\S])"
+    },
+    "agent": {
+      "type": "object",
+      "required": ["enabled", "platform_identities", "approval_scope", "eligible_paths", "independent_review_required", "exact_head_successful_check_required"],
+      "properties": {
+        "enabled": { "const": true },
+        "platform_identities": {
+          "type": "object",
+          "minProperties": 1,
+          "properties": {
+            "github": { "$ref": "#/$defs/identity" },
+            "gitlab": { "$ref": "#/$defs/identity" }
+          },
+          "additionalProperties": false
+        },
+        "approval_scope": { "const": "data-only" },
+        "eligible_paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["catalogue/models/**", "catalogue/offerings/**", "catalogue/evidence/**"] }
+        },
+        "independent_review_required": { "const": true },
+        "exact_head_successful_check_required": { "const": true }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["version", "agents"],
+  "properties": {
+    "version": { "const": 1 },
+    "agents": {
+      "type": "object",
+      "propertyNames": { "$ref": "common.schema.json#/$defs/id" },
+      "additionalProperties": { "$ref": "#/$defs/agent" }
+    }
+  },
+  "additionalProperties": false
+}

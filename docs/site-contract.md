@@ -12,11 +12,20 @@ site/
   templates/{base,home,catalogue,model,offering,changes,process,propose,docs,404}.html
   assets/{site.css,catalogue.js}
   content/{process,propose,docs}.md
-dist/site/                       generated and disposable
+dist/candidate/site/             pre-merge generated and disposable
+dist/final/site/                 post-merge generated and disposable
+dist/receipts/                   detached; never publication members
 ```
 
 The generator lives in `tooling/modelo/`. Site JavaScript is local progressive
 enhancement. Node, npm and `npx` are not required.
+
+T5 supplies one validated canonical catalogue projection. T6 consumes those
+exact bytes and must not perform a second raw/private catalogue serialisation.
+It adds the site bytes and complete `data/manifest.json` defined by
+`schemas/build-manifest.schema.json`. The manifest lists every publication file
+except itself. T8 supplies trusted provider metadata and creates the detached
+check receipt; only post-merge publication may create the final receipt.
 
 ## Required routes
 
@@ -82,7 +91,7 @@ screen-reader smoke-test result as first-launch evidence.
 - `site/content/*.md` is non-normative presentation copy checked for drift
   against canonical documents. Its trusted renderer disables raw HTML.
 - Every public HTML and JSON file comes from the same publication projection;
-  a full private object must never reach `dist/site/`.
+  a full private object must never reach a synthetic publication directory.
 
 ## Determinism and gates
 
@@ -104,6 +113,12 @@ merge-aware artefact once, validates it, creates a detached release receipt that
 hashes it, and deploys that exact final artefact without rebuilding. The receipt
 is not stored inside the artefact whose digest it records.
 
+The build stages beneath `dist/.staging/`, validates the complete result, then
+atomically renames it to `dist/candidate/` or `dist/final/`. Failure removes the
+new staging directory and preserves the previous complete output. File digests
+are SHA-256 over exact bytes; the publication digest hashes sorted
+path/NUL/digest/NUL/size/LF records, so archive metadata is irrelevant.
+
 CI must prove canonical detail-page coverage, link integrity at both base paths,
 deterministic rebuilds, manifest integrity, search/filter behaviour, stable
 ordering including zero prices, revoke history, inert malicious fixtures,
@@ -112,3 +127,8 @@ the exact post-merge checked artefact without rebuilding it. The private
 restricted fallback is a digest-verified release artefact retained for the same
 period as its protected release; expiry must be explicit and cannot remove the
 only durable consumer copy.
+
+Test ownership is deliberately split. T6 owns static no-JavaScript navigation,
+links, inert malicious fixtures, non-leakage and automated accessibility
+structure. T8 owns pinned Python-controlled browser execution outside the core
+build runtime. T10 records human keyboard and screen-reader smoke evidence.

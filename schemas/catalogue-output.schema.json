@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/catalogue-output.schema.json",
+  "title": "Modelo canonical catalogue publication projection",
+  "type": "object",
+  "required": ["contract_version", "source_commit", "source_tree", "as_of", "profile", "models", "offerings", "evidence", "conditions", "vendors", "inference_services", "freshness"],
+  "properties": {
+    "contract_version": { "const": "0.1.0" },
+    "source_commit": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "source_tree": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "as_of": { "type": "string", "format": "date" },
+    "profile": { "enum": ["synthetic", "private"] },
+    "models": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "model.schema.json" }
+    },
+    "offerings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "offering.schema.json" }
+    },
+    "evidence": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "evidence.schema.json" }
+    },
+    "conditions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "condition.schema.json" }
+    },
+    "vendors": { "$ref": "vendors-registry.schema.json" },
+    "inference_services": { "$ref": "inference-services-registry.schema.json" },
+    "freshness": { "$ref": "freshness-policy.schema.json" }
+  },
+  "additionalProperties": false
+}

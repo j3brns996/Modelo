@@ -4,6 +4,9 @@ contract:
   name: modelo
   version: "0.1.0"
   status: target_not_as_built
+  implemented_slices: [T1, T2, T3, T4, T7]
+  accepted_t4_head: "76b6fe8f3e74a34299851b6bae9411c719154e9d"
+  unimplemented_slices: [T5, T6, T8, T9, T10]
   executable_config: modelo.yaml
   implementation_plan_config_key: paths.implementation_plan
   drift_is_error: true
@@ -62,12 +65,15 @@ approval:
   independent_review_required: true
   new_commit_invalidates_check_and_review: true
   agent_approval:
+    enabled: false
     allowed_for: data_only_mac
     allowed_paths: [catalogue/models/**, catalogue/offerings/**, catalogue/evidence/**]
     every_other_path_requires_human_codeowner: true
     requires_distinct_eligible_platform_identity: true
     author_committer_or_modifier_may_approve: false
     successful_trusted_exact_head_ci_evidence_required: true
+    registry_config_key: paths.actors_registry
+    empty_or_missing_registry_means: disabled
   human_codeowner_required_for: every_path_outside_agent_approval_allowlist
 
 evidence:
@@ -236,11 +242,44 @@ toolchain:
     platform_adapter: read_only_same_repository_git_provider_only
     platform_adapter_output: bounded_canonical_mac_input
 
+build:
+  catalogue_wire_schema: schemas/catalogue-output.schema.json
+  manifest_wire_schema: schemas/build-manifest.schema.json
+  check_receipt_wire_schema: schemas/check-receipt.schema.json
+  release_receipt_wire_schema: schemas/release-receipt.schema.json
+  actors_registry_schema: schemas/actors-registry.schema.json
+  t5_outputs: [canonical_catalogue_bytes, canonical_change_delta_bytes, receipt_primitives]
+  t5_explicit_inputs: [source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url, base_path]
+  local_candidate_base_url_may_be_null: true
+  trusted_ci_and_final_base_url: explicit_absolute_https
+  default_source_epoch: exact_source_commit_author_unix_seconds
+  ignored_timestamps: [committer_time, filesystem_mtime]
+  source_date_epoch_override: non_negative_whole_seconds_passed_by_adapter_and_recorded_unchanged
+  t5_provider_or_git_host_reads: false
+  t6_consumes_single_t5_projection: true
+  t6_second_raw_or_private_serialisation: forbidden
+  t8_assembles_check_receipt_from_trusted_provider_metadata: true
+  postmerge_assembles_release_receipt_after_exact_tree_verification: true
+  output_roots:
+    candidate: dist/candidate
+    final: dist/final
+    staging: dist/.staging
+    detached_receipts: dist/receipts
+  publication_subdir: site
+  catalogue_path: data/catalogue.json
+  manifest_path: data/manifest.json
+  digest_algorithm: sha256_exact_bytes
+  publication_digest: sha256_of_sorted_path_nul_digest_nul_size_lf_records
+  manifest_files_include_manifest: false
+  canonical_json: rfc8785_utf8_plus_single_lf
+  atomic_publish: stage_validate_then_rename
+  failure: remove_new_staging_and_preserve_previous_complete_output
+
 site:
   contract_config_key: paths.site_contract
   routes_config_key: site.routes
   templates_config_key: paths.site_templates
-  generated_output_config_key: paths.site_output
+  generated_output_config_key: build.final_root
   generator_uses_network: false
   urls_come_from_global_config_only: true
   profiles: [synthetic, private]
@@ -249,6 +288,10 @@ site:
   change_history_source: local_git_first_parent_deltas
   release_receipt_is_site_build_input: false
   final_postmerge_artifact_is_validated_then_deployed_without_rebuild: true
+  test_ownership:
+    t6: [no_javascript_navigation, link_integrity, inert_xss, publication_non_leakage, accessibility_structure]
+    t8: pinned_python_controlled_browser_outside_core_build
+    t10: human_keyboard_and_screen_reader_evidence
 
 validation:
   command: modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
@@ -267,7 +310,7 @@ validation:
     - contract_version
     - base_source_and_merge_shas
     - as_of
-    - catalogue_site_and_manifest_digests
+    - catalogue_publication_and_manifest_digests
     - tool_and_lock_digest
     - exact_ci_run_check_and_result
     - issue_and_change_request_refs
@@ -277,7 +320,7 @@ validation:
     - reviewer_platform_identity
     - approved_head_sha
     - approval_timestamp
-    - actor_policy_digest
+    - actors_registry_digest
     - independence_and_eligibility_result
     - provider_approval_and_check_reference
   premerge_artifact:
@@ -302,8 +345,11 @@ platform:
   missing_required_capability: fail_closed
   private_pages_missing: restricted_artifact_not_public_pages
   merge_queue_or_train: deferred_until_candidate_tree_contract
-  actor_policy_config_key: paths.actor_policy
+  actors_registry_config_key: paths.actors_registry
   unconfigured_agent_identity_mode: human_only
+  github_trusted_pipeline: required_workflow_from_protected_default_branch
+  gitlab_trusted_pipeline: pipeline_execution_policy_or_equivalent
+  missing_trusted_pipeline_result: incapable
 
 recovery:
   git_mirror_alone_is_complete_operational_backup: false
@@ -315,6 +361,9 @@ agents:
   canonical_open_skills_config_key: paths.open_skills
   skills_purpose: authorship_and_review_guidance
   ci_executes_skill_prose: false
+  skills_used_before_locked_cli_not_by_build: true
+  build_identical_without_skills: true
+  shared_cli_ownership_slices: [T5, T6, T8]
   one_writer_per_branch_or_worktree: true
   review_agents_read_only: true
 

@@ -36,13 +36,16 @@ paths:
   offerings: catalogue/offerings
   evidence: catalogue/evidence
   governance: catalogue/governance
-  actor_policy: catalogue/governance/actors.yaml
+  actors_registry: catalogue/governance/actors.yaml
   conditions: catalogue/policies/conditions
-  publication_profiles: publication
   schemas: schemas
   provider_schemas: schemas/providers
   mac_schema: schemas/mac.schema.json
   release_receipt_schema: schemas/release-receipt.schema.json
+  catalogue_output_schema: schemas/catalogue-output.schema.json
+  build_manifest_schema: schemas/build-manifest.schema.json
+  check_receipt_schema: schemas/check-receipt.schema.json
+  actors_registry_schema: schemas/actors-registry.schema.json
   tests: tests
   fixtures: tests/fixtures
   implementation: tooling/modelo
@@ -51,7 +54,6 @@ paths:
   site_assets: site/assets
   site_content: site/content
   build: dist
-  site_output: dist/site
   docs: docs
   human_specification: SPEC.md
   machine_contract: docs/contract.yaml
@@ -130,6 +132,23 @@ publication:
   production_field_level_public_redaction: deferred
   silent_private_to_public_downgrade: false
 
+build:
+  candidate_root: dist/candidate
+  final_root: dist/final
+  staging_parent: dist/.staging
+  receipts_root: dist/receipts
+  publication_subdir: site
+  catalogue_path: data/catalogue.json
+  manifest_path: data/manifest.json
+  check_receipt_path: dist/receipts/check.json
+  release_receipt_path: dist/receipts/release.json
+  digest_algorithm: sha256
+  canonical_json: rfc8785_utf8_plus_single_lf
+  publication_digest: sha256_of_sorted_path_nul_digest_nul_size_lf_records
+  manifest_hashes_itself: false
+  atomic_publish: stage_validate_then_rename
+  failed_build_cleanup: remove_staging_preserve_previous_complete_output
+
 platform:
   identities:
     control_plane_owner:
@@ -152,6 +171,10 @@ platform:
     force_push: false
     branch_deletion: false
     protected_release_tags: true
+    trusted_pipeline:
+      github: required_workflow_from_protected_default_branch
+      gitlab: pipeline_execution_policy_or_equivalent
+      fail_closed_if_unavailable: true
   conditional_capabilities:
     code_owner_review:
       required_for_everything_outside_agent_data_allowlist: true
@@ -163,7 +186,17 @@ platform:
       required_only_for_profile: private
       fallback: restricted_ci_or_release_artifact
   optional_capabilities:
-    agent_approval: data_only_mac
+    agent_approval:
+      enabled: false
+      scope: data_only_mac
+      registry: catalogue/governance/actors.yaml
+      enablement_requires:
+        - registered_distinct_platform_identity
+        - enabled_eligible_actor
+        - independent_of_author_committer_and_last_pusher
+        - successful_trusted_exact_head_check_receipt
+        - current_base_and_head
+        - paths_within_agent_data_allowlist
     serialised_merge: manual_one_at_a_time
 
 artifact_identity:
@@ -179,15 +212,26 @@ artifact_identity:
     - reviewer_platform_identity
     - approved_head_sha
     - approval_timestamp
-    - actor_policy_digest
+    - actors_registry_digest
     - independence_and_eligibility_result
     - provider_approval_and_check_reference
 
 determinism:
   source_date_epoch: derive_from_exact_source_commit_author_timestamp
+  source_date_epoch_unit: non_negative_whole_unix_seconds
+  ignored_timestamps: [committer_time, filesystem_mtime]
   explicit_override_must_be_recorded: true
+  source_tree: exact_source_commit_tree
+  build_inputs_explicit: [source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url, base_path]
+  core_provider_reads: false
   change_history: local_git_first_parent_deltas
   site_build_requires_complete_first_parent_history: true
+
+verification:
+  t6_static: [no_javascript_navigation, link_integrity, inert_xss_fixtures, publication_non_leakage, accessibility_structure]
+  t8_browser: pinned_python_controlled_browser_outside_core_build_runtime
+  t10_human: keyboard_and_screen_reader_launch_evidence
+  node_npm_npx_required: false
 
 recovery:
   bundle_contents:

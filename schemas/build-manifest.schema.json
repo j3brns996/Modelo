@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/build-manifest.schema.json",
+  "title": "Modelo non-recursive publication manifest",
+  "$defs": {
+    "file": {
+      "type": "object",
+      "required": ["sha256", "size", "media_type"],
+      "properties": {
+        "sha256": { "$ref": "common.schema.json#/$defs/sha256" },
+        "size": { "type": "integer", "minimum": 0 },
+        "media_type": {
+          "type": "string",
+          "pattern": "^[a-z0-9!#$&^_.+-]+/[a-z0-9!#$&^_.+-]+(?:; charset=utf-8)?(?![\\s\\S])",
+          "maxLength": 128
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["contract_version", "kind", "source_commit", "source_tree", "as_of", "source_date_epoch", "profile", "base_url", "base_path", "catalogue_path", "manifest_path", "digest_algorithm", "publication_digest", "files"],
+  "properties": {
+    "contract_version": { "const": "0.1.0" },
+    "kind": { "enum": ["candidate", "final"] },
+    "source_commit": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "source_tree": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "as_of": { "type": "string", "format": "date" },
+    "source_date_epoch": { "type": "integer", "minimum": 0 },
+    "profile": { "enum": ["synthetic", "private"] },
+    "base_url": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/httpsUri" }] },
+    "base_path": {
+      "type": "string",
+      "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~-]+/)*(?![\\s\\S])"
+    },
+    "catalogue_path": { "const": "data/catalogue.json" },
+    "manifest_path": { "const": "data/manifest.json" },
+    "digest_algorithm": { "const": "sha256" },
+    "publication_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "files": {
+      "type": "object",
+      "minProperties": 1,
+      "required": ["data/catalogue.json"],
+      "propertyNames": {
+        "allOf": [
+          { "$ref": "common.schema.json#/$defs/safeRelativePath" },
+          { "not": { "const": "data/manifest.json" } }
+        ]
+      },
+      "additionalProperties": { "$ref": "#/$defs/file" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "final" } }, "required": ["kind"] },
+      "then": { "properties": { "base_url": { "$ref": "common.schema.json#/$defs/httpsUri" } } }
+    }
+  ],
+  "additionalProperties": false
+}

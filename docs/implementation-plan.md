@@ -1,7 +1,8 @@
 # Modelo v0.1 implementation and verification plan
 
-Status: Slice 0 is reconciled and T1 is implemented. T2, T3 and T7 may branch
-from the independently accepted T1 head. No catalogue record may merge yet.
+Status: T1, T2, T3, T4 and T7 are implemented and independently gated. The
+accepted T4 head is `76b6fe8f3e74a34299851b6bae9411c719154e9d`. T5 is next;
+no catalogue record may merge before T10.
 
 ## Outcome
 
@@ -37,10 +38,10 @@ The build is split logically, not into services:
 | T2 | `tooling/modelo/src/modelo/{loader,discovery,diagnostics}.py` and `tests/unit/{test_loader,test_discovery,test_diagnostics}.py` | T1 | Malicious YAML/path corpus and diagnostic snapshot tests pass |
 | T3 | Core/AWS/entity/receipt schemas and schema-only fixtures under `schemas/` and `tests/fixtures/schema/` | T1 | Every structural invariant has passing and failing fixtures |
 | T4 | `tooling/modelo/src/modelo/{schemas,evidence,freshness,change,validators}.py`, `tests/fixtures/semantic/` and matching `tests/unit/test_{schemas,evidence,freshness,change,validators}.py` | T2, T3, T7 | Base/head, model binding, equality, immutability, move and revoke tests pass |
-| T5 | `tooling/modelo/src/modelo/{build,receipt}.py` and build/receipt tests | T4 | Candidate and final builds are deterministic; detached receipt and deltas verify |
-| T6 | `tooling/modelo/src/modelo/site.py`, `site/`, `publication/` and `tests/site/` | T5 | Route, base-path, XSS, leakage, accessibility, history and reproducibility gates pass |
+| T5 | `tooling/modelo/src/modelo/{build,receipt}.py`, build/receipt fixtures and tests | T4 | Deterministic canonical catalogue/delta bytes and receipt primitives verify; exact inputs only, no provider reads |
+| T6 | `tooling/modelo/src/modelo/site.py`, `site/`, `tests/fixtures/publication/` and `tests/site/` | T5 | Complete non-recursive manifest; route, base-path, XSS, leakage, static accessibility, history and reproducibility gates pass |
 | T7 | `tooling/modelo/src/modelo/mac.py`, MAC schema/examples, GitHub/GitLab issue and change-request template directories, MAC tests | T1, T0 | Adapter fixtures round-trip to identical canonical MAC objects |
-| T8 | `tooling/modelo/src/modelo/platform.py`, `.github/workflows/`, `paths.gitlab_ci`, and `tests/contract/platform/` | T4, T6, T7 | Exact-head trusted final check; skipped/failed/stale checks fail closed |
+| T8 | `tooling/modelo/src/modelo/platform.py`, `.github/workflows/`, `paths.gitlab_ci`, and `tests/contract/platform/` | T4, T6, T7 | Assemble the trusted exact-head check receipt; skipped/failed/stale checks and untrusted GitLab pipelines fail closed |
 | T9 | `.agents/skills/{modelo-change,modelo-review,modelo-discover}/` and static skill lint | T7, T8 | Skill commands and paths resolve; no skill is a build/runtime input |
 | T10 | Remote platform check, synthetic Pages deployment, release and mirror-restore rehearsal | T1–T9 | Protection/capability report, exact artefact deployment, verified receipt and restore log |
 
@@ -49,6 +50,11 @@ All other edges are hard dependencies and later tasks run sequentially where
 they extend the same package. Each task uses a separate branch/worktree and one
 writer. Review agents are read-only. The integration writer alone updates the
 target branch after validating each task's exact head.
+
+`tooling/modelo/src/modelo/cli.py` and `tests/unit/test_cli.py` are narrow shared
+integration paths for T5, T6 and T8. A task may change them only to expose its
+already-tested command surface and must run the combined earlier-slice suite.
+They contain orchestration only, never duplicate build, site or platform rules.
 
 T1 owns the bootstrap reader for `modelo.yaml`; it validates only fields needed
 to locate and run the locked tool. T2 owns the restricted loader for catalogue
@@ -64,9 +70,12 @@ mandatory input is missing, skipped, neutral, cancelled, stale or failed. Its
 receipt binds base SHA, exact head SHA, workflow/pipeline identity, tool and lock
 digests, test result and build artefact digests.
 
-Governance approval is separate. An independent eligible agent may approve a
-data-only MAC only after verifying the trusted receipt for the exact current
-head. It cannot have authored, committed or modified the change. Control-plane
+Governance approval is separate. Agent approval is disabled until the actors
+registry contains a distinct enabled platform identity and the platform control
+is explicitly enabled. An independently eligible agent may then approve a
+data-only MAC only after verifying the successful trusted receipt for the exact
+current base and head. It cannot be author, committer, last pusher or change
+writer. Control-plane
 changes—CI, tooling, schemas, locks, `modelo.yaml`, governance, publication or
 skills—require a human CODEOWNER. Any new commit invalidates checks and review.
 
@@ -77,6 +86,19 @@ to equal the accepted receipt base SHA. Post-merge CI proves that the merge tree
 tree, builds the final merge-aware artefact once, validates it, creates a
 detached receipt that hashes it, then deploys that exact final artefact without
 another build. A pull request cannot possess a post-merge receipt.
+
+T5 accepts exact commit/tree, `as_of`, source epoch and validated MAC metadata
+as arguments and emits only canonical catalogue/delta bytes and receipt
+primitives. T6 consumes that single projection and writes the complete static
+publication and non-recursive manifest. T8 supplies trusted provider metadata
+and creates the detached check receipt. Post-merge publication creates the
+final receipt only after exact-tree verification. Core T5/T6 code performs no
+provider read.
+
+T6 owns no-JavaScript navigation, link/XSS/non-leakage and accessibility
+structure. T8 owns pinned Python-controlled browser execution outside the core
+build runtime. T10 records human keyboard and screen-reader evidence. Node,
+npm and `npx` are not required.
 
 ## Launch gates
 
@@ -106,7 +128,7 @@ cannot substitute for host controls.
 |---|---|
 | Six independent read-only architecture reviews | Complete |
 | T0 contract reconciliation | Complete; four independent exact-head gates returned READY |
-| Implementation swarm | T1 implemented; T2/T3/T7 ready after exact-head T1 acceptance |
-| Executable validator and CI | Missing |
+| Implementation swarm | T1/T2/T3/T4/T7 accepted; T5 next from exact T4 head `76b6fe8f...` |
+| Executable validator and CI | Validator implemented; trusted CI adapter missing |
 | Static site and platform templates | Missing |
 | Production catalogue launch | Blocked through T10 |

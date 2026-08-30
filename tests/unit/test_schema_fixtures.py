@@ -163,6 +163,41 @@ class SchemaFixtureTests(unittest.TestCase):
                         ],
                     )
 
+    def test_launch_wire_schemas_are_closed_and_non_recursive(self) -> None:
+        manifest = self.schemas["build-manifest.schema.json"]
+        files = manifest["properties"]["files"]
+        self.assertEqual(manifest["additionalProperties"], False)
+        self.assertEqual(files["required"], ["data/catalogue.json"])
+        self.assertIn(
+            {"not": {"const": "data/manifest.json"}},
+            files["propertyNames"]["allOf"],
+        )
+        self.assertEqual(
+            self.schemas["check-receipt.schema.json"]["properties"]["change_delta"]["$ref"],
+            "release-receipt.schema.json#/$defs/changeDeltaList",
+        )
+        self.assertEqual(
+            self.schemas["release-receipt.schema.json"]["properties"]["change_delta"]["$ref"],
+            "#/$defs/changeDeltaList",
+        )
+
+    def test_modelo_removes_legacy_publication_path_and_disables_agent_approval(self) -> None:
+        config = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
+        self.assertNotIn("publication_profiles", config["paths"])
+        self.assertNotIn("site_output", config["paths"])
+        approval = config["platform"]["optional_capabilities"]["agent_approval"]
+        self.assertIs(approval["enabled"], False)
+        self.assertEqual(approval["registry"], config["paths"]["actors_registry"])
+        self.assertEqual(
+            config["platform"]["required_capabilities"]["trusted_pipeline"]["gitlab"],
+            "pipeline_execution_policy_or_equivalent",
+        )
+
+    def test_catalogue_output_cannot_publish_actor_registry(self) -> None:
+        output = self.schemas["catalogue-output.schema.json"]
+        self.assertNotIn("actors", output["properties"])
+        self.assertEqual(output["additionalProperties"], False)
+
 
 if __name__ == "__main__":
     unittest.main()

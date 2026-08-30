@@ -5,10 +5,12 @@ enterprise AI model catalogue. Git provider issues initiate move/add/change
 (MAC) work; pull or merge requests and trusted CI arbitrate acceptance. Modelo
 does not expose an application API.
 
-> **Bootstrap status:** T1 provides the locked Python package and fail-closed
-> CLI foundation only. The validator, CI adapters, catalogue, static site and
-> site templates, Pages deployment, issue and change-request templates, and
-> Agent Skills are not implemented yet.
+> **Implementation status:** T1, T2, T3, T4 and T7 are implemented and
+> independently gated. The accepted T4 head is
+> `76b6fe8f3e74a34299851b6bae9411c719154e9d`. Change-aware `modelo check`,
+> schemas and MAC templates exist. Build/receipt tooling, the static site,
+> trusted CI adapters, Agent Skills, Pages and release/restore rehearsal remain
+> unimplemented. Agent approval is disabled.
 > Do not add real catalogue data before T10 passes.
 
 ## Repository planes
@@ -21,9 +23,15 @@ does not expose an application API.
 | Publication | `dist/` | Generated, tested and never committed |
 
 Agent Skills under `.agents/skills/` will guide authorship and review. They are
-not executable build inputs. Required CI contains no Node, npm or `npx` step.
+not executable build inputs: an agent uses a skill before invoking the ordinary
+locked CLI. Required CI contains no Node, npm or `npx` step and produces the
+same bytes when no skills are installed.
 
-## T1 clean-clone smoke test
+`uv build --locked` packages the Python tooling. `uv run --locked modelo build
+--as-of YYYY-MM-DD` will compile the catalogue/static publication. These are
+different outputs; neither creates a service.
+
+## Clean-clone smoke test
 
 Prerequisites are Git, Python `3.12.13` and `uv 0.11.33`.
 
@@ -35,9 +43,9 @@ uv run --locked modelo check --help
 uv run --locked modelo build --help
 ```
 
-Running `modelo check` or `modelo build` currently exits with status 2 because
-their implementation slices have not landed. The static site has no deployed
-URL while `site.base_url` is unset.
+`modelo check` is implemented. `modelo build` still exits with status 2 until
+T5/T6 land. The static site and its templates are specified under `site/` but
+not implemented or deployed; `site.base_url` remains unset.
 
 Read [SPEC.md](SPEC.md), [the machine contract](docs/contract.yaml),
 [the implementation plan](docs/implementation-plan.md),

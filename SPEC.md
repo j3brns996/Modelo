@@ -116,6 +116,7 @@ catalogue/
     vendors.yaml                     Vendor identities
     inference-services.yaml          Inference-service identities and adapters
     freshness.yaml                   Evidence freshness policy
+    actors.yaml                       Eligible agent actors; empty means disabled
   policies/conditions/
     {condition_id}/{version}.yaml    Immutable condition versions
 schemas/                             Core and provider-adapter schemas
@@ -136,8 +137,8 @@ docs/
 ```
 
 Top-level `models/`, `offerings/`, `governance/` and `data/` are forbidden.
-Generated site data belongs in `dist/site/` and is published as a CI artefact;
-it is never committed back to the source branch.
+Generated site data belongs in the configured candidate/final `dist/` roots
+and is published as a CI artefact; it is never committed to the source branch.
 
 ## Invariants
 
@@ -233,7 +234,7 @@ The portable release receipt contains base, source and merge commits; explicit
 `as_of`; contract, tool and lock versions; catalogue, site and manifest digests;
 the exact CI result; linked issue and request; and change delta. Approval
 evidence includes reviewer platform identity, approved head SHA, approval time,
-actor-policy digest, independence/eligibility result and provider
+actors-registry digest, independence/eligibility result and provider
 approval/check reference; stale-head, self-authored or ineligible approval is
 invalid. The
 portable release is a protected annotated `catalogue-YYYYMMDD.N` tag at the
@@ -245,6 +246,51 @@ The same source tree, exact source-commit author timestamp, explicit `as_of`,
 effective site base URL/path, runtime version and locked dependencies must
 produce byte-identical catalogue and site artefacts. An explicit
 `SOURCE_DATE_EPOCH` override is permitted only when recorded in the receipt.
+
+The exact source commit and its tree are inputs. By default the source epoch is
+that commit's author timestamp expressed as non-negative whole Unix seconds;
+filesystem mtimes and committer time are ignored. An explicit
+`SOURCE_DATE_EPOCH` must be a non-negative whole-second value passed by the host
+adapter and recorded unchanged in the check/release receipt. T5 receives the
+commit, tree, `as_of`, epoch,
+validated MAC metadata, publication profile, base URL and base path explicitly;
+it performs no provider or Git-host API reads.
+
+For a local candidate build, the explicit base URL may be `null` and links are
+resolved from `base_path`. Trusted CI and every final build must supply and
+receipt-bind an absolute HTTPS base URL; the adapter may not infer it from an
+untrusted change.
+
+### Build and receipt wire contract
+
+`schemas/catalogue-output.schema.json` defines the sole JSON serialisation of
+validated catalogue state. T5 emits RFC 8785 UTF-8 bytes followed by exactly
+one LF, and
+canonical change-delta bytes. T6 consumes that projection and adds HTML, local
+assets and schema copies; it must not independently serialise raw or private
+catalogue state.
+
+Candidate output is staged beneath `dist/.staging/` and atomically promoted to
+`dist/candidate/`; final post-merge output is promoted to `dist/final/`.
+Publication files are below each output's `site/` directory. The catalogue is
+`site/data/catalogue.json`, the manifest is `site/data/manifest.json`, and
+detached receipts are below `dist/receipts/`. A failed build removes only its
+staging directory and preserves the previous complete output.
+
+`schemas/build-manifest.schema.json` defines the complete publication manifest.
+Its `files` map hashes every emitted publication file except the manifest
+itself. File digests are SHA-256 of exact bytes. `publication_digest` is
+SHA-256 of the concatenation, in UTF-8 bytewise path order, of one record per
+file: path, NUL, lowercase `sha256:<hex>`, NUL, base-10 byte size, LF. The
+manifest digest is SHA-256 of its RFC 8785 UTF-8 bytes plus one LF. This removes
+recursive and archive-metadata ambiguity.
+
+`schemas/check-receipt.schema.json` is the detached pre-merge envelope. T8,
+not T5, supplies trusted Git-provider workflow identity, run and exact-head
+result and assembles it. A change request has no final receipt. Post-merge CI
+proves the merge tree equals the accepted head tree, validates the final
+publication once, creates the detached release receipt, and deploys those exact
+bytes without rebuilding.
 
 ### 9. The Git provider is the only workflow API
 
@@ -559,10 +605,20 @@ independent approval, stale-review dismissal, resolved conversations, protected
 tags and appropriate Pages visibility. Human CODEOWNER approval is mandatory
 for every path except the positive agent-approval allowlist
 (`catalogue/models/**`, `catalogue/offerings/**`, `catalogue/evidence/**`);
-agent approval is optional and data-only. The topic branch must be up to date
+agent approval is disabled by default. It can be enabled only when
+`catalogue/governance/actors.yaml` registers an enabled actor with a distinct
+platform identity and data-only scope, the reviewer is independent of author,
+committer and last pusher, and the current exact head has a successful trusted
+check receipt. Control-plane changes always require a human CODEOWNER. The
+topic branch must be up to date
 with the protected base, and a merge queue/train is deferred until it has a
 candidate-tree contract. Repository
 files alone cannot prove those remote settings are active.
+
+GitLab must enforce the trusted pipeline through a Pipeline Execution Policy or
+an equivalent control outside change-request authors' control. If that cannot
+be proved, `modelo platform check` reports the repository incapable rather than
+accepting project-local CI.
 
 There is no Modelo service endpoint to port. Switching from GitHub to GitLab
 changes the platform adapter and `modelo.yaml`; it does not change the core
@@ -606,6 +662,11 @@ acceptance. `.codex/` and `.kiro/` are optional adapters and must not redefine
 catalogue rules. `npx` may be an optional skill-import convenience, never a
 required build or CI runtime.
 
+Skills participate before the build: an author or reviewer invokes a skill to
+prepare or inspect repository source, then the ordinary locked `modelo check`
+validates that source. CI never executes skill prose, and build output must be
+identical when `.agents/skills/` is absent.
+
 The project-scoped Codex configuration declares the official AWS Documentation
 MCP server as a pinned, read-only dependency. Hosted ChatGPT Work does not load
 local MCP configuration; it needs an installed plugin. Either route may gather
@@ -630,6 +691,12 @@ merge-aware site/release artefact once, validates that exact artefact, creates a
 detached receipt that hashes it, and deploys without another build. The receipt
 is not inside the artefact whose digest it records. Pre-merge and post-merge
 artefacts are not claimed to be byte-identical.
+
+T6 owns static no-JavaScript navigation, link integrity, inert-XSS fixtures,
+publication non-leakage and accessibility-structure tests. T8 owns pinned
+Python-controlled browser execution outside the deterministic core build
+runtime. T10 records human keyboard and screen-reader launch evidence. None
+requires Node, npm or `npx`.
 
 Lint, dependency lock, secret scanning and document-drift checks are internal
 stages of those outcomes, not eleven independently promised products. A control
@@ -693,3 +760,9 @@ No implementation swarm starts until those contracts and `modelo.yaml` agree.
 No production catalogue launches until the executable validator, schemas,
 fixtures, templates, GitHub/GitLab adapters, synthetic Pages build, protected
 host controls, release receipt and mirror-restore rehearsal all pass.
+
+Implementation status at this contract revision: T1, T2, T3, T4 and T7 are
+implemented and independently gated. The accepted T4 head is
+`76b6fe8f3e74a34299851b6bae9411c719154e9d`. T5, T6, T8, T9 and T10 remain
+unimplemented; no static site or trusted CI is deployed and agent approval is
+disabled.

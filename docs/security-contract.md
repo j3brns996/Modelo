@@ -25,17 +25,26 @@
   locked. Required CI has no floating images, unpinned executable downloads,
   `pip install --upgrade` or `npx`. `uv sync --locked` may fetch hash-locked
   dependencies from the configured registry; recovery uses the archived copy.
-- Agent approval is positively allowlisted only for `catalogue/models/**`,
-  `catalogue/offerings/**` and `catalogue/evidence/**`; every other path requires
-  human CODEOWNER approval.
+- Agent approval is disabled by default. Enabling it requires an enabled actor
+  in the schema-valid actors registry, a distinct registered platform identity,
+  independence from author/committer/last pusher, a current successful trusted
+  exact-head check receipt and a diff wholly within `catalogue/models/**`,
+  `catalogue/offerings/**` or `catalogue/evidence/**`. Every control-plane path
+  always requires human CODEOWNER approval.
 - The neutral release receipt records base/source/merge SHAs, versions,
   explicit `as_of`, check identity/result, tool/lock digest, change delta and
-  all catalogue/site/manifest hashes. Provider attestations may strengthen but
+  exact catalogue/publication/manifest hashes. The manifest hashes every
+  publication member except itself; the receipt is detached and hashes the
+  completed manifest. Provider attestations may strengthen but
   do not replace it.
 - The receipt also preserves reviewer platform identity, approved head SHA,
-  approval time, actor-policy digest, independence/eligibility result and the
+  approval time, actors-registry digest, independence/eligibility result and the
   provider approval/check reference. Schema verification rejects stale-head,
   self-authored or ineligible approval evidence.
+- GitHub requires a trusted required workflow sourced from the protected
+  default branch. GitLab requires a Pipeline Execution Policy or equivalent
+  control outside contributor modification; absence is an incapable platform,
+  not an advisory warning.
 - Pre-merge records the up-to-date head tree. Post-merge proves tree equality,
   builds and validates the final artefact once, and stores its receipt detached
   from the bytes it hashes.

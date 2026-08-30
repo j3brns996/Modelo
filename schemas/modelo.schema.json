@@ -59,7 +59,7 @@
     }
   },
   "type": "object",
-  "required": ["config_version", "project", "repository", "paths", "toolchain", "site", "publication", "platform", "artifact_identity", "determinism", "recovery"],
+  "required": ["config_version", "project", "repository", "paths", "toolchain", "site", "publication", "build", "platform", "artifact_identity", "determinism", "verification", "recovery"],
   "properties": {
     "config_version": { "const": "0.1.0" },
     "project": {
@@ -115,7 +115,7 @@
     },
     "paths": {
       "type": "object",
-      "required": ["readme", "contributing", "codeowners", "gitignore", "gitattributes", "catalogue", "models", "offerings", "evidence", "governance", "actor_policy", "conditions", "publication_profiles", "schemas", "provider_schemas", "mac_schema", "release_receipt_schema", "tests", "fixtures", "implementation", "site_source", "site_templates", "site_assets", "site_content", "build", "site_output", "docs", "human_specification", "machine_contract", "implementation_plan", "site_contract", "mac_contract", "security_contract", "agent_rules", "provider_docs", "decisions", "reviews", "open_skills", "codex_adapter", "kiro_adapter", "github_adapter", "gitlab_adapter", "gitlab_ci"],
+      "required": ["readme", "contributing", "codeowners", "gitignore", "gitattributes", "catalogue", "models", "offerings", "evidence", "governance", "actors_registry", "conditions", "schemas", "provider_schemas", "mac_schema", "release_receipt_schema", "catalogue_output_schema", "build_manifest_schema", "check_receipt_schema", "actors_registry_schema", "tests", "fixtures", "implementation", "site_source", "site_templates", "site_assets", "site_content", "build", "docs", "human_specification", "machine_contract", "implementation_plan", "site_contract", "mac_contract", "security_contract", "agent_rules", "provider_docs", "decisions", "reviews", "open_skills", "codex_adapter", "kiro_adapter", "github_adapter", "gitlab_adapter", "gitlab_ci"],
       "properties": {
         "readme": { "$ref": "#/$defs/path" },
         "contributing": { "$ref": "#/$defs/path" },
@@ -127,13 +127,16 @@
         "offerings": { "$ref": "#/$defs/path" },
         "evidence": { "$ref": "#/$defs/path" },
         "governance": { "$ref": "#/$defs/path" },
-        "actor_policy": { "$ref": "#/$defs/path" },
+        "actors_registry": { "$ref": "#/$defs/path" },
         "conditions": { "$ref": "#/$defs/path" },
-        "publication_profiles": { "$ref": "#/$defs/path" },
         "schemas": { "$ref": "#/$defs/path" },
         "provider_schemas": { "$ref": "#/$defs/path" },
         "mac_schema": { "$ref": "#/$defs/path" },
         "release_receipt_schema": { "$ref": "#/$defs/path" },
+        "catalogue_output_schema": { "$ref": "#/$defs/path" },
+        "build_manifest_schema": { "$ref": "#/$defs/path" },
+        "check_receipt_schema": { "$ref": "#/$defs/path" },
+        "actors_registry_schema": { "$ref": "#/$defs/path" },
         "tests": { "$ref": "#/$defs/path" },
         "fixtures": { "$ref": "#/$defs/path" },
         "implementation": { "$ref": "#/$defs/path" },
@@ -142,7 +145,6 @@
         "site_assets": { "$ref": "#/$defs/path" },
         "site_content": { "$ref": "#/$defs/path" },
         "build": { "$ref": "#/$defs/path" },
-        "site_output": { "$ref": "#/$defs/path" },
         "docs": { "$ref": "#/$defs/path" },
         "human_specification": { "$ref": "#/$defs/path" },
         "machine_contract": { "$ref": "#/$defs/path" },
@@ -280,6 +282,28 @@
       },
       "additionalProperties": false
     },
+    "build": {
+      "type": "object",
+      "required": ["candidate_root", "final_root", "staging_parent", "receipts_root", "publication_subdir", "catalogue_path", "manifest_path", "check_receipt_path", "release_receipt_path", "digest_algorithm", "canonical_json", "publication_digest", "manifest_hashes_itself", "atomic_publish", "failed_build_cleanup"],
+      "properties": {
+        "candidate_root": { "const": "dist/candidate" },
+        "final_root": { "const": "dist/final" },
+        "staging_parent": { "const": "dist/.staging" },
+        "receipts_root": { "const": "dist/receipts" },
+        "publication_subdir": { "const": "site" },
+        "catalogue_path": { "const": "data/catalogue.json" },
+        "manifest_path": { "const": "data/manifest.json" },
+        "check_receipt_path": { "const": "dist/receipts/check.json" },
+        "release_receipt_path": { "const": "dist/receipts/release.json" },
+        "digest_algorithm": { "const": "sha256" },
+        "canonical_json": { "const": "rfc8785_utf8_plus_single_lf" },
+        "publication_digest": { "const": "sha256_of_sorted_path_nul_digest_nul_size_lf_records" },
+        "manifest_hashes_itself": { "const": false },
+        "atomic_publish": { "const": "stage_validate_then_rename" },
+        "failed_build_cleanup": { "const": "remove_staging_preserve_previous_complete_output" }
+      },
+      "additionalProperties": false
+    },
     "platform": {
       "type": "object",
       "required": ["identities", "required_capabilities", "conditional_capabilities", "optional_capabilities"],
@@ -302,7 +326,7 @@
         },
         "required_capabilities": {
           "type": "object",
-          "required": ["protected_default_branch", "direct_push", "change_request_required", "required_check", "independent_approved_review", "stale_review_dismissal", "last_pusher_cannot_supply_required_approval", "branch_must_be_up_to_date", "resolved_conversations", "force_push", "branch_deletion", "protected_release_tags"],
+          "required": ["protected_default_branch", "direct_push", "change_request_required", "required_check", "independent_approved_review", "stale_review_dismissal", "last_pusher_cannot_supply_required_approval", "branch_must_be_up_to_date", "resolved_conversations", "force_push", "branch_deletion", "protected_release_tags", "trusted_pipeline"],
           "properties": {
             "protected_default_branch": { "const": true },
             "direct_push": { "const": false },
@@ -325,7 +349,17 @@
             "resolved_conversations": { "const": true },
             "force_push": { "const": false },
             "branch_deletion": { "const": false },
-            "protected_release_tags": { "const": true }
+            "protected_release_tags": { "const": true },
+            "trusted_pipeline": {
+              "type": "object",
+              "required": ["github", "gitlab", "fail_closed_if_unavailable"],
+              "properties": {
+                "github": { "const": "required_workflow_from_protected_default_branch" },
+                "gitlab": { "const": "pipeline_execution_policy_or_equivalent" },
+                "fail_closed_if_unavailable": { "const": true }
+              },
+              "additionalProperties": false
+            }
           },
           "additionalProperties": false
         },
@@ -363,7 +397,25 @@
           "type": "object",
           "required": ["agent_approval", "serialised_merge"],
           "properties": {
-            "agent_approval": { "const": "data_only_mac" },
+            "agent_approval": {
+              "type": "object",
+              "required": ["enabled", "scope", "registry", "enablement_requires"],
+              "properties": {
+                "enabled": { "const": false },
+                "scope": { "const": "data_only_mac" },
+                "registry": { "const": "catalogue/governance/actors.yaml" },
+                "enablement_requires": {
+                  "type": "array",
+                  "minItems": 6,
+                  "maxItems": 6,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": ["registered_distinct_platform_identity", "enabled_eligible_actor", "independent_of_author_committer_and_last_pusher", "successful_trusted_exact_head_check_receipt", "current_base_and_head", "paths_within_agent_data_allowlist"]
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
             "serialised_merge": { "const": "manual_one_at_a_time" }
           },
           "additionalProperties": false
@@ -389,12 +441,46 @@
     },
     "determinism": {
       "type": "object",
-      "required": ["source_date_epoch", "explicit_override_must_be_recorded", "change_history", "site_build_requires_complete_first_parent_history"],
+      "required": ["source_date_epoch", "source_date_epoch_unit", "ignored_timestamps", "explicit_override_must_be_recorded", "source_tree", "build_inputs_explicit", "core_provider_reads", "change_history", "site_build_requires_complete_first_parent_history"],
       "properties": {
         "source_date_epoch": { "const": "derive_from_exact_source_commit_author_timestamp" },
+        "source_date_epoch_unit": { "const": "non_negative_whole_unix_seconds" },
+        "ignored_timestamps": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "enum": ["committer_time", "filesystem_mtime"] }
+        },
         "explicit_override_must_be_recorded": { "const": true },
+        "source_tree": { "const": "exact_source_commit_tree" },
+        "build_inputs_explicit": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "enum": ["source_commit", "source_tree", "as_of", "source_date_epoch", "validated_mac_metadata", "publication_profile", "base_url", "base_path"] }
+        },
+        "core_provider_reads": { "const": false },
         "change_history": { "const": "local_git_first_parent_deltas" },
         "site_build_requires_complete_first_parent_history": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "verification": {
+      "type": "object",
+      "required": ["t6_static", "t8_browser", "t10_human", "node_npm_npx_required"],
+      "properties": {
+        "t6_static": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": { "enum": ["no_javascript_navigation", "link_integrity", "inert_xss_fixtures", "publication_non_leakage", "accessibility_structure"] }
+        },
+        "t8_browser": { "const": "pinned_python_controlled_browser_outside_core_build_runtime" },
+        "t10_human": { "const": "keyboard_and_screen_reader_launch_evidence" },
+        "node_npm_npx_required": { "const": false }
       },
       "additionalProperties": false
     },

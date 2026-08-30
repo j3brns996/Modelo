@@ -1,0 +1,35 @@
+{
+  "schema_version": "0.1",
+  "request_id": "00000000-0000-4000-8000-000000000005",
+  "operation": "batch",
+  "item_operation": "add",
+  "purpose": "approve-bedrock-observation-batch",
+  "subjects": [
+    { "kind": "offering", "identity": "bedrock-example-a" },
+    { "kind": "offering", "identity": "bedrock-example-b" }
+  ],
+  "batch_scope": {
+    "source": {
+      "type": "first-party-read-api",
+      "uri": "https://bedrock.us-east-1.amazonaws.com/foundation-models"
+    },
+    "observation_scope": {
+      "scope_ref": "synthetic-scope",
+      "partition": "aws",
+      "region": "us-east-1"
+    },
+    "inference_service_id": "aws-bedrock"
+  },
+  "requested_outcome": "Add the two independently evidenced offering candidates.",
+  "reason": "One bounded first-party observation produced a homogeneous proposal set.",
+  "candidate_evidence": [
+    {
+      "uri": "https://example.invalid/official/batch-observation",
+      "observed_at": "2026-08-30T12:00:00Z",
+      "digest": "sha256-5555555555555555555555555555555555555555555555555555555555555555"
+    }
+  ],
+  "acceptance": ["Every subject has independent admissible evidence in the branch."],
+  "dedupe_key": "sha256-57c7a62733d7bff4470e35756f4e558d8a7ac95b58242c0635f4c57e8e91a377",
+  "idempotency_key": "sha256-26da2a933fe80c0b5b39d9d0f8b6b5b2203d9291536b8b4d879269f20688740d"
+}

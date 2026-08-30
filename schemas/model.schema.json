@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/model.schema.json",
+  "title": "Modelo canonical model",
+  "type": "object",
+  "required": ["id", "vendor_id", "name", "evidence_refs"],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/id",
+      "x-modelo-provenance": "internal"
+    },
+    "vendor_id": {
+      "$ref": "common.schema.json#/$defs/id",
+      "x-modelo-provenance": "internal"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "x-modelo-provenance": "external",
+      "x-modelo-freshness-class": "intrinsic_model_fact"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "x-modelo-provenance": "external",
+      "x-modelo-freshness-class": "intrinsic_model_fact"
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "common.schema.json#/$defs/id",
+        "x-modelo-provenance": "external",
+        "x-modelo-freshness-class": "intrinsic_model_fact"
+      }
+    },
+    "modalities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "common.schema.json#/$defs/id",
+        "x-modelo-provenance": "external",
+        "x-modelo-freshness-class": "intrinsic_model_fact"
+      }
+    },
+    "context_window": {
+      "type": "integer",
+      "minimum": 1,
+      "x-modelo-provenance": "external",
+      "x-modelo-freshness-class": "intrinsic_model_fact"
+    },
+    "licensing": {
+      "type": "string",
+      "enum": ["proprietary", "open-weights", "open-source"],
+      "x-modelo-provenance": "external",
+      "x-modelo-freshness-class": "intrinsic_model_fact"
+    },
+    "lifecycle": {
+      "type": "string",
+      "enum": ["active", "legacy", "eol"],
+      "x-modelo-provenance": "external",
+      "x-modelo-freshness-class": "intrinsic_model_fact"
+    },
+    "evidence_refs": { "$ref": "common.schema.json#/$defs/evidenceRefs" }
+  },
+  "additionalProperties": false
+}

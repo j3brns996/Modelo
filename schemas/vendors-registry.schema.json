@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/vendors-registry.schema.json",
+  "title": "Modelo vendor registry",
+  "type": "object",
+  "required": ["vendors"],
+  "properties": {
+    "vendors": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "common.schema.json#/$defs/id" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["id", "name", "evidence_refs"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 256, "x-modelo-provenance": "external", "x-modelo-freshness-class": "intrinsic_model_fact" },
+          "evidence_refs": { "$ref": "common.schema.json#/$defs/evidenceRefs" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

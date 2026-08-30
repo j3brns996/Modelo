@@ -331,7 +331,7 @@ model_binding:
   kind: system-inference-profile
   profile_evidence:
     id: <profile-evidence-id>
-    projection_pointer: /
+    projection_pointer: ""
   destinations:
     - destination_pointer: /models/0/modelArn
       model_evidence:

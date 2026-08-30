@@ -72,9 +72,13 @@ approval:
   applies_to: valid_catalogue_records
   requires:
     - linked_mac_issue
-    - reviewed_change_request
-    - required_checks
+    - successful_trusted_ci_at_exact_head_sha
+    - eligible_independent_approved_review_at_exact_head_sha
     - merge_to_protected_default_branch
+  technical_arbiter: trusted_ci
+  review_role: independent_evidence_attestation
+  new_commit_invalidates_ci_and_approval: true
+  approval_cannot_override_ci: true
   issue_is_approval: false
   provider_availability_is_approval: false
   model_alone_is_consumable: false
@@ -189,6 +193,7 @@ platform:
     - change_request
     - protected_default_branch
     - required_check
+    - independent_review
     - code_owner_review
     - static_site
     - protected_release
@@ -209,6 +214,9 @@ platform:
   new_service_api_allowed: false
   site_routes_are_relative: true
   git_is_worm_immutable: false
+  formal_agent_approval_requires_distinct_eligible_platform_identity: true
+  contributor_self_approval_forbidden: true
+  stale_approval_dismissal_required: true
   receipt_requires:
     - source_commit
     - catalogue_revision
@@ -227,6 +235,14 @@ mac:
   intake_aliases:
     move: atomic_add_and_revoke
   approval_unit: change_request
+  eligible_approver:
+    - independent_human
+    - independent_agent
+  agent_approval_requires:
+    - distinct_eligible_platform_identity
+    - no_authorship_commits_or_modifications
+    - successful_trusted_ci_for_exact_head_sha
+    - recorded_ci_evidence_identifiers
   duplicate_proposal_files: false
   batch:
     max_identities: 25
@@ -243,14 +259,44 @@ agents:
   optional_adapters:
     - paths.codex_adapter
     - paths.kiro_adapter
-  write_owner: root_agent
+  write_owner: one_authoring_agent
   subagents_default: read_only
-  may_push: false
+  topic_branch_push: allowed_for_authoring_agent
+  protected_branch_push: false
   may_merge: false
   may_invent_facts: false
+  review_agent:
+    may_approve: conditionally
+    independent_requires:
+      - distinct_eligible_platform_identity
+      - no_authorship
+      - no_commits
+      - no_modifications
+    evidence_requires:
+      - exact_head_sha
+      - trusted_ci_workflow_or_pipeline_id
+      - required_check_name
+      - successful_result
+      - completion_time
+      - test_summary
+      - manifest_or_artefact_digests
+    cannot_override_missing_stale_or_failed_ci: true
+    same_identity_as_author_action: review_report_only
 
 validation:
   command: modelo check
+  technical_arbiter: trusted_ci
+  required_check: modelo/check
+  result_must_bind_exact_change_request_head_sha: true
+  successful_result_required: true
+  non_accepting_results:
+    - missing
+    - skipped
+    - neutral
+    - cancelled
+    - stale
+    - failed
+  approval_cannot_change_result: true
   externally_visible_outcomes:
     - schema-and-facts
     - tests

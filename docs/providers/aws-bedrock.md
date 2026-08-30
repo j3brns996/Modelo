@@ -53,6 +53,11 @@ responses may be short-lived private artefacts, but are not the only retained
 proof. Discovery opens or updates a MAC issue; it cannot edit an approved
 catalogue record.
 
+For first-party API evidence the operation name and request scope are required.
+The evidence ID is content-addressed from the full canonical envelope, excluding
+the ID itself. Once merged, an evidence record is immutable; refreshes create a
+new record and migrate references through MAC review.
+
 ## AWS route types
 
 - `foundation-model`: a direct Bedrock foundation-model ID or ARN, generally

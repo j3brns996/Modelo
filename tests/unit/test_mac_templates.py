@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 import json
+import re
 import unittest
 from pathlib import Path
 
 import yaml
+
+from modelo.mac import (
+    MAX_ADAPTER_OVERHEAD_BYTES,
+    MAX_BODY_BYTES,
+    extract_adapter_issue_payload,
+    payload_digest,
+    with_computed_keys,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -12,12 +21,49 @@ OPERATIONS = {"add", "change", "revoke", "move", "batch"}
 
 
 class MacTemplateTests(unittest.TestCase):
+    def fixtures(self) -> dict[str, dict[str, object]]:
+        return {
+            path.stem: json.loads(path.read_text(encoding="utf-8"))
+            for path in sorted((ROOT / "tests/fixtures/mac").glob("*.json"))
+        }
+
+    def fill_github_form(self, operation: str, payload: dict[str, object]) -> str:
+        path = ROOT / f".github/ISSUE_TEMPLATE/mac-{operation}.yml"
+        form = yaml.safe_load(path.read_text(encoding="utf-8"))
+        pretty = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
+        sections: list[str] = []
+        for item in form["body"]:
+            if item["type"] == "textarea" and item["id"] == "mac_payload":
+                sections.append(f"### {item['attributes']['label']}\n\n```json\n{pretty}\n```")
+            elif item["type"] == "input" and item["id"] == "payload_digest":
+                sections.append(f"### {item['attributes']['label']}\n\n{payload_digest(payload)}")
+            elif item["type"] == "checkboxes":
+                choices = "\n".join(f"- [x] {choice['label']}" for choice in item["attributes"]["options"])
+                sections.append(f"### {item['attributes']['label']}\n\n{choices}")
+        return "\n\n".join(sections) + "\n"
+
+    def fill_gitlab_template(self, operation: str, payload: dict[str, object]) -> str:
+        path = ROOT / f".gitlab/issue_templates/MAC-{operation.title()}.md"
+        text = path.read_text(encoding="utf-8")
+        pretty = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
+        text, count = re.subn(r"(?ms)```json\n[\s\S]*?\n```", f"```json\n{pretty}\n```", text)
+        self.assertEqual(count, 1)
+        return text.replace("Neutral payload digest: `sha256-...`", f"Neutral payload digest: `{payload_digest(payload)}`")
+
     def test_schema_is_draft_2020_12_and_closed(self) -> None:
         schema = json.loads((ROOT / "schemas/mac.schema.json").read_text(encoding="utf-8"))
         self.assertEqual(schema["$schema"], "https://json-schema.org/draft/2020-12/schema")
         self.assertFalse(schema["additionalProperties"])
         self.assertEqual(set(schema["properties"]["operation"]["enum"]), OPERATIONS)
         self.assertEqual(schema["properties"]["subjects"]["maxItems"], 25)
+        self.assertEqual(
+            schema["$defs"]["identity"]["pattern"],
+            "^[a-z0-9](?:[a-z0-9._:/@+\\-]*[a-z0-9])?$",
+        )
+        self.assertEqual(
+            schema["$defs"]["text"]["pattern"],
+            "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$",
+        )
         for definition in ("subject", "batchScope", "candidateEvidence"):
             self.assertFalse(schema["$defs"][definition]["additionalProperties"])
 
@@ -39,6 +85,18 @@ class MacTemplateTests(unittest.TestCase):
                 self.assertTrue(inputs[0]["validations"]["required"])
                 self.assertNotIn("labels", form)
 
+    def test_actual_filled_github_forms_round_trip(self) -> None:
+        for operation, payload in self.fixtures().items():
+            body = self.fill_github_form(operation, payload)
+            with self.subTest(operation=operation):
+                self.assertLessEqual(len(body.encode("utf-8")), MAX_BODY_BYTES)
+                self.assertEqual(extract_adapter_issue_payload(body, "github"), payload)
+                rendered_payload = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
+                self.assertLessEqual(
+                    len(body.encode("utf-8")) - len(rendered_payload.encode("utf-8")),
+                    MAX_ADAPTER_OVERHEAD_BYTES,
+                )
+
     def test_gitlab_templates_are_operation_specific_and_inert(self) -> None:
         paths = sorted((ROOT / ".gitlab/issue_templates").glob("MAC-*.md"))
         self.assertEqual({path.stem.removeprefix("MAC-").lower() for path in paths}, OPERATIONS)
@@ -51,6 +109,38 @@ class MacTemplateTests(unittest.TestCase):
                 self.assertIn("Neutral payload digest: `sha256-...`", text)
                 self.assertNotIn("/label", text)
                 self.assertNotIn("curl ", text)
+
+    def test_actual_filled_gitlab_templates_round_trip(self) -> None:
+        for operation, payload in self.fixtures().items():
+            body = self.fill_gitlab_template(operation, payload)
+            with self.subTest(operation=operation):
+                self.assertLessEqual(len(body.encode("utf-8")), MAX_BODY_BYTES)
+                self.assertEqual(extract_adapter_issue_payload(body, "gitlab"), payload)
+                rendered_payload = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
+                self.assertLessEqual(
+                    len(body.encode("utf-8")) - len(rendered_payload.encode("utf-8")),
+                    MAX_ADAPTER_OVERHEAD_BYTES,
+                )
+
+    def test_near_limit_payload_round_trips_through_actual_templates(self) -> None:
+        payload = self.fixtures()["add"]
+        payload["acceptance"] = [f"criterion-{index}-" + "a" * 1_960 for index in range(25)]
+        payload["candidate_evidence"] = [
+            {
+                "uri": "https://example.invalid/" + "e" * 900 + f"/{index}",
+                "observed_at": "2026-08-30T12:00:00Z",
+                "digest": "sha256-" + f"{index:064x}",
+            }
+            for index in range(10)
+        ]
+        payload = with_computed_keys(payload)
+        for adapter, body in (
+            ("github", self.fill_github_form("add", payload)),
+            ("gitlab", self.fill_gitlab_template("add", payload)),
+        ):
+            with self.subTest(adapter=adapter):
+                self.assertLessEqual(len(body.encode("utf-8")), MAX_BODY_BYTES)
+                self.assertEqual(extract_adapter_issue_payload(body, adapter), payload)
 
     def test_change_request_templates_have_identical_neutral_contract(self) -> None:
         github = (ROOT / ".github/PULL_REQUEST_TEMPLATE/mac.md").read_text(encoding="utf-8")

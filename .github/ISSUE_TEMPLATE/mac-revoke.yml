@@ -10,7 +10,7 @@ body:
     id: mac_payload
     attributes:
       label: Neutral MAC payload
-      description: The operation must be `revoke`; generate both hashes from the canonical payload.
+      description: The operation must be `revoke`; subject identities use lowercase ASCII canonical IDs; generate both hashes from the canonical payload.
       render: json
       placeholder: |
         { "schema_version": "0.1", "operation": "revoke", "replace": "with a complete schema-valid payload" }

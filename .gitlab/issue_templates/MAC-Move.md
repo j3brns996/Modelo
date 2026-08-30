@@ -1,6 +1,6 @@
 # MAC: move
 
-Replace the object below with one complete `schemas/mac.schema.json` payload. In v0.1 a move has exactly one source and one destination offering; a Git rename is insufficient.
+Replace the object below with one complete `schemas/mac.schema.json` payload. Subject identities use lowercase ASCII canonical IDs. In v0.1 a move has exactly one source and one destination offering; a Git rename is insufficient.
 
 ```json
 { "schema_version": "0.1", "operation": "move", "replace": "with a complete schema-valid payload" }

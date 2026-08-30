@@ -156,19 +156,25 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 2048,
-      "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+      "pattern": "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$"
     },
     "shortText": {
       "type": "string",
       "minLength": 1,
       "maxLength": 160,
-      "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+      "pattern": "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$"
     },
     "identity": {
       "type": "string",
       "minLength": 1,
       "maxLength": 256,
-      "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+      "pattern": "^[a-z0-9](?:[a-z0-9._:/@+\\-]*[a-z0-9])?$"
+    },
+    "scopeToken": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$"
     },
     "digest": {
       "type": "string",
@@ -203,9 +209,9 @@
           "additionalProperties": false,
           "required": ["scope_ref", "partition", "region"],
           "properties": {
-            "scope_ref": { "$ref": "#/$defs/identity" },
-            "partition": { "$ref": "#/$defs/identity" },
-            "region": { "$ref": "#/$defs/identity" }
+            "scope_ref": { "$ref": "#/$defs/scopeToken" },
+            "partition": { "$ref": "#/$defs/scopeToken" },
+            "region": { "$ref": "#/$defs/scopeToken" }
           }
         },
         "inference_service_id": { "$ref": "#/$defs/identity" }

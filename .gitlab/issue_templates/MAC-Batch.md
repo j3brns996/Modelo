@@ -1,6 +1,6 @@
 # MAC: batch
 
-Replace the object below with one complete `schemas/mac.schema.json` payload. A batch has at most 25 subjects and one item operation, source, observation scope, inference service and purpose.
+Replace the object below with one complete `schemas/mac.schema.json` payload. Subject identities use lowercase ASCII canonical IDs. A batch has at most 25 subjects and one item operation, source, observation scope, inference service and purpose.
 
 ```json
 { "schema_version": "0.1", "operation": "batch", "replace": "with a complete schema-valid payload" }

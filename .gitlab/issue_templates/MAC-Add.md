@@ -1,6 +1,6 @@
 # MAC: add
 
-Replace the object below with one complete `schemas/mac.schema.json` payload. The operation must be `add`. Candidate issue evidence is not accepted catalogue evidence.
+Replace the object below with one complete `schemas/mac.schema.json` payload. The operation must be `add`; subject identities use lowercase ASCII canonical IDs. Candidate issue evidence is not accepted catalogue evidence.
 
 ```json
 { "schema_version": "0.1", "operation": "add", "replace": "with a complete schema-valid payload" }

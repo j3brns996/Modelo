@@ -1,6 +1,6 @@
 # MAC: change
 
-Replace the object below with one complete `schemas/mac.schema.json` payload. The operation must be `change` and preserve logical identity. Candidate issue evidence is not accepted catalogue evidence.
+Replace the object below with one complete `schemas/mac.schema.json` payload. The operation must be `change` and preserve a lowercase ASCII canonical logical identity. Candidate issue evidence is not accepted catalogue evidence.
 
 ```json
 { "schema_version": "0.1", "operation": "change", "replace": "with a complete schema-valid payload" }

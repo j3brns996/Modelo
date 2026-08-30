@@ -10,7 +10,7 @@ body:
     id: mac_payload
     attributes:
       label: Neutral MAC payload
-      description: The operation must be `batch`; generate both hashes from the canonical payload.
+      description: The operation must be `batch`; subject identities use lowercase ASCII canonical IDs; generate both hashes from the canonical payload.
       render: json
       placeholder: |
         { "schema_version": "0.1", "operation": "batch", "replace": "with a complete schema-valid payload" }

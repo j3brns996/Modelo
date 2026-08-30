@@ -21,11 +21,14 @@ from uuid import UUID
 
 Adapter = Literal["github", "gitlab"]
 MAX_BODY_BYTES = 65_536
+MAX_ADAPTER_OVERHEAD_BYTES = 4_096
+MAX_RENDERED_PAYLOAD_BYTES = MAX_BODY_BYTES - MAX_ADAPTER_OVERHEAD_BYTES
 MAX_DEPTH = 12
 MAX_NODES = 500
 PAYLOAD_START = "<!-- modelo:mac-payload:start -->"
 PAYLOAD_END = "<!-- modelo:mac-payload:end -->"
 _HASH_PATTERN = re.compile(r"^sha256-[0-9a-f]{64}$")
+_IDENTITY_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9._:/@+-]*[a-z0-9])?$")
 _KINDS = {"model", "offering", "evidence", "vendor", "inference-service", "condition"}
 _OPERATIONS = {"add", "change", "revoke", "move", "batch"}
 _ITEM_OPERATIONS = {"add", "change", "revoke"}
@@ -98,6 +101,16 @@ def _text(value: Any, name: str, *, maximum: int = 2_048) -> str:
     return value
 
 
+def _identity(value: Any, name: str) -> str:
+    text = _text(value, name, maximum=256)
+    if not _IDENTITY_PATTERN.fullmatch(text):
+        raise MacError(
+            f"{name} must be a lowercase ASCII canonical identifier using "
+            "letters, digits, dot, underscore, colon, slash, at, plus or hyphen"
+        )
+    return text
+
+
 def _https(value: Any, name: str) -> str:
     text = _text(value, name)
     parsed = urlsplit(text)
@@ -146,7 +159,7 @@ def _validate_subjects(payload: Mapping[str, Any]) -> list[dict[str, str]]:
     for index, item in enumerate(raw):
         subject = _mapping(item, f"subjects[{index}]", {"kind", "identity", "role"}, {"kind", "identity"})
         kind = _text(subject["kind"], f"subjects[{index}].kind", maximum=32)
-        identity = _text(subject["identity"], f"subjects[{index}].identity", maximum=256)
+        identity = _identity(subject["identity"], f"subjects[{index}].identity")
         if kind not in _KINDS:
             raise MacError(f"subjects[{index}].kind is unsupported")
         reservation = (kind, identity)
@@ -186,8 +199,8 @@ def _validate_batch_scope(value: Any) -> dict[str, Any]:
             key: _text(observation[key], f"batch_scope.observation_scope.{key}", maximum=256)
             for key in ("scope_ref", "partition", "region")
         },
-        "inference_service_id": _text(
-            scope["inference_service_id"], "batch_scope.inference_service_id", maximum=128
+        "inference_service_id": _identity(
+            scope["inference_service_id"], "batch_scope.inference_service_id"
         ),
     }
 
@@ -305,6 +318,13 @@ def validate_payload(payload: Mapping[str, Any], *, verify_hashes: bool = True) 
         result["item_operation"] = item_operation
     if batch_scope is not None:
         result["batch_scope"] = batch_scope
+    rendered_payload_bytes = len(
+        json.dumps(result, ensure_ascii=False, allow_nan=False, indent=2, sort_keys=True).encode("utf-8")
+    )
+    if rendered_payload_bytes > MAX_RENDERED_PAYLOAD_BYTES:
+        raise MacError(
+            f"rendered canonical payload exceeds {MAX_RENDERED_PAYLOAD_BYTES} bytes"
+        )
     if verify_hashes:
         expected_dedupe, expected_idempotency = compute_keys(result)
         if result["dedupe_key"] != expected_dedupe:
@@ -362,18 +382,89 @@ def render_issue_body(payload: Mapping[str, Any], adapter: Adapter) -> str:
         raise MacError("unsupported Git-provider adapter")
     value = validate_payload(payload)
     pretty = json.dumps(value, ensure_ascii=False, allow_nan=False, indent=2, sort_keys=True)
-    return (
+    body = (
         f"## Neutral MAC payload ({adapter})\n\n"
         f"{PAYLOAD_START}\n```json\n{pretty}\n```\n{PAYLOAD_END}\n\n"
         f"<!-- modelo:mac-payload-digest {payload_digest(value)} -->\n"
     )
+    if len(body.encode("utf-8")) > MAX_BODY_BYTES:
+        raise MacError(f"rendered issue body exceeds {MAX_BODY_BYTES} bytes")
+    return body
+
+
+def render_adapter_issue_body(payload: Mapping[str, Any], adapter: Adapter) -> str:
+    """Render the provider-native filled fields represented by checked-in templates."""
+
+    if adapter not in {"github", "gitlab"}:
+        raise MacError("unsupported Git-provider adapter")
+    value = validate_payload(payload)
+    pretty = json.dumps(value, ensure_ascii=False, allow_nan=False, indent=2, sort_keys=True)
+    digest = payload_digest(value)
+    if adapter == "github":
+        body = (
+            f"### Neutral MAC payload\n\n```json\n{pretty}\n```\n\n"
+            f"### Neutral payload digest\n\n{digest}\n"
+        )
+    else:
+        body = (
+            f"# MAC request\n\n```json\n{pretty}\n```\n\n"
+            f"Neutral payload digest: `{digest}`\n"
+        )
+    if len(body.encode("utf-8")) > MAX_BODY_BYTES:
+        raise MacError(f"rendered adapter issue body exceeds {MAX_BODY_BYTES} bytes")
+    return body
+
+
+def _parse_json_payload(raw: str) -> dict[str, Any]:
+    try:
+        value = json.loads(
+            raw,
+            object_pairs_hook=_object_pairs,
+            parse_constant=lambda token: (_ for _ in ()).throw(MacError(f"invalid JSON value {token}")),
+        )
+    except (json.JSONDecodeError, UnicodeError, RecursionError) as exc:
+        raise MacError(f"invalid MAC JSON: {exc}") from exc
+    depth, nodes = _measure(value)
+    if depth > MAX_DEPTH or nodes > MAX_NODES:
+        raise MacError("MAC payload exceeds depth or node limits")
+    return validate_payload(value)
+
+
+def _bounded_body(body: str) -> None:
+    if not isinstance(body, str) or len(body.encode("utf-8")) > MAX_BODY_BYTES:
+        raise MacError(f"issue body exceeds {MAX_BODY_BYTES} bytes")
+
+
+def extract_adapter_issue_payload(body: str, adapter: Adapter) -> dict[str, Any]:
+    """Recover a payload from the actual filled GitHub or GitLab template shape."""
+
+    _bounded_body(body)
+    if adapter == "github":
+        payload_matches = re.findall(
+            r"(?ms)^### Neutral MAC payload\n\n```json\n([\s\S]*?)\n```(?:\n|$)", body
+        )
+        digest_matches = re.findall(
+            r"(?m)^### Neutral payload digest\n\n(sha256-[0-9a-f]{64})$", body
+        )
+    elif adapter == "gitlab":
+        payload_matches = re.findall(r"(?ms)^```json\n([\s\S]*?)\n```(?:\n|$)", body)
+        digest_matches = re.findall(
+            r"(?m)^Neutral payload digest: `(sha256-[0-9a-f]{64})`$", body
+        )
+    else:
+        raise MacError("unsupported Git-provider adapter")
+    if len(payload_matches) != 1 or len(digest_matches) != 1:
+        raise MacError("adapter issue body must contain one MAC payload and one digest field")
+    payload = _parse_json_payload(payload_matches[0])
+    if digest_matches[0] != payload_digest(payload):
+        raise MacError("declared adapter payload digest does not match the canonical payload")
+    return payload
 
 
 def extract_issue_payload(body: str) -> dict[str, Any]:
     """Recover and validate one canonical payload block from an issue body."""
 
-    if not isinstance(body, str) or len(body.encode("utf-8")) > MAX_BODY_BYTES:
-        raise MacError(f"issue body exceeds {MAX_BODY_BYTES} bytes")
+    _bounded_body(body)
     start_pattern = re.compile(rf"(?m)^{re.escape(PAYLOAD_START)}$")
     end_pattern = re.compile(rf"(?m)^{re.escape(PAYLOAD_END)}$")
     starts = list(start_pattern.finditer(body))
@@ -384,18 +475,7 @@ def extract_issue_payload(body: str) -> dict[str, Any]:
     match = re.fullmatch(r"```json\n([\s\S]+)\n```", block)
     if match is None:
         raise MacError("MAC payload marker must contain exactly one fenced JSON object")
-    try:
-        value = json.loads(
-            match.group(1),
-            object_pairs_hook=_object_pairs,
-            parse_constant=lambda token: (_ for _ in ()).throw(MacError(f"invalid JSON value {token}")),
-        )
-    except (json.JSONDecodeError, UnicodeError, RecursionError) as exc:
-        raise MacError(f"invalid MAC JSON: {exc}") from exc
-    depth, nodes = _measure(value)
-    if depth > MAX_DEPTH or nodes > MAX_NODES:
-        raise MacError("MAC payload exceeds depth or node limits")
-    payload = validate_payload(value)
+    payload = _parse_json_payload(match.group(1))
     marker_pattern = re.compile(r"(?m)^<!-- modelo:mac-payload-digest (sha256-[0-9a-f]{64}) -->$")
     markers = marker_pattern.findall(body)
     if markers != [payload_digest(payload)]:

@@ -1,6 +1,6 @@
 # MAC: revoke
 
-Replace the object below with one complete `schemas/mac.schema.json` payload. In v0.1 a revoke subject is one offering. Absence from discovery is not a revocation reason by itself.
+Replace the object below with one complete `schemas/mac.schema.json` payload. Subject identities use lowercase ASCII canonical IDs. In v0.1 a revoke subject is one offering. Absence from discovery is not a revocation reason by itself.
 
 ```json
 { "schema_version": "0.1", "operation": "revoke", "replace": "with a complete schema-valid payload" }

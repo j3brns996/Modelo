@@ -1,0 +1,45 @@
+config_version: "0.1.0"
+
+project:
+  id: modelo
+  title: Modelo
+  version_file: VERSION
+  default_branch: main
+
+repository:
+  adapter: github
+  host: github.com
+  namespace: j3brns
+  name: Modelo
+
+paths:
+  catalogue: catalogue
+  models: catalogue/models
+  offerings: catalogue/offerings
+  governance: catalogue/governance
+  conditions: catalogue/policies/conditions
+  schemas: schemas
+  tests: tests
+  site_source: site
+  build: dist
+  site_output: dist/site
+  docs: docs
+
+routes:
+  catalogue: data/catalogue.json
+  manifest: data/manifest.json
+  schemas: data/schemas
+  contract: docs/contract.yaml
+
+publication:
+  visibility: private
+  public_data_allowed: false
+
+platform:
+  required_capabilities:
+    protected_default_branch: true
+    change_request_required: true
+    required_check: modelo/check
+    code_owner_review: true
+    force_push: false
+    protected_release_tags: true

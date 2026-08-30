@@ -16,7 +16,7 @@ API. `npx`, Agent Skills, cloud CLIs and MCP tools are not build dependencies.
 uv sync --locked
 uv build --offline --no-cache
 uv run --locked modelo check --base <protected-base-sha> --head <head-sha> --as-of <YYYY-MM-DD>
-uv run --locked modelo build --kind candidate --base-commit <BASE> --source-commit <HEAD> --source-tree <TREE> --as-of <DATE> --source-date-epoch <EPOCH> --mac-metadata <MAC_JSON> --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
+uv run --locked modelo build --kind candidate --base-commit <BASE> --source-commit <HEAD> --source-tree <TREE> --as-of <DATE> --source-date-epoch <EPOCH> --mac-metadata <MAC_JSON_PATH> --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
 ```
 
 `uv.lock` controls runtime sync and `uv run --locked`. Tool-package creation is
@@ -94,11 +94,15 @@ tree, builds the final merge-aware artefact once, validates it, creates a
 detached receipt that hashes it, then deploys that exact final artefact without
 another build. A pull request cannot possess a post-merge receipt.
 
-T5 accepts exact base/head/tree, `as_of`, source epoch and validated MAC metadata
+T5 accepts exact base/head/tree, `as_of`, source epoch and an explicit path to validated MAC metadata
 as arguments and writes exactly candidate `site/data/{catalogue,change-delta,manifest}.json`;
 the manifest hashes exactly catalogue and change delta. Receipt primitives are
 library values and T8 writes the detached check receipt. T6 consumes that single projection and writes the complete static
-publication and non-recursive manifest. T8 supplies trusted provider metadata
+publication and non-recursive manifest. Its executable completeness check
+requires the fixed routes/assets, `data/catalogue.json`,
+`data/change-delta.json`, every schema beneath the configured schema root at
+the exact source commit, and every projection-derived model/offering detail
+page; missing or extra entries fail. T8 supplies trusted provider metadata
 and creates the detached check receipt. Post-merge publication creates the
 final receipt only after exact-tree verification. Core T5/T6 code performs no
 provider read.
@@ -109,6 +113,13 @@ The T5 CLI has no ambient defaults: common required flags are `--kind`,
 `--base-url` or `--no-base-url`. T5 implements candidate only; final and its
 future `--merge-commit`/`--merge-tree` inputs remain unavailable until T6. T8 supplies every value from trusted inputs and rejects any
 receipt correlation mismatch.
+
+The metadata path names one regular non-symlink strict-UTF-8 JSON object of at
+most 262144 bytes. T5 reads it once from one no-follow descriptor, rejects
+duplicate keys, floats, non-finite values and YAML, and compares device, inode,
+size and nanosecond mtime before and after the read. Trusted CI fails closed if
+those controls are unavailable. The metadata schema validates this one input;
+it is not another CLI input.
 
 T5 defines the shared single-writer publication state machine and exercises it
 only for candidate output: exclusive fail-fast lock, same-filesystem sibling

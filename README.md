@@ -38,7 +38,7 @@ defaults:
 uv run --locked modelo build --kind candidate \
   --base-commit BASE_SHA --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA \
   --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS \
-  --mac-metadata VALIDATED_MAC_JSON --profile synthetic \
+  --mac-metadata /path/to/validated-mac.json --profile synthetic \
   --no-base-url --base-path /Modelo/ --output dist/candidate
 ```
 
@@ -53,8 +53,12 @@ The candidate output is exactly `site/data/catalogue.json`,
 output. The manifest hashes exactly the first two files and never itself. T8,
 not T5, writes detached `dist/receipts/check.json`.
 
-`--mac-metadata` is the closed `schemas/mac-metadata.schema.json` envelope
-created only by T8 from the same repository. It binds the open issue, exact
+`--mac-metadata` is an explicit path to one closed `schemas/mac-metadata.schema.json`
+JSON envelope, not the JSON value and not a second schema argument. The file is
+read once as a regular non-symlink, is limited to 262144 bytes, and rejects
+invalid UTF-8, YAML, duplicate keys, floating-point or non-finite numbers. CI
+fails closed if stable no-follow and before/after file identity checks cannot
+be enforced. The envelope is created only by T8 from the same repository. It binds the open issue, exact
 base/head/tree, complete neutral MAC payload and digest, and expected Git delta;
 T5 performs no provider read or enrichment.
 

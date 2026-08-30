@@ -295,7 +295,7 @@
     },
     "build": {
       "type": "object",
-      "required": ["command", "implemented_kinds", "deferred_kind", "required_cli_arguments", "deferred_final_cli_arguments", "base_url_choice", "ambient_git_or_environment_inference", "candidate_root", "final_root", "target_parent", "receipts_root", "publication_subdir", "catalogue_path", "change_delta_path", "manifest_path", "candidate_output_inventory", "candidate_manifest_files", "change_delta_wire", "change_delta_digest", "receipt_primitives", "check_receipt_writer", "check_receipt_path", "release_receipt_path", "digest_algorithm", "canonical_json", "publication_digest", "manifest_hashes_itself", "writer_lock", "lock_acquire", "staging_name", "backup_name", "journal", "promotion_state_machine", "crash_recovery", "atomic_publish", "observable_contract", "final_requires_fsync_durability", "failed_build_cleanup"],
+      "required": ["command", "implemented_kinds", "deferred_kind", "required_cli_arguments", "deferred_final_cli_arguments", "base_url_choice", "ambient_git_or_environment_inference", "candidate_root", "final_root", "target_parent", "receipts_root", "publication_subdir", "catalogue_path", "change_delta_path", "manifest_path", "candidate_output_inventory", "candidate_manifest_files", "mac_metadata_ingestion", "change_delta_wire", "change_delta_digest", "receipt_primitives", "check_receipt_writer", "check_receipt_path", "release_receipt_path", "digest_algorithm", "canonical_json", "publication_digest", "manifest_hashes_itself", "writer_lock", "lock_acquire", "staging_name", "backup_name", "journal", "promotion_state_machine", "crash_recovery", "atomic_publish", "observable_contract", "final_requires_fsync_durability", "failed_build_cleanup"],
       "properties": {
         "command": { "const": "modelo build" },
         "implemented_kinds": { "type": "array", "prefixItems": [{ "const": "candidate" }], "items": false },
@@ -325,6 +325,32 @@
         "candidate_manifest_files": {
           "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true,
           "items": { "enum": ["data/catalogue.json", "data/change-delta.json"] }
+        },
+        "mac_metadata_ingestion": {
+          "type": "object",
+          "required": ["cli_value", "file_type", "max_bytes", "encoding", "format", "duplicate_keys", "non_finite_numbers", "floating_point_numbers", "open_strategy", "read_strategy", "mutation_check", "incapable_ci", "outside_repository_temp_path", "network_read", "validation_order"],
+          "properties": {
+            "cli_value": { "const": "explicit_file_path" },
+            "file_type": { "const": "regular_non_symlink" },
+            "max_bytes": { "const": 262144 },
+            "encoding": { "const": "strict_utf8" },
+            "format": { "const": "strict_json_object_not_yaml" },
+            "duplicate_keys": { "const": "reject" },
+            "non_finite_numbers": { "const": "reject" },
+            "floating_point_numbers": { "const": "reject" },
+            "open_strategy": { "const": "nofollow_required_in_ci" },
+            "read_strategy": { "const": "once_from_single_open_descriptor" },
+            "mutation_check": { "const": "fstat_before_after_device_inode_size_mtime_ns_equal" },
+            "incapable_ci": { "const": "fail_closed" },
+            "outside_repository_temp_path": { "const": "allowed" },
+            "network_read": { "const": false },
+            "validation_order": {
+              "type": "array", "minItems": 4, "maxItems": 4,
+              "prefixItems": [{ "const": "file_boundary" }, { "const": "json_parse" }, { "const": "schema" }, { "const": "semantic_correlations" }],
+              "items": false
+            }
+          },
+          "additionalProperties": false
         },
         "change_delta_wire": { "const": "canonical_rfc8785_array_utf8_plus_single_lf" },
         "change_delta_digest": { "const": "sha256_exact_bytes_including_single_lf" },

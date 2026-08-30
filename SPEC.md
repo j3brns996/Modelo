@@ -276,16 +276,27 @@ validation.
 
 ### Build and receipt wire contract
 
-T8 is the sole producer of `schemas/mac-metadata.schema.json`, a bounded
-same-repository adapter envelope containing canonical repository and open issue
+T8 is the sole producer of the bounded same-repository adapter envelope
+validated by `schemas/mac-metadata.schema.json`. The `--mac-metadata` value is
+an explicit file path, not JSON text or another schema input. T5 reads one
+regular non-symlink file once, with a 262144-byte ceiling, strict UTF-8 JSON
+object parsing, duplicate-key/float/non-finite/YAML rejection and stable
+before/after device, inode, size and nanosecond-mtime checks. Trusted CI fails
+closed if no-follow or stable identity checks cannot be enforced; T8 may stage
+the file outside the repository but never behind a network read. The envelope contains canonical repository and open issue
 identity, exact base/head/head-tree SHAs, the complete neutral MAC payload, its
 SHA-256 over RFC 8785 UTF-8 bytes plus one LF, and canonical expected change
 delta. T5 validates the envelope and payload, URL/repository binding, the three
 explicit Git flags, affected identities and exact computed Git paths and blob
 digests. It performs no provider read, supplies no missing fact and rejects all
-mismatches. Revoke/move `reason`, `effective_at` and optional `replacement`
-come only from expected delta; they are never inferred from deletion, prose or
-the clock.
+mismatches. Vendor and inference-service identities are the exact changed keys
+from canonical base/head registry-map comparison, so one registry-file delta
+may bind a homogeneous batch while missing or extra subjects fail. Other kinds
+retain per-record path identity. Revoke/move `reason` and `effective_at` come
+only from expected delta. Move replacement is required and equals its
+destination path; standalone revoke replacement is optional but, when present,
+is a distinct offering path existing in the exact head. Nothing is inferred
+from deletion, prose or the clock.
 
 `schemas/catalogue-output.schema.json` defines the sole JSON serialisation of
 validated catalogue state. T5 emits RFC 8785 UTF-8 bytes followed by exactly
@@ -356,7 +367,8 @@ recursive and archive-metadata ambiguity.
 
 T6's executable completeness check requires `files` keys to equal, not merely
 contain, the fixed inventory in `docs/contract.yaml` (base routes, local assets,
-canonical catalogue and all seventeen schema copies) union one model detail page
+canonical catalogue, canonical change delta and every schema file beneath the
+configured schema root at the exact source commit) union one model detail page
 per projected model and one offering detail page per projected offering. The
 manifest itself is excluded. Missing required files, missing projection-derived
 pages and undeclared extra files all fail; schema validation alone is not the
@@ -758,7 +770,7 @@ T6 will add final builds with explicit `--merge-commit` and `--merge-tree`,
 merge-tree equality and the accepted source epoch unchanged.
 
 T8 invokes the candidate build with the trusted provider's base/head/tree,
-validated bounded MAC metadata, explicit epoch/profile/base URL/path and a
+the explicit path to validated bounded MAC metadata, explicit epoch/profile/base URL/path and a
 fresh candidate output path, then hashes that exact result. T5 does not perform
 the post-merge final build; that interface remains deferred to T6.
 

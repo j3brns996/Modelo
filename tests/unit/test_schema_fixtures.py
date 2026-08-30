@@ -3,7 +3,10 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
+import stat
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
@@ -22,17 +25,20 @@ SCHEMAS = ROOT / "schemas"
 CASES = ROOT / "tests/fixtures/schema/cases.json"
 MAC_FIXTURES = ROOT / "tests/fixtures/mac"
 
-REQUIRED_PUBLICATION_FILES = {
+REQUIRED_FIXED_PUBLICATION_FILES = {
     "404.html",
     "assets/catalogue.js",
     "assets/site.css",
     "catalogue/index.html",
     "changes/index.html",
     "data/catalogue.json",
+    "data/change-delta.json",
     "docs/index.html",
     "index.html",
     "process/index.html",
     "propose/index.html",
+}
+REQUIRED_PUBLICATION_FILES = REQUIRED_FIXED_PUBLICATION_FILES | {
     *(f"schemas/{path.relative_to(SCHEMAS).as_posix()}" for path in SCHEMAS.rglob("*.schema.json")),
 }
 
@@ -94,7 +100,13 @@ def _canonical_receipt_bytes(value: dict[str, Any]) -> bytes:
 
 
 def _mac_metadata_errors(
-    envelope: dict[str, Any], flags: dict[str, str], computed_delta: list[dict[str, Any]]
+    envelope: dict[str, Any],
+    flags: dict[str, str],
+    computed_delta: list[dict[str, Any]],
+    *,
+    base_registries: dict[str, dict[str, Any]] | None = None,
+    head_registries: dict[str, dict[str, Any]] | None = None,
+    head_offering_paths: set[str] | None = None,
 ) -> set[str]:
     errors: set[str] = set()
     repository = envelope["repository"]
@@ -123,6 +135,10 @@ def _mac_metadata_errors(
     payload = envelope["payload"]
     subjects = payload["subjects"]
     operation = payload["item_operation"] if payload["operation"] == "batch" else payload["operation"]
+    registry_paths = {
+        "vendor": "catalogue/governance/vendors.yaml",
+        "inference-service": "catalogue/governance/inference-services.yaml",
+    }
 
     def path_for(subject: dict[str, str]) -> str:
         kind, identity = subject["kind"], subject["identity"]
@@ -159,12 +175,40 @@ def _mac_metadata_errors(
                 or not path_matches(destination, delta["destination"]["path"])
             ):
                 errors.add("operation-subjects")
+            if delta["source"].get("replacement") != delta["destination"]["path"]:
+                errors.add("move-replacement")
     else:
-        if len(expected_delta) != len(subjects):
+        registry_subjects = [item for item in subjects if item["kind"] in registry_paths]
+        ordinary_subjects = [item for item in subjects if item["kind"] not in registry_paths]
+        registry_delta = [
+            item for item in expected_delta
+            if item.get("path") in set(registry_paths.values())
+        ]
+        ordinary_delta = [item for item in expected_delta if item not in registry_delta]
+        if registry_subjects:
+            if base_registries is None or head_registries is None:
+                errors.add("registry-context")
+            else:
+                for kind, registry_path in registry_paths.items():
+                    claimed = {
+                        item["identity"] for item in registry_subjects if item["kind"] == kind
+                    }
+                    base_map = base_registries.get(kind, {})
+                    head_map = head_registries.get(kind, {})
+                    changed = {
+                        key for key in set(base_map) | set(head_map)
+                        if canonical_json(base_map.get(key)) != canonical_json(head_map.get(key))
+                    }
+                    if claimed != changed:
+                        errors.add("registry-subjects")
+                    matching_delta = [item for item in registry_delta if item["path"] == registry_path]
+                    if bool(changed) != (len(matching_delta) == 1):
+                        errors.add("registry-subjects")
+        if len(ordinary_delta) != len(ordinary_subjects):
             errors.add("operation-subjects")
         else:
-            unmatched = list(expected_delta)
-            for subject in subjects:
+            unmatched = list(ordinary_delta)
+            for subject in ordinary_subjects:
                 match = next(
                     (item for item in unmatched if item["operation"] == operation and path_matches(subject, item["path"])),
                     None,
@@ -175,7 +219,63 @@ def _mac_metadata_errors(
                 unmatched.remove(match)
             if unmatched:
                 errors.add("operation-subjects")
+        if operation == "revoke":
+            for delta in ordinary_delta:
+                replacement = delta.get("replacement")
+                if replacement is not None and (
+                    replacement == delta["path"]
+                    or head_offering_paths is None
+                    or replacement not in head_offering_paths
+                ):
+                    errors.add("revoke-replacement")
     return errors
+
+
+def _read_mac_metadata_contract(path: Path) -> dict[str, Any]:
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise RuntimeError("CI cannot enforce non-symlink metadata input")
+    descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError("metadata input must be a regular file")
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(descriptor, min(65536, 262145 - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > 262144:
+                raise ValueError("metadata input exceeds 262144 bytes")
+        after = os.fstat(descriptor)
+        identity = lambda value: (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns)
+        if identity(before) != identity(after):
+            raise ValueError("metadata input changed while read")
+    finally:
+        os.close(descriptor)
+
+    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("duplicate JSON key")
+            result[key] = value
+        return result
+
+    def reject_number(value: str) -> Any:
+        raise ValueError(f"non-integer JSON number {value!r}")
+
+    document = json.loads(
+        b"".join(chunks).decode("utf-8", errors="strict"),
+        object_pairs_hook=pairs,
+        parse_float=reject_number,
+        parse_constant=reject_number,
+    )
+    if not isinstance(document, dict):
+        raise ValueError("metadata root must be a JSON object")
+    return document
 
 
 def _canonical_site_url_matches(url: str, base_path: str) -> bool:
@@ -455,6 +555,7 @@ class SchemaFixtureTests(unittest.TestCase):
             metadata["properties"]["expected_change_delta"]["$ref"],
             "release-receipt.schema.json#/$defs/changeDeltaList",
         )
+        self.assertEqual(metadata["properties"]["expected_change_delta"]["maxItems"], 25)
 
     def test_modelo_removes_legacy_publication_path_and_disables_agent_approval(self) -> None:
         config = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
@@ -582,7 +683,15 @@ class SchemaFixtureTests(unittest.TestCase):
             "candidate_files_exact_catalogue_plus_change_delta;final_files_equal_contract_fixed_union_projection_derived_excluding_manifest",
         )
         configured = set(contract["build"]["manifest_required_fixed_files"])
-        self.assertEqual(configured, REQUIRED_PUBLICATION_FILES)
+        self.assertEqual(configured, REQUIRED_FIXED_PUBLICATION_FILES)
+        configured_schemas = {
+            path for path in REQUIRED_PUBLICATION_FILES if path.startswith("schemas/")
+        }
+        source_schemas = {
+            f"schemas/{path.relative_to(SCHEMAS).as_posix()}"
+            for path in SCHEMAS.rglob("*.schema.json")
+        }
+        self.assertEqual(configured_schemas, source_schemas)
         projection = {
             "models": [{"id": "model-a"}, {"id": "model-b"}],
             "offerings": [
@@ -709,6 +818,155 @@ class SchemaFixtureTests(unittest.TestCase):
         self.assertIn("operation-subjects", errors)
         self.assertIn("computed-delta", errors)
 
+    def test_registry_subjects_are_derived_from_keyed_document_diff(self) -> None:
+        base = next(
+            case["valid"][0] for case in self.cases
+            if case["schema"] == "mac-metadata.schema.json"
+        )
+        digest_a = "sha256:" + "a" * 64
+        digest_b = "sha256:" + "b" * 64
+        delta = [{
+            "operation": "change",
+            "path": "catalogue/governance/vendors.yaml",
+            "before": digest_a,
+            "after": digest_b,
+        }]
+        flags = {
+            "base_commit": base["base_sha"],
+            "source_commit": base["head_sha"],
+            "source_tree": base["head_tree_sha"],
+        }
+
+        def envelope_for(identities: list[str]) -> dict[str, Any]:
+            envelope = copy.deepcopy(base)
+            payload = json.loads((MAC_FIXTURES / "batch.json").read_text(encoding="utf-8"))
+            payload["subjects"] = [
+                {"kind": "vendor", "identity": identity} for identity in identities
+            ]
+            envelope["payload"] = payload
+            envelope["payload_digest"] = "sha256:" + hashlib.sha256(
+                _canonical_receipt_bytes(payload)
+            ).hexdigest()
+            envelope["expected_change_delta"] = copy.deepcopy(delta)
+            return envelope
+
+        base_maps = {"vendor": {}, "inference-service": {}}
+        head_maps = {
+            "vendor": {"vendor-a": {"name": "A"}, "vendor-b": {"name": "B"}},
+            "inference-service": {},
+        }
+        batch = envelope_for(["vendor-a", "vendor-b"])
+        metadata_validator = Draft202012Validator(
+            self.schemas["mac-metadata.schema.json"],
+            registry=self.registry,
+            format_checker=FormatChecker(),
+        )
+        self.assertEqual(list(metadata_validator.iter_errors(batch)), [])
+        self.assertEqual(
+            _mac_metadata_errors(
+                batch, flags, delta,
+                base_registries=base_maps, head_registries=head_maps,
+            ),
+            set(),
+        )
+        for identities in (["vendor-a"], ["vendor-a", "vendor-b", "vendor-c"]):
+            with self.subTest(identities=identities):
+                self.assertIn(
+                    "registry-subjects",
+                    _mac_metadata_errors(
+                        envelope_for(list(identities)), flags, delta,
+                        base_registries=base_maps, head_registries=head_maps,
+                    ),
+                )
+        claim_a_change_b = envelope_for(["vendor-a"])
+        self.assertIn(
+            "registry-subjects",
+            _mac_metadata_errors(
+                claim_a_change_b, flags, delta,
+                base_registries=base_maps,
+                head_registries={
+                    "vendor": {"vendor-b": {"name": "B"}},
+                    "inference-service": {},
+                },
+            ),
+        )
+        service = envelope_for(["service-a"])
+        service["payload"]["subjects"] = [
+            {"kind": "inference-service", "identity": "service-a"}
+        ]
+        service["payload_digest"] = "sha256:" + hashlib.sha256(
+            _canonical_receipt_bytes(service["payload"])
+        ).hexdigest()
+        service_delta = [{
+            "operation": "change",
+            "path": "catalogue/governance/inference-services.yaml",
+            "before": digest_a,
+            "after": digest_b,
+        }]
+        service["expected_change_delta"] = service_delta
+        self.assertEqual(
+            _mac_metadata_errors(
+                service, flags, service_delta,
+                base_registries={"vendor": {}, "inference-service": {}},
+                head_registries={
+                    "vendor": {},
+                    "inference-service": {"service-a": {"name": "Service A"}},
+                },
+            ),
+            set(),
+        )
+
+    def test_mac_metadata_ingestion_is_bounded_strict_json_read_once(self) -> None:
+        config = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
+        ingestion = config["build"]["mac_metadata_ingestion"]
+        self.assertEqual(
+            ingestion,
+            {
+                "cli_value": "explicit_file_path",
+                "file_type": "regular_non_symlink",
+                "max_bytes": 262144,
+                "encoding": "strict_utf8",
+                "format": "strict_json_object_not_yaml",
+                "duplicate_keys": "reject",
+                "non_finite_numbers": "reject",
+                "floating_point_numbers": "reject",
+                "open_strategy": "nofollow_required_in_ci",
+                "read_strategy": "once_from_single_open_descriptor",
+                "mutation_check": "fstat_before_after_device_inode_size_mtime_ns_equal",
+                "incapable_ci": "fail_closed",
+                "outside_repository_temp_path": "allowed",
+                "network_read": False,
+                "validation_order": ["file_boundary", "json_parse", "schema", "semantic_correlations"],
+            },
+        )
+        valid = next(
+            case["valid"][0] for case in self.cases
+            if case["schema"] == "mac-metadata.schema.json"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            regular = root / "valid.json"
+            regular.write_text(json.dumps(valid), encoding="utf-8")
+            self.assertEqual(_read_mac_metadata_contract(regular), valid)
+            symlink = root / "link.json"
+            symlink.symlink_to(regular)
+            invalid: list[tuple[str, bytes | None]] = [
+                ("link.json", None),
+                ("large.json", b"{" + b" " * 262144 + b"}"),
+                ("utf8.json", b"{\"x\":\xff}"),
+                ("yaml.json", b"key: value\n"),
+                ("duplicate.json", b"{\"x\":1,\"x\":2}"),
+                ("nan.json", b"{\"x\":NaN}"),
+                ("float.json", b"{\"x\":1.5}"),
+                ("array.json", b"[]"),
+            ]
+            for name, content in invalid:
+                path = root / name
+                if content is not None:
+                    path.write_bytes(content)
+                with self.subTest(name=name), self.assertRaises((OSError, ValueError, UnicodeError, json.JSONDecodeError)):
+                    _read_mac_metadata_contract(path)
+
     def test_revoke_and_move_annotations_are_envelope_only_and_exact(self) -> None:
         base = next(
             case["valid"][0]
@@ -753,6 +1011,90 @@ class SchemaFixtureTests(unittest.TestCase):
             target[mutation_path[-1]] = value
             with self.subTest(name=name):
                 self.assertIn("computed-delta", _mac_metadata_errors(envelope, flags, changed))
+
+    def test_move_and_revoke_replacements_are_exact_and_resolvable(self) -> None:
+        base = next(
+            case["valid"][0] for case in self.cases
+            if case["schema"] == "mac-metadata.schema.json"
+        )
+        flags = {
+            "base_commit": base["base_sha"],
+            "source_commit": base["head_sha"],
+            "source_tree": base["head_tree_sha"],
+        }
+        digest = "sha256:" + "a" * 64
+        move = copy.deepcopy(base)
+        move["payload"] = json.loads((MAC_FIXTURES / "move.json").read_text(encoding="utf-8"))
+        move["payload_digest"] = "sha256:" + hashlib.sha256(
+            _canonical_receipt_bytes(move["payload"])
+        ).hexdigest()
+        move_delta = [{
+            "operation": "move",
+            "source": {
+                "operation": "revoke",
+                "path": "catalogue/offerings/aws-bedrock/bedrock-example-old.yaml",
+                "before": digest,
+                "reason": "Identity moved.",
+                "effective_at": "2026-08-30T14:00:00Z",
+                "replacement": "catalogue/offerings/aws-bedrock/bedrock-example-new.yaml",
+            },
+            "destination": {
+                "operation": "add",
+                "path": "catalogue/offerings/aws-bedrock/bedrock-example-new.yaml",
+                "after": digest,
+            },
+        }]
+        move["expected_change_delta"] = move_delta
+        self.assertEqual(_mac_metadata_errors(move, flags, move_delta), set())
+        for replacement in (None, "catalogue/offerings/aws-bedrock/arbitrary.yaml"):
+            changed = copy.deepcopy(move_delta)
+            if replacement is None:
+                changed[0]["source"].pop("replacement")
+            else:
+                changed[0]["source"]["replacement"] = replacement
+            changed_envelope = copy.deepcopy(move)
+            changed_envelope["expected_change_delta"] = changed
+            self.assertIn("move-replacement", _mac_metadata_errors(changed_envelope, flags, changed))
+
+        revoke = copy.deepcopy(base)
+        revoke["payload"] = json.loads((MAC_FIXTURES / "revoke.json").read_text(encoding="utf-8"))
+        revoke["payload_digest"] = "sha256:" + hashlib.sha256(
+            _canonical_receipt_bytes(revoke["payload"])
+        ).hexdigest()
+        revoked_path = "catalogue/offerings/aws-bedrock/bedrock-example-model.yaml"
+        replacement_path = "catalogue/offerings/aws-bedrock/bedrock-example-new.yaml"
+        revoke_delta = [{
+            "operation": "revoke", "path": revoked_path, "before": digest,
+            "reason": "Governance withdrawal.", "effective_at": "2026-08-30T14:00:00Z",
+        }]
+        revoke["expected_change_delta"] = revoke_delta
+        self.assertEqual(
+            _mac_metadata_errors(revoke, flags, revoke_delta, head_offering_paths=set()), set()
+        )
+        valid = copy.deepcopy(revoke_delta)
+        valid[0]["replacement"] = replacement_path
+        valid_envelope = copy.deepcopy(revoke)
+        valid_envelope["expected_change_delta"] = valid
+        self.assertEqual(
+            _mac_metadata_errors(
+                valid_envelope, flags, valid, head_offering_paths={replacement_path}
+            ),
+            set(),
+        )
+        for replacement, head_paths in (
+            (revoked_path, {revoked_path}),
+            (replacement_path, set()),
+        ):
+            changed = copy.deepcopy(revoke_delta)
+            changed[0]["replacement"] = replacement
+            changed_envelope = copy.deepcopy(revoke)
+            changed_envelope["expected_change_delta"] = changed
+            self.assertIn(
+                "revoke-replacement",
+                _mac_metadata_errors(
+                    changed_envelope, flags, changed, head_offering_paths=head_paths
+                ),
+            )
 
     def test_canonical_base_url_and_path_pairs(self) -> None:
         for url, path in (

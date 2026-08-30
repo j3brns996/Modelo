@@ -587,6 +587,7 @@
         { "name": "MAC metadata wrong payload operation", "op": "set", "path": ["payload", "operation"], "value": "unknown", "expect": ["enum", ["payload", "operation"]] },
         { "name": "MAC metadata wrong subject kind", "op": "set", "path": ["payload", "subjects", 0, "kind"], "value": "service", "expect": ["enum", ["payload", "subjects", 0, "kind"]] },
         { "name": "MAC metadata delta path traversal", "op": "set", "path": ["expected_change_delta", 0, "path"], "value": "catalogue/models/../x.yaml", "expect": ["pattern", ["expected_change_delta", 0, "path"]] },
+        { "name": "MAC metadata delta exceeds bounded subject count", "op": "repeat", "path": ["expected_change_delta"], "value": [{ "operation": "add", "path": "catalogue/models/example-model-v1.yaml", "after": "sha256:9999999999999999999999999999999999999999999999999999999999999999" }], "count": 26, "expect": ["maxItems", ["expected_change_delta"]] },
         { "name": "MAC metadata extra field", "op": "set", "path": ["labels"], "value": [], "expect": ["additionalProperties", []] }
       ]
     },

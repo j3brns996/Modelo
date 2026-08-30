@@ -97,7 +97,7 @@ toolchain:
     sync: uv sync --locked
     package: uv build --offline --no-cache
     check: uv run --locked modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
-    build: uv run --locked modelo build --kind candidate --base-commit BASE_SHA --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
+    build: uv run --locked modelo build --kind candidate --base-commit BASE_SHA --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON_PATH --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
 
 site:
   base_url: null
@@ -155,6 +155,22 @@ build:
   manifest_path: data/manifest.json
   candidate_output_inventory: [site/data/catalogue.json, site/data/change-delta.json, site/data/manifest.json]
   candidate_manifest_files: [data/catalogue.json, data/change-delta.json]
+  mac_metadata_ingestion:
+    cli_value: explicit_file_path
+    file_type: regular_non_symlink
+    max_bytes: 262144
+    encoding: strict_utf8
+    format: strict_json_object_not_yaml
+    duplicate_keys: reject
+    non_finite_numbers: reject
+    floating_point_numbers: reject
+    open_strategy: nofollow_required_in_ci
+    read_strategy: once_from_single_open_descriptor
+    mutation_check: fstat_before_after_device_inode_size_mtime_ns_equal
+    incapable_ci: fail_closed
+    outside_repository_temp_path: allowed
+    network_read: false
+    validation_order: [file_boundary, json_parse, schema, semantic_correlations]
   change_delta_wire: canonical_rfc8785_array_utf8_plus_single_lf
   change_delta_digest: sha256_exact_bytes_including_single_lf
   receipt_primitives: library_values_only

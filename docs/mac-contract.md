@@ -70,7 +70,8 @@ input bound to the head SHA. The networkless core check verifies repository,
 immutable platform issue identifier, open state, payload, digest and affected
 identities from that input. Labels are routing hints only.
 
-The input is `schemas/mac-metadata.schema.json`. T8 alone creates it from the
+The `--mac-metadata` input is an explicit file path; `schemas/mac-metadata.schema.json`
+is its validation contract, not a second input. T8 alone creates the file from the
 current same-repository provider context. It contains canonical repository
 identity; immutable issue reference, canonical issue URL and literal open
 state; exact comparison base, head and head-tree SHAs; the complete neutral MAC
@@ -83,8 +84,23 @@ path/content-digest delta. An offering subject identity binds the offering
 filename; its inference-service directory comes only from the computed Git
 delta and must be structurally valid.
 
-For revoke and move, durable `reason`, `effective_at` and optional
-`replacement` exist only in the envelope's expected delta. They must accompany
+T5 accepts only a regular non-symlink file of at most 262144 bytes and reads it
+once from one no-follow descriptor. The bytes must be strict UTF-8 JSON with an
+object root; YAML, duplicate keys, floats and non-finite numbers are rejected.
+Before/after `fstat` device, inode, size and nanosecond mtime must agree. Trusted
+CI fails closed where no-follow or stable identity checks cannot be enforced;
+T8 may use a temporary path outside the repository but never a network source.
+
+Vendor and inference-service registries are correlated by canonical keyed
+document diff, not registry-file cardinality: claimed identities must equal the
+changed keys between exact base and head maps. One registry-file delta may thus
+represent a homogeneous batch of up to 25 keys; missing, extra or different
+claimed keys fail. Other subject kinds retain one record-path identity binding.
+
+For revoke and move, durable `reason` and `effective_at` exist only in the
+envelope's expected delta. A move requires its source `replacement` to equal
+the destination path. A standalone revoke may omit replacement; when present,
+it must be a distinct offering path that exists in the exact head. These fields must accompany
 the correct neutral operation and subject identities and exactly equal the
 validated delta; T5 never derives them from deletion, payload prose or current
 time.

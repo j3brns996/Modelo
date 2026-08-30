@@ -6,7 +6,7 @@
     "path": { "$ref": "common.schema.json#/$defs/safeRelativePath" },
     "routeTemplate": {
       "type": "string",
-      "pattern": "^/",
+      "pattern": "^/(?!/)(?!.*//)(?!.*\\$\\{)(?!.*[\\u0000-\\u001f\\u007f])[A-Za-z0-9._~!$&'()*+,;=:@%/?{}-]*(?![\\s\\S])",
       "minLength": 1,
       "maxLength": 512
     },
@@ -36,7 +36,11 @@
       "required": ["adapter", "host", "namespace", "name", "web_base", "web_routes"],
       "properties": {
         "adapter": { "enum": ["github", "gitlab"] },
-        "host": { "type": "string", "format": "hostname" },
+        "host": {
+          "type": "string",
+          "format": "hostname",
+          "pattern": "^(?=.{1,253}(?![\\s\\S]))(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)*[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?![\\s\\S])"
+        },
         "namespace": { "type": "string", "minLength": 1, "maxLength": 256 },
         "name": { "type": "string", "minLength": 1, "maxLength": 256 },
         "web_base": { "$ref": "common.schema.json#/$defs/httpsUri" },
@@ -70,7 +74,52 @@
     "paths": {
       "type": "object",
       "required": ["readme", "contributing", "codeowners", "gitignore", "gitattributes", "catalogue", "models", "offerings", "evidence", "governance", "actor_policy", "conditions", "publication_profiles", "schemas", "provider_schemas", "mac_schema", "release_receipt_schema", "tests", "fixtures", "implementation", "site_source", "site_templates", "site_assets", "site_content", "build", "site_output", "docs", "human_specification", "machine_contract", "implementation_plan", "site_contract", "mac_contract", "security_contract", "agent_rules", "provider_docs", "decisions", "reviews", "open_skills", "codex_adapter", "kiro_adapter", "github_adapter", "gitlab_adapter", "gitlab_ci"],
-      "additionalProperties": { "$ref": "#/$defs/path" }
+      "properties": {
+        "readme": { "$ref": "#/$defs/path" },
+        "contributing": { "$ref": "#/$defs/path" },
+        "codeowners": { "$ref": "#/$defs/path" },
+        "gitignore": { "$ref": "#/$defs/path" },
+        "gitattributes": { "$ref": "#/$defs/path" },
+        "catalogue": { "$ref": "#/$defs/path" },
+        "models": { "$ref": "#/$defs/path" },
+        "offerings": { "$ref": "#/$defs/path" },
+        "evidence": { "$ref": "#/$defs/path" },
+        "governance": { "$ref": "#/$defs/path" },
+        "actor_policy": { "$ref": "#/$defs/path" },
+        "conditions": { "$ref": "#/$defs/path" },
+        "publication_profiles": { "$ref": "#/$defs/path" },
+        "schemas": { "$ref": "#/$defs/path" },
+        "provider_schemas": { "$ref": "#/$defs/path" },
+        "mac_schema": { "$ref": "#/$defs/path" },
+        "release_receipt_schema": { "$ref": "#/$defs/path" },
+        "tests": { "$ref": "#/$defs/path" },
+        "fixtures": { "$ref": "#/$defs/path" },
+        "implementation": { "$ref": "#/$defs/path" },
+        "site_source": { "$ref": "#/$defs/path" },
+        "site_templates": { "$ref": "#/$defs/path" },
+        "site_assets": { "$ref": "#/$defs/path" },
+        "site_content": { "$ref": "#/$defs/path" },
+        "build": { "$ref": "#/$defs/path" },
+        "site_output": { "$ref": "#/$defs/path" },
+        "docs": { "$ref": "#/$defs/path" },
+        "human_specification": { "$ref": "#/$defs/path" },
+        "machine_contract": { "$ref": "#/$defs/path" },
+        "implementation_plan": { "$ref": "#/$defs/path" },
+        "site_contract": { "$ref": "#/$defs/path" },
+        "mac_contract": { "$ref": "#/$defs/path" },
+        "security_contract": { "$ref": "#/$defs/path" },
+        "agent_rules": { "$ref": "#/$defs/path" },
+        "provider_docs": { "$ref": "#/$defs/path" },
+        "decisions": { "$ref": "#/$defs/path" },
+        "reviews": { "$ref": "#/$defs/path" },
+        "open_skills": { "$ref": "#/$defs/path" },
+        "codex_adapter": { "$ref": "#/$defs/path" },
+        "kiro_adapter": { "$ref": "#/$defs/path" },
+        "github_adapter": { "$ref": "#/$defs/path" },
+        "gitlab_adapter": { "$ref": "#/$defs/path" },
+        "gitlab_ci": { "$ref": "#/$defs/path" }
+      },
+      "additionalProperties": false
     },
     "toolchain": {
       "type": "object",
@@ -116,7 +165,7 @@
       "required": ["base_url", "base_path", "routes", "data_routes", "urls_resolved_from_config_only", "effective_base_url_and_path_are_receipt_inputs", "ci_requires_explicit_base_url"],
       "properties": {
         "base_url": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/httpsUri" }] },
-        "base_path": { "type": "string", "pattern": "^/(?:[^?#]*/)?$" },
+        "base_path": { "type": "string", "pattern": "^/(?!/)(?!.*//)(?!.*[\\u0000-\\u001f\\u007f])(?:[^?#]*/)?(?![\\s\\S])" },
         "routes": {
           "type": "object",
           "required": ["home", "catalogue", "model", "offering", "changes", "process", "propose", "docs", "not_found"],

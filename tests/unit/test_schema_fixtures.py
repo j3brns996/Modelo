@@ -5,6 +5,7 @@ import json
 import unittest
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin
 
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
@@ -39,9 +40,33 @@ def _mutate(instance: Any, mutation: dict[str, Any]) -> Any:
         parent[key] = mutation["value"]
     elif mutation["op"] == "rename":
         parent[mutation["value"]] = parent.pop(key)
+    elif mutation["op"] == "repeat":
+        parent[key] = mutation["value"] * mutation["count"]
+    elif mutation["op"] == "duplicate_first":
+        parent[key].append(copy.deepcopy(parent[key][0]))
     else:
         raise AssertionError(f"unknown fixture mutation {mutation['op']!r}")
     return changed
+
+
+def _flatten_errors(errors: list[Any]) -> list[Any]:
+    flattened: list[Any] = []
+    pending = list(errors)
+    while pending:
+        error = pending.pop()
+        flattened.append(error)
+        pending.extend(error.context)
+    return flattened
+
+
+def _walk_json(value: Any):
+    if isinstance(value, dict):
+        yield value
+        for child in value.values():
+            yield from _walk_json(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _walk_json(child)
 
 
 class SchemaFixtureTests(unittest.TestCase):
@@ -54,6 +79,24 @@ class SchemaFixtureTests(unittest.TestCase):
         expected = set(self.schemas) - {"common.schema.json"}
         actual = {case["schema"] for case in self.cases}
         self.assertEqual(actual, expected)
+
+    def test_all_schema_references_resolve(self) -> None:
+        identifiers = {document["$id"] for document in self.schemas.values()}
+        for name, document in self.schemas.items():
+            for node in _walk_json(document):
+                if "$ref" not in node:
+                    continue
+                target = urljoin(document["$id"], node["$ref"]).split("#", 1)[0]
+                with self.subTest(schema=name, reference=node["$ref"]):
+                    self.assertIn(target, identifiers)
+
+    def test_patterns_do_not_use_ambiguous_terminal_dollar_anchor(self) -> None:
+        for name, document in self.schemas.items():
+            for node in _walk_json(document):
+                if "pattern" not in node:
+                    continue
+                with self.subTest(schema=name, pattern=node["pattern"]):
+                    self.assertFalse(node["pattern"].endswith("$"))
 
     def test_valid_and_invalid_fixtures(self) -> None:
         for case in self.cases:
@@ -68,16 +111,40 @@ class SchemaFixtureTests(unittest.TestCase):
                     yaml.safe_load((ROOT / case["valid_source"]).read_text(encoding="utf-8"))
                 ]
             else:
-                valid = case["valid"]
+                valid = copy.deepcopy(case["valid"])
+            for mutation in case.get("valid_mutations", []):
+                valid.append(
+                    _mutate(valid[mutation.get("valid_index", 0)], mutation)
+                )
             for index, instance in enumerate(valid):
                 with self.subTest(schema=case["schema"], valid=index):
                     errors = list(validator.iter_errors(instance))
                     self.assertEqual(errors, [], [error.message for error in errors])
             for mutation in case["invalid"]:
+                self.assertIn("expect", mutation, mutation["name"])
                 source = valid[mutation.get("valid_index", 0)]
                 instance = _mutate(source, mutation)
                 with self.subTest(schema=case["schema"], invalid=mutation["name"]):
-                    self.assertNotEqual(list(validator.iter_errors(instance)), [])
+                    errors = _flatten_errors(list(validator.iter_errors(instance)))
+                    expected_keyword, expected_path = mutation["expect"]
+                    matching = [
+                        error
+                        for error in errors
+                        if error.validator == expected_keyword
+                        and list(error.absolute_path) == expected_path
+                    ]
+                    self.assertNotEqual(
+                        matching,
+                        [],
+                        [
+                            {
+                                "keyword": error.validator,
+                                "path": list(error.absolute_path),
+                                "message": error.message,
+                            }
+                            for error in errors
+                        ],
+                    )
 
 
 if __name__ == "__main__":

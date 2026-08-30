@@ -21,10 +21,14 @@
         }
       ],
       "invalid": [
-        { "name": "missing name", "op": "remove", "path": ["name"] },
-        { "name": "bad identity", "op": "set", "path": ["id"], "value": "Test Model" },
-        { "name": "unknown field", "op": "set", "path": ["approved"], "value": true },
-        { "name": "binary float context", "op": "set", "path": ["context_window"], "value": 1.5 }
+        { "name": "missing name", "op": "remove", "path": ["name"], "expect": ["required", []] },
+        { "name": "bad identity", "op": "set", "path": ["id"], "value": "Test Model", "expect": ["pattern", ["id"]] },
+        { "name": "unknown field", "op": "set", "path": ["approved"], "value": true, "expect": ["additionalProperties", []] },
+        { "name": "binary float context", "op": "set", "path": ["context_window"], "value": 1.5, "expect": ["type", ["context_window"]] },
+        { "name": "identity line feed", "op": "set", "path": ["id"], "value": "test-model\n", "expect": ["pattern", ["id"]] },
+        { "name": "identity carriage return", "op": "set", "path": ["id"], "value": "test-model\r", "expect": ["pattern", ["id"]] },
+        { "name": "identity control", "op": "set", "path": ["id"], "value": "test\u0000model", "expect": ["pattern", ["id"]] },
+        { "name": "identity too long", "op": "repeat", "path": ["id"], "value": "a", "count": 129, "expect": ["maxLength", ["id"]] }
       ]
     },
     {
@@ -62,11 +66,22 @@
         }
       ],
       "invalid": [
-        { "name": "bad digest", "op": "set", "path": ["id"], "value": "sha256-ABC" },
-        { "name": "API operation absent", "op": "remove", "path": ["source", "operation"] },
-        { "name": "binary float projection", "op": "set", "path": ["projection", "price"], "value": 1.25 },
-        { "name": "sensitive extra source field", "op": "set", "path": ["source", "offerToken"], "value": "secret" },
-        { "name": "timestamp lacks timezone", "op": "set", "path": ["observed_at"], "value": "2026-08-30T12:00:00" }
+        { "name": "bad digest", "op": "set", "path": ["id"], "value": "sha256-ABC", "expect": ["pattern", ["id"]] },
+        { "name": "digest line feed", "op": "set", "path": ["id"], "value": "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n", "expect": ["pattern", ["id"]] },
+        { "name": "digest carriage return", "op": "set", "path": ["id"], "value": "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\r", "expect": ["pattern", ["id"]] },
+        { "name": "digest control", "op": "set", "path": ["id"], "value": "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\u0000", "expect": ["pattern", ["id"]] },
+        { "name": "API operation absent", "op": "remove", "path": ["source", "operation"], "expect": ["required", ["source"]] },
+        { "name": "binary float projection", "op": "set", "path": ["projection", "price"], "value": 1.25, "expect": ["oneOf", ["projection", "price"]] },
+        { "name": "sensitive extra source field", "op": "set", "path": ["source", "offerToken"], "value": "secret", "expect": ["additionalProperties", ["source"]] },
+        { "name": "timestamp lacks timezone", "op": "set", "path": ["observed_at"], "value": "2026-08-30T12:00:00", "expect": ["pattern", ["observed_at"]] },
+        { "name": "region line feed", "op": "set", "path": ["source", "region"], "value": "eu-west-2\n", "expect": ["pattern", ["source", "region"]] },
+        { "name": "region carriage return", "op": "set", "path": ["source", "region"], "value": "eu-west-2\r", "expect": ["pattern", ["source", "region"]] },
+        { "name": "region control", "op": "set", "path": ["source", "region"], "value": "eu-west-\u00002", "expect": ["pattern", ["source", "region"]] },
+        { "name": "documentation URI not HTTPS", "op": "set", "path": ["source", "documentation_uri"], "value": "http://example.invalid/api", "expect": ["pattern", ["source", "documentation_uri"]] },
+        { "name": "documentation URI malformed", "op": "set", "path": ["source", "documentation_uri"], "value": "https://[", "expect": ["pattern", ["source", "documentation_uri"]] },
+        { "name": "documentation URI line feed", "op": "set", "path": ["source", "documentation_uri"], "value": "https://example.invalid/api\n", "expect": ["pattern", ["source", "documentation_uri"]] },
+        { "name": "documentation URI carriage return", "op": "set", "path": ["source", "documentation_uri"], "value": "https://example.invalid/api\r", "expect": ["pattern", ["source", "documentation_uri"]] },
+        { "name": "documentation URI control", "op": "set", "path": ["source", "documentation_uri"], "value": "https://example.invalid/\u0000api", "expect": ["pattern", ["source", "documentation_uri"]] }
       ]
     },
     {
@@ -75,8 +90,10 @@
         { "id": "test-condition", "version": 1, "title": "Test condition", "description": "Synthetic policy text.", "owner": "Test policy owner" }
       ],
       "invalid": [
-        { "name": "zero version", "op": "set", "path": ["version"], "value": 0 },
-        { "name": "workflow status forbidden", "op": "set", "path": ["status"], "value": "approved" }
+        { "name": "zero version", "op": "set", "path": ["version"], "value": 0, "expect": ["minimum", ["version"]] },
+        { "name": "workflow status forbidden", "op": "set", "path": ["status"], "value": "approved", "expect": ["additionalProperties", []] },
+        { "name": "condition owner absent", "op": "remove", "path": ["owner"], "expect": ["required", []] },
+        { "name": "condition title empty", "op": "set", "path": ["title"], "value": "", "expect": ["minLength", ["title"]] }
       ]
     },
     {
@@ -98,8 +115,10 @@
         }
       ],
       "invalid": [
-        { "name": "empty registry", "op": "set", "path": ["vendors"], "value": {} },
-        { "name": "bad registry key", "op": "rename", "path": ["vendors", "test-vendor"], "value": "Test Vendor" }
+        { "name": "empty registry", "op": "set", "path": ["vendors"], "value": {}, "expect": ["minProperties", ["vendors"]] },
+        { "name": "bad registry key", "op": "rename", "path": ["vendors", "test-vendor"], "value": "Test Vendor", "expect": ["pattern", ["vendors"]] },
+        { "name": "vendor nested unknown", "op": "set", "path": ["vendors", "test-vendor", "domicile"], "value": "us", "expect": ["additionalProperties", ["vendors", "test-vendor"]] },
+        { "name": "vendor evidence digest control", "op": "set", "path": ["vendors", "test-vendor", "evidence_refs", "/name", "id"], "value": "sha256-ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\u0000", "expect": ["pattern", ["vendors", "test-vendor", "evidence_refs", "/name", "id"]] }
       ]
     },
     {
@@ -108,8 +127,9 @@
         { "inference_services": { "aws-bedrock": { "id": "aws-bedrock", "adapter": "aws-bedrock" } } }
       ],
       "invalid": [
-        { "name": "GCP deferred", "op": "set", "path": ["inference_services", "aws-bedrock", "adapter"], "value": "gcp-vertex-ai" },
-        { "name": "extra service assertion", "op": "set", "path": ["inference_services", "aws-bedrock", "availability"], "value": true }
+        { "name": "GCP deferred", "op": "set", "path": ["inference_services", "aws-bedrock", "adapter"], "value": "gcp-vertex-ai", "expect": ["const", ["inference_services", "aws-bedrock", "adapter"]] },
+        { "name": "extra service assertion", "op": "set", "path": ["inference_services", "aws-bedrock", "availability"], "value": true, "expect": ["additionalProperties", ["inference_services", "aws-bedrock"]] },
+        { "name": "service ID absent", "op": "remove", "path": ["inference_services", "aws-bedrock", "id"], "expect": ["required", ["inference_services", "aws-bedrock"]] }
       ]
     },
     {
@@ -118,8 +138,9 @@
         { "classes_days": { "availability": 30, "pricing": 90, "intrinsic_model_fact": 365 } }
       ],
       "invalid": [
-        { "name": "pricing threshold drift", "op": "set", "path": ["classes_days", "pricing"], "value": 91 },
-        { "name": "unknown freshness class", "op": "set", "path": ["classes_days", "marketing"], "value": 7 }
+        { "name": "pricing threshold drift", "op": "set", "path": ["classes_days", "pricing"], "value": 91, "expect": ["const", ["classes_days", "pricing"]] },
+        { "name": "unknown freshness class", "op": "set", "path": ["classes_days", "marketing"], "value": 7, "expect": ["additionalProperties", ["classes_days"]] },
+        { "name": "availability threshold absent", "op": "remove", "path": ["classes_days", "availability"], "expect": ["required", ["classes_days"]] }
       ]
     },
     {
@@ -143,7 +164,7 @@
         {
           "id": "eu-system-profile",
           "adapter": "aws-bedrock",
-          "reference": "test.profile-v1",
+          "reference": "eu.test.profile-v1",
           "model_binding": {
             "kind": "system-inference-profile",
             "profile_evidence": {
@@ -164,11 +185,29 @@
           }
         }
       ],
+      "valid_mutations": [
+        { "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2::foundation-model/test.model-v1" },
+        { "valid_index": 1, "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2::inference-profile/eu.test.profile-v1" }
+      ],
       "invalid": [
-        { "name": "provider adapter deferred", "op": "set", "path": ["adapter"], "value": "azure-foundry" },
-        { "name": "direct binding lacks explicit ID pointer", "op": "remove", "path": ["model_binding", "model_evidence", "id_pointer"] },
-        { "name": "profile has no destinations", "valid_index": 1, "op": "set", "path": ["model_binding", "destinations"], "value": [] },
-        { "name": "account scope forbidden extra", "op": "set", "path": ["account_id"], "value": "123456789012" }
+        { "name": "provider adapter deferred", "op": "set", "path": ["adapter"], "value": "azure-foundry", "expect": ["const", ["adapter"]] },
+        { "name": "direct binding lacks explicit ID pointer", "op": "remove", "path": ["model_binding", "model_evidence", "id_pointer"], "expect": ["required", ["model_binding", "model_evidence"]] },
+        { "name": "profile has no destinations", "valid_index": 1, "op": "set", "path": ["model_binding", "destinations"], "value": [], "expect": ["minItems", ["model_binding", "destinations"]] },
+        { "name": "account scope forbidden extra", "op": "set", "path": ["account_id"], "value": "123456789012", "expect": ["additionalProperties", []] },
+        { "name": "route reference absent", "op": "remove", "path": ["reference"], "expect": ["required", []] },
+        { "name": "arbitrary direct reference", "op": "set", "path": ["reference"], "value": "arbitrary", "expect": ["oneOf", ["reference"]] },
+        { "name": "profile reference used for foundation binding", "op": "set", "path": ["reference"], "value": "eu.test.profile-v1", "expect": ["oneOf", ["reference"]] },
+        { "name": "provisioned reference deferred", "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2:123456789012:provisioned-model/test", "expect": ["oneOf", ["reference"]] },
+        { "name": "custom model reference deferred", "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2:123456789012:custom-model/test", "expect": ["oneOf", ["reference"]] },
+        { "name": "imported model reference deferred", "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2:123456789012:imported-model/test", "expect": ["oneOf", ["reference"]] },
+        { "name": "application profile kind deferred", "valid_index": 1, "op": "set", "path": ["model_binding", "kind"], "value": "application-inference-profile", "expect": ["oneOf", ["model_binding"]] },
+        { "name": "application profile ARN deferred", "valid_index": 1, "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2:123456789012:application-inference-profile/test", "expect": ["oneOf", ["reference"]] },
+        { "name": "account-owned profile ARN forbidden", "valid_index": 1, "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2:123456789012:inference-profile/eu.test.profile-v1", "expect": ["oneOf", ["reference"]] },
+        { "name": "direct reference line feed", "op": "set", "path": ["reference"], "value": "test.model-v1\n", "expect": ["oneOf", ["reference"]] },
+        { "name": "direct reference carriage return", "op": "set", "path": ["reference"], "value": "test.model-v1\r", "expect": ["oneOf", ["reference"]] },
+        { "name": "direct reference control", "op": "set", "path": ["reference"], "value": "test.model-\u0000v1", "expect": ["oneOf", ["reference"]] },
+        { "name": "direct reference too long", "op": "repeat", "path": ["reference"], "value": "a", "count": 2049, "expect": ["maxLength", ["reference"]] },
+        { "name": "unknown binding field", "op": "set", "path": ["model_binding", "scope"], "value": "test", "expect": ["additionalProperties", ["model_binding"]] }
       ]
     },
     {
@@ -212,11 +251,23 @@
         }
       ],
       "invalid": [
-        { "name": "no consumable route", "op": "set", "path": ["routes"], "value": [] },
-        { "name": "numeric amount", "op": "set", "path": ["pricing", 0, "amount"], "value": 3.0 },
-        { "name": "zero quantity", "op": "set", "path": ["pricing", 0, "quantity"], "value": 0 },
-        { "name": "condition version absent", "op": "remove", "path": ["condition_refs", 0, "version"] },
-        { "name": "approval flag forbidden", "op": "set", "path": ["approved"], "value": true }
+        { "name": "no consumable route", "op": "set", "path": ["routes"], "value": [], "expect": ["minItems", ["routes"]] },
+        { "name": "numeric amount", "op": "set", "path": ["pricing", 0, "amount"], "value": 3.0, "expect": ["type", ["pricing", 0, "amount"]] },
+        { "name": "zero quantity", "op": "set", "path": ["pricing", 0, "quantity"], "value": 0, "expect": ["minimum", ["pricing", 0, "quantity"]] },
+        { "name": "condition version absent", "op": "remove", "path": ["condition_refs", 0, "version"], "expect": ["required", ["condition_refs", 0]] },
+        { "name": "approval flag forbidden", "op": "set", "path": ["approved"], "value": true, "expect": ["additionalProperties", []] },
+        { "name": "offering model ID line feed", "op": "set", "path": ["model_id"], "value": "test-model-1\n", "expect": ["pattern", ["model_id"]] },
+        { "name": "decimal line feed", "op": "set", "path": ["pricing", 0, "amount"], "value": "3.00\n", "expect": ["pattern", ["pricing", 0, "amount"]] },
+        { "name": "decimal carriage return", "op": "set", "path": ["pricing", 0, "amount"], "value": "3.00\r", "expect": ["pattern", ["pricing", 0, "amount"]] },
+        { "name": "decimal control", "op": "set", "path": ["pricing", 0, "amount"], "value": "3.\u000000", "expect": ["pattern", ["pricing", 0, "amount"]] },
+        { "name": "negative decimal", "op": "set", "path": ["pricing", 0, "amount"], "value": "-1.00", "expect": ["pattern", ["pricing", 0, "amount"]] },
+        { "name": "currency lowercase", "op": "set", "path": ["pricing", 0, "currency"], "value": "usd", "expect": ["pattern", ["pricing", 0, "currency"]] },
+        { "name": "currency line feed", "op": "set", "path": ["pricing", 0, "currency"], "value": "USD\n", "expect": ["pattern", ["pricing", 0, "currency"]] },
+        { "name": "currency carriage return", "op": "set", "path": ["pricing", 0, "currency"], "value": "USD\r", "expect": ["pattern", ["pricing", 0, "currency"]] },
+        { "name": "currency control", "op": "set", "path": ["pricing", 0, "currency"], "value": "US\u0000", "expect": ["pattern", ["pricing", 0, "currency"]] },
+        { "name": "price unknown field", "op": "set", "path": ["pricing", 0, "estimate"], "value": true, "expect": ["additionalProperties", ["pricing", 0]] },
+        { "name": "price currency absent", "op": "remove", "path": ["pricing", 0, "currency"], "expect": ["required", ["pricing", 0]] },
+        { "name": "evidence pointer control", "op": "rename", "path": ["evidence_refs", "/pricing/0"], "value": "/pricing/0\u0000", "expect": ["pattern", ["evidence_refs"]] }
       ]
     },
     {
@@ -262,23 +313,77 @@
           }
         }
       ],
+      "valid_mutations": [
+        { "op": "set", "path": ["change_delta", 0], "value": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test-offering.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+        { "op": "set", "path": ["change_delta", 0], "value": { "operation": "change", "path": "catalogue/models/test-model-1.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "after": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } },
+        { "op": "set", "path": ["change_delta", 0], "value": { "operation": "move", "path": "catalogue/offerings/aws-bedrock/test-offering.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "after": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } }
+      ],
       "invalid": [
-        { "name": "failed CI is not accepting", "op": "set", "path": ["ci", "result"], "value": "failure" },
-        { "name": "receipt missing explicit as-of", "op": "remove", "path": ["as_of"] },
-        { "name": "approval lacks exact head", "op": "remove", "path": ["approval", "approved_head_sha"] },
-        { "name": "approval timestamp lacks timezone", "op": "set", "path": ["approval", "approval_timestamp"], "value": "2026-08-30T13:00:00" },
-        { "name": "delta path terminates in parent traversal", "op": "set", "path": ["change_delta", 0, "path"], "value": "catalogue/models/.." },
-        { "name": "add delta has before digest", "op": "set", "path": ["change_delta", 0, "before"], "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000" }
+        { "name": "failed CI is not accepting", "op": "set", "path": ["ci", "result"], "value": "failure", "expect": ["const", ["ci", "result"]] },
+        { "name": "receipt missing explicit as-of", "op": "remove", "path": ["as_of"], "expect": ["required", []] },
+        { "name": "approval lacks exact head", "op": "remove", "path": ["approval", "approved_head_sha"], "expect": ["required", ["approval"]] },
+        { "name": "approval timestamp lacks timezone", "op": "set", "path": ["approval", "approval_timestamp"], "value": "2026-08-30T13:00:00", "expect": ["pattern", ["approval", "approval_timestamp"]] },
+        { "name": "delta path terminates in parent traversal", "op": "set", "path": ["change_delta", 0, "path"], "value": "catalogue/models/..", "expect": ["pattern", ["change_delta", 0, "path"]] },
+        { "name": "add delta has before digest", "op": "set", "path": ["change_delta", 0, "before"], "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000", "expect": ["not", ["change_delta", 0]] },
+        { "name": "release line feed", "op": "set", "path": ["release"], "value": "catalogue-20260830.1\n", "expect": ["pattern", ["release"]] },
+        { "name": "release carriage return", "op": "set", "path": ["release"], "value": "catalogue-20260830.1\r", "expect": ["pattern", ["release"]] },
+        { "name": "release control", "op": "set", "path": ["release"], "value": "catalogue-20260830.\u00001", "expect": ["pattern", ["release"]] },
+        { "name": "Git SHA line feed", "op": "set", "path": ["base_sha"], "value": "1111111111111111111111111111111111111111\n", "expect": ["pattern", ["base_sha"]] },
+        { "name": "Git SHA carriage return", "op": "set", "path": ["base_sha"], "value": "1111111111111111111111111111111111111111\r", "expect": ["pattern", ["base_sha"]] },
+        { "name": "Git SHA control", "op": "set", "path": ["base_sha"], "value": "111111111111111111111111111111111111111\u0000", "expect": ["pattern", ["base_sha"]] },
+        { "name": "artifact digest line feed", "op": "set", "path": ["tool_digest"], "value": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\n", "expect": ["pattern", ["tool_digest"]] },
+        { "name": "artifact digest carriage return", "op": "set", "path": ["tool_digest"], "value": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\r", "expect": ["pattern", ["tool_digest"]] },
+        { "name": "artifact digest control", "op": "set", "path": ["tool_digest"], "value": "sha256:ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\u0000", "expect": ["pattern", ["tool_digest"]] },
+        { "name": "delta path line feed", "op": "set", "path": ["change_delta", 0, "path"], "value": "catalogue/models/test.yaml\n", "expect": ["pattern", ["change_delta", 0, "path"]] },
+        { "name": "delta path carriage return", "op": "set", "path": ["change_delta", 0, "path"], "value": "catalogue/models/test.yaml\r", "expect": ["pattern", ["change_delta", 0, "path"]] },
+        { "name": "delta path control", "op": "set", "path": ["change_delta", 0, "path"], "value": "catalogue/models/test\u0000.yaml", "expect": ["pattern", ["change_delta", 0, "path"]] },
+        { "name": "duplicate deltas", "op": "duplicate_first", "path": ["change_delta"], "expect": ["uniqueItems", ["change_delta"]] },
+        { "name": "revoke missing before", "op": "set", "path": ["change_delta", 0], "value": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test.yaml" }, "expect": ["required", ["change_delta", 0]] },
+        { "name": "revoke has after", "op": "set", "path": ["change_delta", 0], "value": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "after": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }, "expect": ["not", ["change_delta", 0]] },
+        { "name": "change missing before", "op": "set", "path": ["change_delta", 0], "value": { "operation": "change", "path": "catalogue/models/test.yaml", "after": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }, "expect": ["required", ["change_delta", 0]] },
+        { "name": "move missing after", "op": "set", "path": ["change_delta", 0], "value": { "operation": "move", "path": "catalogue/offerings/aws-bedrock/test.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }, "expect": ["required", ["change_delta", 0]] },
+        { "name": "unknown delta field", "op": "set", "path": ["change_delta", 0, "status"], "value": "approved", "expect": ["additionalProperties", ["change_delta", 0]] },
+        { "name": "artifact digest absent", "op": "remove", "path": ["artifacts", "site"], "expect": ["required", ["artifacts"]] },
+        { "name": "unknown approval field", "op": "set", "path": ["approval", "human"], "value": true, "expect": ["additionalProperties", ["approval"]] },
+        { "name": "invalid as-of date", "op": "set", "path": ["as_of"], "value": "2026-02-30", "expect": ["format", ["as_of"]] },
+        { "name": "negative source epoch", "op": "set", "path": ["source_date_epoch"], "value": -1, "expect": ["minimum", ["source_date_epoch"]] },
+        { "name": "unsupported CI provider", "op": "set", "path": ["ci", "provider"], "value": "jenkins", "expect": ["enum", ["ci", "provider"]] }
       ]
     },
     {
       "schema": "modelo.schema.json",
       "valid_source": "modelo.yaml",
       "invalid": [
-        { "name": "Node runtime forbidden", "op": "set", "path": ["toolchain", "required_runtime_is_node"], "value": true },
-        { "name": "required check renamed", "op": "set", "path": ["platform", "required_capabilities", "required_check", "name"], "value": "other/check" },
-        { "name": "silent publication downgrade", "op": "set", "path": ["publication", "silent_private_to_public_downgrade"], "value": true },
-        { "name": "unknown root service", "op": "set", "path": ["application_api"], "value": true }
+        { "name": "Node runtime forbidden", "op": "set", "path": ["toolchain", "required_runtime_is_node"], "value": true, "expect": ["const", ["toolchain", "required_runtime_is_node"]] },
+        { "name": "required check renamed", "op": "set", "path": ["platform", "required_capabilities", "required_check", "name"], "value": "other/check", "expect": ["const", ["platform", "required_capabilities", "required_check", "name"]] },
+        { "name": "silent publication downgrade", "op": "set", "path": ["publication", "silent_private_to_public_downgrade"], "value": true, "expect": ["const", ["publication", "silent_private_to_public_downgrade"]] },
+        { "name": "unknown root service", "op": "set", "path": ["application_api"], "value": true, "expect": ["additionalProperties", []] },
+        { "name": "unknown configured path", "op": "set", "path": ["paths", "services"], "value": "services", "expect": ["additionalProperties", ["paths"]] },
+        { "name": "required configured path absent", "op": "remove", "path": ["paths", "models"], "expect": ["required", ["paths"]] },
+        { "name": "configured path line feed", "op": "set", "path": ["paths", "models"], "value": "catalogue/models\n", "expect": ["pattern", ["paths", "models"]] },
+        { "name": "configured path carriage return", "op": "set", "path": ["paths", "models"], "value": "catalogue/models\r", "expect": ["pattern", ["paths", "models"]] },
+        { "name": "configured path control", "op": "set", "path": ["paths", "models"], "value": "catalogue/\u0000models", "expect": ["pattern", ["paths", "models"]] },
+        { "name": "configured parent path", "op": "set", "path": ["paths", "models"], "value": "catalogue/../models", "expect": ["pattern", ["paths", "models"]] },
+        { "name": "host malformed", "op": "set", "path": ["repository", "host"], "value": "git_hub.com", "expect": ["pattern", ["repository", "host"]] },
+        { "name": "host line feed", "op": "set", "path": ["repository", "host"], "value": "github.com\n", "expect": ["pattern", ["repository", "host"]] },
+        { "name": "host control", "op": "set", "path": ["repository", "host"], "value": "git\u0000hub.com", "expect": ["pattern", ["repository", "host"]] },
+        { "name": "web base not HTTPS", "op": "set", "path": ["repository", "web_base"], "value": "http://github.com/j3brns/Modelo", "expect": ["pattern", ["repository", "web_base"]] },
+        { "name": "route absolute URL", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "https://github.com/issues/1", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route protocol-relative", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "//evil.invalid/x", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route double slash", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues//1", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route environment interpolation", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues/${TOKEN}", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route line feed", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues/1\n", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route carriage return", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues/1\r", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route control", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues/\u00001", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route too long", "op": "repeat", "path": ["repository", "web_routes", "issue"], "value": "/a", "count": 257, "expect": ["maxLength", ["repository", "web_routes", "issue"]] },
+        { "name": "route missing", "op": "remove", "path": ["repository", "web_routes", "commit"], "expect": ["required", ["repository", "web_routes"]] },
+        { "name": "unknown nested route", "op": "set", "path": ["repository", "web_routes", "wiki"], "value": "/wiki", "expect": ["additionalProperties", ["repository", "web_routes"]] },
+        { "name": "site base path double slash", "op": "set", "path": ["site", "base_path"], "value": "/Modelo//", "expect": ["pattern", ["site", "base_path"]] },
+        { "name": "site route environment interpolation", "op": "set", "path": ["site", "routes", "home"], "value": "/${HOME}", "expect": ["pattern", ["site", "routes", "home"]] },
+        { "name": "clean clone build absent", "op": "remove", "path": ["toolchain", "clean_clone", "build"], "expect": ["required", ["toolchain", "clean_clone"]] },
+        { "name": "unknown toolchain field", "op": "set", "path": ["toolchain", "npx"], "value": true, "expect": ["additionalProperties", ["toolchain"]] },
+        { "name": "unsupported publication profile", "op": "set", "path": ["publication", "active_profile"], "value": "public", "expect": ["enum", ["publication", "active_profile"]] },
+        { "name": "unknown platform capability", "op": "set", "path": ["platform", "required_capabilities", "sso"], "value": true, "expect": ["additionalProperties", ["platform", "required_capabilities"]] }
       ]
     }
   ]

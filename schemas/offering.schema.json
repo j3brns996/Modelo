@@ -39,7 +39,7 @@
         },
         "currency": {
           "type": "string",
-          "pattern": "^[A-Z]{3}$",
+          "pattern": "^[A-Z]{3}(?![\\s\\S])",
           "x-modelo-provenance": "external",
           "x-modelo-freshness-class": "pricing"
         },

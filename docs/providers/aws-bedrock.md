@@ -46,10 +46,12 @@ aws bedrock get-foundation-model-availability \
 aws bedrock list-inference-profiles --region <region>
 ```
 
-The adapter stores a short-lived private response artefact when policy allows,
-computes a digest, extracts only schema-supported facts, and attaches fact-level
-JSON Pointers to the evidence record. Discovery opens or updates a MAC issue;
-it cannot edit an approved catalogue record.
+The adapter stores a durable redacted canonical projection beneath the globally
+configured evidence path, computes its digest, extracts only schema-supported
+facts, and attaches fact-level JSON Pointers to that evidence record. Raw
+responses may be short-lived private artefacts, but are not the only retained
+proof. Discovery opens or updates a MAC issue; it cannot edit an approved
+catalogue record.
 
 ## AWS route types
 
@@ -60,8 +62,10 @@ it cannot edit an approved catalogue record.
 - Provisioned, custom and imported model resources require their own adapter
   values and first-party fixtures before they are admitted.
 
-Account IDs, ARNs, Regions and inference-profile references belong in route or
-protected discovery configuration. They do not belong in canonical filenames.
+Regions and AWS-owned model or system-profile references may appear in routes.
+Account IDs and account-owned ARNs belong only in protected, redacted evidence
+or discovery configuration until a publication-projection contract admits
+them. None belongs in canonical filenames.
 
 ## Cross-cloud path comparison
 

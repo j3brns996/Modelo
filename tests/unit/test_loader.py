@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import date
+from io import BytesIO
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from modelo.loader import LoadError, YamlLimits, load_yaml_mapping
@@ -49,6 +51,19 @@ class LoaderTests(unittest.TestCase):
         self.assertNotIsInstance(document["observed_at"], date)
         self.assertEqual(document["items"], ["one", 2, None])
 
+    def test_signed_64_boundaries_and_decimal_strings_are_valid(self) -> None:
+        root = self.repository()
+        self.write(
+            root,
+            "minimum: -9223372036854775808\n"
+            "maximum: 9223372036854775807\n"
+            'decimal: "19.95"\n',
+        )
+        document = load_yaml_mapping(root, "catalogue/item.yaml")
+        self.assertEqual(document["minimum"], -(2**63))
+        self.assertEqual(document["maximum"], 2**63 - 1)
+        self.assertEqual(document["decimal"], "19.95")
+
     def test_duplicate_alias_anchor_tag_and_multiple_documents_fail(self) -> None:
         cases = {
             "YAML_DUPLICATE_KEY": "id: one\nid: two\n",
@@ -64,18 +79,48 @@ class LoaderTests(unittest.TestCase):
                 expected = "YAML_ALIAS_OR_ANCHOR" if label == "alias" else label
                 self.assert_error(root, expected)
 
-    def test_invalid_syntax_root_key_and_nonfinite_number_fail(self) -> None:
+    def test_invalid_syntax_root_key_and_all_floats_fail(self) -> None:
         cases = (
             ("[unterminated", "YAML_PARSE_ERROR"),
             ("- item\n", "YAML_INVALID_ROOT"),
             ("1: value\n", "YAML_PARSE_ERROR"),
+            ("value: 1.0\n", "YAML_PARSE_ERROR"),
+            ("value: -2.5\n", "YAML_PARSE_ERROR"),
             ("value: .inf\n", "YAML_PARSE_ERROR"),
+            ("value: .nan\n", "YAML_PARSE_ERROR"),
         )
         for content, code in cases:
             with self.subTest(content=content):
                 root = self.repository()
                 self.write(root, content)
                 self.assert_error(root, code)
+
+    def test_out_of_range_and_unrepresentable_integers_fail_stably(self) -> None:
+        for value in (str(-(2**63) - 1), str(2**63)):
+            with self.subTest(digits=len(value)):
+                root = self.repository()
+                self.write(root, f"value: {value}\n")
+                error = self.assert_error(root, "YAML_PARSE_ERROR")
+                self.assertEqual(
+                    error.diagnostic.message,
+                    "integer is outside the signed 64-bit range",
+                )
+        root = self.repository()
+        self.write(root, "value: " + "9" * 5_000 + "\n")
+        error = self.assert_error(root, "YAML_PARSE_ERROR")
+        self.assertEqual(error.diagnostic.message, "YAML scalar cannot be represented safely")
+
+    def test_lone_surrogates_in_values_and_keys_fail(self) -> None:
+        for content in (
+            'value: "\\uD800"\n',
+            'value: "\\uDC00"\n',
+            '"\\uD800": value\n',
+            '"\\uDC00": value\n',
+        ):
+            with self.subTest(content=content):
+                root = self.repository()
+                self.write(root, content)
+                self.assert_error(root, "YAML_PARSE_ERROR")
 
     def test_invalid_utf8_and_missing_file_fail(self) -> None:
         root = self.repository()
@@ -118,6 +163,26 @@ class LoaderTests(unittest.TestCase):
         root = self.repository()
         self.write(root, "values:\n" + "".join("  - item\n" for _ in range(30)))
         self.assert_error(root, "YAML_LIMIT_EXCEEDED", limits=YamlLimits(max_nodes=20))
+
+    def test_content_read_is_bounded_to_max_bytes_plus_one(self) -> None:
+        class RecordingBytesIO(BytesIO):
+            requested_sizes: list[int]
+
+            def __init__(self, value: bytes) -> None:
+                super().__init__(value)
+                self.requested_sizes = []
+
+            def read(self, size: int = -1) -> bytes:
+                self.requested_sizes.append(size)
+                return super().read(size)
+
+        root = self.repository()
+        self.write(root, "id: exists\n")
+        stream = RecordingBytesIO(b"a" * 100)
+        with patch.object(Path, "open", return_value=stream) as opened:
+            self.assert_error(root, "YAML_LIMIT_EXCEEDED", limits=YamlLimits(max_bytes=16))
+        opened.assert_called_once_with("rb")
+        self.assertEqual(stream.requested_sizes, [17])
 
     def test_limits_must_be_positive_integers(self) -> None:
         for field in ("max_bytes", "max_depth", "max_nodes"):

@@ -6,9 +6,51 @@
     "path": { "$ref": "common.schema.json#/$defs/safeRelativePath" },
     "routeTemplate": {
       "type": "string",
-      "pattern": "^/(?!/)(?!.*//)(?!.*\\$\\{)(?!.*[\\u0000-\\u001f\\u007f])[A-Za-z0-9._~!$&'()*+,;=:@%/?{}-]*(?![\\s\\S])",
+      "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*\\$\\{)(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~!$&'()*+,;=:@/?-]|\\{[a-z][a-z0-9_]*\\})*(?![\\s\\S])",
       "minLength": 1,
       "maxLength": 512
+    },
+    "noParameterRoute": {
+      "allOf": [
+        { "$ref": "#/$defs/routeTemplate" },
+        { "pattern": "^[^{}]*(?![\\s\\S])" }
+      ]
+    },
+    "issueRoute": {
+      "allOf": [
+        { "$ref": "#/$defs/routeTemplate" },
+        { "pattern": "^[^{}]*\\{issue_number\\}[^{}]*(?![\\s\\S])" }
+      ]
+    },
+    "changeRequestRoute": {
+      "allOf": [
+        { "$ref": "#/$defs/routeTemplate" },
+        { "pattern": "^[^{}]*\\{change_request_number\\}[^{}]*(?![\\s\\S])" }
+      ]
+    },
+    "commitRoute": {
+      "allOf": [
+        { "$ref": "#/$defs/routeTemplate" },
+        { "pattern": "^[^{}]*\\{commit_sha\\}[^{}]*(?![\\s\\S])" }
+      ]
+    },
+    "tagRoute": {
+      "allOf": [
+        { "$ref": "#/$defs/routeTemplate" },
+        { "pattern": "^[^{}]*\\{tag_name\\}[^{}]*(?![\\s\\S])" }
+      ]
+    },
+    "modelRoute": {
+      "allOf": [
+        { "$ref": "#/$defs/routeTemplate" },
+        { "pattern": "^[^{}]*\\{model_id\\}[^{}]*(?![\\s\\S])" }
+      ]
+    },
+    "offeringRoute": {
+      "allOf": [
+        { "$ref": "#/$defs/routeTemplate" },
+        { "pattern": "^[^{}]*\\{inference_service_id\\}[^{}]*\\{offering_id\\}[^{}]*(?![\\s\\S])" }
+      ]
     },
     "digestField": {
       "type": "string",
@@ -48,20 +90,20 @@
           "type": "object",
           "required": ["issue", "change_request", "commit", "tag", "release", "mac_intake"],
           "properties": {
-            "issue": { "$ref": "#/$defs/routeTemplate" },
-            "change_request": { "$ref": "#/$defs/routeTemplate" },
-            "commit": { "$ref": "#/$defs/routeTemplate" },
-            "tag": { "$ref": "#/$defs/routeTemplate" },
-            "release": { "$ref": "#/$defs/routeTemplate" },
+            "issue": { "$ref": "#/$defs/issueRoute" },
+            "change_request": { "$ref": "#/$defs/changeRequestRoute" },
+            "commit": { "$ref": "#/$defs/commitRoute" },
+            "tag": { "$ref": "#/$defs/tagRoute" },
+            "release": { "$ref": "#/$defs/tagRoute" },
             "mac_intake": {
               "type": "object",
               "required": ["add", "change", "revoke", "move", "batch"],
               "properties": {
-                "add": { "$ref": "#/$defs/routeTemplate" },
-                "change": { "$ref": "#/$defs/routeTemplate" },
-                "revoke": { "$ref": "#/$defs/routeTemplate" },
-                "move": { "$ref": "#/$defs/routeTemplate" },
-                "batch": { "$ref": "#/$defs/routeTemplate" }
+                "add": { "$ref": "#/$defs/noParameterRoute" },
+                "change": { "$ref": "#/$defs/noParameterRoute" },
+                "revoke": { "$ref": "#/$defs/noParameterRoute" },
+                "move": { "$ref": "#/$defs/noParameterRoute" },
+                "batch": { "$ref": "#/$defs/noParameterRoute" }
               },
               "additionalProperties": false
             }
@@ -165,20 +207,20 @@
       "required": ["base_url", "base_path", "routes", "data_routes", "urls_resolved_from_config_only", "effective_base_url_and_path_are_receipt_inputs", "ci_requires_explicit_base_url"],
       "properties": {
         "base_url": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/httpsUri" }] },
-        "base_path": { "type": "string", "pattern": "^/(?!/)(?!.*//)(?!.*[\\u0000-\\u001f\\u007f])(?:[^?#]*/)?(?![\\s\\S])" },
+        "base_path": { "type": "string", "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~-]+/)*(?![\\s\\S])" },
         "routes": {
           "type": "object",
           "required": ["home", "catalogue", "model", "offering", "changes", "process", "propose", "docs", "not_found"],
           "properties": {
-            "home": { "$ref": "#/$defs/routeTemplate" },
-            "catalogue": { "$ref": "#/$defs/routeTemplate" },
-            "model": { "$ref": "#/$defs/routeTemplate" },
-            "offering": { "$ref": "#/$defs/routeTemplate" },
-            "changes": { "$ref": "#/$defs/routeTemplate" },
-            "process": { "$ref": "#/$defs/routeTemplate" },
-            "propose": { "$ref": "#/$defs/routeTemplate" },
-            "docs": { "$ref": "#/$defs/routeTemplate" },
-            "not_found": { "$ref": "#/$defs/routeTemplate" }
+            "home": { "$ref": "#/$defs/noParameterRoute" },
+            "catalogue": { "$ref": "#/$defs/noParameterRoute" },
+            "model": { "$ref": "#/$defs/modelRoute" },
+            "offering": { "$ref": "#/$defs/offeringRoute" },
+            "changes": { "$ref": "#/$defs/noParameterRoute" },
+            "process": { "$ref": "#/$defs/noParameterRoute" },
+            "propose": { "$ref": "#/$defs/noParameterRoute" },
+            "docs": { "$ref": "#/$defs/noParameterRoute" },
+            "not_found": { "$ref": "#/$defs/noParameterRoute" }
           },
           "additionalProperties": false
         },
@@ -186,9 +228,9 @@
           "type": "object",
           "required": ["catalogue", "manifest", "schemas"],
           "properties": {
-            "catalogue": { "$ref": "#/$defs/routeTemplate" },
-            "manifest": { "$ref": "#/$defs/routeTemplate" },
-            "schemas": { "$ref": "#/$defs/routeTemplate" }
+            "catalogue": { "$ref": "#/$defs/noParameterRoute" },
+            "manifest": { "$ref": "#/$defs/noParameterRoute" },
+            "schemas": { "$ref": "#/$defs/noParameterRoute" }
           },
           "additionalProperties": false
         },

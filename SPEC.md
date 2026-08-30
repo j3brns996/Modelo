@@ -33,7 +33,7 @@ artefacts from Pages, a release or a clone.
 The catalogue answers:
 
 1. Which named model is being described?
-2. Which operator offering is approved for enterprise consumption?
+2. Which inference-service offering is approved for enterprise consumption?
 3. Through which provider route can it be consumed?
 4. What factual price and capability evidence supports the record?
 5. Which versioned enterprise conditions apply?
@@ -77,7 +77,7 @@ Its identity is independent of the cloud or API host that serves it.
 
 ### Offering
 
-An enterprise-approved operator/model relationship. The offering has a stable
+An enterprise-approved inference-service/model relationship. The offering has a stable
 internal ID and contains one or more approved provider routes.
 
 ### Route
@@ -109,17 +109,17 @@ modelo.yaml                          Global bootstrap configuration
 AGENTS.md                            Repository-wide agent rules
 catalogue/
   models/{model_id}.yaml             Canonical model records
-  offerings/{operator_id}/
+  offerings/{inference_service_id}/
     {offering_id}.yaml               Stable approved offerings and routes
   evidence/{evidence_id}.yaml        Durable redacted evidence projections
   governance/
     vendors.yaml                     Vendor identities
-    operators.yaml                   Operator identities and adapters
+    inference-services.yaml          Inference-service identities and adapters
     freshness.yaml                   Evidence freshness policy
   policies/conditions/
     {condition_id}/{version}.yaml    Immutable condition versions
 schemas/                             Core and provider-adapter schemas
-scripts/                             Platform-neutral implementation
+tooling/modelo/                      Locked platform-neutral Python package
 tests/                               Unit, fixture and contract tests
 site/                                Static HTML, CSS and JavaScript source
 dist/                                Untracked deterministic output
@@ -185,8 +185,9 @@ evidence about themselves.
 
 Each evidence record contains:
 
-- an official source URI;
-- for first-party API evidence, the exact operation as an additional required field;
+- for documentation, an official HTTPS URI;
+- for first-party API evidence, provider, service, exact operation, partition,
+  Region, sanitised parameters and an official documentation URI;
 - source type;
 - observation date and time;
 - retrieval method and scope;
@@ -201,9 +202,9 @@ reasoning support, licensing or approval from model names.
 |---|---|
 | Paths and relative site routes | `modelo.yaml` |
 | Model identity and evidenced intrinsic facts | Model record |
-| Operator route, availability scope and price | Offering record |
+| Inference-service route, availability scope and price | Offering record |
 | Redacted observation projection and provenance | Evidence record |
-| Vendor and operator identity | Governance registry |
+| Vendor and inference-service identity | Governance registry |
 | Enterprise condition text and owner | Condition record |
 | Field shape and allowed values | Schema |
 | Provider resource syntax | Provider adapter schema |
@@ -236,8 +237,10 @@ exact merge commit. Optional signatures may strengthen it.
 
 ### 8. Deterministic input produces deterministic output
 
-The same source tree, source-date epoch, runtime version and locked dependencies
-must produce byte-identical catalogue and site artefacts.
+The same source tree, exact source-commit author timestamp, explicit `as_of`,
+effective site base URL/path, runtime version and locked dependencies must
+produce byte-identical catalogue and site artefacts. An explicit
+`SOURCE_DATE_EPOCH` override is permitted only when recorded in the receipt.
 
 ### 9. The Git provider is the only workflow API
 
@@ -303,7 +306,7 @@ routes:
     reference: <opaque-first-party-reference>
 ```
 
-The core validates structure and references. The operator adapter validates
+The core validates structure and references. The inference-service adapter validates
 provider-specific values. Route IDs are internal and stable; provider references
 may change through an evidenced MAC change.
 
@@ -370,6 +373,19 @@ fields are excluded. v0.1 publishes either a complete validated catalogue
 privately or a separate synthetic fixture publicly. Production field-level
 redaction is deferred because removing facts can silently change meaning.
 
+YAML date and timestamp scalars remain strings. Evidence projections admit only
+signed 64-bit integers or decimal strings for numbers; binary floating point and
+non-finite values are forbidden so RFC 8785 hashes remain portable.
+
+### Freshness
+
+`as_of` is an explicit UTC date recorded in every check and receipt. A fact is
+stale only when `as_of - date(observed_at in UTC)` is greater than its class
+threshold: availability 30 days, pricing 90 days and intrinsic model facts 365
+days. Equality is fresh; a future observation is an error. Staleness fails the
+next change check or scheduled main audit but never auto-revokes an offering.
+The scheduled audit checks `base=head=main` with the current explicit UTC date.
+
 ## AWS-first provider reasoning
 
 AWS is the first adapter to be implemented because its topology exposes the
@@ -385,6 +401,19 @@ mistakes a falsely universal model would make.
 
 The exact commands and evidence boundaries are documented in
 `docs/providers/aws-bedrock.md`.
+
+`GetFoundationModelAvailability` is discovery-only in v0.1 and is not retained
+as catalogue evidence. Other account-scoped observations use a non-secret,
+non-reversible opaque `scope_ref`; account aliases, IDs and fingerprints are not
+stored.
+
+AWS routes must also bind to the offering's canonical `model_id`. A direct route
+retains evidenced model ID/ARN, model name and provider name and requires those
+reported identity facts to equal the canonical model's evidenced facts. A
+system inference profile retains every destination model ARN; CI resolves each
+through evidenced `GetFoundationModel` facts and requires all destinations to
+bind to that same canonical model. Mappings needing transformation or
+interpretation are deferred.
 
 ### Illustrative AWS configuration
 
@@ -414,7 +443,7 @@ model identity.
 
 ## Cross-cloud configuration boundary
 
-| Operator | External model coordinate | Deployment or route coordinate |
+| Inference service | External model coordinate | Deployment or route coordinate |
 |---|---|---|
 | AWS Bedrock | `modelId` and AWS-owned foundation-model ARN | Base model ID or inference-profile ID/ARN; discovery is Region and sometimes account scoped |
 | GCP Vertex | Publisher/model/version | Managed publisher route or project/location endpoint |
@@ -445,12 +474,16 @@ Scheduled native CI
 ```
 
 The neutral operations are `add`, `change`, `revoke`, `move` and `batch`.
-`change` preserves identity. `move` compiles to atomic add-destination and
-revoke-source. The issue contains a schema-valid neutral payload whose canonical
+`change` preserves identity. In v0.1, move and revoke apply only to offerings;
+move compiles to atomic add-destination and revoke-source. A batch declares one
+homogeneous `item_operation` (`add`, `change` or `revoke`). The issue contains a
+schema-valid neutral payload whose canonical
 digest is bound into the change request and release receipt.
 
-A dedupe key hashes the sorted identity reservation set, operation family and
-purpose. An idempotency key hashes the full canonical intent. Exact retries
+A dedupe key hashes a typed sorted identity reservation set, effective
+operation and purpose. An idempotency key hashes the full canonical intent.
+Both use RFC 8785 with hash fields omitted; idempotency also omits random
+`request_id`. Exact retries
 return the existing issue; a conflicting open reservation fails closed. Move
 reserves source and destination. A batch reserves at most 25 identities and has
 one source, observation scope, inference service and purpose. Candidate issue
@@ -475,11 +508,23 @@ Pages, or stops at a restricted CI/release artefact for the private catalogue.
 It must not acquire an
 authentication proxy merely to compensate for a hosting-plan limitation.
 
+The site route resolver receives the configured repository web base, neutral
+commit/issue/change-request/tag/release route templates, MAC intake routes, and
+effective `base_url`/`base_path`. CI may override local repository coordinates
+only through the selected adapter; the effective values are receipt-bound.
+`/changes/` is generated without network access from local Git first-parent
+history plus validated base/head deltas. Release receipts are detached release
+assets, not recursive site inputs.
+
 `modelo platform check` will verify the remote control profile: protected
 default branch, no direct or force pushes, trusted exact-head validation,
 independent approval, stale-review dismissal, resolved conversations, protected
 tags and appropriate Pages visibility. Human CODEOWNER approval is mandatory
-for control-plane paths; agent approval is optional and data-only. Repository
+for every path except the positive agent-approval allowlist
+(`catalogue/models/**`, `catalogue/offerings/**`, `catalogue/evidence/**`);
+agent approval is optional and data-only. The topic branch must be up to date
+with the protected base, and a merge queue/train is deferred until it has a
+candidate-tree contract. Repository
 files alone cannot prove those remote settings are active.
 
 There is no Modelo service endpoint to port. Switching from GitHub to GitLab
@@ -543,8 +588,11 @@ The trusted final `modelo/check` job runs even when dependencies fail and
 explicitly rejects missing, skipped, neutral, cancelled, stale or failed
 prerequisites. Its receipt binds the exact base/head, trusted workflow identity,
 tool/lock digests, test results and built artefacts. Post-merge publication then
-creates the release receipt and deploys that already checked artefact; it does
-not rebuild it.
+proves the merge tree equals the accepted, up-to-date head tree, builds the final
+merge-aware site/release artefact once, validates that exact artefact, creates a
+detached receipt that hashes it, and deploys without another build. The receipt
+is not inside the artefact whose digest it records. Pre-merge and post-merge
+artefacts are not claimed to be byte-identical.
 
 Lint, dependency lock, secret scanning and document-drift checks are internal
 stages of those outcomes, not eleven independently promised products. A control
@@ -568,7 +616,7 @@ The initial explicit contracts are:
 - **Observation:** discovery cannot write approved state.
 - **Change:** every catalogue diff links to one MAC issue and reviewed change request.
 - **Identity:** identity changes are migrations, not silent moves.
-- **Batch:** one source, time, operator and semantic purpose.
+- **Batch:** one source, time, inference service and semantic purpose.
 - **Generated output:** reproducible, uneditable and tied to a source commit.
 - **Automation:** issue conversion is idempotent.
 - **Platform:** core code contains no GitHub or GitLab URL logic.
@@ -601,7 +649,8 @@ The detailed static-site, MAC, security and staged implementation contracts are
 `docs/site-contract.md`, `docs/mac-contract.md`,
 `docs/security-contract.md` and `docs/implementation-plan.md`. The dated
 repository comparison is
-`docs/reviews/catalogue-repositories-2026-08-30.md`.
+`docs/reviews/catalogue-repositories-2026-08-30.md`; the pinned Addy Osmani
+skills decision is `docs/reviews/agent-skills-2026-08-30.md`.
 
 No implementation swarm starts until those contracts and `modelo.yaml` agree.
 No production catalogue launches until the executable validator, schemas,

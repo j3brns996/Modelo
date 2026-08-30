@@ -123,7 +123,7 @@ def _normalise_offering(value: Mapping[str, Any]) -> dict[str, Any]:
             lambda item: (
                 item["dimension"].encode("utf-8"),
                 item["unit"].encode("utf-8"),
-                item["quantity"].encode("utf-8"),
+                item["quantity"],
                 item["amount"].encode("utf-8"),
                 item["currency"].encode("utf-8"),
                 "\0".join(item["route_ids"]).encode("utf-8"),

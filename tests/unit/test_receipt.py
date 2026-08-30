@@ -48,7 +48,14 @@ class ReceiptTests(unittest.TestCase):
                 {"id": "a", "adapter": "a", "reference": "a", "model_binding": {}},
             ],
             "condition_refs": [{"id": "z", "version": 2}, {"id": "a", "version": 1}],
-            "evidence_refs": {"/routes/0/reference": {"id": "e", "projection_pointer": "/z"}},
+            "pricing": [
+                {"dimension": "output", "unit": "token", "quantity": 1000, "amount": "2", "currency": "USD", "route_ids": ["z", "a"]},
+                {"dimension": "input", "unit": "token", "quantity": 1, "amount": "1", "currency": "USD", "route_ids": ["a"]},
+            ],
+            "evidence_refs": {
+                "/routes/0/reference": {"id": "e", "projection_pointer": "/z"},
+                "/pricing/0/amount": {"id": "e", "projection_pointer": "/price"},
+            },
         }
         projection = catalogue_projection(
             contract_version="0.1.0", source_commit="a" * 40, source_tree="b" * 40,
@@ -60,6 +67,8 @@ class ReceiptTests(unittest.TestCase):
         normal = projection["offerings"][0]
         self.assertEqual([route["id"] for route in normal["routes"]], ["a", "z"])
         self.assertIn("/routes/1/reference", normal["evidence_refs"])
+        self.assertEqual([price["dimension"] for price in normal["pricing"]], ["input", "output"])
+        self.assertIn("/pricing/1/amount", normal["evidence_refs"])
         self.assertEqual(projection["evidence"][0]["projection"]["ordered"], [2, 1])
 
 

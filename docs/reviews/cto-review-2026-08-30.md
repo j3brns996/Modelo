@@ -42,6 +42,8 @@ acceptance and humans approve the change request.
 13. Scope evidence coverage to externally sourced catalogue leaves, terminate
     the chain at the evidence envelope, and make merged evidence IDs
     content-addressed and immutable.
+14. Make all bootstrap paths config-owned, require API operation provenance,
+    and define evidence hashing with RFC 8785 canonical JSON plus SHA-256.
 
 ## Repository comparison
 

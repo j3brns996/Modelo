@@ -16,8 +16,9 @@ acceptance and humans approve the change request.
 
 1. Describe the repository as a target contract until executable schemas,
    fixtures and `modelo check` exist. Do not call design claims “as-built”.
-2. Require evidence for every non-identity assertion. Optional evidence would
-   contradict the catalogue objective.
+2. Require evidence for every externally sourced catalogue assertion. Internal
+   references and policy are validated by the repository contract; evidence
+   envelopes terminate the evidence chain.
 3. Separate canonical models, approved offerings and provider routes.
    `(operator_id, model_id, geo)` is too lossy for AWS inference profiles and
    Azure or GCP deployments.
@@ -38,6 +39,9 @@ acceptance and humans approve the change request.
     workflow writes and static artefacts for consumers.
 12. Retain a redacted canonical evidence projection in Git. A digest of an
     expiring CI artefact is insufficient to reproduce factual validation.
+13. Scope evidence coverage to externally sourced catalogue leaves, terminate
+    the chain at the evidence envelope, and make merged evidence IDs
+    content-addressed and immutable.
 
 ## Repository comparison
 

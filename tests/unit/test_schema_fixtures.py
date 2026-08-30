@@ -15,6 +15,7 @@ from referencing import Registry, Resource
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMAS = ROOT / "schemas"
 CASES = ROOT / "tests/fixtures/schema/cases.json"
+MAC_FIXTURES = ROOT / "tests/fixtures/mac"
 
 
 def _schemas() -> tuple[dict[str, dict[str, Any]], Registry[Any]]:
@@ -78,6 +79,22 @@ class SchemaFixtureTests(unittest.TestCase):
     def test_every_non_common_schema_has_fixtures(self) -> None:
         expected = set(self.schemas) - {"common.schema.json"}
         actual = {case["schema"] for case in self.cases}
+        mac_fixtures = sorted(MAC_FIXTURES.glob("*.json"))
+        self.assertEqual(
+            {path.stem for path in mac_fixtures},
+            {"add", "batch", "change", "move", "revoke"},
+        )
+        mac_validator = Draft202012Validator(
+            self.schemas["mac.schema.json"],
+            registry=self.registry,
+            format_checker=FormatChecker(),
+        )
+        for path in mac_fixtures:
+            instance = json.loads(path.read_text(encoding="utf-8"))
+            with self.subTest(schema="mac.schema.json", fixture=path.name):
+                errors = list(mac_validator.iter_errors(instance))
+                self.assertEqual(errors, [], [error.message for error in errors])
+        actual.add("mac.schema.json")
         self.assertEqual(actual, expected)
 
     def test_all_schema_references_resolve(self) -> None:

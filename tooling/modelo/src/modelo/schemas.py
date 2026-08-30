@@ -17,15 +17,20 @@ from modelo.diagnostics import Diagnostic, Severity
 
 RFC3339 = re.compile(
     r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
-    r"(?:\.[0-9]+)?(?:Z|[+-][0-9]{2}:[0-9]{2})(?![\s\S])"
+    r"(?:\.[0-9]+)?(?:Z|[+-](?P<offset_hour>[0-9]{2}):(?P<offset_minute>[0-9]{2}))(?![\s\S])"
 )
 
 
 def parse_rfc3339(value: str) -> datetime:
     """Parse the strict timestamp subset used by the executable contract."""
 
-    if RFC3339.fullmatch(value) is None:
+    match = RFC3339.fullmatch(value)
+    if match is None:
         raise ValueError("timestamp is not strict RFC 3339")
+    if match["offset_hour"] is not None and (
+        int(match["offset_hour"]) > 23 or int(match["offset_minute"]) > 59
+    ):
+        raise ValueError("timestamp timezone offset is outside RFC 3339 range")
     candidate = value[:-1] + "+00:00" if value.endswith("Z") else value
     parsed = datetime.fromisoformat(candidate)
     if parsed.tzinfo is None:

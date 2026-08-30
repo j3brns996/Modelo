@@ -33,7 +33,7 @@ Completeness ownership is split: T5 enforces the exact candidate set above;
 T6 owns the executable final exact-set rule. Final manifest `files` keys must
 equal the fixed list in `docs/contract.yaml`—base route HTML, two local assets,
 `data/catalogue.json` and `data/change-delta.json`—union every schema file
-beneath the configured schema root at the exact source commit (currently 17), union
+beneath the configured schema root at the exact source commit, union
 `models/{model_id}/index.html` for every projected model and
 `offerings/{inference_service_id}/{offering_id}/index.html` for every projected
 offering. `data/manifest.json` is deliberately excluded. Missing fixed files,

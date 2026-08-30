@@ -313,6 +313,11 @@ build:
     final: dist/final
     target_parent: dist
     detached_receipts: dist/receipts
+  output_argument_equality:
+    candidate: exact_configured_candidate_root
+    final_when_t6_lands: exact_configured_final_root
+  output_path_validation: repo_relative_safe_resolution_no_symlink_no_traversal_not_inside_any_input
+  t8_output_argument: exact_configured_root_for_kind
   publication_subdir: site
   catalogue_path: data/catalogue.json
   change_delta_path: data/change-delta.json

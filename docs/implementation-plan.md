@@ -114,6 +114,12 @@ The T5 CLI has no ambient defaults: common required flags are `--kind`,
 future `--merge-commit`/`--merge-tree` inputs remain unavailable until T6. T8 supplies every value from trusted inputs and rejects any
 receipt correlation mismatch.
 
+`--output` is not a caller-selected alternative directory. For candidate it
+must equal the configured `candidate_root` (`dist/candidate`) after safe
+repository-relative resolution; T6 will require final to equal `final_root`
+(`dist/final`). Traversal, absolute or symlinked paths and any output inside a
+source/input tree fail. T8 passes the exact configured value for the kind.
+
 The metadata path names one regular non-symlink strict-UTF-8 JSON object of at
 most 262144 bytes. T5 reads it once from one no-follow descriptor, rejects
 duplicate keys, floats, non-finite values and YAML, and compares device, inode,

@@ -8,7 +8,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urljoin
 from urllib.parse import urlsplit
@@ -314,6 +314,27 @@ def _canonical_site_url_matches(url: str, base_path: str) -> bool:
 
 def _source_epoch_errors(explicit_epoch: int, source_author_epoch: int) -> set[str]:
     return set() if explicit_epoch == source_author_epoch else {"source-author-epoch"}
+
+
+def _output_path_errors(
+    kind: str,
+    output: str,
+    candidate_root: str,
+    final_root: str,
+    *,
+    is_symlink: bool = False,
+    input_roots: tuple[str, ...] = ("catalogue", "schemas", "tests", "site", "tooling"),
+) -> set[str]:
+    errors: set[str] = set()
+    expected = candidate_root if kind == "candidate" else final_root
+    path = PurePosixPath(output)
+    if output != expected:
+        errors.add("output-root")
+    if path.is_absolute() or ".." in path.parts or is_symlink:
+        errors.add("output-safety")
+    if any(path == PurePosixPath(root) or PurePosixPath(root) in path.parents for root in input_roots):
+        errors.add("output-inside-input")
+    return errors
 
 
 def _sort_delta(value: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -717,7 +738,7 @@ class SchemaFixtureTests(unittest.TestCase):
         site_contract = (ROOT / "docs/site-contract.md").read_text(encoding="utf-8")
         self.assertIn("`data/change-delta.json`", site_contract)
         self.assertIn("every schema file", site_contract)
-        self.assertIn("currently 17", site_contract)
+        self.assertNotIn("currently 17", site_contract)
         self.assertNotIn("sixteen schema", site_contract)
         projection = {
             "models": [{"id": "model-a"}, {"id": "model-b"}],
@@ -790,6 +811,37 @@ class SchemaFixtureTests(unittest.TestCase):
         for path in (ROOT / "README.md", ROOT / "SPEC.md", ROOT / "docs/implementation-plan.md"):
             with self.subTest(path=path.name):
                 self.assertIn("--base-commit", path.read_text(encoding="utf-8"))
+        build = config["build"]
+        self.assertEqual(
+            _output_path_errors(
+                "candidate", build["candidate_root"],
+                build["candidate_root"], build["final_root"],
+            ),
+            set(),
+        )
+        self.assertEqual(
+            _output_path_errors(
+                "final", build["final_root"],
+                build["candidate_root"], build["final_root"],
+            ),
+            set(),
+        )
+        adversarial = (
+            ("candidate", "dist/other", False, "output-root"),
+            ("candidate", "../candidate", False, "output-safety"),
+            ("candidate", "/tmp/candidate", False, "output-safety"),
+            ("candidate", "dist/candidate", True, "output-safety"),
+            ("candidate", "catalogue/output", False, "output-inside-input"),
+        )
+        for kind, output, symlink, expected in adversarial:
+            with self.subTest(output=output, symlink=symlink):
+                self.assertIn(
+                    expected,
+                    _output_path_errors(
+                        kind, output, build["candidate_root"], build["final_root"],
+                        is_symlink=symlink,
+                    ),
+                )
 
     def test_validated_mac_metadata_correlates_exact_inputs_and_delta(self) -> None:
         envelope = next(

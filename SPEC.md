@@ -769,6 +769,12 @@ T5 implements exactly those build inputs. `--kind`, `--base-commit`, `--source-c
 required. T5 accepts only `--kind candidate`; final fails closed until T6. The CLI validates that the
 explicit base is the comparison base and the source commit resolves to the explicit tree and timestamp; it never
 infers HEAD, environment values, output, MAC metadata or publication settings.
+The explicit output is not freely selectable: candidate must equal the
+configured repository-relative `candidate_root` (`dist/candidate`) after safe
+resolution. T6 will require final to equal `final_root` (`dist/final`). An
+absolute, traversing or symlinked path, any alternative directory, or an output
+inside catalogue, schema, fixture, template, asset or other input roots fails.
+T8 supplies the exact configured value for the requested kind.
 T6 will add final builds with explicit `--merge-commit` and `--merge-tree`,
 merge-tree equality and the accepted source epoch unchanged.
 

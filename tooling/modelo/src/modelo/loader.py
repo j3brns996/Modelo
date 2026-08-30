@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
-import math
 from pathlib import Path, PurePosixPath
 from typing import Any, TypeAlias
 
@@ -33,6 +32,8 @@ class YamlLimits:
 
 
 DEFAULT_LIMITS = YamlLimits()
+MIN_SIGNED_64 = -(2**63)
+MAX_SIGNED_64 = 2**63 - 1
 
 
 class LoadError(Exception):
@@ -275,14 +276,32 @@ def _validate_json_value(document: Any, *, path: str, limits: YamlLimits) -> Non
                 path=path,
                 json_pointer=pointer,
             )
-        if value is None or isinstance(value, (bool, int, str)):
+        if value is None or isinstance(value, bool):
             continue
-        if isinstance(value, float):
-            if not math.isfinite(value):
+        if isinstance(value, int):
+            if value < MIN_SIGNED_64 or value > MAX_SIGNED_64:
                 raise _error(
                     "YAML_PARSE_ERROR",
-                    "non-finite numbers are not JSON-compatible",
-                    "Use a finite number or a decimal string.",
+                    "integer is outside the signed 64-bit range",
+                    "Use a signed 64-bit integer or preserve the number as a decimal string.",
+                    path=path,
+                    json_pointer=pointer,
+                )
+            continue
+        if isinstance(value, float):
+            raise _error(
+                "YAML_PARSE_ERROR",
+                "floating-point numbers are forbidden",
+                "Preserve decimal values as strings for portable canonicalisation.",
+                path=path,
+                json_pointer=pointer,
+            )
+        if isinstance(value, str):
+            if _has_lone_surrogate(value):
+                raise _error(
+                    "YAML_PARSE_ERROR",
+                    "string contains a lone UTF-16 surrogate",
+                    "Use valid Unicode scalar values; pair or remove the surrogate.",
                     path=path,
                     json_pointer=pointer,
                 )
@@ -300,6 +319,14 @@ def _validate_json_value(document: Any, *, path: str, limits: YamlLimits) -> Non
                         "YAML_PARSE_ERROR",
                         "mapping keys must be strings",
                         "Use string keys so the document has a portable JSON data model.",
+                        path=path,
+                        json_pointer=pointer,
+                    )
+                if _has_lone_surrogate(key):
+                    raise _error(
+                        "YAML_PARSE_ERROR",
+                        "mapping key contains a lone UTF-16 surrogate",
+                        "Use valid Unicode scalar values in mapping keys.",
                         path=path,
                         json_pointer=pointer,
                     )
@@ -321,6 +348,21 @@ def _escape_pointer(value: str) -> str:
     return value.replace("~", "~0").replace("/", "~1")
 
 
+def _has_lone_surrogate(value: str) -> bool:
+    index = 0
+    while index < len(value):
+        codepoint = ord(value[index])
+        if 0xD800 <= codepoint <= 0xDBFF:
+            if index + 1 >= len(value) or not 0xDC00 <= ord(value[index + 1]) <= 0xDFFF:
+                return True
+            index += 2
+            continue
+        if 0xDC00 <= codepoint <= 0xDFFF:
+            return True
+        index += 1
+    return False
+
+
 def load_yaml_mapping(
     repository_root: Path,
     relative_path: str | PurePosixPath,
@@ -333,7 +375,8 @@ def load_yaml_mapping(
     path_text = relative.as_posix()
     try:
         target = _confined_file(repository_root, relative)
-        raw = target.read_bytes()
+        with target.open("rb") as stream:
+            raw = stream.read(limits.max_bytes + 1)
     except LoadError:
         raise
     except OSError as exc:
@@ -380,6 +423,13 @@ def load_yaml_mapping(
             "YAML_LIMIT_EXCEEDED",
             "YAML nesting is excessive",
             "Reduce document nesting.",
+            path=path_text,
+        ) from exc
+    except ValueError as exc:
+        raise _error(
+            "YAML_PARSE_ERROR",
+            "YAML scalar cannot be represented safely",
+            "Preserve very large numeric values as decimal strings.",
             path=path_text,
         ) from exc
     except yaml.YAMLError as exc:

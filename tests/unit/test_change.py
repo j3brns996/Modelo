@@ -77,7 +77,7 @@ class ChangeTests(unittest.TestCase):
         original = condition.read_text(encoding="utf-8")
         condition.write_text(original.replace("Synthetic condition", "Mutated condition"), encoding="utf-8", newline="\n")
         mutated = self.repository.commit("mutate condition")
-        self.assertIn("CHANGE_INVALID", {finding.code for finding in validate_condition_history(self.repository.root, mutated, "catalogue/policies/conditions", "catalogue/offerings")})
+        self.assertIn("CHANGE_INVALID", {finding.code for finding in validate_condition_history(self.repository.root, self.repository.base, mutated, "catalogue/policies/conditions", "catalogue/offerings")})
         condition.unlink()
         offering = self.repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml"
         offering_text = offering.read_text(encoding="utf-8")
@@ -87,7 +87,7 @@ class ChangeTests(unittest.TestCase):
         condition.write_text(original.replace("Synthetic condition", "Reintroduced condition"), encoding="utf-8", newline="\n")
         offering.write_text(offering_text, encoding="utf-8", newline="\n")
         reintroduced = self.repository.commit("reintroduce condition")
-        self.assertIn("CHANGE_INVALID", {finding.code for finding in validate_condition_history(self.repository.root, reintroduced, "catalogue/policies/conditions", "catalogue/offerings")})
+        self.assertIn("CHANGE_INVALID", {finding.code for finding in validate_condition_history(self.repository.root, self.repository.base, reintroduced, "catalogue/policies/conditions", "catalogue/offerings")})
         self.assertNotEqual(deleted, reintroduced)
 
     def test_condition_history_fails_closed_when_clone_is_shallow(self) -> None:
@@ -102,7 +102,25 @@ class ChangeTests(unittest.TestCase):
                 capture_output=True, text=True,
             ).stdout.strip()
             with self.assertRaisesRegex(GitError, "shallow"):
-                validate_condition_history(shallow, head, "catalogue/policies/conditions", "catalogue/offerings")
+                validate_condition_history(shallow, head, head, "catalogue/policies/conditions", "catalogue/offerings")
+
+    def test_candidate_draft_is_mutable_until_first_reference(self) -> None:
+        condition = self.repository.root / "catalogue/policies/conditions/draft-condition/1.yaml"
+        condition.parent.mkdir(parents=True)
+        condition.write_text("id: draft-condition\nversion: 1\ntitle: First draft\ndescription: Draft\n", encoding="utf-8", newline="\n")
+        self.repository.commit("add unreferenced draft")
+        condition.write_text("id: draft-condition\nversion: 1\ntitle: Revised draft\ndescription: Draft\n", encoding="utf-8", newline="\n")
+        revised = self.repository.commit("revise unreferenced draft")
+        self.assertEqual(validate_condition_history(self.repository.root, self.repository.base, revised, "catalogue/policies/conditions", "catalogue/offerings"), ())
+
+        offering = self.repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml"
+        text = offering.read_text(encoding="utf-8")
+        offering.write_text(text.replace("condition_refs:\n", "condition_refs:\n  - id: draft-condition\n    version: 1\n"), encoding="utf-8", newline="\n")
+        referenced = self.repository.commit("reference revised draft")
+        self.assertEqual(validate_condition_history(self.repository.root, self.repository.base, referenced, "catalogue/policies/conditions", "catalogue/offerings"), ())
+        condition.write_text("id: draft-condition\nversion: 1\ntitle: Changed after reference\ndescription: Draft\n", encoding="utf-8", newline="\n")
+        changed = self.repository.commit("change referenced condition")
+        self.assertIn("CHANGE_INVALID", {finding.code for finding in validate_condition_history(self.repository.root, self.repository.base, changed, "catalogue/policies/conditions", "catalogue/offerings")})
 
 
 if __name__ == "__main__":

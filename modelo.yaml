@@ -21,10 +21,19 @@ paths:
   conditions: catalogue/policies/conditions
   schemas: schemas
   tests: tests
+  implementation: scripts
   site_source: site
   build: dist
   site_output: dist/site
   docs: docs
+  provider_docs: docs/providers
+  decisions: docs/adr
+  reviews: docs/reviews
+  open_skills: .agents/skills
+  codex_adapter: .codex
+  kiro_adapter: .kiro
+  github_adapter: .github
+  gitlab_adapter: .gitlab
 
 routes:
   catalogue: data/catalogue.json

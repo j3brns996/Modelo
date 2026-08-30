@@ -19,7 +19,7 @@
   ],
   "properties": {
     "schema_version": { "const": "0.1" },
-    "request_id": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f-]{36}$" },
+    "request_id": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f-]{36}(?![\\s\\S])" },
     "operation": { "enum": ["add", "change", "revoke", "move", "batch"] },
     "item_operation": { "enum": ["add", "change", "revoke"] },
     "purpose": { "$ref": "#/$defs/shortText" },
@@ -156,29 +156,29 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 2048,
-      "pattern": "^[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000](?:[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000])?$"
+      "pattern": "^[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000](?:[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000])?(?![\\s\\S])"
     },
     "shortText": {
       "type": "string",
       "minLength": 1,
       "maxLength": 160,
-      "pattern": "^[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000](?:[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000])?$"
+      "pattern": "^[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000](?:[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000])?(?![\\s\\S])"
     },
     "identity": {
       "type": "string",
       "minLength": 1,
       "maxLength": 256,
-      "pattern": "^[a-z0-9](?:[a-z0-9._:/@+\\-]*[a-z0-9])?$"
+      "pattern": "^[a-z0-9](?:[a-z0-9._:/@+\\-]*[a-z0-9])?(?![\\s\\S])"
     },
     "scopeToken": {
       "type": "string",
       "minLength": 1,
       "maxLength": 256,
-      "pattern": "^[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000](?:[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000])?$"
+      "pattern": "^[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000](?:[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000])?(?![\\s\\S])"
     },
     "digest": {
       "type": "string",
-      "pattern": "^sha256-[0-9a-f]{64}$"
+      "pattern": "^sha256-[0-9a-f]{64}(?![\\s\\S])"
     },
     "subject": {
       "type": "object",
@@ -205,7 +205,7 @@
               "type": "string",
               "format": "uri",
               "maxLength": 2048,
-              "pattern": "^https://(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)*[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:[/?#][\\u0021-\\u007e]*)?$"
+              "pattern": "^https://(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)*[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:[/?#][\\u0021-\\u007e]*)?(?![\\s\\S])"
             }
           }
         },
@@ -231,13 +231,13 @@
           "type": "string",
           "format": "uri",
           "maxLength": 2048,
-          "pattern": "^https://(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)*[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:[/?#][\\u0021-\\u007e]*)?$"
+          "pattern": "^https://(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)*[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:[/?#][\\u0021-\\u007e]*)?(?![\\s\\S])"
         },
         "observed_at": {
           "type": "string",
           "format": "date-time",
           "maxLength": 40,
-          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$"
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z(?![\\s\\S])"
         },
         "digest": { "$ref": "#/$defs/digest" }
       }

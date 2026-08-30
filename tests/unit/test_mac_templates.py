@@ -60,14 +60,34 @@ class MacTemplateTests(unittest.TestCase):
         self.assertEqual(schema["properties"]["subjects"]["maxItems"], 25)
         self.assertEqual(
             schema["$defs"]["identity"]["pattern"],
-            "^[a-z0-9](?:[a-z0-9._:/@+\\-]*[a-z0-9])?$",
+            "^[a-z0-9](?:[a-z0-9._:/@+\\-]*[a-z0-9])?(?![\\s\\S])",
         )
         self.assertEqual(
             schema["$defs"]["text"]["pattern"],
-            "^[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000](?:[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000])?$",
+            "^[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000](?:[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000])?(?![\\s\\S])",
         )
         for definition in ("subject", "batchScope", "candidateEvidence"):
             self.assertFalse(schema["$defs"][definition]["additionalProperties"])
+
+    def test_security_patterns_never_use_ambiguous_dollar_anchor(self) -> None:
+        schema = json.loads((ROOT / "schemas/mac.schema.json").read_text(encoding="utf-8"))
+
+        def patterns(value: object) -> list[str]:
+            if isinstance(value, dict):
+                found = [value["pattern"]] if isinstance(value.get("pattern"), str) else []
+                for child in value.values():
+                    found.extend(patterns(child))
+                return found
+            if isinstance(value, list):
+                return [pattern for child in value for pattern in patterns(child)]
+            return []
+
+        security_patterns = patterns(schema)
+        self.assertTrue(security_patterns)
+        for pattern in security_patterns:
+            with self.subTest(pattern=pattern):
+                self.assertNotIn("$", pattern)
+                self.assertTrue(pattern.endswith("(?![\\s\\S])"))
 
     def test_github_issue_forms_are_valid_and_operation_specific(self) -> None:
         paths = sorted((ROOT / ".github/ISSUE_TEMPLATE").glob("mac-*.yml"))
@@ -234,6 +254,62 @@ class MacTemplateTests(unittest.TestCase):
                     self.assertEqual(schema_accepts, expected)
                     self.assertEqual(module_accepts, expected)
                     self.assertEqual(schema_accepts, module_accepts)
+
+    def test_schema_and_module_true_end_of_input_parity_corpus(self) -> None:
+        schema = json.loads((ROOT / "schemas/mac.schema.json").read_text(encoding="utf-8"))
+        validator = Draft202012Validator(schema, format_checker=FormatChecker())
+        separators = {
+            "lf": "\n",
+            "cr": "\r",
+            "line-separator": "\u2028",
+            "paragraph-separator": "\u2029",
+        }
+
+        for separator_name, separator in separators.items():
+            for placement in ("leading", "trailing"):
+                text_value = separator + "value" if placement == "leading" else "value" + separator
+                uri_value = (
+                    separator + "https://example.invalid/path"
+                    if placement == "leading"
+                    else "https://example.invalid/path" + separator
+                )
+                cases = (
+                    ("reason", "add", ("reason",), text_value),
+                    ("purpose", "add", ("purpose",), text_value),
+                    (
+                        "scope_ref",
+                        "batch",
+                        ("batch_scope", "observation_scope", "scope_ref"),
+                        text_value,
+                    ),
+                    (
+                        "candidate_uri",
+                        "add",
+                        ("candidate_evidence", 0, "uri"),
+                        uri_value,
+                    ),
+                )
+                for field, fixture, path, value in cases:
+                    payload = self.fixtures()[fixture]
+                    target: object = payload
+                    for segment in path[:-1]:
+                        target = target[segment]  # type: ignore[index]
+                    target[path[-1]] = value  # type: ignore[index]
+
+                    schema_accepts = not list(validator.iter_errors(payload))
+                    try:
+                        validate_payload(payload, verify_hashes=False)
+                        module_accepts = True
+                    except ValueError:
+                        module_accepts = False
+                    with self.subTest(
+                        separator=separator_name,
+                        placement=placement,
+                        field=field,
+                    ):
+                        self.assertFalse(schema_accepts)
+                        self.assertFalse(module_accepts)
+                        self.assertEqual(schema_accepts, module_accepts)
 
 
 if __name__ == "__main__":

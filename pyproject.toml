@@ -3,7 +3,10 @@ name = "modelo-tooling"
 version = "0.1.0"
 description = "Validation and static-publication tooling for Modelo"
 requires-python = "==3.12.13"
-dependencies = ["PyYAML==6.0.3"]
+dependencies = [
+  "jsonschema==4.26.0",
+  "PyYAML==6.0.3",
+]
 
 [project.scripts]
 modelo = "modelo.cli:main"

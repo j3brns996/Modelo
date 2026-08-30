@@ -1,0 +1,35 @@
+name: "MAC: add"
+description: Propose one neutral add operation; the payload and CI are authoritative.
+title: "MAC add: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Paste a complete `schemas/mac.schema.json` payload. Candidate issue evidence is not accepted catalogue evidence. Do not include secrets or private commercial terms.
+  - type: textarea
+    id: mac_payload
+    attributes:
+      label: Neutral MAC payload
+      description: The operation must be `add`; generate both hashes from the canonical payload.
+      render: json
+      placeholder: |
+        { "schema_version": "0.1", "operation": "add", "replace": "with a complete schema-valid payload" }
+    validations:
+      required: true
+  - type: input
+    id: payload_digest
+    attributes:
+      label: Neutral payload digest
+      description: SHA-256 of the complete canonical payload, including its two validated keys.
+      placeholder: sha256-...
+    validations:
+      required: true
+  - type: checkboxes
+    id: assertions
+    attributes:
+      label: Assertions
+      options:
+        - label: I have not included credentials, tokens or private commercial terms.
+          required: true
+        - label: I understand that labels and checkboxes are assertions, not evidence or approval.
+          required: true

@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/mac.schema.json",
+  "title": "Modelo neutral MAC request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "operation",
+    "purpose",
+    "subjects",
+    "requested_outcome",
+    "reason",
+    "candidate_evidence",
+    "acceptance",
+    "dedupe_key",
+    "idempotency_key"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "request_id": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f-]{36}$" },
+    "operation": { "enum": ["add", "change", "revoke", "move", "batch"] },
+    "item_operation": { "enum": ["add", "change", "revoke"] },
+    "purpose": { "$ref": "#/$defs/shortText" },
+    "subjects": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 25,
+      "items": { "$ref": "#/$defs/subject" }
+    },
+    "batch_scope": { "$ref": "#/$defs/batchScope" },
+    "requested_outcome": { "$ref": "#/$defs/text" },
+    "reason": { "$ref": "#/$defs/text" },
+    "candidate_evidence": {
+      "type": "array",
+      "maxItems": 25,
+      "items": { "$ref": "#/$defs/candidateEvidence" }
+    },
+    "acceptance": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 25,
+      "items": { "$ref": "#/$defs/text" }
+    },
+    "dedupe_key": { "$ref": "#/$defs/digest" },
+    "idempotency_key": { "$ref": "#/$defs/digest" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "operation": { "const": "batch" } }, "required": ["operation"] },
+      "then": {
+        "required": ["item_operation", "batch_scope"],
+        "properties": {
+          "subjects": {
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/subject" },
+                { "not": { "required": ["role"] } }
+              ]
+            }
+          }
+        }
+      },
+      "else": {
+        "not": { "anyOf": [{ "required": ["item_operation"] }, { "required": ["batch_scope"] }] }
+      }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "move" } }, "required": ["operation"] },
+      "then": {
+        "properties": {
+          "subjects": {
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/subject" },
+                { "properties": { "kind": { "const": "offering" } }, "required": ["role"] }
+              ]
+            },
+            "allOf": [
+              {
+                "contains": { "properties": { "role": { "const": "source" } }, "required": ["role"] },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": { "properties": { "role": { "const": "destination" } }, "required": ["role"] },
+                "minContains": 1,
+                "maxContains": 1
+              }
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "subjects": {
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/subject" },
+                { "not": { "required": ["role"] } }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "operation": { "enum": ["add", "change", "revoke"] } },
+        "required": ["operation"]
+      },
+      "then": { "properties": { "subjects": { "minItems": 1, "maxItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "revoke" } }, "required": ["operation"] },
+      "then": {
+        "properties": {
+          "subjects": {
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/subject" },
+                { "properties": { "kind": { "const": "offering" } } }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": { "const": "batch" },
+          "item_operation": { "const": "revoke" }
+        },
+        "required": ["operation", "item_operation"]
+      },
+      "then": {
+        "properties": {
+          "subjects": {
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/subject" },
+                { "properties": { "kind": { "const": "offering" } } }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+    },
+    "shortText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+    },
+    "identity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256-[0-9a-f]{64}$"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "identity"],
+      "properties": {
+        "kind": { "enum": ["model", "offering", "evidence", "vendor", "inference-service", "condition"] },
+        "identity": { "$ref": "#/$defs/identity" },
+        "role": { "enum": ["source", "destination"] }
+      }
+    },
+    "batchScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "observation_scope", "inference_service_id"],
+      "properties": {
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "uri"],
+          "properties": {
+            "type": { "enum": ["first-party-read-api", "official-documentation"] },
+            "uri": { "type": "string", "format": "uri", "pattern": "^https://" }
+          }
+        },
+        "observation_scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scope_ref", "partition", "region"],
+          "properties": {
+            "scope_ref": { "$ref": "#/$defs/identity" },
+            "partition": { "$ref": "#/$defs/identity" },
+            "region": { "$ref": "#/$defs/identity" }
+          }
+        },
+        "inference_service_id": { "$ref": "#/$defs/identity" }
+      }
+    },
+    "candidateEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "observed_at", "digest"],
+      "properties": {
+        "uri": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$"
+        },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

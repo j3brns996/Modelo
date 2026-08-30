@@ -1,0 +1,15 @@
+{
+  "schema_version": "0.1",
+  "request_id": "00000000-0000-4000-8000-000000000003",
+  "operation": "revoke",
+  "purpose": "revoke-offering",
+  "subjects": [
+    { "kind": "offering", "identity": "bedrock-example-model" }
+  ],
+  "requested_outcome": "Remove the current offering and retain the release delta.",
+  "reason": "Enterprise approval has been withdrawn through the linked governance decision.",
+  "candidate_evidence": [],
+  "acceptance": ["No current record or reference requires the offering."],
+  "dedupe_key": "sha256-89901272bdf093041a6912ac44f4cae80b861fae46ff0e3018a52c8c3ba5bea1",
+  "idempotency_key": "sha256-4bb1fd928f818df19b51bbcc20874701bb86c5b8ae867affb4d787c67a8b81f6"
+}

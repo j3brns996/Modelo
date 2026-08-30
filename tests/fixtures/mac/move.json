@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.1",
+  "request_id": "00000000-0000-4000-8000-000000000004",
+  "operation": "move",
+  "purpose": "replace-offering-identity",
+  "subjects": [
+    { "kind": "offering", "identity": "bedrock-example-old", "role": "source" },
+    { "kind": "offering", "identity": "bedrock-example-new", "role": "destination" }
+  ],
+  "requested_outcome": "Atomically add the destination and revoke the source offering.",
+  "reason": "The stable offering identity has changed meaning and cannot be renamed cosmetically.",
+  "candidate_evidence": [],
+  "acceptance": ["The destination is valid before the source is removed.", "The release delta links both identities."],
+  "dedupe_key": "sha256-089be7cbc8d897dc82406c64bf54bced676838f31e3c6b6a866f347a41457198",
+  "idempotency_key": "sha256-9f0cfac6a2ffaf0ec7a1f5bc359754310df7b813a0ab9244ab9d75a9210e9fbc"
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1",
+  "request_id": "00000000-0000-4000-8000-000000000002",
+  "operation": "change",
+  "purpose": "refresh-offering-price",
+  "subjects": [
+    { "kind": "offering", "identity": "bedrock-example-model" }
+  ],
+  "requested_outcome": "Replace the price fact and its evidence reference without changing identity.",
+  "reason": "The first-party price observation has changed.",
+  "candidate_evidence": [
+    {
+      "uri": "https://example.invalid/official/pricing",
+      "observed_at": "2026-08-30T12:00:00Z",
+      "digest": "sha256-2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "acceptance": ["The offering identity is unchanged.", "The new value equals the cited observation."],
+  "dedupe_key": "sha256-07edb325cb04d089744f02c55ea7f5100b392db747ab0eadc2a1ede8982b72a4",
+  "idempotency_key": "sha256-306d4a26519e4e15cab200b998da4cd77ea60c0c574cb124c9f43f9803dfbbcb"
+}

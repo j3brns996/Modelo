@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1",
+  "request_id": "00000000-0000-4000-8000-000000000001",
+  "operation": "add",
+  "purpose": "approve-model-definition",
+  "subjects": [
+    { "kind": "model", "identity": "example-model-v1" }
+  ],
+  "requested_outcome": "Add the evidenced model definition.",
+  "reason": "The model is required by an approved offering proposal.",
+  "candidate_evidence": [
+    {
+      "uri": "https://example.invalid/official/model-v1",
+      "observed_at": "2026-08-30T12:00:00Z",
+      "digest": "sha256-1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "acceptance": ["The model facts match admissible evidence."],
+  "dedupe_key": "sha256-aa864bc685a1c64485a0bcc579481ea9ece2533e90d93076ef1876e8696995fd",
+  "idempotency_key": "sha256-4f915f916f106699d472ec991b8d7f76dbed90c98c4e9e4145fdecd4f9e4f8c2"
+}

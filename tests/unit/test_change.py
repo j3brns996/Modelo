@@ -3,8 +3,10 @@ from __future__ import annotations
 import unittest
 import sys
 from pathlib import Path
+import subprocess
+from tempfile import TemporaryDirectory
 
-from modelo.change import GitError, changed_paths, require_ancestor, resolve_commit, validate_changes
+from modelo.change import GitError, changed_paths, require_ancestor, resolve_commit, validate_changes, validate_condition_history
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests/fixtures/semantic"))
@@ -49,6 +51,58 @@ class ChangeTests(unittest.TestCase):
         unrelated = self.repository.commit("unrelated")
         with self.assertRaises(GitError):
             require_ancestor(self.repository.root, unrelated, head)
+
+    def test_mixed_offering_changes_are_exactly_one_atomic_move(self) -> None:
+        roots = dict(evidence_root="catalogue/evidence", conditions_root="catalogue/policies/conditions", models_root="catalogue/models", offerings_root="catalogue/offerings")
+        prefix = "catalogue/offerings/aws-bedrock/"
+        cases = (
+            (("D", prefix + "a.yaml"), ("A", prefix + "b.yaml")),
+            (("A", prefix + "a.yaml"), ("A", prefix + "b.yaml")),
+            (("D", prefix + "a.yaml"), ("D", prefix + "b.yaml")),
+        )
+        for changes in cases:
+            with self.subTest(changes=changes):
+                self.assertEqual(validate_changes(changes, **roots), ())
+        rejected = (
+            (("D", prefix + "a.yaml"), ("A", prefix + "b.yaml"), ("A", prefix + "c.yaml")),
+            (("D", prefix + "a.yaml"), ("D", prefix + "b.yaml"), ("A", prefix + "c.yaml")),
+            (("D", prefix + "a.yaml"), ("D", prefix + "b.yaml"), ("A", prefix + "c.yaml"), ("A", prefix + "d.yaml")),
+        )
+        for changes in rejected:
+            with self.subTest(changes=changes):
+                self.assertIn("CHANGE_INVALID", {finding.code for finding in validate_changes(changes, **roots)})
+
+    def test_condition_history_detects_mutation_and_changed_reintroduction(self) -> None:
+        condition = self.repository.root / "catalogue/policies/conditions/test-condition/1.yaml"
+        original = condition.read_text(encoding="utf-8")
+        condition.write_text(original.replace("Synthetic condition", "Mutated condition"), encoding="utf-8", newline="\n")
+        mutated = self.repository.commit("mutate condition")
+        self.assertIn("CHANGE_INVALID", {finding.code for finding in validate_condition_history(self.repository.root, mutated, "catalogue/policies/conditions", "catalogue/offerings")})
+        condition.unlink()
+        offering = self.repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml"
+        offering_text = offering.read_text(encoding="utf-8")
+        offering.write_text(offering_text.replace("condition_refs:\n  - id: test-condition\n    version: 1", "condition_refs: []"), encoding="utf-8", newline="\n")
+        deleted = self.repository.commit("delete condition")
+        condition.parent.mkdir(parents=True, exist_ok=True)
+        condition.write_text(original.replace("Synthetic condition", "Reintroduced condition"), encoding="utf-8", newline="\n")
+        offering.write_text(offering_text, encoding="utf-8", newline="\n")
+        reintroduced = self.repository.commit("reintroduce condition")
+        self.assertIn("CHANGE_INVALID", {finding.code for finding in validate_condition_history(self.repository.root, reintroduced, "catalogue/policies/conditions", "catalogue/offerings")})
+        self.assertNotEqual(deleted, reintroduced)
+
+    def test_condition_history_fails_closed_when_clone_is_shallow(self) -> None:
+        with TemporaryDirectory(prefix="modelo-shallow-") as temporary:
+            shallow = Path(temporary) / "repository"
+            subprocess.run(
+                ["git", "clone", "-q", "--depth", "1", f"file://{self.repository.root}", str(shallow)],
+                check=True, capture_output=True, text=True,
+            )
+            head = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=shallow, check=True,
+                capture_output=True, text=True,
+            ).stdout.strip()
+            with self.assertRaisesRegex(GitError, "shallow"):
+                validate_condition_history(shallow, head, "catalogue/policies/conditions", "catalogue/offerings")
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
-from modelo.change import GitError, changed_paths, require_ancestor, resolve_commit, validate_changes, with_snapshot
+from modelo.change import GitError, changed_paths, require_ancestor, resolve_commit, validate_changes, validate_condition_history, with_snapshot
 from modelo.config import ConfigError, ModeloConfig, load_config
 from modelo.diagnostics import Diagnostic, Severity, sort_diagnostics
 from modelo.discovery import DiscoveryError, discover_yaml_files
@@ -340,6 +340,15 @@ def check_repository(root: Path, base: str, head: str, as_of: date) -> tuple[Dia
         models_root=head_state.config.paths["models"].as_posix(),
         offerings_root=head_state.config.paths["offerings"].as_posix(),
     ))
+    try:
+        diagnostics.extend(validate_condition_history(
+            root,
+            head_commit,
+            head_state.config.paths["conditions"].as_posix(),
+            head_state.config.paths["offerings"].as_posix(),
+        ))
+    except GitError as exc:
+        raise CheckSystemError(str(exc)) from exc
     # A modified record may not silently change logical identity even if a path error
     # in the candidate would otherwise obscure the base comparison.
     for status, path in changes:

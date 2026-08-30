@@ -689,73 +689,35 @@ def _persist_journal(parent: Path, lock: Path, value: Mapping[str, Any], *, init
     raw = canonical_bytes(dict(value))
     if len(raw) > 32_768:
         raise BuildError("build journal exceeds its bound")
-    temporary = parent / f".{lock.name}.{value['token']}.{value['sequence']}.tmp"
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(temporary, flags, 0o600)
+    path = lock if initial else parent / f".{lock.name}.{value['token']}.{value['sequence']}.tmp"
+    descriptor = os.open(path, flags, 0o600)
     try:
-        try:
-            _write_all(descriptor, raw)
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-        if initial:
-            os.link(temporary, lock, follow_symlinks=False)
-        else:
-            os.replace(temporary, lock)
-        _fsync_dir(parent)
+        _write_all(descriptor, raw)
+        os.fsync(descriptor)
     finally:
-        if temporary.exists() or temporary.is_symlink():
-            if temporary.is_symlink() or not temporary.is_file():
-                raise BuildError("journal temporary path is unsafe")
-            temporary.unlink()
-            _fsync_dir(parent)
+        os.close(descriptor)
+    if not initial:
+        os.replace(path, lock)
+    _fsync_dir(parent)
 
 
-def _cleanup_journal_temporaries(
+def _reject_journal_temporaries(
     parent: Path, lock: Path, journal: Mapping[str, Any], lock_raw: bytes,
 ) -> None:
-    """Remove only initial-journal hard links proven identical to the lock.
+    """Fail closed for every token-shaped journal temporary.
 
-    A token-shaped name is not an ownership claim.  Classification is
-    completed before the first unlink so an unrelated matching entry leaves
-    the entire publication namespace untouched.
+    Portable filesystems do not provide unlink-if-inode semantics.  Recovery
+    therefore never guesses ownership and never unlinks a temporary, even if
+    it appears to be a hard link or byte-identical to the validated lock.
     """
-
     prefix = f".{lock.name}.{journal['token']}."
-    try:
-        lock_status = os.lstat(lock)
-    except OSError as exc:
-        raise BuildError("build recovery lock changed during temporary validation") from exc
-    if not stat.S_ISREG(lock_status.st_mode):
-        raise BuildError("build recovery lock is not a regular file")
     expected_raw = canonical_bytes(dict(journal))
     if lock_raw != expected_raw:
         raise BuildError("build recovery journal is not canonical")
-    removable: list[Path] = []
     for path in parent.iterdir():
-        if not path.name.startswith(prefix) or not path.name.endswith(".tmp"):
-            continue
-        try:
-            temporary_status = os.lstat(path)
-            raw = _read_regular_nofollow(
-                path, limit=32_768, label="build recovery journal temporary"
-            )
-        except (BuildError, OSError) as exc:
-            raise BuildError("ambiguous build recovery journal temporary") from exc
-        same_inode = (
-            temporary_status.st_dev == lock_status.st_dev
-            and temporary_status.st_ino == lock_status.st_ino
-        )
-        if (
-            not stat.S_ISREG(temporary_status.st_mode)
-            or not same_inode or raw != lock_raw or raw != expected_raw
-        ):
+        if path.name.startswith(prefix) and path.name.endswith(".tmp"):
             raise BuildError("ambiguous build recovery journal temporary")
-        removable.append(path)
-    for path in removable:
-        path.unlink()
-    if removable:
-        _fsync_dir(parent)
 
 
 def _walk_regular_tree(target: Path) -> dict[str, bytes]:
@@ -915,7 +877,7 @@ def _recover_candidate(root: Path) -> RecoveryOutcome | None:
         _strict_json_bytes(lock_raw, "build recovery journal"), layout
     )
     token = journal["token"]
-    _cleanup_journal_temporaries(parent, lock, journal, lock_raw)
+    _reject_journal_temporaries(parent, lock, journal, lock_raw)
     target = repository.joinpath(*layout.candidate_root.parts)
     staging = parent / f"{target.name}.{token}.staging"
     backup = parent / f"{target.name}.{token}.backup"

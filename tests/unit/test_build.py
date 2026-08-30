@@ -663,7 +663,7 @@ class BuildTests(unittest.TestCase):
                 self.assertEqual(lock.read_bytes(), canonical_bytes(record))
                 lock.unlink()
 
-    def test_recovery_removes_only_proven_hard_link_journal_temporary(self) -> None:
+    def test_recovery_never_unlinks_even_hard_linked_journal_temporary(self) -> None:
         result = build_candidate(self.request())
         layout = build_module._layout(self.repository.root)
         inventory = build_module._candidate_inventory(self.repository.root, result.output, layout)
@@ -674,15 +674,52 @@ class BuildTests(unittest.TestCase):
         lock.write_bytes(canonical_bytes(record))
         temporary = parent / f".{lock.name}.{record['token']}.0.tmp"
         os.link(lock, temporary)
-        real_fsync_dir = build_module._fsync_dir
-        with patch.object(build_module, "_fsync_dir", wraps=real_fsync_dir) as fsync_dir:
-            self.assertIs(
-                recover_candidate(self.repository.root), build_module.RecoveryOutcome.ROLLED_BACK
-            )
-        self.assertFalse(lock.exists()); self.assertFalse(temporary.exists())
-        self.assertGreaterEqual(
-            sum(call.args == (parent,) for call in fsync_dir.call_args_list), 2
+        # A pathname could be swapped after any identity read.  Recovery has no
+        # unlink path at all, so the attempted TOCTOU callback is never reached.
+        with patch.object(Path, "unlink", side_effect=AssertionError("unsafe unlink attempted")) as unlink:
+            with self.assertRaisesRegex(BuildError, "ambiguous build recovery journal temporary"):
+                recover_candidate(self.repository.root)
+        unlink.assert_not_called()
+        self.assertTrue(lock.exists()); self.assertTrue(temporary.exists())
+        temporary.unlink(); lock.unlink()
+
+    def test_normal_journal_replace_consumes_temporary_without_hard_link_acquisition(self) -> None:
+        with patch.object(os, "link", side_effect=AssertionError("hard-link acquisition attempted")):
+            result = build_candidate(self.request())
+        self.assertTrue(result.output.is_dir())
+        self.assertEqual(
+            list(result.output.parent.glob("..modelo-build.lock.*.tmp")), []
         )
+
+    def test_failed_journal_replace_retains_ambiguous_temp_and_complete_target(self) -> None:
+        result = build_candidate(self.request())
+        files, manifest = self.changed_publication(result)
+        layout = build_module._layout(self.repository.root)
+        before = {
+            path.relative_to(result.output).as_posix(): path.read_bytes()
+            for path in result.output.rglob("*") if path.is_file()
+        }
+        real_replace = os.replace
+
+        def fail_journal_replace(source, destination):
+            if str(source).endswith(".tmp") and Path(destination).name == ".modelo-build.lock":
+                raise OSError("injected before journal replace")
+            return real_replace(source, destination)
+
+        with patch.object(os, "replace", side_effect=fail_journal_replace):
+            with self.assertRaisesRegex(BuildError, "explicit recovery required"):
+                build_module._publish(self.repository.root, result.output, files, manifest, layout)
+        self.assertEqual(
+            {
+                path.relative_to(result.output).as_posix(): path.read_bytes()
+                for path in result.output.rglob("*") if path.is_file()
+            },
+            before,
+        )
+        lock = result.output.parent / ".modelo-build.lock"
+        temporaries = list(result.output.parent.glob("..modelo-build.lock.*.tmp"))
+        self.assertTrue(lock.exists()); self.assertEqual(len(temporaries), 1)
+        temporaries[0].unlink(); lock.unlink()
 
     def test_foreign_journal_temporaries_are_ambiguous_and_never_removed(self) -> None:
         result = build_candidate(self.request())

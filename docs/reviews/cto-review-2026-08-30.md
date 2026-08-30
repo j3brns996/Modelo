@@ -9,10 +9,8 @@ state and measure explicit exit criteria.
 
 Codex Work is appropriate for planning, research coordination and preparing a
 reviewable branch. It is not the system of record, an enforcement boundary or
-an approval authority. Issues hold intent, one authoring agent owns writes, and CI is the technical
-acceptance arbiter. An eligible independent human or agent may approve the
-change request after inspecting successful trusted-CI evidence for the exact
-head commit.
+an approval authority. Issues hold intent, one root agent owns writes, CI owns
+acceptance and humans approve the change request.
 
 ## Required corrections to the original draft
 
@@ -46,11 +44,13 @@ head commit.
     content-addressed and immutable.
 14. Make all bootstrap paths config-owned, require API operation provenance,
     and define evidence hashing with RFC 8785 canonical JSON plus SHA-256.
-15. Make CI the technical acceptance arbiter. Permit agent approval only for a
-    distinct eligible reviewer that did not contribute to the change and
-    records successful trusted-CI evidence for the exact head commit.
 
 ## Repository comparison
+
+This initial comparison has been superseded by the pinned, evidence-backed
+review in `docs/reviews/catalogue-repositories-2026-08-30.md`. That review makes
+`openmodels.run` the primary reference and documents the important limitation:
+its public registry-to-site build is not reproducible from the public source.
 
 | Repository | Strength to reuse | Limitation for Modelo |
 |---|---|---|
@@ -92,3 +92,13 @@ Do not merge catalogue data until the next implementation slice supplies:
 - GitHub adapter workflows and a remote `modelo platform check`;
 - a Pages build that publishes no private terms;
 - a GitLab adapter conformance fixture proving core data is unchanged.
+
+## Reconciliation addendum
+
+The second independent review wave added four launch-blocking contracts that
+were absent here: `docs/site-contract.md`, `docs/mac-contract.md`,
+`docs/security-contract.md` and `docs/implementation-plan.md`. They define the
+actual templates and routes, neutral MAC hashes, CI trust/approval boundary,
+locked Python/`uv` build, task graph and verification gates. `npx` and Agent
+Skills are not build inputs. Agent approval is data-only; control-plane changes
+require human CODEOWNER review.

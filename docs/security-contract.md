@@ -5,6 +5,10 @@
 - The restricted YAML loader rejects duplicate keys, aliases, anchors, custom
   tags, multi-documents, symlinks, non-mapping roots, excess depth/size/count
   and paths outside configured roots. It never constructs Python objects.
+  The bootstrap configuration reader applies the same input restrictions to
+  `modelo.yaml` only; its limits are configured by
+  `toolchain.bootstrap_config_limits`. The catalogue loader remains a separate
+  T2 security boundary.
 - Core validation/build never uses the network or dereferences catalogue URLs.
   A least-privilege host-adapter pre-step may read bounded MAC metadata from the
   same repository's Git-provider API and emits canonical input bound to the head

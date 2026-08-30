@@ -26,6 +26,11 @@ repository:
       batch: /issues/new?template=mac-batch.yml
 
 paths:
+  readme: README.md
+  contributing: CONTRIBUTING.md
+  codeowners: CODEOWNERS
+  gitignore: .gitignore
+  gitattributes: .gitattributes
   catalogue: catalogue
   models: catalogue/models
   offerings: catalogue/offerings
@@ -73,6 +78,10 @@ toolchain:
   python_version_file: .python-version
   python_version: "3.12.13"
   uv_version: "0.11.33"
+  bootstrap_config_limits:
+    max_bytes: 131072
+    max_depth: 20
+    max_nodes: 2000
   required_runtime_is_node: false
   npx_allowed_in_required_ci: false
   skills_are_build_inputs: false
@@ -122,6 +131,10 @@ publication:
   silent_private_to_public_downgrade: false
 
 platform:
+  identities:
+    control_plane_owner:
+      github: j3brns
+      gitlab: null
   required_capabilities:
     protected_default_branch: true
     direct_push: false

@@ -33,7 +33,7 @@ The build is split logically, not into services:
 | ID | Deliverable and owned paths | Depends on | Acceptance evidence |
 |---|---|---|---|
 | T0 | Reconciled target contract, site/MAC/security contracts and repository review under `docs/`; freeze `modelo.yaml` | — | Structured files parse; contradiction checklist is closed; independent review |
-| T1 | Root metadata, exact Python/uv pins and CLI/config skeleton: root files plus `tooling/modelo/src/modelo/{cli,config}.py` | T0 | Clean clone runs locked commands; CLI/config smoke tests |
+| T1 | Repository/CLI foundation: `README.md`, `CONTRIBUTING.md`, `CODEOWNERS`, `.gitignore`, `.gitattributes`, `.python-version`, `pyproject.toml`, `uv.lock`, `tooling/modelo/src/modelo/{__init__,__main__,cli,config}.py` and `tests/unit/test_{cli,config}.py` | T0 | Locked sync, package/build and CLI/config smoke tests pass; `check`/`build` expose target syntax but fail closed as unavailable |
 | T2 | `tooling/modelo/src/modelo/{loader,discovery,diagnostics}.py` and `tests/unit/{test_loader,test_discovery,test_diagnostics}.py` | T1 | Malicious YAML/path corpus and diagnostic snapshot tests pass |
 | T3 | Core/AWS/entity/receipt schemas and schema-only fixtures under `schemas/` and `tests/fixtures/schema/` | T1 | Every structural invariant has passing and failing fixtures |
 | T4 | `tooling/modelo/src/modelo/{schemas,evidence,freshness,change,validators}.py`, `tests/fixtures/semantic/` and matching `tests/unit/test_{schemas,evidence,freshness,change,validators}.py` | T2, T3, T7 | Base/head, model binding, equality, immutability, move and revoke tests pass |
@@ -49,6 +49,12 @@ All other edges are hard dependencies and later tasks run sequentially where
 they extend the same package. Each task uses a separate branch/worktree and one
 writer. Review agents are read-only. The integration writer alone updates the
 target branch after validating each task's exact head.
+
+T1 owns the bootstrap reader for `modelo.yaml`; it validates only fields needed
+to locate and run the locked tool. T2 owns the restricted loader for catalogue
+and policy documents. Both enforce the common YAML safety rules, but they are
+separate trust boundaries and neither may silently broaden the other. T3 owns
+the complete `modelo.yaml` schema and drift fixtures.
 
 ## CI is the arbiter
 

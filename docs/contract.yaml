@@ -35,17 +35,32 @@ concepts:
   route: provider_scoped_invocation_reference
   observation: time_bounded_first_party_evidence
   condition: versioned_enterprise_policy
+  evidence: durable_redacted_canonical_projection
 
 identity:
   model:
     field: id
-    path_template: catalogue/models/{model_id}.yaml
+    path_config_key: paths.models
+    filename_template: "{model_id}.yaml"
   offering:
     field: id
-    path_template: catalogue/offerings/{operator_id}/{offering_id}.yaml
+    path_config_key: paths.offerings
+    filename_template: "{operator_id}/{offering_id}.yaml"
   route:
     field: id
     stored_under: offering
+  evidence:
+    field: id
+    path_config_key: paths.evidence
+    filename_template: "{evidence_id}.yaml"
+  condition:
+    fields:
+      - id
+      - version
+    path_config_key: paths.conditions
+    filename_template: "{condition_id}/{version}.yaml"
+    version_type: positive_integer
+    used_version_is_immutable: true
   provider_scope_in_canonical_path: false
   move_semantics: add_new_and_revoke_old
 
@@ -60,6 +75,7 @@ approval:
   provider_availability_is_approval: false
   model_alone_is_consumable: false
   offering_required_for_consumption: true
+  offering_requires_routes_minimum: 1
   forbidden_record_fields:
     - approval_status
     - approval_flag
@@ -67,28 +83,46 @@ approval:
 
 evidence:
   required_for: every_non_identity_assertion
-  fact_links: json_pointer
+  fact_links: entity_json_pointer_to_evidence_id
   admissible_sources:
     - first_party_read_api
     - official_provider_documentation
     - official_vendor_documentation
   required_metadata:
     - source
-    - source_type
     - observed_at
-    - retrieval_method
+    - retrieved_by
     - scope
-  digest_when_safe_and_stable: true
+    - projection
+    - content_sha256
+    - visibility
+  source_shape:
+    required:
+      - type
+      - uri
+    optional:
+      - operation
+  retention:
+    canonical_projection: durable_git_source
+    raw_response: optional_short_lived_private_artefact
+  public_projection_default: excluded
+  canonical_projection_digest_required: true
   unsupported_fact_action: omit
   discovery_absence_can_revoke: false
 
 pricing:
   representation: dimensional
   dimensions_are_provider_adapter_values: true
-  amount:
-    value_type: decimal_string
-    currency: iso_4217
-    unit: explicit
+  record_required:
+    - dimension
+    - unit
+    - quantity
+    - amount
+    - currency
+    - route_ids
+  amount_type: decimal_string
+  currency: iso_4217
+  unit: explicit
   private_terms_in_public_site: false
 
 provider_boundary:
@@ -113,24 +147,14 @@ provider_boundary:
       - offerToken
   gcp:
     adapter: gcp-vertex-ai
-    route_parts:
-      - project
-      - location
-      - publisher
-      - model
-      - version
-      - endpoint
+    status: not_implemented
+    normative_route_shape: deferred_until_first_party_fixtures
+    documentation: docs/providers/aws-bedrock.md#cross-cloud-path-comparison
   azure:
     adapter: azure-ai-foundry
-    route_parts:
-      - subscription
-      - resource_group
-      - account
-      - location
-      - publisher
-      - model
-      - version
-      - deployment
+    status: not_implemented
+    normative_route_shape: deferred_until_first_party_fixtures
+    documentation: docs/providers/aws-bedrock.md#cross-cloud-path-comparison
 
 platform:
   kernel_terms:
@@ -170,10 +194,11 @@ platform:
 mac:
   initiation: issue
   operations:
-    - move
     - add
     - change
     - revoke
+  intake_aliases:
+    move: atomic_add_and_revoke
   approval_unit: change_request
   duplicate_proposal_files: false
   batch:
@@ -200,10 +225,10 @@ agents:
 validation:
   command: modelo check
   externally_visible_outcomes:
-    - format
-    - facts
-    - change
-    - build
+    - schema-and-facts
+    - tests
+    - build-and-site
+    - release-and-clean-tree
   deterministic: true
   writes_must_be_parsed_and_re_read: true
   platform_controls_check: modelo platform check
@@ -223,15 +248,39 @@ sustainability:
   intended_rate: 10_to_20_approved_changes_per_working_day
   review_window_days: 90
   reconsider_git_if_two_persist_for_four_weeks:
-    - accepted_changes_over_50_per_day
-    - repeated_bursts_over_10_per_hour_with_sub_hour_sla
-    - conflict_or_manual_rebase_rate_over_10_percent
-    - p95_issue_to_site_over_one_business_day_below_70_percent_reviewer_utilisation
-    - p95_check_over_five_minutes_or_site_publish_over_ten_minutes
-    - bypass_rate_over_5_percent
-    - same_identity_normally_changes_more_than_once_per_day
-    - transactional_row_level_or_live_state_required
-    - clean_clone_bootstrap_over_60_seconds
+    - metric: accepted_changes_per_working_day
+      operator: greater_than
+      threshold: 50
+    - metric: repeated_burst_changes_per_hour
+      operator: greater_than
+      threshold: 10
+      condition: publication_sla_under_one_hour
+    - metric: conflict_or_manual_rebase_percent
+      operator: greater_than
+      threshold: 10
+    - metric: p95_issue_to_site_business_days
+      operator: greater_than
+      threshold: 1
+      condition: reviewer_utilisation_under_70_percent
+    - metric: p95_check_minutes
+      operator: greater_than
+      threshold: 5
+    - metric: p95_site_publish_minutes
+      operator: greater_than
+      threshold: 10
+    - metric: workflow_bypass_percent
+      operator: greater_than
+      threshold: 5
+    - metric: same_identity_changes_per_day
+      operator: greater_than
+      threshold: 1
+      condition: normal_operation
+    - metric: transactional_row_level_or_live_state_required
+      operator: equals
+      threshold: true
+    - metric: clean_clone_bootstrap_seconds
+      operator: greater_than
+      threshold: 60
 
 deferred_until_contract_and_tests_exist:
   - live_operational_store

@@ -95,7 +95,9 @@ never revoke an offering automatically.
 ### Condition
 
 A versioned enterprise policy identifier referenced by offerings. Conditions
-are structured records, not free-form strings.
+are structured records, not free-form strings. A reference contains both `id`
+and positive integer `version`. A used version is immutable; changed meaning
+adds the next version and migrates offerings through MAC review.
 
 ## Source layout
 
@@ -108,12 +110,13 @@ catalogue/
   models/{model_id}.yaml             Canonical model records
   offerings/{operator_id}/
     {offering_id}.yaml               Stable approved offerings and routes
+  evidence/{evidence_id}.yaml        Durable redacted evidence projections
   governance/
     vendors.yaml                     Vendor identities
     operators.yaml                   Operator identities and adapters
     freshness.yaml                   Evidence freshness policy
   policies/conditions/
-    {condition_id}.yaml              Versioned enterprise conditions
+    {condition_id}/{version}.yaml    Immutable condition versions
 schemas/                             Core and provider-adapter schemas
 scripts/                             Platform-neutral implementation
 tests/                               Unit, fixture and contract tests
@@ -187,6 +190,7 @@ reasoning support, licensing or approval from model names.
 | Paths and relative site routes | `modelo.yaml` |
 | Model identity and evidenced intrinsic facts | Model record |
 | Operator route, availability scope and price | Offering record |
+| Redacted observation projection and provenance | Evidence record |
 | Vendor and operator identity | Governance registry |
 | Enterprise condition text and owner | Condition record |
 | Field shape and allowed values | Schema |
@@ -237,7 +241,9 @@ The exact shape belongs to `schemas/model.schema.json`. The minimum record is:
 id: <stable-canonical-model-id>
 vendor_id: <vendor-id>
 name: <official-name>
-evidence: []
+evidence_refs:
+  /vendor_id: <evidence-id>
+  /name: <evidence-id>
 ```
 
 Capabilities, modalities, context limits, licence, lifecycle and descriptions
@@ -257,11 +263,26 @@ The exact shape belongs to `schemas/offering.schema.json`. The minimum shape is:
 id: <stable-offering-id>
 operator_id: aws
 model_id: <stable-canonical-model-id>
-routes: []
+routes:
+  - id: <stable-route-id>
+    operator_reference: <opaque-first-party-reference>
+    resource_type: <provider-adapter-value>
+    scope:
+      kind: region
+      values: [<provider-region>]
+    consumption: <provider-adapter-value>
 pricing: []
-condition_ids: []
-evidence: []
+condition_refs:
+  - id: <condition-id>
+    version: 1
+evidence_refs:
+  /operator_id: <evidence-id>
+  /model_id: <evidence-id>
+  /routes/0/operator_reference: <evidence-id>
 ```
+
+An offering must have at least one valid route to be consumable. Empty pricing
+means that no price assertion is made; it does not imply zero or free usage.
 
 ### Routes
 
@@ -291,10 +312,12 @@ pricing:
   - dimension: input
     unit: token
     quantity: 1000000
-    price: 3.00
+    amount: "3.00"
     currency: USD
     route_ids: [<route-id>]
-    evidence_refs: [<evidence-id>]
+evidence_refs:
+  /pricing/0/amount: <evidence-id>
+  /pricing/0/currency: <evidence-id>
 ```
 
 The schema admits only explicit units and dimensions. Unsupported commercial
@@ -304,28 +327,34 @@ token price.
 ### Evidence coverage
 
 ```yaml
-evidence:
-  - id: <evidence-id>
-    supports:
-      - /routes/0/operator_reference
-      - /pricing/0/price
-    source:
-      type: api | official-documentation | pricing-page | model-card
-      url: <official-source-url>
-      operation: <optional-first-party-operation>
-    retrieved_by: cli | mcp | manual
-    observed_at: <RFC-3339-timestamp>
-    scope: {}
-    content_sha256: <optional-lowercase-hex>
+# catalogue/evidence/{evidence_id}.yaml
+id: <evidence-id>
+source:
+  type: first-party-read-api | official-provider-documentation | official-vendor-documentation
+  uri: <official-source-uri>
+  operation: <optional-first-party-operation>
+retrieved_by: cli | mcp | manual
+observed_at: <RFC-3339-timestamp>
+scope: {}
+projection: {}
+content_sha256: <lowercase-hex-of-canonical-projection>
+visibility: internal
 ```
 
-Evidence may support several facts from the same response. CI checks that every
-required external fact is covered and that pointers resolve.
+Entity `evidence_refs` map JSON Pointers to evidence IDs. One evidence record may
+support several facts. CI checks that every required external fact is covered,
+pointers resolve, and the digest matches the canonical retained projection.
+
+The redacted projection is durable Git source, not an expiring CI artefact. It
+contains only the first-party response fields needed to reproduce validation.
+Credentials, tokens, private prices, account identifiers and unrelated response
+fields are excluded. The static-site projection omits evidence records unless
+their schema explicitly marks them public.
 
 ## AWS-first provider reasoning
 
-AWS is the first implemented adapter because its topology exposes the mistakes
-a falsely universal model would make.
+AWS is the first adapter to be implemented because its topology exposes the
+mistakes a falsely universal model would make.
 
 | AWS read operation | Facts it can establish | Facts it cannot establish |
 |---|---|---|
@@ -388,7 +417,7 @@ the v0.1.0 core.
 ```text
 Scheduled native CI
   -> read configured provider APIs
-  -> retain a short-lived private observation artefact and digest
+  -> retain a redacted canonical evidence projection and digest
   -> compare factual fields with approved state
   -> open or update one MAC issue
   -> human or agent prepares a branch and change request
@@ -398,8 +427,9 @@ Scheduled native CI
   -> deterministic Pages artefact and protected release
 ```
 
-The neutral MAC operations are `add`, `change` and `revoke`. A logical move is
-`add + revoke` in one change request. The issue captures target identity,
+The neutral catalogue operations are `add`, `change` and `revoke`. `move` is an
+intake convenience compiled to atomic `add + revoke` in one change request. The
+issue captures target identity,
 requested outcome, official evidence, observation time, reason and acceptance
 criteria. Its mutable body is not authoritative data.
 
@@ -442,7 +472,7 @@ adapter and local repository coordinates. CI host variables override local
 repository coordinates through the adapter; the YAML contains no `${ENV}`
 interpolation and no provider URL templates.
 
-Baseline clone acceptance:
+Target clone acceptance, once the executable slice is present:
 
 ```bash
 git clone <repository-url>
@@ -480,10 +510,10 @@ evidence, but neither is a source of approval.
 One command, `modelo check`, owns acceptance. Its externally visible outcomes
 are:
 
-1. schema, path, reference and evidence validation;
-2. unit and fixture tests;
-3. deterministic catalogue and static-site build with smoke tests;
-4. clean-tree and release-contract verification.
+1. `schema-and-facts`: schema, path, reference and evidence validation;
+2. `tests`: unit and fixture tests;
+3. `build-and-site`: deterministic catalogue and static-site build with smoke tests;
+4. `release-and-clean-tree`: release-contract and clean-tree verification.
 
 Lint, dependency lock, secret scanning and document-drift checks are internal
 stages of those outcomes, not eleven independently promised products. A control

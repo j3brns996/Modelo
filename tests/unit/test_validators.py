@@ -78,6 +78,27 @@ class ValidatorTests(unittest.TestCase):
         head = self.repository.commit()
         self.assertIn("CHANGE_INVALID", {finding.code for finding in self.check(head=head)})
 
+    def test_scheduled_audit_detects_historical_condition_mutation(self) -> None:
+        path = self.repository.root / "catalogue/policies/conditions/test-condition/1.yaml"
+        original = path.read_text(encoding="utf-8")
+        path.write_text(original.replace("Synthetic condition", "Historically changed condition"), encoding="utf-8", newline="\n")
+        final = self.repository.commit("historical mutation")
+        self.assertIn("CHANGE_INVALID", {finding.code for finding in self.check(base=final, head=final)})
+
+    def test_changed_condition_reintroduction_after_deletion_fails(self) -> None:
+        path = self.repository.root / "catalogue/policies/conditions/test-condition/1.yaml"
+        original = path.read_text(encoding="utf-8")
+        offering = self.repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml"
+        offering_text = offering.read_text(encoding="utf-8")
+        path.unlink()
+        offering.write_text(offering_text.replace("condition_refs:\n  - id: test-condition\n    version: 1", "condition_refs: []"), encoding="utf-8", newline="\n")
+        deleted = self.repository.commit("delete condition")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(original.replace("Synthetic condition", "Reintroduced meaning"), encoding="utf-8", newline="\n")
+        offering.write_text(offering_text, encoding="utf-8", newline="\n")
+        head = self.repository.commit("reintroduce condition")
+        self.assertIn("CHANGE_INVALID", {finding.code for finding in self.check(base=deleted, head=head)})
+
     def test_atomic_offering_move_is_add_destination_and_revoke_source(self) -> None:
         source = self.repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml"
         document = yaml.safe_load(source.read_text(encoding="utf-8"))

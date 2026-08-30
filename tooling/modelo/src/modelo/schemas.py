@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime
+import re
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 from urllib.parse import urljoin, urlsplit
@@ -12,6 +13,24 @@ from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 
 from modelo.diagnostics import Diagnostic, Severity
+
+
+RFC3339 = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
+    r"(?:\.[0-9]+)?(?:Z|[+-][0-9]{2}:[0-9]{2})(?![\s\S])"
+)
+
+
+def parse_rfc3339(value: str) -> datetime:
+    """Parse the strict timestamp subset used by the executable contract."""
+
+    if RFC3339.fullmatch(value) is None:
+        raise ValueError("timestamp is not strict RFC 3339")
+    candidate = value[:-1] + "+00:00" if value.endswith("Z") else value
+    parsed = datetime.fromisoformat(candidate)
+    if parsed.tzinfo is None:
+        raise ValueError("timestamp has no timezone")
+    return parsed
 
 
 def _pointer(parts: object) -> str:
@@ -85,10 +104,9 @@ class SchemaSet:
         def valid_datetime(value: object) -> bool:
             if not isinstance(value, str):
                 return True
-            candidate = value[:-1] + "+00:00" if value.endswith("Z") else value
             try:
-                parsed = datetime.fromisoformat(candidate)
-                return parsed.tzinfo is not None
+                parse_rfc3339(value)
+                return True
             except ValueError:
                 return False
 

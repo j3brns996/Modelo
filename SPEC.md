@@ -1,453 +1,535 @@
-# Model Catalogue v0.1.0 — Specification
+# Modelo v0.1.0 — Model Catalogue Specification
 
-> Status: draft implementation contract for version `0.1.0`.
+> Status: target contract, not yet an as-built description.
 >
-> This document explains the system's intent and operating model. JSON Schema,
-> the validator and the CI pipeline determine whether a change is accepted.
-> A disagreement between them and this document is a defect that must be fixed
-> in the same pull request.
+> Modelo is a Git-backed approval and publication ledger for AI model
+> offerings. It is not a live cloud inventory and it does not replace provider
+> APIs, IAM, procurement, Legal review or runtime policy enforcement.
 >
-> **Agent entry point:** load [`docs/contract.yaml`](docs/contract.yaml) first.
+> Agents should load `modelo.yaml`, then `docs/contract.yaml`.
 
----
+## Decision
 
-## Quick reference
+Use Git for v0.1.0.
 
-```bash
-python scripts/ci_local.py                     # Run all 11 CI gates
-python scripts/validate.py                     # Validate the catalogue
-python scripts/validate.py --format json       # Emit structured diagnostics
-python scripts/validate.py --as-of 2026-08-28  # Fix the date for tests only
-python scripts/build.py                        # Development build
-python scripts/build.py --release              # Release build
-```
+Ten to twenty approved changes per working day is comfortably within Git's
+mechanical capacity when records are split by identity. The likely constraint
+is evidence review, not storage or merging. Live provider discovery may run
+more frequently, but its output is an observation: it can open or update an
+issue and supply evidence; it cannot approve, revoke or directly rewrite the
+catalogue.
 
-After a successful build, open `public-docs/index.html` to inspect the site.
+No database, application API, bespoke authentication service, audit service or
+message bus is justified for v0.1.0. The Git platform supplies identity,
+change requests, review, protected branches, CI, static Pages and releases.
 
-## Objective and scope
+Modelo exposes no HTTP or service API. Workflow writes and control-plane
+automation use only the selected Git provider API. Cloud provider APIs, CLIs
+and MCP tools are read-only evidence sources. Consumers read versioned static
+artefacts from Pages, a release or a clone.
 
-The catalogue is a Git-backed registry of AI model offerings approved for
-enterprise consumption. It answers four questions:
+## Objective
 
-1. Which model is being offered?
-2. Which operator supplies it, and where?
-3. What does it cost?
-4. Which conditions constrain its use?
+The catalogue answers:
 
-A **model** records facts about a named, versioned model. An **offering** records
-an operator's provision of that model in a geographical market. A model record
-alone does not grant permission to consume anything; an approved offering is
-required.
+1. Which named model is being described?
+2. Which operator offering is approved for enterprise consumption?
+3. Through which provider route can it be consumed?
+4. What factual price and capability evidence supports the record?
+5. Which versioned enterprise conditions apply?
 
-Version `0.1.0` supports token-priced inference. A model may be multimodal, but
-an offering whose price cannot be represented as input and output tokens per
-million is outside this version's scope.
+An approved model record is not, by itself, consumable. Consumption approval
+exists only through an approved offering.
+
+## Non-goals
+
+Version `0.1.0` does not:
+
+- represent real-time account entitlements or deployment health;
+- infer approval from provider availability;
+- provide transactional or row-level access;
+- store prompts, usage telemetry or model artefacts;
+- normalise every AWS, GCP and Azure resource hierarchy into one invented path;
+- make Git history legally immutable or WORM-compliant.
 
 ## Authority
 
-| Concern | Authority |
+| Concern | Executable owner |
 |---|---|
-| Data shape, required fields, patterns, enums and formats | `schemas/*.schema.json` |
-| Paths, references, uniqueness and freshness | Python validators |
-| Gate order and release acceptance | `scripts/ci_local.py` |
-| Approval, ownership and audit history | GitHub branch protection, reviews and `CODEOWNERS` |
-| Human explanation | `SPEC.md` |
-| Compact agent navigation | `docs/contract.yaml` |
+| Repository paths, relative public routes and selected host adapter | `modelo.yaml` |
+| Entity structure and allowed values | `schemas/` |
+| Path, reference, evidence and change rules | Validator |
+| Acceptance command | `modelo check` |
+| Remote branch, review and publication controls | Platform adapter and host settings |
+| Human rationale | `SPEC.md` and ADRs |
+| Compact agent context | `docs/contract.yaml` |
 
-The contract is a checked summary, not an independent source of catalogue
-rules. Changes to schemas, paths, diagnostic codes or CI gates must update the
-contract in the same pull request.
+`SPEC.md` and `docs/contract.yaml` are checked explanations, not competing
+sources of executable truth. A conflict is a defect. It must not be excused by
+silently saying that code wins.
+
+## Core concepts
+
+### Model
+
+A canonical, named model release produced by a model vendor or laboratory.
+Its identity is independent of the cloud or API host that serves it.
+
+### Offering
+
+An enterprise-approved operator/model relationship. The offering has a stable
+internal ID and contains one or more approved provider routes.
+
+### Route
+
+An invocable provider reference plus its scope and consumption mode. Provider
+references are opaque to the core schema. AWS, GCP and Azure adapters validate
+their syntax and obtain them from first-party read APIs.
+
+### Observation
+
+A time-bounded result from a provider CLI, API, MCP tool or official document.
+An observation is evidence, never approval. Failed or missing discovery must
+never revoke an offering automatically.
+
+### Condition
+
+A versioned enterprise policy identifier referenced by offerings. Conditions
+are structured records, not free-form strings.
+
+## Source layout
+
+`modelo.yaml` owns these paths. They are shown here for orientation only.
+
+```text
+modelo.yaml                          Global bootstrap configuration
+AGENTS.md                            Repository-wide agent rules
+catalogue/
+  models/{model_id}.yaml             Canonical model records
+  offerings/{operator_id}/
+    {offering_id}.yaml               Stable approved offerings and routes
+  governance/
+    vendors.yaml                     Vendor identities
+    operators.yaml                   Operator identities and adapters
+    freshness.yaml                   Evidence freshness policy
+  policies/conditions/
+    {condition_id}.yaml              Versioned enterprise conditions
+schemas/                             Core and provider-adapter schemas
+scripts/                             Platform-neutral implementation
+tests/                               Unit, fixture and contract tests
+site/                                Static HTML, CSS and JavaScript source
+dist/                                Untracked deterministic output
+docs/
+  contract.yaml                      Compact agent context
+  adr/                               Architecture decisions
+  providers/                         Provider discovery facts
+  reviews/                           Dated design reviews
+.agents/skills/                      Open Agent Skills workflows
+.codex/                              Optional Codex adapter
+.kiro/                               Optional Kiro adapter
+.github/                             GitHub-only workflow adapter
+.gitlab/                             GitLab-only workflow adapter
+```
+
+Top-level `models/`, `offerings/`, `governance/` and `data/` are forbidden.
+Generated site data belongs in `dist/site/` and is published as a CI artefact;
+it is never committed back to the source branch.
 
 ## Invariants
 
-### 1. Protected-main presence is approval
+### 1. Protected-default-branch presence is approval
 
-Approval applies only to records beneath these paths:
+Approval applies only to valid records beneath `catalogue/`. It requires a
+linked MAC issue, a reviewed change request, required checks and merge to the
+protected default branch.
 
-```text
-catalogue/models/
-catalogue/offerings/
-catalogue/governance/
-```
+The issue is intake. The merged files and commit are the approved state.
 
-A record at one of those paths on protected `main` has passed CI and review.
-The pull request, reviews and resulting commit form the governance receipt.
-Files elsewhere on `main`, including proposals and generated artefacts, are not
-approved catalogue entries.
-
-There are no approval flags or workflow-state fields. `lifecycle` is descriptive
-vendor metadata; it is not an approval state.
-
-### 2. Paths encode identity
+### 2. Stable paths use internal identities
 
 ```text
 catalogue/models/{model_id}.yaml
-catalogue/offerings/{operator_id}/{model_id}.{geo}.yaml
+catalogue/offerings/{operator_id}/{offering_id}.yaml
 ```
 
-The model key is `model_id`. The offering key is
-`(operator_id, model_id, geo)`. Identifiers and filename components must match.
+The offering path does not contain geography, cloud region, account, project,
+subscription or a provider's mutable deployment alias. Those values belong in
+routes or discovery configuration.
 
-`model_id` must identify a named model version, not a mutable family alias. If
-two operators expose materially different model capabilities or context limits,
-they are not silently treated as the same model.
+A move that changes identity is an atomic add-new and revoke-old operation. It
+is never treated as a cosmetic Git rename.
 
-### 3. Consumption requires an offering
+### 3. Availability is not approval
 
-A vendor, operator or model entry permits referential use only. It does not
-grant consumption approval. An offering on protected `main` is the consumable
-unit, subject to its recorded conditions.
+AWS `AVAILABLE`, a visible Vertex publisher model or an Azure account model
+means the provider reports availability in a particular scope. It does not
+prove enterprise approval, effective IAM permission, legal acceptance, data
+residency suitability or suitability for a workload.
 
-Revocation removes the offering in a pull request. Git history retains the
-reason, reviewer and former content while current consumers see only the live
-set.
+### 4. Every non-identity assertion has evidence
 
-### 4. Every enforced fact is testable
+Each externally asserted fact must be linked by JSON Pointer to an evidence
+record containing:
 
-Schema-enforced files contain facts that CI can check structurally or against a
-defined reference. Assertions such as `dpa_agreed: true` are excluded unless the
-system also defines evidence, ownership and validation semantics for them.
+- an official source URL or first-party API operation;
+- source type;
+- observation date and time;
+- retrieval method and scope;
+- a content digest when a stable response can be retained safely.
 
-Free-form conditions in `0.1.0` are human-readable constraints, not executable
-policy. `docs/conditions.yaml` is guidance and is deliberately outside the
-authoritative catalogue-data boundary.
+If a fact cannot be evidenced and tested, omit it. Do not infer context windows,
+reasoning support, licensing or approval from model names.
 
 ### 5. One fact has one owner
 
 | Fact | Owner |
 |---|---|
-| Vendor identity and domicile | `catalogue/governance/vendors.yaml` |
-| Operator identity and service name | `catalogue/governance/operators.yaml` |
-| Freshness thresholds | `catalogue/governance/freshness.yaml` |
-| Model capabilities and context window | Model file |
-| Price, market and operator regions | Offering file |
-| Structural rules and enums | JSON Schema |
-| Path and reference rules | Python validators |
+| Paths and relative site routes | `modelo.yaml` |
+| Model identity and evidenced intrinsic facts | Model record |
+| Operator route, availability scope and price | Offering record |
+| Vendor and operator identity | Governance registry |
+| Enterprise condition text and owner | Condition record |
+| Field shape and allowed values | Schema |
+| Provider resource syntax | Provider adapter schema |
+| Approval receipt | Git platform change request and commit |
 
-Summaries in this specification and the agent contract must not become competing
-authorities.
+### 6. Platform semantics stay outside the kernel
 
-### 6. Geography is not a residency claim
+The catalogue, schemas, validator, builder and tests use neutral terms:
 
-`geo` identifies the offering's catalogue market: `uk`, `eu`, `us` or `global`.
-`available_regions` contains operator deployment-region identifiers. Neither
-field, by itself, proves data residency, processing location or regulatory
-compliance. Those claims require separately modelled evidence.
+- issue;
+- change request;
+- protected default branch;
+- required check;
+- code-owner review;
+- static-site publication;
+- protected release.
 
-### 7. Deterministic input produces deterministic output
+GitHub pull requests, Actions, Issue Forms and Pages live in `.github/` and the
+GitHub adapter. GitLab merge requests, CI, issue templates and Pages live in
+`.gitlab/` and the GitLab adapter. Switching host must not require catalogue or
+core-schema changes.
 
-Given the same source tree, `SOURCE_DATE_EPOCH`, Python version and locked
-dependencies, the build must be byte-identical. File discovery is sorted and
-output serialisation is canonical.
+### 7. Git is tamper-evident, not absolutely immutable
 
-## Repository layout
+The portable release receipt contains the source commit, catalogue revision,
+manifest digest, validation result, linked issue and change request, and a
+protected signed or annotated tag. Host-native immutable releases may strengthen
+this on GitHub; they are not a portable WORM guarantee.
 
-```text
-catalogue/                         Authoritative source data
-  models/                          One YAML file per named model version
-  offerings/
-    {operator_id}/                 One operator directory
-      {model_id}.{geo}.yaml
-  governance/
-    vendors.yaml                   Schema-enforced vendor registry
-    operators.yaml                 Schema-enforced operator registry
-    freshness.yaml                 Schema-enforced freshness policy
-schemas/                           JSON Schema 2020-12 documents
-scripts/
-  ci_local.py                      Authoritative CI gate sequence
-  validate.py                      Validator CLI
-  build.py                         Build CLI
-  loader.py                        Restricted YAML loader
-  discovery.py                     Deterministic discovery
-  validators.py                    Cross-file validation
-  diagnostics.py                   Structured diagnostics
-tests/
-  fixtures/valid/                  Miniature repositories that must pass
-  fixtures/invalid/                Miniature repositories that must fail
-public-docs/                       Static catalogue site
-  assets/base.css
-  index.html
-  browse.html
-  process.html
-  propose.html                     Download or GitHub issue hand-off only
-docs/
-  contract.yaml                    Compact agent reference
-  conditions.yaml                  Non-normative condition guidance
-  adr/                             Architecture decision records
-config/model-discovery/            Source configuration for Kiro skills
-.kiro/                             Agent configuration and skills
-.github/
-  workflows/ci.yml                 Calls `scripts/ci_local.py`
-  CODEOWNERS                       Review ownership
-  ISSUE_TEMPLATE/                  Proposal issue forms
-VERSION                            Plain-text semantic version
-pyproject.toml                     Python project configuration
-requirements.lock                  Locked CI dependencies
-.yamllint.yml                      YAML lint configuration
-.secrets.baseline                  Secret-scanning baseline
+### 8. Deterministic input produces deterministic output
+
+The same source tree, source-date epoch, runtime version and locked dependencies
+must produce byte-identical catalogue and site artefacts.
+
+### 9. The Git provider is the only workflow API
+
+Modelo has no application API or API gateway. Issues, branches, change
+requests, checks, releases and publication are created through the selected Git
+provider API. Provider adapters may call cloud APIs only for read-only evidence
+collection. Pages and release artefacts are read-only distribution surfaces.
+
+## Model contract
+
+The exact shape belongs to `schemas/model.schema.json`. The minimum record is:
+
+```yaml
+id: <stable-canonical-model-id>
+vendor_id: <vendor-id>
+name: <official-name>
+evidence: []
 ```
 
-Top-level `models/`, `offerings/`, `governance/`, `data/`, `registries/` and
-`operators/` are forbidden. The `catalogue/` prefix provides one review,
-ownership, validation and change-detection boundary. Generated site data remains
-under `public-docs/data/` and cannot be mistaken for source.
+Capabilities, modalities, context limits, licence, lifecycle and descriptions
+are optional until supported by admissible evidence. A canonical model ID must
+identify a named version, not a mutable `latest` alias.
 
-`scripts/ci_local.py` is authoritative. Convenience wrappers may call it but
-must not redefine the pipeline.
+The design follows the strongest idea in
+[models.dev](https://github.com/anomalyco/models.dev): separate laboratory model
+facts from host-specific serving details. Modelo adds evidence and enterprise
+approval semantics that community discovery catalogues do not provide.
 
-## Entity contracts
+## Offering contract
 
-The tables below are summaries. The JSON Schemas own the exact constraints.
+The exact shape belongs to `schemas/offering.schema.json`. The minimum shape is:
 
-### Model
+```yaml
+id: <stable-offering-id>
+operator_id: aws
+model_id: <stable-canonical-model-id>
+routes: []
+pricing: []
+condition_ids: []
+evidence: []
+```
 
-Path: `catalogue/models/{model_id}.yaml`
+### Routes
 
-| Field | Type | Required | Summary |
-|---|---|---:|---|
-| `id` | string | yes | Kebab-case; equals filename stem |
-| `vendor` | string | yes | Key in the vendor registry |
-| `name` | string | yes | Non-empty display name |
-| `description` | string | yes | Non-empty description |
-| `capabilities` | array | yes | Unique schema-enumerated values |
-| `modalities` | array | yes | Unique schema-enumerated values |
-| `context_window` | integer | yes | Minimum `1` |
-| `licensing` | string | yes | Schema-enumerated value |
-| `lifecycle` | string | no | `active`, `legacy` or `eol`; not approval |
-| `evidence` | object | no | Capability evidence required when present |
+```yaml
+routes:
+  - id: <stable-route-id>
+    operator_reference: <opaque-first-party-reference>
+    resource_type: <provider-adapter-value>
+    scope:
+      kind: region | geography | global
+      values: []
+    consumption: <provider-adapter-value>
+```
 
-### Offering
+The core validates structure and references. The operator adapter validates
+provider-specific values. Route IDs are internal and stable; provider references
+may change through an evidenced MAC change.
 
-Path: `catalogue/offerings/{operator_id}/{model_id}.{geo}.yaml`
+### Dimensional pricing
 
-| Field | Type | Required | Summary |
-|---|---|---:|---|
-| `model_id` | string | yes | References an existing model |
-| `operator_id` | string | yes | Key in the operator registry |
-| `provider_model_name` | string | yes | Operator's exact model identifier |
-| `geo` | string | yes | `uk`, `eu`, `us` or `global` |
-| `pricing` | object | yes | Token price and evidence |
-| `available_regions` | array | yes | At least one operator region identifier |
-| `conditions` | array | no | Free-form strings in `0.1.0` |
+Pricing is dimensional from v0.1.0. Two mandatory token-price fields would
+either exclude Bedrock image, cache, batch and provisioned prices or encourage
+fabrication.
 
-### Pricing
+```yaml
+pricing:
+  - dimension: input
+    unit: token
+    quantity: 1000000
+    price: 3.00
+    currency: USD
+    route_ids: [<route-id>]
+    evidence_refs: [<evidence-id>]
+```
 
-| Field | Type | Required | Summary |
-|---|---|---:|---|
-| `input_per_million` | number | yes | Minimum `0`; zero is valid |
-| `output_per_million` | number | yes | Minimum `0`; zero is valid |
-| `currency` | string | yes | Three-letter uppercase ISO 4217 code |
-| `source_url` | string | yes | Valid absolute URI |
-| `checked_at` | string | yes | ISO 8601 calendar date |
+The schema admits only explicit units and dimensions. Unsupported commercial
+terms are omitted and diagnosed; they are never squeezed into an approximate
+token price.
 
-### Governance registries
+### Evidence coverage
 
-`catalogue/governance/vendors.yaml` contains a top-level `vendors` mapping. Each
-key is a kebab-case vendor ID with a non-empty `name` and two-letter lowercase
-ISO 3166-1 alpha-2 `domicile`.
+```yaml
+evidence:
+  - id: <evidence-id>
+    supports:
+      - /routes/0/operator_reference
+      - /pricing/0/price
+    source:
+      type: api | official-documentation | pricing-page | model-card
+      url: <official-source-url>
+      operation: <optional-first-party-operation>
+    retrieved_by: cli | mcp | manual
+    observed_at: <RFC-3339-timestamp>
+    scope: {}
+    content_sha256: <optional-lowercase-hex>
+```
 
-`catalogue/governance/operators.yaml` contains a top-level `operators` mapping.
-Each entry has `id`, `name` and `service_name`; `id` must equal its mapping key.
+Evidence may support several facts from the same response. CI checks that every
+required external fact is covered and that pointers resolve.
 
-`catalogue/governance/freshness.yaml` contains positive integer
-`pricing_days` and `capabilities_days` thresholds. All three registries reject
-unknown properties.
+## AWS-first provider reasoning
 
-## Restricted YAML loading
+AWS is the first implemented adapter because its topology exposes the mistakes
+a falsely universal model would make.
 
-`scripts/loader.py` treats catalogue YAML as untrusted input and accepts a
-deliberately small YAML subset.
-
-| Rejected input | Diagnostic | Reason |
+| AWS read operation | Facts it can establish | Facts it cannot establish |
 |---|---|---|
-| Duplicate mapping key | `DUPLICATE_KEY` | Prevent silent replacement |
-| Alias | `ALIAS_FOUND` | Prevent expansion and hidden sharing |
-| Anchor | `ANCHOR_FOUND` | Keep documents explicit |
-| Custom tag | `CUSTOM_TAG` | Exclude loader-specific object semantics |
-| Multiple documents | `MULTI_DOCUMENT` | Require one record per file |
-| Non-mapping root | `INVALID_ROOT` | Preserve the entity shape |
-| Nesting beyond 10 levels | `EXCESSIVE_NESTING` | Bound parser work |
-| Invalid YAML | `YAML_PARSE_ERROR` | Reject malformed data |
-| Unreadable UTF-8 file | `FILE_READ_ERROR` | Require portable source text |
+| `ListFoundationModels` / `GetFoundationModel` | AWS model ID/ARN, provider name, AWS modalities, streaming, customisation types, inference types and lifecycle | Internal approval, context limits, generic reasoning, licence or residency suitability |
+| `GetFoundationModelAvailability` | Account/Region agreement, authorisation, entitlement and regional availability observations | Enterprise approval or effective workload permission |
+| `ListInferenceProfiles` / `GetInferenceProfile` | Profile identity, type, status and constituent model ARNs | Canonical model identity or enterprise approval |
+| `ListFoundationModelAgreementOffers` | Legal-term URL and rate-card dimensions | Internal Legal approval; offer tokens must never be published |
+| AWS Price List API | Public price products and dimensions | Private negotiated price unless deliberately queried and protected |
 
-Implicit timestamp resolution is disabled, so `2026-08-28` remains a string.
-Boolean resolution follows YAML 1.2 (`true` and `false` only). All file I/O uses
-UTF-8 and LF line endings.
+The exact commands and evidence boundaries are documented in
+`docs/providers/aws-bedrock.md`.
 
-JSON Schema uses `Draft202012Validator` with `FormatChecker()` enabled. Without
-the format checker, `date` and `uri` would be annotations rather than enforced
-constraints.
+### Illustrative AWS configuration
 
-## Validation and CI
+The following contains placeholders, not catalogue facts:
 
-`python scripts/ci_local.py` runs these gates sequentially and fails fast:
+```yaml
+operator_id: aws
+model_id: <canonical-model-id>
+routes:
+  - id: london-direct
+    operator_reference: <bedrock-foundation-model-id>
+    resource_type: foundation-model
+    scope:
+      kind: region
+      values: [eu-west-2]
+    consumption: managed-on-demand
+  - id: eu-cross-region
+    operator_reference: <bedrock-inference-profile-id>
+    resource_type: inference-profile
+    scope:
+      kind: geography
+      values: [eu]
+    consumption: managed-on-demand
+```
 
-| # | Gate | Failure detected |
-|---:|---|---|
-| 1 | `lock-check` | Dependency drift |
-| 2 | `lint` | Python or YAML style failure |
-| 3 | `validate` | Invalid catalogue or contract drift |
-| 4 | `test` | Broken validation logic |
-| 5 | `site-test` | Broken static pages |
-| 6 | `skill-test` | Invalid agent or skill configuration |
-| 7 | `build` | Output generation failure |
-| 8 | `scan` | Secrets; advisory only when tooling is unavailable |
-| 9 | `reproducibility-check` | Non-deterministic output |
-| 10 | `generated-output-check` | Invalid generated JSON |
-| 11 | `clean-tree-check` | Build changed tracked source |
+`uk` is not an AWS inference geography. London is `eu-west-2`. AWS geography
+and global inference profiles are distinct routes, not suffixes on canonical
+model identity.
 
-The pipeline exits `0` only when every blocking gate passes. It exits `1` for a
-gate failure. `validate.py` exits `0` for success, `1` for invalid catalogue data
-and `2` for invocation or repository-layout errors.
+## Cross-cloud configuration boundary
 
-CI evaluates freshness against the current UTC date. `--as-of` exists for
-reproducible tests and diagnostics; release CI must not supply a fixed date.
+| Operator | External model coordinate | Deployment or route coordinate |
+|---|---|---|
+| AWS Bedrock | `modelId` and AWS-owned foundation-model ARN | Base model ID or inference-profile ID/ARN; discovery is Region and sometimes account scoped |
+| GCP Vertex | Publisher/model/version | Managed publisher route or project/location endpoint |
+| Azure Foundry | Publisher/format/name/version | Account-child deployment name plus deployment type and region/data zone |
 
-The scan requires both `detect-secrets` and `.secrets.baseline`. Their absence is
-reported prominently but is non-blocking in `0.1.0`; repositories requiring a
-hard security gate must install both.
+The common model stores an exact opaque external reference, scope, consumption
+mode and evidence. Provider adapters define syntax and API mappings. Account,
+project, subscription and resource-group coordinates belong in discovery
+configuration or protected observations, not canonical paths.
 
-### Dependent-check suppression
+GCP and Azure adapter schemas will be added only from captured first-party API
+fixtures. Their differences are documented now; they are not speculated into
+the v0.1.0 core.
 
-When a prerequisite cannot be loaded, validators suppress only checks that
-depend on it:
+## Discovery and MAC workflow
 
-- vendor references when the vendor registry is invalid;
-- operator references when the operator registry is invalid;
-- model references when no model records load successfully.
+```text
+Scheduled native CI
+  -> read configured provider APIs
+  -> retain a short-lived private observation artefact and digest
+  -> compare factual fields with approved state
+  -> open or update one MAC issue
+  -> human or agent prepares a branch and change request
+  -> modelo check
+  -> code-owner review
+  -> protected-default-branch merge
+  -> deterministic Pages artefact and protected release
+```
 
-The prerequisite diagnostic remains an error, so validation cannot pass. This
-reduces noise without failing open.
+The neutral MAC operations are `add`, `change` and `revoke`. A logical move is
+`add + revoke` in one change request. The issue captures target identity,
+requested outcome, official evidence, observation time, reason and acceptance
+criteria. Its mutable body is not authoritative data.
 
-## Diagnostic contract
+One open MAC is permitted per logical identity. Ordinary changes affect one
+identity or one model plus its initial offerings. A batch is allowed only for
+one source, observation time, operator and semantic purpose, with a default
+limit of 25 identities.
 
-Every diagnostic contains `code`, `severity`, `path`, `json_pointer`, `message`
-and `remediation`. Codes are stable API values; consumers must not parse message
-text.
+## Git-platform implementation
 
-| Layer | Codes |
-|---|---|
-| YAML | `DUPLICATE_KEY`, `ALIAS_FOUND`, `ANCHOR_FOUND`, `CUSTOM_TAG`, `MULTI_DOCUMENT`, `INVALID_ROOT`, `EXCESSIVE_NESTING`, `YAML_PARSE_ERROR`, `FILE_READ_ERROR` |
-| Schema | `SCHEMA_VIOLATION` |
-| Path | `MODEL_PATH_MISMATCH`, `OFFERING_OPERATOR_MISMATCH`, `OFFERING_PATH_MISMATCH`, `OFFERING_GEO_MISMATCH`, `DUPLICATE_IDENTITY` |
-| Reference | `UNKNOWN_VENDOR`, `UNKNOWN_OPERATOR`, `UNKNOWN_MODEL` |
-| Evidence | `STALE_PRICING`, `STALE_EVIDENCE`, `FUTURE_DATE` |
-| Build | `DIRTY_TREE`, `UNKNOWN_COMMIT` |
-| System | `MISSING_SCHEMAS` |
+| Capability | GitHub adapter | GitLab adapter |
+|---|---|---|
+| Structured intake | Issue Forms | Issue/description templates |
+| Change review | Pull request | Merge request |
+| Validation | Actions | GitLab CI |
+| Concurrency | Merge queue | Merge train |
+| Ownership | CODEOWNERS and ruleset | CODEOWNERS and approval rules |
+| Publication | Pages Actions artefact | Pages CI artefact |
+| Release | Protected tag and release | Protected tag and release |
 
-Adding a code is additive for tolerant consumers. Renaming, removing or changing
-the meaning of a code requires a format-version change and migration note.
+Pages serves static HTML and JSON only. It has no write API and no custom auth.
+If the selected GitHub plan cannot publish a private Pages site, v0.1.0 must use
+synthetic/public data or stop at a private CI artefact. It must not acquire an
+authentication proxy merely to compensate for a hosting-plan limitation.
 
-## Evidence and freshness
+`modelo platform check` will verify the remote control profile: protected
+default branch, no direct or force pushes, required validation, code-owner
+approval, stale-review dismissal, resolved conversations, protected tags and
+appropriate Pages visibility. Repository files alone cannot prove those remote
+settings are active.
 
-Freshness thresholds come only from
-`catalogue/governance/freshness.yaml`. Pricing evidence uses `pricing_days`;
-capability evidence uses `capabilities_days`. Future `checked_at` values are
-errors because verification cannot occur in the future.
+There is no Modelo service endpoint to port. Switching from GitHub to GitLab
+changes the platform adapter and `modelo.yaml`; it does not change the core
+catalogue, schemas or consumer artefact contract.
 
-Preferred source order is operator pricing API, official pricing page, vendor or
-operator documentation, then secondary sources. This ordering guides review; it
-is not machine proof of truth. Conflicting authoritative sources block a human
-approval until resolved.
+## Global bootstrap and clone contract
 
-## Build and release
+`modelo.yaml` is the only owner of paths, relative public routes, selected host
+adapter and local repository coordinates. CI host variables override local
+repository coordinates through the adapter; the YAML contains no `${ENV}`
+interpolation and no provider URL templates.
+
+Baseline clone acceptance:
 
 ```bash
-python scripts/build.py                  # Validate, then build
-python scripts/build.py --skip-validation # Development output; non-releasable
-python scripts/build.py --release         # Strict release build
+git clone <repository-url>
+cd Modelo
+uv sync --frozen
+uv run modelo check
+uv run modelo build
 ```
 
-| Output | Purpose | Tracked |
-|---|---|---:|
-| `dist/catalogue.json` | Merged catalogue | no |
-| `dist/manifest.json` | Provenance and catalogue digest | no |
-| `public-docs/data/catalogue.json` | Byte-copy for the site | no |
-| `public-docs/data/schemas-bundle.json` | Client-side schema bundle | no |
+Codespaces, GitLab Workspaces, Kiro and IDE settings are optional conveniences.
+They cannot be required for a clean clone.
 
-`catalogue.json` contains `catalogue_revision`, `generated_at`, sorted `models`
-and `offerings`, `project_version`, and the full `source_commit`. The manifest
-records the catalogue SHA-256 but never hashes itself.
+## Codex, agents and plugins
 
-The builder serialises catalogue data once and uses `shutil.copy2()` for the site
-copy. It writes `public-docs/data/` only when using the default `dist/` output,
-so temporary reproducibility builds cannot alter the site tree.
+Codex Work is suitable as the planner and coordinating implementation agent,
+not as the planning system of record or an approval authority.
 
-Release mode requires a clean tree, a known source commit, valid data,
-`SOURCE_DATE_EPOCH`, and `CATALOGUE_RELEASE_SEQ`; it rejects
-`--skip-validation`. Release revisions use `YYYYMMDD.N`, while development
-revisions use `dev+{seven-character-commit}`. An unknown commit produces
-`dev+unknown` and is never releasable.
+- The MAC issue records intent and acceptance criteria.
+- Read-only specialist agents may research independent questions in parallel.
+- One root agent owns writes.
+- Every write receives targeted validation; `modelo check` runs before hand-off.
+- The platform change request exposes the diff for human review.
 
-## GitHub proposal and approval workflow
+`AGENTS.md` and `.agents/skills/` are the portable workflow layer. Skills follow
+the open Agent Skills format. `.codex/` and `.kiro/` are optional adapters and
+must not redefine catalogue rules.
 
-### Issue-form path
+The project-scoped Codex configuration declares the official AWS Documentation
+MCP server as a pinned, read-only dependency. Hosted ChatGPT Work does not load
+local MCP configuration; it needs an installed plugin. Either route may gather
+evidence, but neither is a source of approval.
 
-```text
-GitHub issue form -> structured proposal -> discussion -> catalogue pull request
-```
+## Validation contract
 
-The public site's `propose.html` may validate and preview YAML locally, then
-download it or open a pre-filled GitHub issue. It must not hold a personal access
-token or claim that a GitHub browser session authorises API calls.
+One command, `modelo check`, owns acceptance. Its externally visible outcomes
+are:
 
-### Pull-request path
+1. schema, path, reference and evidence validation;
+2. unit and fixture tests;
+3. deterministic catalogue and static-site build with smoke tests;
+4. clean-tree and release-contract verification.
 
-```text
-Branch proposal/{id} -> edit catalogue YAML -> local CI -> pull request ->
-required GitHub Actions check -> CODEOWNERS review -> merge to protected main
-```
+Lint, dependency lock, secret scanning and document-drift checks are internal
+stages of those outcomes, not eleven independently promised products. A control
+is blocking or it is explicitly outside the baseline; an advisory security gate
+must not be advertised as enforcement.
 
-Neither an issue nor a pull request grants approval. Only a qualifying merge to
-protected `main` does.
+The implementation must distinguish root errors from suppressed dependent
+checks. If a vendor registry is invalid, vendor-reference checks may be skipped
+to reduce noise, but the original error still fails the run.
 
-## Fixture contract
+## No-technical-debt contracts
 
-Each fixture is a miniature repository using the same `catalogue/` boundary and
-an `expected_diagnostics.json` file. `tests/test_fixtures.py` discovers fixture
-directories automatically.
+No workaround, compatibility shim, duplicate rule, placeholder field or
+deferred control enters `main` without an issue or ADR containing owner,
+rationale, removal condition, target version and a test that exposes its
+continued presence.
 
-| Prefix | Layer |
-|---|---|
-| `yaml--` | Restricted YAML loader |
-| `schema--` | JSON Schema |
-| `path--` | Path and identity |
-| `ref--` | Referential integrity |
-| `evidence--` | Freshness and dates |
+The initial explicit contracts are:
 
-Fixtures use synthetic identifiers and `example.invalid` URLs. Real catalogue
-records appear only below `catalogue/`.
+- **Fact:** every external assertion has evidence or is omitted.
+- **Observation:** discovery cannot write approved state.
+- **Change:** every catalogue diff links to one MAC issue and reviewed change request.
+- **Identity:** identity changes are migrations, not silent moves.
+- **Batch:** one source, time, operator and semantic purpose.
+- **Generated output:** reproducible, uneditable and tied to a source commit.
+- **Automation:** issue conversion is idempotent.
+- **Platform:** core code contains no GitHub or GitLab URL logic.
+- **Schema:** shape changes include compatibility, migration and rollback.
+- **Audit:** claim tamper evidence, not WORM immutability.
+- **Exit:** measure when Git stops fitting.
 
-## Agent boundary
+## Sustainability exit criteria
 
-The contract describes expected agent behaviour; enforcement belongs to the
-runtime sandbox, GitHub permissions and branch protection. A prose deny-list is
-not a security boundary.
+Review the architecture after 90 days. Move live operational state to an event
+or database service, while retaining Git for approved releases, if any two of
+these persist for four weeks:
 
-Agents may write proposal artefacts and tests beneath `proposals/**`,
-`artifacts/**` and `tests/fixtures/**`. They may inspect catalogue source and run
-the documented validation, build, test and read-only Git commands. They must not
-modify protected catalogue data, schemas, validators or agent policy unless a
-human explicitly scopes that work.
+- more than 50 accepted changes per working day;
+- repeated peaks above 10 changes per hour with a sub-hour publication SLA;
+- more than 10% of catalogue changes require conflict resolution;
+- p95 issue-to-publication exceeds one business day while review utilisation is below 70%;
+- p95 validation exceeds five minutes or publication exceeds ten minutes;
+- more than 5% of changes bypass the standard workflow;
+- the same logical identity normally changes more than once per day;
+- consumers require transactional queries, row-level access or live state;
+- the supported baseline clone exceeds 60 seconds because of retained data.
 
-Agents cannot approve or merge pull requests, push to protected branches,
-weaken validation, invent catalogue facts, or infer revocation from the absence
-of discovery evidence.
-
-## Compatibility and deferred work
-
-While the project is below `1.0.0`, incompatible format changes increment the
-minor version. Patch releases correct behaviour without changing accepted data
-shape.
-
-Adding an optional schema field is safe only until producers begin emitting it;
-older validators reject unknown properties. Adding an enum value similarly
-requires consumer coordination. The release notes must describe both changes.
-
-Targeted for `0.2.0`, not `0.1.x`:
-
-- unit-based pricing beyond input and output tokens;
-- referentially validated condition identifiers;
-- structured modality and context representations;
-- deletion-aware validation against base and head commits.
-
+Until those conditions exist, adding services would be anticipatory complexity,
+not architecture.

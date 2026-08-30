@@ -26,6 +26,9 @@ paths:
   build: dist
   site_output: dist/site
   docs: docs
+  human_specification: SPEC.md
+  machine_contract: docs/contract.yaml
+  agent_rules: AGENTS.md
   provider_docs: docs/providers
   decisions: docs/adr
   reviews: docs/reviews

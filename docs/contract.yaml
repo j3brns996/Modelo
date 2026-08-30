@@ -6,7 +6,8 @@ contract:
   version: "0.1.0"
   status: target
   executable_config: modelo.yaml
-  human_specification: SPEC.md
+  human_specification_config_key: paths.human_specification
+  machine_contract_config_key: paths.machine_contract
   drift_is_error: true
 
 purpose:
@@ -23,7 +24,7 @@ purpose:
 
 authority:
   paths_and_routes: modelo.yaml
-  entity_shapes: schemas/
+  entity_shapes_config_key: paths.schemas
   semantic_rules: validator
   acceptance_command: modelo check
   remote_controls: platform_adapter
@@ -121,6 +122,13 @@ evidence:
   content_address:
     algorithm: sha256
     input: canonical_evidence_envelope_without_id
+    canonicalisation:
+      data_model: json
+      source: restricted_yaml_parse
+      standard: RFC_8785_JCS
+      encoding: utf-8
+      omitted_root_fields:
+        - id
   correction_or_refresh: new_evidence_id_and_mac_reference_migration
   unsupported_fact_action: omit
   discovery_absence_can_revoke: false
@@ -164,12 +172,16 @@ provider_boundary:
     adapter: gcp-vertex-ai
     status: not_implemented
     normative_route_shape: deferred_until_first_party_fixtures
-    documentation: docs/providers/aws-bedrock.md#cross-cloud-path-comparison
+    documentation_path_config_key: paths.provider_docs
+    documentation_file: aws-bedrock.md
+    documentation_anchor: cross-cloud-path-comparison
   azure:
     adapter: azure-ai-foundry
     status: not_implemented
     normative_route_shape: deferred_until_first_party_fixtures
-    documentation: docs/providers/aws-bedrock.md#cross-cloud-path-comparison
+    documentation_path_config_key: paths.provider_docs
+    documentation_file: aws-bedrock.md
+    documentation_anchor: cross-cloud-path-comparison
 
 platform:
   kernel_terms:
@@ -226,7 +238,7 @@ mac:
 agents:
   planner: codex_work
   planner_is_system_of_record: false
-  canonical_rules: AGENTS.md
+  canonical_rules_config_key: paths.agent_rules
   canonical_open_skills_config_key: paths.open_skills
   optional_adapters:
     - paths.codex_adapter

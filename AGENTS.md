@@ -29,7 +29,12 @@ present and passing, do not add or merge catalogue records.
 
 - Never invent, extrapolate or infer catalogue facts from names or marketing.
 - Provider availability is an observation, not enterprise approval.
-- Every non-identity assertion requires admissible evidence and a fact link.
+- Every externally sourced assertion requires admissible evidence and a fact
+  link. Internal references and enterprise-authored policy are validated by the
+  repository contract; evidence envelopes terminate the evidence chain.
+- Evidence records are terminal, content-addressed and immutable once merged.
+  Refreshes create new records and migrate references; never edit proof behind
+  an existing evidence ID.
 - Prefer first-party read APIs, then official provider or vendor documentation.
 - Record retrieval scope and time. Do not store credentials, tokens, private
   commercial terms or AWS agreement `offerToken` values.

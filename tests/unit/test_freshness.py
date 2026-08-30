@@ -4,7 +4,7 @@ from datetime import date
 import unittest
 
 from modelo.evidence import ExternalFact
-from modelo.freshness import parse_as_of, validate_freshness
+from modelo.freshness import observed_utc_date, parse_as_of, validate_freshness
 
 
 class FreshnessTests(unittest.TestCase):
@@ -28,6 +28,12 @@ class FreshnessTests(unittest.TestCase):
         for value in ("2026-8-30", "2026-02-30", "2026-08-30T00:00:00Z"):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 parse_as_of(value)
+
+    def test_timestamp_parser_matches_strict_schema_contract(self) -> None:
+        self.assertEqual(observed_utc_date("2026-08-30T23:30:00-01:00"), date(2026, 8, 31))
+        for value in ("2026-08-30 12:00:00Z", "2026-08-30T12:00:00", "2026-08-30T12:00:60Z", "2026-08-30T12:00:00+24:00"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                observed_utc_date(value)
 
 
 if __name__ == "__main__":

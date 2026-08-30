@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, timezone
 from typing import Iterable, Mapping
 
 from modelo.diagnostics import Diagnostic, Severity
 from modelo.evidence import ExternalFact
+from modelo.schemas import parse_rfc3339
 
 
 def parse_as_of(value: str) -> date:
@@ -17,11 +18,7 @@ def parse_as_of(value: str) -> date:
 
 
 def observed_utc_date(value: str) -> date:
-    if value.endswith("Z"):
-        value = value[:-1] + "+00:00"
-    parsed = datetime.fromisoformat(value)
-    if parsed.tzinfo is None:
-        raise ValueError("observation timestamp has no timezone")
+    parsed = parse_rfc3339(value)
     return parsed.astimezone(timezone.utc).date()
 
 

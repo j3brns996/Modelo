@@ -15,6 +15,16 @@ purpose: <short-stable-purpose>
 subjects:
   - kind: model | offering | evidence | vendor | inference-service | condition
     identity: <logical-identity>
+    role: source | destination  # required only for move
+batch_scope:                   # required only for batch
+  source:
+    type: first-party-read-api | official-documentation
+    uri: <official-https-uri>
+  observation_scope:
+    scope_ref: <opaque-scope-ref>
+    partition: <provider-partition>
+    region: <provider-region>
+  inference_service_id: <inference-service-id>
 requested_outcome: <testable-outcome>
 reason: <reason>
 candidate_evidence:
@@ -32,7 +42,8 @@ must contain admissible evidence records.
 
 `change` preserves identity. In v0.1, `move` and `revoke` apply only to
 offerings. A move changes offering identity and compiles to atomic
-add-destination plus revoke-source; a Git rename is insufficient. Revoke
+add-destination plus revoke-source; it has exactly two subjects, one with each
+role. A Git rename is insufficient. Revoke
 deletes the current offering after reference checks, while the post-merge
 release delta permanently records prior identity/digest, reason, effective
 time, replacement if any, issue, change request and merge commit. No parallel
@@ -77,7 +88,11 @@ The trusted final job rejects missing, skipped, neutral, cancelled, stale or
 failed prerequisites and any unexpected check producer. Pre-merge acceptance
 binds the exact base/head and built artefacts. Post-merge publication binds the
 issue, request digest, accepted head, merge commit, independent reviewer,
-checks, change delta and artefact hashes in the release receipt.
+checks, change delta and artefact hashes in the release receipt. The approval
+section preserves reviewer platform identity, approved head SHA, timestamp,
+actor-policy digest, independence/eligibility result and provider
+approval/check reference; schema verification rejects stale or ineligible
+evidence.
 
 An agent approver must be a distinct eligible platform identity and not an
 author, committer or modifier. Agent approval is restricted to data-only MACs.

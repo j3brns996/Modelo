@@ -6,8 +6,9 @@ enterprise AI model catalogue. Git provider issues initiate move/add/change
 does not expose an application API.
 
 > **Bootstrap status:** T1 provides the locked Python package and fail-closed
-> CLI foundation only. The validator, CI adapters, catalogue, static site,
-> Pages deployment, issue templates and Agent Skills are not implemented yet.
+> CLI foundation only. The validator, CI adapters, catalogue, static site and
+> site templates, Pages deployment, issue and change-request templates, and
+> Agent Skills are not implemented yet.
 > Do not add real catalogue data before T10 passes.
 
 ## Repository planes

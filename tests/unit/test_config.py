@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -34,6 +35,8 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.python_version, "3.12.13")
         self.assertEqual(config.uv_version, "0.11.33")
         self.assertEqual(config.repository_path("site_templates"), ROOT / "site/templates")
+        for key in ("readme", "contributing", "codeowners", "gitignore", "gitattributes"):
+            self.assertTrue(config.repository_path(key).is_file())
         with self.assertRaises(TypeError):
             config.paths["bad"] = Path("bad")  # type: ignore[index,assignment]
 
@@ -56,6 +59,13 @@ class ConfigTests(unittest.TestCase):
         root = self.clone_bootstrap()
         (root / "modelo.yaml").write_bytes(b"\xff")
         self.assert_code(root, "FILE_OR_PATH_ERROR")
+
+    def test_invalid_utf8_in_companion_files_fails(self) -> None:
+        for relative in ("VERSION", ".python-version"):
+            with self.subTest(relative=relative):
+                root = self.clone_bootstrap()
+                (root / relative).write_bytes(b"\xff")
+                self.assert_code(root, "FILE_OR_PATH_ERROR")
 
     def test_restricted_yaml_constructs_fail(self) -> None:
         cases = {
@@ -89,6 +99,51 @@ class ConfigTests(unittest.TestCase):
                 path.write_text(text, encoding="utf-8")
                 self.assert_code(root, "FILE_OR_PATH_ERROR")
 
+    def test_symlinked_parent_cannot_escape_repository(self) -> None:
+        root = self.clone_bootstrap()
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        Path(outside.name, "VERSION").write_text("0.1.0\n", encoding="utf-8")
+        (root / "escape").symlink_to(outside.name, target_is_directory=True)
+        path = root / "modelo.yaml"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace("version_file: VERSION", "version_file: escape/VERSION"),
+            encoding="utf-8",
+        )
+        self.assert_code(root, "FILE_OR_PATH_ERROR")
+
+    def test_depth_node_and_byte_limits_fail_before_construction(self) -> None:
+        cases = (
+            ("deep", "value: " + "[" * 500 + "0" + "]" * 500, "YAML_LIMIT_EXCEEDED"),
+            ("nodes", "values:\n" + "".join("  - value\n" for _ in range(2_001)), "YAML_LIMIT_EXCEEDED"),
+        )
+        for name, content, code in cases:
+            with self.subTest(name=name):
+                root = self.clone_bootstrap()
+                (root / "modelo.yaml").write_text(content, encoding="utf-8")
+                self.assert_code(root, code)
+        root = self.clone_bootstrap()
+        (root / "modelo.yaml").write_bytes(b"a" * 131_073)
+        self.assert_code(root, "YAML_LIMIT_EXCEEDED")
+
+    def test_bootstrap_limit_drift_and_wrong_section_type_fail(self) -> None:
+        for old, new in (
+            ("max_depth: 20", "max_depth: 21"),
+            ("project:\n  id: modelo", "project: invalid\nignored:\n  id: modelo"),
+        ):
+            root = self.clone_bootstrap()
+            path = root / "modelo.yaml"
+            path.write_text(path.read_text(encoding="utf-8").replace(old, new, 1), encoding="utf-8")
+            self.assert_code(root, "SCHEMA_VIOLATION")
+
+    def test_adapter_and_web_base_mismatch_fail(self) -> None:
+        for old, new in (("adapter: github", "adapter: unknown"),
+                         ("web_base: https://github.com/j3brns/Modelo", "web_base: https://example.invalid/repo")):
+            root = self.clone_bootstrap()
+            path = root / "modelo.yaml"
+            path.write_text(path.read_text(encoding="utf-8").replace(old, new, 1), encoding="utf-8")
+            self.assert_code(root, "SCHEMA_VIOLATION")
+
     def test_pin_and_required_file_drift_fail(self) -> None:
         root = self.clone_bootstrap()
         (root / ".python-version").write_text("3.13.0\n", encoding="utf-8")
@@ -96,6 +151,35 @@ class ConfigTests(unittest.TestCase):
         root = self.clone_bootstrap()
         (root / "uv.lock").unlink()
         self.assert_code(root, "FILE_OR_PATH_ERROR")
+
+    def test_repository_ignore_and_attribute_contract(self) -> None:
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        shutil.copyfile(ROOT / ".gitignore", root / ".gitignore")
+        shutil.copyfile(ROOT / ".gitattributes", root / ".gitattributes")
+        for relative in ("dist/probe", "site/probe.html", "schemas/probe.json", "tests/fixtures/probe.yaml", "uv.lock"):
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.touch()
+        ignored = subprocess.run(
+            ["git", "-C", str(root), "check-ignore", "-q", "dist/probe"], check=False
+        )
+        self.assertEqual(ignored.returncode, 0)
+        for relative in ("site/probe.html", "schemas/probe.json", "tests/fixtures/probe.yaml", "uv.lock"):
+            result = subprocess.run(
+                ["git", "-C", str(root), "check-ignore", "-q", relative], check=False
+            )
+            self.assertEqual(result.returncode, 1, relative)
+        attributes = subprocess.run(
+            ["git", "-C", str(root), "check-attr", "text", "eol", "--", "site/probe.html", "uv.lock"],
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout
+        self.assertNotIn("unspecified", attributes)
+        self.assertEqual((ROOT / "CODEOWNERS").read_text(encoding="utf-8").splitlines()[-1], "* @j3brns")
 
 
 if __name__ == "__main__":

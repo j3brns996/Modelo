@@ -42,7 +42,7 @@ class CliTests(unittest.TestCase):
                 result = self.run_cli(*arguments)
                 self.assertEqual(result.returncode, 2)
                 self.assertEqual(result.stdout, "")
-                self.assertIn("UNAVAILABLE:", result.stderr)
+                self.assertIn("is not implemented in the current repository slice", result.stderr)
                 self.assertNotIn("Traceback", result.stderr)
 
     def test_missing_arguments_fail_as_usage(self) -> None:

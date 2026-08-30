@@ -178,6 +178,8 @@ def _parse(path: Path) -> Mapping[str, Any]:
     except (OSError, UnicodeDecodeError) as exc:
         raise ConfigError("FILE_OR_PATH_ERROR", str(exc), path=str(path)) from exc
     try:
+        nesting = 0
+        nodes = 0
         for token in yaml.scan(text):
             if isinstance(token, (yaml.tokens.AnchorToken, yaml.tokens.AliasToken)):
                 raise ConfigError(
@@ -185,9 +187,38 @@ def _parse(path: Path) -> Mapping[str, Any]:
                 )
             if isinstance(token, yaml.tokens.TagToken):
                 raise ConfigError("YAML_CUSTOM_TAG", "explicit YAML tags are forbidden")
+            if isinstance(
+                token,
+                (
+                    yaml.tokens.BlockMappingStartToken,
+                    yaml.tokens.BlockSequenceStartToken,
+                    yaml.tokens.FlowMappingStartToken,
+                    yaml.tokens.FlowSequenceStartToken,
+                ),
+            ):
+                nesting += 1
+                nodes += 1
+            elif isinstance(
+                token,
+                (
+                    yaml.tokens.BlockEndToken,
+                    yaml.tokens.FlowMappingEndToken,
+                    yaml.tokens.FlowSequenceEndToken,
+                ),
+            ):
+                nesting = max(0, nesting - 1)
+            elif isinstance(token, yaml.tokens.ScalarToken):
+                nodes += 1
+            if nesting > MAX_DEPTH or nodes > MAX_NODES:
+                raise ConfigError(
+                    "YAML_LIMIT_EXCEEDED",
+                    f"configuration exceeds depth {MAX_DEPTH} or node count {MAX_NODES}",
+                )
         documents = list(yaml.load_all(text, Loader=_RestrictedLoader))
     except ConfigError:
         raise
+    except RecursionError as exc:
+        raise ConfigError("YAML_LIMIT_EXCEEDED", "configuration nesting is excessive") from exc
     except yaml.YAMLError as exc:
         raise ConfigError("YAML_PARSE_ERROR", str(exc)) from exc
     if len(documents) != 1:
@@ -207,7 +238,23 @@ def _parse(path: Path) -> Mapping[str, Any]:
 
 def _require_regular_file(root: Path, relative: PurePosixPath, pointer: str) -> Path:
     target = root.joinpath(*relative.parts)
-    if target.is_symlink() or not target.is_file():
+    current = root
+    try:
+        for part in relative.parts:
+            current = current / part
+            if current.is_symlink():
+                raise ConfigError(
+                    "FILE_OR_PATH_ERROR",
+                    "symlinks are forbidden in bootstrap paths",
+                    path=str(current),
+                    json_pointer=pointer,
+                )
+        resolved = target.resolve(strict=True)
+    except ConfigError:
+        raise
+    except OSError as exc:
+        raise ConfigError("FILE_OR_PATH_ERROR", str(exc), path=str(target)) from exc
+    if not resolved.is_relative_to(root) or not resolved.is_file():
         raise ConfigError(
             "FILE_OR_PATH_ERROR",
             "required bootstrap file is missing, not regular, or a symlink",
@@ -215,6 +262,13 @@ def _require_regular_file(root: Path, relative: PurePosixPath, pointer: str) -> 
             json_pointer=pointer,
         )
     return target
+
+
+def _read_bootstrap_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ConfigError("FILE_OR_PATH_ERROR", str(exc), path=str(path)) from exc
 
 
 def load_config(root: Path | None = None) -> ModeloConfig:
@@ -276,7 +330,7 @@ def load_config(root: Path | None = None) -> ModeloConfig:
 
     python_version = _string(toolchain, "python_version", "/toolchain")
     uv_version = _string(toolchain, "uv_version", "/toolchain")
-    if python_path.read_text(encoding="utf-8").strip() != python_version:
+    if _read_bootstrap_text(python_path) != python_version:
         raise ConfigError(
             "SCHEMA_VIOLATION",
             ".python-version and toolchain.python_version differ",
@@ -288,7 +342,7 @@ def load_config(root: Path | None = None) -> ModeloConfig:
         raise ConfigError(
             "FILE_OR_PATH_ERROR", "modelo-tooling is not installed", path="pyproject.toml"
         ) from exc
-    project_version = version_path.read_text(encoding="utf-8").strip()
+    project_version = _read_bootstrap_text(version_path)
     if project_version != installed_version:
         raise ConfigError(
             "SCHEMA_VIOLATION",

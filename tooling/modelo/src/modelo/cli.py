@@ -10,7 +10,7 @@ from typing import Sequence
 from modelo.config import ConfigError, load_config
 
 
-UNAVAILABLE = "UNAVAILABLE: {command} is not implemented in the current repository slice"
+UNAVAILABLE = "modelo: {command} is not implemented in the current repository slice"
 
 
 def _parser() -> argparse.ArgumentParser:

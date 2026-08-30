@@ -29,6 +29,10 @@ Each accepted fact keeps a durable, redacted canonical evidence projection in
 Git with its digest. Expiring CI artefacts may retain raw responses, but are not
 the sole evidence record.
 
+Evidence IDs are content-addressed from the complete canonical evidence
+envelope and immutable once merged. A new observation or correction creates a
+new ID and migrates references through MAC review.
+
 Keep the kernel platform-neutral. GitHub and GitLab integrations are thin
 adapters. `modelo.yaml` owns global paths, relative routes and the selected
 adapter.

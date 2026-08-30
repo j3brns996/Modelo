@@ -250,14 +250,15 @@ exact merge commit. Optional signatures may strengthen it.
 
 The same source tree, exact source-commit author timestamp, explicit `as_of`,
 effective site base URL/path, runtime version and locked dependencies must
-produce byte-identical catalogue and site artefacts. An explicit
-`SOURCE_DATE_EPOCH` override is permitted only when recorded in the receipt.
+produce byte-identical catalogue and site artefacts.
 
-The exact source commit and its tree are inputs. By default the source epoch is
-that commit's author timestamp expressed as non-negative whole Unix seconds;
-filesystem mtimes and committer time are ignored. An explicit
-`SOURCE_DATE_EPOCH` must be a non-negative whole-second value passed by the host
-adapter and recorded unchanged in the check/release receipt. T5 receives the
+The exact source commit and its tree are inputs. The required explicit source
+epoch must equal that commit's author timestamp expressed as non-negative whole
+Unix seconds; arbitrary overrides, environment reads, filesystem mtimes and
+committer time are forbidden. T5 resolves the explicit source commit locally
+and rejects any epoch mismatch. For final, the source commit remains the
+accepted head; T8 may record the merge timestamp separately in the release
+receipt, but it is not a build epoch. T5 receives the
 commit, tree, `as_of`, epoch,
 validated MAC metadata, publication profile, base URL and base path explicitly;
 it performs no provider or Git-host API reads.
@@ -282,7 +283,9 @@ an explicit file path, not JSON text or another schema input. T5 reads one
 regular non-symlink file once, with a 262144-byte ceiling, strict UTF-8 JSON
 object parsing, duplicate-key/float/non-finite/YAML rejection and stable
 before/after device, inode, size and nanosecond-mtime checks. Trusted CI fails
-closed if no-follow or stable identity checks cannot be enforced; T8 may stage
+closed if no-follow or stable identity checks over device, inode, mode/type,
+size, nanosecond mtime and nanosecond ctime cannot be enforced; a local
+candidate cannot produce accepting durability without them. T8 may stage
 the file outside the repository but never behind a network read. The envelope contains canonical repository and open issue
 identity, exact base/head/head-tree SHAs, the complete neutral MAC payload, its
 SHA-256 over RFC 8785 UTF-8 bytes plus one LF, and canonical expected change

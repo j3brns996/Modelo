@@ -117,9 +117,16 @@ receipt correlation mismatch.
 The metadata path names one regular non-symlink strict-UTF-8 JSON object of at
 most 262144 bytes. T5 reads it once from one no-follow descriptor, rejects
 duplicate keys, floats, non-finite values and YAML, and compares device, inode,
-size and nanosecond mtime before and after the read. Trusted CI fails closed if
-those controls are unavailable. The metadata schema validates this one input;
+mode/type, size, nanosecond mtime and nanosecond ctime before and after the
+read. Trusted CI fails closed if those controls are unavailable, and a local
+candidate cannot produce accepting durability without them. The metadata schema validates this one input;
 it is not another CLI input.
+
+The required explicit source epoch must equal the exact source commit author
+timestamp. T5 compares and rejects mismatch; it never reads a source-epoch
+environment variable or permits an arbitrary override. Final continues to use
+the accepted head's author timestamp; T8 may separately record merge time only
+in the release receipt.
 
 T5 defines the shared single-writer publication state machine and exercises it
 only for candidate output: exclusive fail-fast lock, same-filesystem sibling

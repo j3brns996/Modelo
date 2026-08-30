@@ -87,15 +87,22 @@ delta and must be structurally valid.
 T5 accepts only a regular non-symlink file of at most 262144 bytes and reads it
 once from one no-follow descriptor. The bytes must be strict UTF-8 JSON with an
 object root; YAML, duplicate keys, floats and non-finite numbers are rejected.
-Before/after `fstat` device, inode, size and nanosecond mtime must agree. Trusted
-CI fails closed where no-follow or stable identity checks cannot be enforced;
+Before/after `fstat` device, inode, mode/type, size, nanosecond mtime and
+nanosecond ctime must agree. Trusted CI fails closed where no-follow or stable
+identity checks cannot be enforced; a local candidate without those guarantees
+cannot produce accepting durability;
 T8 may use a temporary path outside the repository but never a network source.
 
 Vendor and inference-service registries are correlated by canonical keyed
-document diff, not registry-file cardinality: claimed identities must equal the
-changed keys between exact base and head maps. One registry-file delta may thus
-represent a homogeneous batch of up to 25 keys; missing, extra or different
-claimed keys fail. Other subject kinds retain one record-path identity binding.
+document transitions, not registry-file cardinality: `add` is absent-to-present
+and `change` is present-changed-to-present. Registry deletion is forbidden in
+v0.1. Every transition must have the payload's effective operation (`operation`,
+or `item_operation` for batch), and claimed identities must exactly equal all
+transitioned keys. One registry-file delta may thus represent a homogeneous
+batch of up to 25 keys; wrong operations, unclaimed deltas, missing, extra or
+different claimed keys fail. Other subject kinds retain one record-path
+identity binding, and the combined governed identity set must equal all MAC
+subjects.
 
 For revoke and move, durable `reason` and `effective_at` exist only in the
 envelope's expected delta. A move requires its source `replacement` to equal

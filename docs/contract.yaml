@@ -198,17 +198,19 @@ mac:
       syntax: strict_json_object_not_yaml
       reject: [duplicate_keys, non_finite_numbers, floating_point_numbers, yaml_tags]
       read: once_from_single_open_descriptor
-      mutation_check: fstat_before_after_device_inode_size_mtime_ns_equal
+      mutation_check: fstat_before_after_device_inode_mode_type_size_mtime_ns_ctime_ns_equal
       nofollow: required_in_ci
       incapable_ci: fail_closed
+      local_candidate_accepting_durability: false
       t8_temporary_path_outside_repository: allowed
       network_read: forbidden
     payload_digest: sha256_of_rfc8785_payload_utf8_plus_single_lf
-    executable_equalities: [issue_url_to_repository_and_reference, flag_base_head_tree, payload_schema_and_digest, operation_and_subjects_to_delta, registry_subjects_to_canonical_keyed_base_head_diff, exact_computed_git_paths_and_digests_to_delta]
+    executable_equalities: [issue_url_to_repository_and_reference, flag_base_head_tree, payload_schema_and_digest, effective_operation_and_all_subjects_to_delta, registry_subjects_to_operation_aware_canonical_keyed_base_head_transitions, exact_computed_git_paths_and_digests_to_delta]
     enrichment_or_inference: forbidden
     revoke_move_annotations_source: expected_change_delta_only
     offering_subject_identity_binding: delta_path_filename_identity_with_inference_service_path_from_computed_git_delta
-    registry_subject_identity_binding: changed_vendor_or_inference_service_map_keys_exactly_equal_claimed_subjects_and_one_registry_file_delta_may_cover_homogeneous_batch
+    registry_subject_identity_binding: add_absent_to_present_or_change_present_changed_to_present_keys_exactly_equal_claimed_subjects_and_one_registry_file_delta_may_cover_homogeneous_batch
+    registry_deletion: forbidden_v0_1
     move_replacement: required_equal_destination_path
     revoke_replacement: optional_but_if_present_distinct_existing_head_offering_path
   revoke:
@@ -294,9 +296,13 @@ build:
   ambient_inference: forbidden
   local_candidate_base_url_may_be_null: true
   trusted_ci_and_final_base_url: explicit_absolute_https
-  default_source_epoch: exact_source_commit_author_unix_seconds
-  ignored_timestamps: [committer_time, filesystem_mtime]
-  source_date_epoch_override: non_negative_whole_seconds_passed_by_adapter_and_recorded_unchanged
+  source_epoch: explicit_value_required_equal_exact_source_commit_author_unix_seconds
+  source_epoch_mismatch: error
+  source_epoch_environment_read: forbidden
+  source_epoch_arbitrary_override: forbidden
+  ignored_timestamps: [committer_time, filesystem_mtime, merge_timestamp]
+  final_source_commit: accepted_head
+  merge_timestamp: optional_t8_release_receipt_fact_never_build_epoch
   t5_provider_or_git_host_reads: false
   t6_consumes_single_t5_projection: true
   t6_second_raw_or_private_serialisation: forbidden
@@ -347,9 +353,11 @@ build:
     - process/index.html
     - propose/index.html
   manifest_required_derived_files: ["models/{model_id}/index.html", "offerings/{inference_service_id}/{offering_id}/index.html"]
-  manifest_completeness: t5_candidate_exact_two_files_or_t6_final_fixed_union_projection_derived_excluding_manifest
+  candidate_manifest_completeness: t5_exact_catalogue_plus_change_delta_excluding_manifest
+  final_manifest_completeness: t6_fixed_union_all_source_commit_schemas_union_projection_derived_excluding_manifest
   final_schema_inventory: every_schema_file_under_configured_paths_schemas_at_exact_source_commit
-  manifest_completeness_executable_owner: t6
+  candidate_manifest_completeness_executable_owner: t5
+  final_manifest_completeness_executable_owner: t6
   semantic_evidence_projection_arrays_preserve_source_order: true
   writer_lock: exclusive_create_or_fail_fast
   staging: dist/{candidate_or_final}.{128_bit_csprng_hex}.staging

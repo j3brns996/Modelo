@@ -166,8 +166,9 @@ build:
     floating_point_numbers: reject
     open_strategy: nofollow_required_in_ci
     read_strategy: once_from_single_open_descriptor
-    mutation_check: fstat_before_after_device_inode_size_mtime_ns_equal
+    mutation_check: fstat_before_after_device_inode_mode_type_size_mtime_ns_ctime_ns_equal
     incapable_ci: fail_closed
+    local_candidate_accepting_durability: false
     outside_repository_temp_path: allowed
     network_read: false
     validation_order: [file_boundary, json_parse, schema, semantic_correlations]
@@ -261,10 +262,13 @@ artifact_identity:
     - provider_approval_and_check_reference
 
 determinism:
-  source_date_epoch: derive_from_exact_source_commit_author_timestamp
+  source_date_epoch: required_equal_exact_source_commit_author_timestamp
   source_date_epoch_unit: non_negative_whole_unix_seconds
-  ignored_timestamps: [committer_time, filesystem_mtime]
-  explicit_override_must_be_recorded: true
+  ignored_timestamps: [committer_time, filesystem_mtime, merge_timestamp]
+  source_date_epoch_environment_read: false
+  arbitrary_override: forbidden
+  final_source_commit: accepted_head
+  merge_timestamp_receipt_only: true
   source_tree: exact_source_commit_tree
   build_inputs_explicit: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url_choice, base_path, output]
   core_provider_reads: false

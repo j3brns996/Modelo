@@ -20,16 +20,20 @@ dist/receipts/                   detached; never publication members
 The generator lives in `tooling/modelo/`. Site JavaScript is local progressive
 enhancement. Node, npm and `npx` are not required.
 
-T5 supplies one validated canonical catalogue projection. T6 consumes those
-exact bytes and must not perform a second raw/private catalogue serialisation.
-It adds the site bytes and complete `data/manifest.json` defined by
+T5 supplies one validated canonical catalogue projection and canonical change
+delta. Its candidate is exactly `data/catalogue.json`,
+`data/change-delta.json` and the non-recursive manifest that hashes those two.
+T6 consumes those exact bytes and must not perform a second raw/private catalogue serialisation.
+It adds the final site bytes and complete `data/manifest.json` defined by
 `schemas/build-manifest.schema.json`. The manifest lists every publication file
 except itself. T8 supplies trusted provider metadata and creates the detached
 check receipt; only post-merge publication may create the final receipt.
 
-T6 owns an executable exact-set completeness rule. Manifest `files` keys must
+Completeness ownership is split: T5 enforces the exact candidate set above;
+T6 owns the executable final exact-set rule. Final manifest `files` keys must
 equal the fixed list in `docs/contract.yaml`—base route HTML, two local assets,
-`data/catalogue.json` and all sixteen schema copies—union
+`data/catalogue.json` and `data/change-delta.json`—union every schema file
+beneath the configured schema root at the exact source commit (currently 17), union
 `models/{model_id}/index.html` for every projected model and
 `offerings/{inference_service_id}/{offering_id}/index.html` for every projected
 offering. `data/manifest.json` is deliberately excluded. Missing fixed files,
@@ -107,8 +111,10 @@ screen-reader smoke-test result as first-launch evidence.
 The generator performs no network calls. Its inputs are validated catalogue
 state, local Git first-parent history and base/head deltas, publication profile,
 routes, templates/assets, locked tooling, explicit `as_of` and the source-date
-epoch deterministically derived from the exact source-commit author timestamp
-(or a recorded explicit override). It emits a site manifest with source commit,
+epoch explicitly supplied and required to equal the exact source-commit author
+timestamp. Environment values and arbitrary overrides are forbidden. Final
+uses the accepted head author timestamp; merge time may be separate receipt
+metadata but is never the build epoch. It emits a site manifest with source commit,
 revision, effective base URL/path, profile, `as_of`, tool version and every file
 hash.
 

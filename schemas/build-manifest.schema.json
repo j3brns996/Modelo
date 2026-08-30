@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://modelo.invalid/schemas/build-manifest.schema.json",
   "title": "Modelo non-recursive publication manifest",
-  "x-modelo-executable-completeness-owner": "T5-candidate-or-T6-final",
-  "x-modelo-executable-completeness": "candidate_files_exact_catalogue_plus_change_delta;final_files_equal_contract_fixed_union_projection_derived_excluding_manifest",
+  "x-modelo-executable-completeness-owner": "candidate:T5;final:T6",
+  "x-modelo-executable-completeness": "candidate_files_exact_catalogue_plus_change_delta;final_files_equal_contract_fixed_union_all_source_commit_schemas_union_projection_derived_excluding_manifest",
   "$defs": {
     "canonicalBaseUrl": {
       "type": "string",

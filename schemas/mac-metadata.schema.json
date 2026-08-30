@@ -9,12 +9,13 @@
     "flags.source_tree==head_tree_sha",
     "payload_digest==sha256(rfc8785(payload)+LF)",
     "payload_operation_and_subjects==expected_change_delta",
-    "vendor_and_inference_service_subjects==canonical_changed_registry_keys",
+    "vendor_and_inference_service_subjects==operation_aware_canonical_registry_key_transitions",
+    "registry_add==absent_to_present;registry_change==present_changed_to_present;registry_deletion==forbidden",
     "move.source.replacement==move.destination.path",
     "revoke.replacement_absent_or_distinct_existing_head_offering_path",
     "computed_git_delta==expected_change_delta"
   ],
-  "x-modelo-ingestion": "explicit_regular_non_symlink_file_max_262144_strict_utf8_json_object_read_once_nofollow_fstat_stable_ci_fail_closed",
+  "x-modelo-ingestion": "explicit_regular_non_symlink_file_max_262144_strict_utf8_json_object_read_once_nofollow_fstat_dev_inode_mode_type_size_mtime_ns_ctime_ns_stable_ci_fail_closed",
   "$defs": {
     "repository": {
       "type": "object",

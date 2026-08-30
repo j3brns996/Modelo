@@ -185,7 +185,7 @@ def _mac_metadata_errors(
             if item.get("path") in set(registry_paths.values())
         ]
         ordinary_delta = [item for item in expected_delta if item not in registry_delta]
-        if registry_subjects:
+        if registry_subjects or registry_delta:
             if base_registries is None or head_registries is None:
                 errors.add("registry-context")
             else:
@@ -195,12 +195,21 @@ def _mac_metadata_errors(
                     }
                     base_map = base_registries.get(kind, {})
                     head_map = head_registries.get(kind, {})
-                    changed = {
-                        key for key in set(base_map) | set(head_map)
-                        if canonical_json(base_map.get(key)) != canonical_json(head_map.get(key))
-                    }
+                    transitions: dict[str, str] = {}
+                    for key in set(base_map) | set(head_map):
+                        if key not in base_map:
+                            transitions[key] = "add"
+                        elif key not in head_map:
+                            transitions[key] = "delete"
+                        elif canonical_json(base_map[key]) != canonical_json(head_map[key]):
+                            transitions[key] = "change"
+                    changed = set(transitions)
                     if claimed != changed:
                         errors.add("registry-subjects")
+                    if "delete" in transitions.values():
+                        errors.add("registry-deletion")
+                    if any(value != operation for value in transitions.values()):
+                        errors.add("registry-operation")
                     matching_delta = [item for item in registry_delta if item["path"] == registry_path]
                     if bool(changed) != (len(matching_delta) == 1):
                         errors.add("registry-subjects")
@@ -231,12 +240,14 @@ def _mac_metadata_errors(
     return errors
 
 
-def _read_mac_metadata_contract(path: Path) -> dict[str, Any]:
+def _read_mac_metadata_contract(path: Path, after_read: Any = None) -> dict[str, Any]:
     if not hasattr(os, "O_NOFOLLOW"):
         raise RuntimeError("CI cannot enforce non-symlink metadata input")
     descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
     try:
         before = os.fstat(descriptor)
+        if not hasattr(before, "st_mtime_ns") or not hasattr(before, "st_ctime_ns"):
+            raise RuntimeError("CI cannot enforce nanosecond metadata identity")
         if not stat.S_ISREG(before.st_mode):
             raise ValueError("metadata input must be a regular file")
         chunks: list[bytes] = []
@@ -249,8 +260,13 @@ def _read_mac_metadata_contract(path: Path) -> dict[str, Any]:
             total += len(chunk)
             if total > 262144:
                 raise ValueError("metadata input exceeds 262144 bytes")
+        if after_read is not None:
+            after_read()
         after = os.fstat(descriptor)
-        identity = lambda value: (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns)
+        identity = lambda value: (
+            value.st_dev, value.st_ino, value.st_mode, value.st_size,
+            value.st_mtime_ns, value.st_ctime_ns,
+        )
         if identity(before) != identity(after):
             raise ValueError("metadata input changed while read")
     finally:
@@ -294,6 +310,10 @@ def _canonical_site_url_matches(url: str, base_path: str) -> bool:
         and parsed.path == base_path
         and url.endswith("/")
     )
+
+
+def _source_epoch_errors(explicit_epoch: int, source_author_epoch: int) -> set[str]:
+    return set() if explicit_epoch == source_author_epoch else {"source-author-epoch"}
 
 
 def _sort_delta(value: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -677,10 +697,10 @@ class SchemaFixtureTests(unittest.TestCase):
     def test_t6_manifest_completeness_has_exact_fixed_and_derived_inventory(self) -> None:
         contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
         manifest_schema = self.schemas["build-manifest.schema.json"]
-        self.assertEqual(manifest_schema["x-modelo-executable-completeness-owner"], "T5-candidate-or-T6-final")
+        self.assertEqual(manifest_schema["x-modelo-executable-completeness-owner"], "candidate:T5;final:T6")
         self.assertEqual(
             manifest_schema["x-modelo-executable-completeness"],
-            "candidate_files_exact_catalogue_plus_change_delta;final_files_equal_contract_fixed_union_projection_derived_excluding_manifest",
+            "candidate_files_exact_catalogue_plus_change_delta;final_files_equal_contract_fixed_union_all_source_commit_schemas_union_projection_derived_excluding_manifest",
         )
         configured = set(contract["build"]["manifest_required_fixed_files"])
         self.assertEqual(configured, REQUIRED_FIXED_PUBLICATION_FILES)
@@ -692,6 +712,13 @@ class SchemaFixtureTests(unittest.TestCase):
             for path in SCHEMAS.rglob("*.schema.json")
         }
         self.assertEqual(configured_schemas, source_schemas)
+        self.assertEqual(contract["build"]["candidate_manifest_completeness_executable_owner"], "t5")
+        self.assertEqual(contract["build"]["final_manifest_completeness_executable_owner"], "t6")
+        site_contract = (ROOT / "docs/site-contract.md").read_text(encoding="utf-8")
+        self.assertIn("`data/change-delta.json`", site_contract)
+        self.assertIn("every schema file", site_contract)
+        self.assertIn("currently 17", site_contract)
+        self.assertNotIn("sixteen schema", site_contract)
         projection = {
             "models": [{"id": "model-a"}, {"id": "model-b"}],
             "offerings": [
@@ -869,6 +896,45 @@ class SchemaFixtureTests(unittest.TestCase):
             ),
             set(),
         )
+        changed_maps_base = {
+            "vendor": {"vendor-a": {"name": "Old A"}, "vendor-b": {"name": "Old B"}},
+            "inference-service": {},
+        }
+        changed_maps_head = {
+            "vendor": {"vendor-a": {"name": "A"}, "vendor-b": {"name": "B"}},
+            "inference-service": {},
+        }
+        self.assertIn(
+            "registry-operation",
+            _mac_metadata_errors(
+                batch, flags, delta,
+                base_registries=changed_maps_base,
+                head_registries=changed_maps_head,
+            ),
+        )
+        changed_batch = copy.deepcopy(batch)
+        changed_batch["payload"]["item_operation"] = "change"
+        changed_batch["payload_digest"] = "sha256:" + hashlib.sha256(
+            _canonical_receipt_bytes(changed_batch["payload"])
+        ).hexdigest()
+        self.assertEqual(
+            _mac_metadata_errors(
+                changed_batch, flags, delta,
+                base_registries=changed_maps_base,
+                head_registries=changed_maps_head,
+            ),
+            set(),
+        )
+        deleted_maps = {
+            "vendor": {"vendor-b": {"name": "B"}}, "inference-service": {}
+        }
+        self.assertIn(
+            "registry-deletion",
+            _mac_metadata_errors(
+                changed_batch, flags, delta,
+                base_registries=changed_maps_head, head_registries=deleted_maps,
+            ),
+        )
         for identities in (["vendor-a"], ["vendor-a", "vendor-b", "vendor-c"]):
             with self.subTest(identities=identities):
                 self.assertIn(
@@ -886,6 +952,19 @@ class SchemaFixtureTests(unittest.TestCase):
                 base_registries=base_maps,
                 head_registries={
                     "vendor": {"vendor-b": {"name": "B"}},
+                    "inference-service": {},
+                },
+            ),
+        )
+        unclaimed = copy.deepcopy(base)
+        unclaimed["expected_change_delta"] = copy.deepcopy(delta)
+        self.assertIn(
+            "registry-subjects",
+            _mac_metadata_errors(
+                unclaimed, flags, delta,
+                base_registries=base_maps,
+                head_registries={
+                    "vendor": {"vendor-a": {"name": "A"}},
                     "inference-service": {},
                 },
             ),
@@ -932,8 +1011,9 @@ class SchemaFixtureTests(unittest.TestCase):
                 "floating_point_numbers": "reject",
                 "open_strategy": "nofollow_required_in_ci",
                 "read_strategy": "once_from_single_open_descriptor",
-                "mutation_check": "fstat_before_after_device_inode_size_mtime_ns_equal",
+                "mutation_check": "fstat_before_after_device_inode_mode_type_size_mtime_ns_ctime_ns_equal",
                 "incapable_ci": "fail_closed",
+                "local_candidate_accepting_durability": False,
                 "outside_repository_temp_path": "allowed",
                 "network_read": False,
                 "validation_order": ["file_boundary", "json_parse", "schema", "semantic_correlations"],
@@ -948,6 +1028,18 @@ class SchemaFixtureTests(unittest.TestCase):
             regular = root / "valid.json"
             regular.write_text(json.dumps(valid), encoding="utf-8")
             self.assertEqual(_read_mac_metadata_contract(regular), valid)
+            original_bytes = regular.read_bytes()
+            original_mtime = regular.stat().st_mtime_ns
+
+            def same_size_rewrite_with_restored_mtime() -> None:
+                changed = bytearray(original_bytes)
+                changed[-2] = ord(" ") if changed[-2] != ord(" ") else ord("\t")
+                regular.write_bytes(bytes(changed))
+                os.utime(regular, ns=(original_mtime, original_mtime))
+
+            with self.assertRaises(ValueError):
+                _read_mac_metadata_contract(regular, same_size_rewrite_with_restored_mtime)
+            regular.write_bytes(original_bytes)
             symlink = root / "link.json"
             symlink.symlink_to(regular)
             invalid: list[tuple[str, bytes | None]] = [
@@ -966,6 +1058,27 @@ class SchemaFixtureTests(unittest.TestCase):
                     path.write_bytes(content)
                 with self.subTest(name=name), self.assertRaises((OSError, ValueError, UnicodeError, json.JSONDecodeError)):
                     _read_mac_metadata_contract(path)
+
+    def test_source_epoch_is_explicit_but_frozen_to_source_author_time(self) -> None:
+        config = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
+        determinism = config["determinism"]
+        self.assertEqual(
+            determinism["source_date_epoch"],
+            "required_equal_exact_source_commit_author_timestamp",
+        )
+        self.assertIs(determinism["source_date_epoch_environment_read"], False)
+        self.assertEqual(determinism["arbitrary_override"], "forbidden")
+        self.assertEqual(determinism["final_source_commit"], "accepted_head")
+        self.assertTrue(determinism["merge_timestamp_receipt_only"])
+        self.assertEqual(_source_epoch_errors(100, 100), set())
+        self.assertEqual(_source_epoch_errors(101, 100), {"source-author-epoch"})
+        for path in (
+            ROOT / "SPEC.md", ROOT / "README.md", ROOT / "docs/contract.yaml",
+            ROOT / "docs/implementation-plan.md", ROOT / "docs/site-contract.md",
+        ):
+            text = path.read_text(encoding="utf-8")
+            self.assertNotIn("SOURCE_DATE_EPOCH", text)
+            self.assertNotIn("recorded explicit override", text)
 
     def test_revoke_and_move_annotations_are_envelope_only_and_exact(self) -> None:
         base = next(

@@ -57,10 +57,16 @@ not T5, writes detached `dist/receipts/check.json`.
 JSON envelope, not the JSON value and not a second schema argument. The file is
 read once as a regular non-symlink, is limited to 262144 bytes, and rejects
 invalid UTF-8, YAML, duplicate keys, floating-point or non-finite numbers. CI
-fails closed if stable no-follow and before/after file identity checks cannot
-be enforced. The envelope is created only by T8 from the same repository. It binds the open issue, exact
+fails closed if stable no-follow and before/after device, inode, mode/type,
+size, nanosecond mtime and nanosecond ctime checks cannot be enforced; such a
+local candidate cannot produce accepting durability. The envelope is created only by T8 from the same repository. It binds the open issue, exact
 base/head/tree, complete neutral MAC payload and digest, and expected Git delta;
 T5 performs no provider read or enrichment.
+
+The explicit `--source-date-epoch` must equal the exact source commit's author
+Unix timestamp. The build rejects mismatch and never reads an environment
+override. Final continues to use the accepted head author time; merge time is
+receipt metadata only.
 
 ## Clean-clone smoke test
 

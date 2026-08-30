@@ -29,9 +29,10 @@ present and passing, do not add or merge catalogue records.
   successful trusted CI for the exact current head and recording the evidence.
   It must not be an author, committer or modifier. Any new commit invalidates
   the check and approval.
-- CI, tooling, schemas, locks, `modelo.yaml`, governance, publication and skills
-  are control-plane paths and require human CODEOWNER approval. Agents may not
-  merge, bypass controls or push to a protected branch.
+- Agent approval is allowlisted only for `catalogue/models/**`,
+  `catalogue/offerings/**` and `catalogue/evidence/**`. Every other path requires
+  human CODEOWNER approval. Agents may not merge, bypass controls or push to a
+  protected branch.
 
 ## Facts
 

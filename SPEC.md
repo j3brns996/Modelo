@@ -96,8 +96,9 @@ never revoke an offering automatically.
 
 A versioned enterprise policy identifier referenced by offerings. Conditions
 are structured records, not free-form strings. A reference contains both `id`
-and positive integer `version`. A used version is immutable; changed meaning
-adds the next version and migrates offerings through MAC review.
+and positive integer `version`. A version is immutable once it has ever been
+merged or referenced on the protected default branch; changed meaning adds the
+next version and migrates offerings through MAC review.
 
 ## Source layout
 
@@ -169,16 +170,25 @@ means the provider reports availability in a particular scope. It does not
 prove enterprise approval, effective IAM permission, legal acceptance, data
 residency suitability or suitability for a workload.
 
-### 4. Every non-identity assertion has evidence
+### 4. Every externally sourced assertion has evidence
 
-Each externally asserted fact must be linked by JSON Pointer to an evidence
-record containing:
+Every externally sourced leaf in a model, offering or external governance
+record must be linked by JSON Pointer to an evidence record. A pointer may name
+an ancestor object or array only when every externally sourced leaf beneath it
+came from the same evidence record.
+
+Internal IDs and references are validated against repository structure.
+Enterprise-authored conditions are approved policy, not claims about an
+external source. Evidence envelopes are terminal provenance and do not require
+evidence about themselves.
+
+Each evidence record contains:
 
 - an official source URL or first-party API operation;
 - source type;
 - observation date and time;
 - retrieval method and scope;
-- a content digest when a stable response can be retained safely.
+- a required digest of its redacted canonical projection.
 
 If a fact cannot be evidenced and tested, omit it. Do not infer context windows,
 reasoning support, licensing or approval from model names.
@@ -276,9 +286,7 @@ condition_refs:
   - id: <condition-id>
     version: 1
 evidence_refs:
-  /operator_id: <evidence-id>
-  /model_id: <evidence-id>
-  /routes/0/operator_reference: <evidence-id>
+  /routes/0: <evidence-id>
 ```
 
 An offering must have at least one valid route to be consumable. Empty pricing
@@ -316,8 +324,7 @@ pricing:
     currency: USD
     route_ids: [<route-id>]
 evidence_refs:
-  /pricing/0/amount: <evidence-id>
-  /pricing/0/currency: <evidence-id>
+  /pricing/0: <evidence-id>
 ```
 
 The schema admits only explicit units and dimensions. Unsupported commercial
@@ -328,7 +335,7 @@ token price.
 
 ```yaml
 # catalogue/evidence/{evidence_id}.yaml
-id: <evidence-id>
+id: sha256-<digest-of-canonical-envelope-without-id>
 source:
   type: first-party-read-api | official-provider-documentation | official-vendor-documentation
   uri: <official-source-uri>
@@ -342,14 +349,22 @@ visibility: internal
 ```
 
 Entity `evidence_refs` map JSON Pointers to evidence IDs. One evidence record may
-support several facts. CI checks that every required external fact is covered,
-pointers resolve, and the digest matches the canonical retained projection.
+support several facts. CI expands ancestor pointers, checks that every externally
+sourced leaf is covered, verifies that pointers resolve, checks the projection
+digest, and verifies that the filename and `id` equal the SHA-256 of the
+canonical evidence envelope with `id` omitted.
+
+A referenced evidence record is immutable once it has ever been merged to the
+protected default branch. A correction or refreshed observation creates a new
+content-addressed evidence ID and migrates fact references through MAC review.
 
 The redacted projection is durable Git source, not an expiring CI artefact. It
 contains only the first-party response fields needed to reproduce validation.
 Credentials, tokens, private prices, account identifiers and unrelated response
-fields are excluded. The static-site projection omits evidence records unless
-their schema explicitly marks them public.
+fields are excluded. Private Pages may include redacted internal evidence. A
+public or synthetic build may include a fact only if it also includes admissible
+public evidence and the reference. Otherwise the builder removes the fact and
+its reference together; dangling or unsupported published facts are errors.
 
 ## AWS-first provider reasoning
 

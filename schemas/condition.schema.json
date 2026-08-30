@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/condition.schema.json",
+  "title": "Modelo enterprise condition version",
+  "type": "object",
+  "required": ["id", "version", "title", "description", "owner"],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "policy" },
+    "version": { "type": "integer", "minimum": 1, "x-modelo-provenance": "policy" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 256, "x-modelo-provenance": "policy" },
+    "description": { "type": "string", "minLength": 1, "maxLength": 4096, "x-modelo-provenance": "policy" },
+    "owner": { "type": "string", "minLength": 1, "maxLength": 256, "x-modelo-provenance": "policy" }
+  },
+  "additionalProperties": false
+}

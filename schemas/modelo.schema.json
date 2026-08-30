@@ -1,0 +1,321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/modelo.schema.json",
+  "title": "Modelo repository configuration",
+  "$defs": {
+    "path": { "$ref": "common.schema.json#/$defs/safeRelativePath" },
+    "routeTemplate": {
+      "type": "string",
+      "pattern": "^/",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "digestField": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    }
+  },
+  "type": "object",
+  "required": ["config_version", "project", "repository", "paths", "toolchain", "site", "publication", "platform", "artifact_identity", "determinism", "recovery"],
+  "properties": {
+    "config_version": { "const": "0.1.0" },
+    "project": {
+      "type": "object",
+      "required": ["id", "title", "version_file", "default_branch"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/id" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "version_file": { "$ref": "#/$defs/path" },
+        "default_branch": { "$ref": "common.schema.json#/$defs/id" }
+      },
+      "additionalProperties": false
+    },
+    "repository": {
+      "type": "object",
+      "required": ["adapter", "host", "namespace", "name", "web_base", "web_routes"],
+      "properties": {
+        "adapter": { "enum": ["github", "gitlab"] },
+        "host": { "type": "string", "format": "hostname" },
+        "namespace": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "web_base": { "$ref": "common.schema.json#/$defs/httpsUri" },
+        "web_routes": {
+          "type": "object",
+          "required": ["issue", "change_request", "commit", "tag", "release", "mac_intake"],
+          "properties": {
+            "issue": { "$ref": "#/$defs/routeTemplate" },
+            "change_request": { "$ref": "#/$defs/routeTemplate" },
+            "commit": { "$ref": "#/$defs/routeTemplate" },
+            "tag": { "$ref": "#/$defs/routeTemplate" },
+            "release": { "$ref": "#/$defs/routeTemplate" },
+            "mac_intake": {
+              "type": "object",
+              "required": ["add", "change", "revoke", "move", "batch"],
+              "properties": {
+                "add": { "$ref": "#/$defs/routeTemplate" },
+                "change": { "$ref": "#/$defs/routeTemplate" },
+                "revoke": { "$ref": "#/$defs/routeTemplate" },
+                "move": { "$ref": "#/$defs/routeTemplate" },
+                "batch": { "$ref": "#/$defs/routeTemplate" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "paths": {
+      "type": "object",
+      "required": ["readme", "contributing", "codeowners", "gitignore", "gitattributes", "catalogue", "models", "offerings", "evidence", "governance", "actor_policy", "conditions", "publication_profiles", "schemas", "provider_schemas", "mac_schema", "release_receipt_schema", "tests", "fixtures", "implementation", "site_source", "site_templates", "site_assets", "site_content", "build", "site_output", "docs", "human_specification", "machine_contract", "implementation_plan", "site_contract", "mac_contract", "security_contract", "agent_rules", "provider_docs", "decisions", "reviews", "open_skills", "codex_adapter", "kiro_adapter", "github_adapter", "gitlab_adapter", "gitlab_ci"],
+      "additionalProperties": { "$ref": "#/$defs/path" }
+    },
+    "toolchain": {
+      "type": "object",
+      "required": ["language", "environment_manager", "lock_file", "package_config", "python_version_file", "python_version", "uv_version", "bootstrap_config_limits", "required_runtime_is_node", "npx_allowed_in_required_ci", "skills_are_build_inputs", "core_check_network", "platform_adapter_network", "clean_clone"],
+      "properties": {
+        "language": { "const": "python" },
+        "environment_manager": { "const": "uv" },
+        "lock_file": { "$ref": "#/$defs/path" },
+        "package_config": { "$ref": "#/$defs/path" },
+        "python_version_file": { "$ref": "#/$defs/path" },
+        "python_version": { "const": "3.12.13" },
+        "uv_version": { "const": "0.11.33" },
+        "bootstrap_config_limits": {
+          "type": "object",
+          "required": ["max_bytes", "max_depth", "max_nodes"],
+          "properties": {
+            "max_bytes": { "const": 131072 },
+            "max_depth": { "const": 20 },
+            "max_nodes": { "const": 2000 }
+          },
+          "additionalProperties": false
+        },
+        "required_runtime_is_node": { "const": false },
+        "npx_allowed_in_required_ci": { "const": false },
+        "skills_are_build_inputs": { "const": false },
+        "core_check_network": { "const": "disabled" },
+        "platform_adapter_network": { "const": "same_repository_git_provider_read_only" },
+        "clean_clone": {
+          "type": "object",
+          "required": ["sync", "check", "build"],
+          "properties": {
+            "sync": { "type": "string", "minLength": 1 },
+            "check": { "type": "string", "minLength": 1 },
+            "build": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "site": {
+      "type": "object",
+      "required": ["base_url", "base_path", "routes", "data_routes", "urls_resolved_from_config_only", "effective_base_url_and_path_are_receipt_inputs", "ci_requires_explicit_base_url"],
+      "properties": {
+        "base_url": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/httpsUri" }] },
+        "base_path": { "type": "string", "pattern": "^/(?:[^?#]*/)?$" },
+        "routes": {
+          "type": "object",
+          "required": ["home", "catalogue", "model", "offering", "changes", "process", "propose", "docs", "not_found"],
+          "properties": {
+            "home": { "$ref": "#/$defs/routeTemplate" },
+            "catalogue": { "$ref": "#/$defs/routeTemplate" },
+            "model": { "$ref": "#/$defs/routeTemplate" },
+            "offering": { "$ref": "#/$defs/routeTemplate" },
+            "changes": { "$ref": "#/$defs/routeTemplate" },
+            "process": { "$ref": "#/$defs/routeTemplate" },
+            "propose": { "$ref": "#/$defs/routeTemplate" },
+            "docs": { "$ref": "#/$defs/routeTemplate" },
+            "not_found": { "$ref": "#/$defs/routeTemplate" }
+          },
+          "additionalProperties": false
+        },
+        "data_routes": {
+          "type": "object",
+          "required": ["catalogue", "manifest", "schemas"],
+          "properties": {
+            "catalogue": { "$ref": "#/$defs/routeTemplate" },
+            "manifest": { "$ref": "#/$defs/routeTemplate" },
+            "schemas": { "$ref": "#/$defs/routeTemplate" }
+          },
+          "additionalProperties": false
+        },
+        "urls_resolved_from_config_only": { "const": true },
+        "effective_base_url_and_path_are_receipt_inputs": { "const": true },
+        "ci_requires_explicit_base_url": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "publication": {
+      "type": "object",
+      "required": ["active_profile", "profiles", "production_field_level_public_redaction", "silent_private_to_public_downgrade"],
+      "properties": {
+        "active_profile": { "enum": ["synthetic", "private"] },
+        "profiles": {
+          "type": "object",
+          "required": ["synthetic", "private"],
+          "properties": {
+            "synthetic": {
+              "type": "object",
+              "required": ["source", "delivery", "visibility", "production_catalogue"],
+              "properties": {
+                "source": { "$ref": "#/$defs/path" },
+                "delivery": { "const": "pages" },
+                "visibility": { "const": "public" },
+                "production_catalogue": { "const": false }
+              },
+              "additionalProperties": false
+            },
+            "private": {
+              "type": "object",
+              "required": ["source", "delivery", "visibility", "fail_if_requested_pages_access_control_is_missing", "restricted_artifact_retention"],
+              "properties": {
+                "source": { "$ref": "#/$defs/path" },
+                "delivery": { "const": "restricted_artifact_or_capability_checked_pages" },
+                "visibility": { "const": "private" },
+                "fail_if_requested_pages_access_control_is_missing": { "const": true },
+                "restricted_artifact_retention": { "const": "protected_release_lifetime" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "production_field_level_public_redaction": { "const": "deferred" },
+        "silent_private_to_public_downgrade": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "platform": {
+      "type": "object",
+      "required": ["identities", "required_capabilities", "conditional_capabilities", "optional_capabilities"],
+      "properties": {
+        "identities": {
+          "type": "object",
+          "required": ["control_plane_owner"],
+          "properties": {
+            "control_plane_owner": {
+              "type": "object",
+              "required": ["github", "gitlab"],
+              "properties": {
+                "github": { "type": ["string", "null"] },
+                "gitlab": { "type": ["string", "null"] }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "required_capabilities": {
+          "type": "object",
+          "required": ["protected_default_branch", "direct_push", "change_request_required", "required_check", "independent_approved_review", "stale_review_dismissal", "last_pusher_cannot_supply_required_approval", "branch_must_be_up_to_date", "resolved_conversations", "force_push", "branch_deletion", "protected_release_tags"],
+          "properties": {
+            "protected_default_branch": { "const": true },
+            "direct_push": { "const": false },
+            "change_request_required": { "const": true },
+            "required_check": {
+              "type": "object",
+              "required": ["name", "trusted_source_required", "exact_head_sha", "skipped_or_neutral_is_failure"],
+              "properties": {
+                "name": { "const": "modelo/check" },
+                "trusted_source_required": { "const": true },
+                "exact_head_sha": { "const": true },
+                "skipped_or_neutral_is_failure": { "const": true }
+              },
+              "additionalProperties": false
+            },
+            "independent_approved_review": { "const": true },
+            "stale_review_dismissal": { "const": true },
+            "last_pusher_cannot_supply_required_approval": { "const": true },
+            "branch_must_be_up_to_date": { "const": true },
+            "resolved_conversations": { "const": true },
+            "force_push": { "const": false },
+            "branch_deletion": { "const": false },
+            "protected_release_tags": { "const": true }
+          },
+          "additionalProperties": false
+        },
+        "conditional_capabilities": {
+          "type": "object",
+          "required": ["code_owner_review", "private_pages"],
+          "properties": {
+            "code_owner_review": {
+              "type": "object",
+              "required": ["required_for_everything_outside_agent_data_allowlist", "agent_approvable_data_paths"],
+              "properties": {
+                "required_for_everything_outside_agent_data_allowlist": { "const": true },
+                "agent_approvable_data_paths": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              },
+              "additionalProperties": false
+            },
+            "private_pages": {
+              "type": "object",
+              "required": ["required_only_for_profile", "fallback"],
+              "properties": {
+                "required_only_for_profile": { "const": "private" },
+                "fallback": { "const": "restricted_ci_or_release_artifact" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "optional_capabilities": {
+          "type": "object",
+          "required": ["agent_approval", "serialised_merge"],
+          "properties": {
+            "agent_approval": { "const": "data_only_mac" },
+            "serialised_merge": { "const": "manual_one_at_a_time" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifact_identity": {
+      "type": "object",
+      "required": ["premerge_receipt_records", "postmerge_requires_merge_tree_equal_head_tree", "merge_gate_requires_current_base_equal_accepted_base", "postmerge_builds_final_artifact_once", "postmerge_validates_and_deploys_that_exact_artifact", "release_receipt_is_detached_from_hashed_artifact", "deploy_exact_premerge_artifact", "merge_queue_or_train", "final_receipt_approval_evidence"],
+      "properties": {
+        "premerge_receipt_records": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/digestField" } },
+        "postmerge_requires_merge_tree_equal_head_tree": { "const": true },
+        "merge_gate_requires_current_base_equal_accepted_base": { "const": true },
+        "postmerge_builds_final_artifact_once": { "const": true },
+        "postmerge_validates_and_deploys_that_exact_artifact": { "const": true },
+        "release_receipt_is_detached_from_hashed_artifact": { "const": true },
+        "deploy_exact_premerge_artifact": { "const": false },
+        "merge_queue_or_train": { "const": "deferred_until_candidate_tree_contract" },
+        "final_receipt_approval_evidence": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/digestField" } }
+      },
+      "additionalProperties": false
+    },
+    "determinism": {
+      "type": "object",
+      "required": ["source_date_epoch", "explicit_override_must_be_recorded", "change_history", "site_build_requires_complete_first_parent_history"],
+      "properties": {
+        "source_date_epoch": { "const": "derive_from_exact_source_commit_author_timestamp" },
+        "explicit_override_must_be_recorded": { "const": true },
+        "change_history": { "const": "local_git_first_parent_deltas" },
+        "site_build_requires_complete_first_parent_history": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "recovery": {
+      "type": "object",
+      "required": ["bundle_contents", "restore_verification_required"],
+      "properties": {
+        "bundle_contents": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/digestField" } },
+        "restore_verification_required": { "const": true }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

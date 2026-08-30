@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/offering.schema.json",
+  "title": "Modelo approved offering",
+  "$defs": {
+    "conditionRef": {
+      "type": "object",
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/id" },
+        "version": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "price": {
+      "type": "object",
+      "required": ["dimension", "unit", "quantity", "amount", "currency", "route_ids"],
+      "properties": {
+        "dimension": {
+          "$ref": "common.schema.json#/$defs/id",
+          "x-modelo-provenance": "external",
+          "x-modelo-freshness-class": "pricing"
+        },
+        "unit": {
+          "$ref": "common.schema.json#/$defs/id",
+          "x-modelo-provenance": "external",
+          "x-modelo-freshness-class": "pricing"
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "x-modelo-provenance": "external",
+          "x-modelo-freshness-class": "pricing"
+        },
+        "amount": {
+          "$ref": "common.schema.json#/$defs/decimal",
+          "x-modelo-provenance": "external",
+          "x-modelo-freshness-class": "pricing"
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "x-modelo-provenance": "external",
+          "x-modelo-freshness-class": "pricing"
+        },
+        "route_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/id" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["id", "inference_service_id", "model_id", "routes", "condition_refs", "evidence_refs"],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
+    "inference_service_id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
+    "model_id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "providers/aws-bedrock-route.schema.json" }
+    },
+    "pricing": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/price" }
+    },
+    "condition_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/conditionRef" }
+    },
+    "evidence_refs": { "$ref": "common.schema.json#/$defs/evidenceRefs" }
+  },
+  "additionalProperties": false
+}

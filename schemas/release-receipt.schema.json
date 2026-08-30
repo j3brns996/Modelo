@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/release-receipt.schema.json",
+  "title": "Modelo detached release receipt",
+  "$defs": {
+    "artifactDigests": {
+      "type": "object",
+      "required": ["catalogue", "site", "manifest"],
+      "properties": {
+        "catalogue": { "$ref": "common.schema.json#/$defs/sha256" },
+        "site": { "$ref": "common.schema.json#/$defs/sha256" },
+        "manifest": { "$ref": "common.schema.json#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "ciResult": {
+      "type": "object",
+      "required": ["provider", "workflow", "run", "check", "result", "head_sha"],
+      "properties": {
+        "provider": { "enum": ["github", "gitlab"] },
+        "workflow": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "run": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "check": { "const": "modelo/check" },
+        "result": { "const": "success" },
+        "head_sha": { "$ref": "common.schema.json#/$defs/gitSha" }
+      },
+      "additionalProperties": false
+    },
+    "change": {
+      "type": "object",
+      "required": ["operation", "path"],
+      "properties": {
+        "operation": { "enum": ["add", "change", "revoke", "move"] },
+        "path": { "$ref": "common.schema.json#/$defs/safeRelativePath" },
+        "before": { "$ref": "common.schema.json#/$defs/sha256" },
+        "after": { "$ref": "common.schema.json#/$defs/sha256" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "operation": { "const": "add" } }, "required": ["operation"] },
+          "then": { "required": ["after"], "not": { "required": ["before"] } }
+        },
+        {
+          "if": { "properties": { "operation": { "const": "revoke" } }, "required": ["operation"] },
+          "then": { "required": ["before"], "not": { "required": ["after"] } }
+        },
+        {
+          "if": { "properties": { "operation": { "enum": ["change", "move"] } }, "required": ["operation"] },
+          "then": { "required": ["before", "after"] }
+        }
+      ]
+    },
+    "approval": {
+      "type": "object",
+      "required": ["reviewer_platform_identity", "approved_head_sha", "approval_timestamp", "actor_policy_digest", "independence_and_eligibility_result", "provider_approval_and_check_reference"],
+      "properties": {
+        "reviewer_platform_identity": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "approved_head_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+        "approval_timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "(?:Z|[+-][0-9]{2}:[0-9]{2})$"
+        },
+        "actor_policy_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+        "independence_and_eligibility_result": { "const": "eligible-independent" },
+        "provider_approval_and_check_reference": { "type": "string", "minLength": 1, "maxLength": 1024 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["contract_version", "release", "base_sha", "source_sha", "merge_sha", "head_tree_sha", "merge_tree_sha", "as_of", "source_date_epoch", "artifacts", "tool_digest", "lock_digest", "ci", "issue", "change_request", "change_delta", "approval"],
+  "properties": {
+    "contract_version": { "type": "string", "pattern": "^0\\.[0-9]+\\.[0-9]+$" },
+    "release": { "type": "string", "pattern": "^catalogue-[0-9]{8}\\.[1-9][0-9]*$" },
+    "base_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "source_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "merge_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "head_tree_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "merge_tree_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "as_of": { "type": "string", "format": "date" },
+    "source_date_epoch": { "type": "integer", "minimum": 0 },
+    "artifacts": { "$ref": "#/$defs/artifactDigests" },
+    "tool_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "lock_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "ci": { "$ref": "#/$defs/ciResult" },
+    "issue": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "change_request": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "change_delta": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/change" } },
+    "approval": { "$ref": "#/$defs/approval" }
+  },
+  "additionalProperties": false
+}

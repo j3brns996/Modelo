@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/evidence.schema.json",
+  "title": "Modelo terminal evidence envelope",
+  "$defs": {
+    "canonicalValue": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "boolean" },
+        { "type": "string" },
+        { "type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807 },
+        { "type": "array", "items": { "$ref": "#/$defs/canonicalValue" } },
+        { "type": "object", "additionalProperties": { "$ref": "#/$defs/canonicalValue" } }
+      ]
+    },
+    "apiSource": {
+      "type": "object",
+      "required": ["type", "provider", "service", "operation", "partition", "region", "sanitised_parameters", "documentation_uri"],
+      "properties": {
+        "type": { "const": "first-party-read-api" },
+        "provider": { "$ref": "common.schema.json#/$defs/id" },
+        "service": { "$ref": "common.schema.json#/$defs/id" },
+        "operation": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "partition": { "type": "string", "enum": ["aws", "aws-cn", "aws-us-gov"] },
+        "region": { "type": "string", "pattern": "^[a-z]{2}(?:-gov)?-[a-z]+-[0-9]+$" },
+        "sanitised_parameters": { "$ref": "#/$defs/canonicalValue" },
+        "documentation_uri": { "$ref": "common.schema.json#/$defs/httpsUri" }
+      },
+      "additionalProperties": false
+    },
+    "documentationSource": {
+      "type": "object",
+      "required": ["type", "uri"],
+      "properties": {
+        "type": { "enum": ["official-provider-documentation", "official-vendor-documentation"] },
+        "uri": { "$ref": "common.schema.json#/$defs/httpsUri" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["id", "source", "retrieved_by", "observed_at", "scope", "projection", "visibility"],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/evidenceId", "x-modelo-provenance": "internal" },
+    "source": { "oneOf": [{ "$ref": "#/$defs/apiSource" }, { "$ref": "#/$defs/documentationSource" }] },
+    "retrieved_by": { "type": "string", "enum": ["cli", "mcp", "manual"] },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "(?:Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "scope": { "$ref": "#/$defs/canonicalValue" },
+    "projection": { "$ref": "#/$defs/canonicalValue" },
+    "visibility": { "type": "string", "enum": ["internal", "public"] }
+  },
+  "additionalProperties": false
+}

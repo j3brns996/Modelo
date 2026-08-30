@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/common.schema.json",
+  "title": "Modelo common definitions",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "evidenceId": {
+      "type": "string",
+      "pattern": "^sha256-[0-9a-f]{64}$"
+    },
+    "gitSha": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "jsonPointer": {
+      "type": "string",
+      "pattern": "^(?:/(?:[^~/]|~0|~1)*)*$"
+    },
+    "nonRootJsonPointer": {
+      "type": "string",
+      "pattern": "^/(?:[^~/]|~0|~1)(?:(?:[^~/]|~0|~1)|/(?:[^~/]|~0|~1)*)*$"
+    },
+    "evidenceRef": {
+      "type": "object",
+      "required": ["id", "projection_pointer"],
+      "properties": {
+        "id": { "$ref": "#/$defs/evidenceId" },
+        "projection_pointer": { "$ref": "#/$defs/jsonPointer" }
+      },
+      "additionalProperties": false
+    },
+    "evidenceRefs": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/nonRootJsonPointer" },
+      "additionalProperties": { "$ref": "#/$defs/evidenceRef" }
+    },
+    "decimal": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$"
+    },
+    "httpsUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "safeRelativePath": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*//)[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+    }
+  }
+}

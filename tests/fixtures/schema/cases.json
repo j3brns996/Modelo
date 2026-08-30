@@ -1,0 +1,285 @@
+{
+  "cases": [
+    {
+      "schema": "model.schema.json",
+      "valid": [
+        {
+          "id": "test-model-1",
+          "vendor_id": "test-vendor",
+          "name": "Test Model 1",
+          "capabilities": ["chat"],
+          "modalities": ["text"],
+          "context_window": 4096,
+          "licensing": "proprietary",
+          "lifecycle": "active",
+          "evidence_refs": {
+            "/name": {
+              "id": "sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "projection_pointer": "/modelName"
+            }
+          }
+        }
+      ],
+      "invalid": [
+        { "name": "missing name", "op": "remove", "path": ["name"] },
+        { "name": "bad identity", "op": "set", "path": ["id"], "value": "Test Model" },
+        { "name": "unknown field", "op": "set", "path": ["approved"], "value": true },
+        { "name": "binary float context", "op": "set", "path": ["context_window"], "value": 1.5 }
+      ]
+    },
+    {
+      "schema": "evidence.schema.json",
+      "valid": [
+        {
+          "id": "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source": {
+            "type": "first-party-read-api",
+            "provider": "aws",
+            "service": "bedrock",
+            "operation": "GetFoundationModel",
+            "partition": "aws",
+            "region": "eu-west-2",
+            "sanitised_parameters": { "modelIdentifier": "test.model-v1" },
+            "documentation_uri": "https://docs.aws.amazon.com/bedrock/latest/APIReference/API_GetFoundationModel.html"
+          },
+          "retrieved_by": "cli",
+          "observed_at": "2026-08-30T12:00:00Z",
+          "scope": { "scope_ref": "test-scope", "region": "eu-west-2" },
+          "projection": { "modelId": "test.model-v1", "streamingSupported": true, "count": 1 },
+          "visibility": "internal"
+        },
+        {
+          "id": "sha256-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "source": {
+            "type": "official-vendor-documentation",
+            "uri": "https://example.invalid/vendor/model-card"
+          },
+          "retrieved_by": "manual",
+          "observed_at": "2026-08-30T12:00:00Z",
+          "scope": {},
+          "projection": { "name": "Test Model 1" },
+          "visibility": "public"
+        }
+      ],
+      "invalid": [
+        { "name": "bad digest", "op": "set", "path": ["id"], "value": "sha256-ABC" },
+        { "name": "API operation absent", "op": "remove", "path": ["source", "operation"] },
+        { "name": "binary float projection", "op": "set", "path": ["projection", "price"], "value": 1.25 },
+        { "name": "sensitive extra source field", "op": "set", "path": ["source", "offerToken"], "value": "secret" },
+        { "name": "timestamp lacks timezone", "op": "set", "path": ["observed_at"], "value": "2026-08-30T12:00:00" }
+      ]
+    },
+    {
+      "schema": "condition.schema.json",
+      "valid": [
+        { "id": "test-condition", "version": 1, "title": "Test condition", "description": "Synthetic policy text.", "owner": "Test policy owner" }
+      ],
+      "invalid": [
+        { "name": "zero version", "op": "set", "path": ["version"], "value": 0 },
+        { "name": "workflow status forbidden", "op": "set", "path": ["status"], "value": "approved" }
+      ]
+    },
+    {
+      "schema": "vendors-registry.schema.json",
+      "valid": [
+        {
+          "vendors": {
+            "test-vendor": {
+              "id": "test-vendor",
+              "name": "Test Vendor",
+              "evidence_refs": {
+                "/name": {
+                  "id": "sha256-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                  "projection_pointer": "/providerName"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "invalid": [
+        { "name": "empty registry", "op": "set", "path": ["vendors"], "value": {} },
+        { "name": "bad registry key", "op": "rename", "path": ["vendors", "test-vendor"], "value": "Test Vendor" }
+      ]
+    },
+    {
+      "schema": "inference-services-registry.schema.json",
+      "valid": [
+        { "inference_services": { "aws-bedrock": { "id": "aws-bedrock", "adapter": "aws-bedrock" } } }
+      ],
+      "invalid": [
+        { "name": "GCP deferred", "op": "set", "path": ["inference_services", "aws-bedrock", "adapter"], "value": "gcp-vertex-ai" },
+        { "name": "extra service assertion", "op": "set", "path": ["inference_services", "aws-bedrock", "availability"], "value": true }
+      ]
+    },
+    {
+      "schema": "freshness-policy.schema.json",
+      "valid": [
+        { "classes_days": { "availability": 30, "pricing": 90, "intrinsic_model_fact": 365 } }
+      ],
+      "invalid": [
+        { "name": "pricing threshold drift", "op": "set", "path": ["classes_days", "pricing"], "value": 91 },
+        { "name": "unknown freshness class", "op": "set", "path": ["classes_days", "marketing"], "value": 7 }
+      ]
+    },
+    {
+      "schema": "providers/aws-bedrock-route.schema.json",
+      "valid": [
+        {
+          "id": "london-direct",
+          "adapter": "aws-bedrock",
+          "reference": "test.model-v1",
+          "model_binding": {
+            "kind": "foundation-model",
+            "model_evidence": {
+              "id": "sha256-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "id_pointer": "/modelId",
+              "arn_pointer": "/modelArn",
+              "name_pointer": "/modelName",
+              "provider_pointer": "/providerName"
+            }
+          }
+        },
+        {
+          "id": "eu-system-profile",
+          "adapter": "aws-bedrock",
+          "reference": "test.profile-v1",
+          "model_binding": {
+            "kind": "system-inference-profile",
+            "profile_evidence": {
+              "id": "sha256-ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "projection_pointer": ""
+            },
+            "destinations": [
+              {
+                "destination_pointer": "/models/0/modelArn",
+                "model_evidence": {
+                  "id": "sha256-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "arn_pointer": "/modelArn",
+                  "name_pointer": "/modelName",
+                  "provider_pointer": "/providerName"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "invalid": [
+        { "name": "provider adapter deferred", "op": "set", "path": ["adapter"], "value": "azure-foundry" },
+        { "name": "direct binding lacks explicit ID pointer", "op": "remove", "path": ["model_binding", "model_evidence", "id_pointer"] },
+        { "name": "profile has no destinations", "valid_index": 1, "op": "set", "path": ["model_binding", "destinations"], "value": [] },
+        { "name": "account scope forbidden extra", "op": "set", "path": ["account_id"], "value": "123456789012" }
+      ]
+    },
+    {
+      "schema": "offering.schema.json",
+      "valid": [
+        {
+          "id": "test-offering",
+          "inference_service_id": "aws-bedrock",
+          "model_id": "test-model-1",
+          "routes": [
+            {
+              "id": "london-direct",
+              "adapter": "aws-bedrock",
+              "reference": "test.model-v1",
+              "model_binding": {
+                "kind": "foundation-model",
+                "model_evidence": {
+                  "id": "sha256-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "id_pointer": "/modelId",
+                  "arn_pointer": "/modelArn",
+                  "name_pointer": "/modelName",
+                  "provider_pointer": "/providerName"
+                }
+              }
+            }
+          ],
+          "pricing": [
+            { "dimension": "input", "unit": "token", "quantity": 1000000, "amount": "3.00", "currency": "USD", "route_ids": ["london-direct"] }
+          ],
+          "condition_refs": [{ "id": "test-condition", "version": 1 }],
+          "evidence_refs": {
+            "/routes/0/reference": {
+              "id": "sha256-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "projection_pointer": "/modelId"
+            },
+            "/pricing/0": {
+              "id": "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "projection_pointer": "/price"
+            }
+          }
+        }
+      ],
+      "invalid": [
+        { "name": "no consumable route", "op": "set", "path": ["routes"], "value": [] },
+        { "name": "numeric amount", "op": "set", "path": ["pricing", 0, "amount"], "value": 3.0 },
+        { "name": "zero quantity", "op": "set", "path": ["pricing", 0, "quantity"], "value": 0 },
+        { "name": "condition version absent", "op": "remove", "path": ["condition_refs", 0, "version"] },
+        { "name": "approval flag forbidden", "op": "set", "path": ["approved"], "value": true }
+      ]
+    },
+    {
+      "schema": "release-receipt.schema.json",
+      "valid": [
+        {
+          "contract_version": "0.1.0",
+          "release": "catalogue-20260830.1",
+          "base_sha": "1111111111111111111111111111111111111111",
+          "source_sha": "2222222222222222222222222222222222222222",
+          "merge_sha": "3333333333333333333333333333333333333333",
+          "head_tree_sha": "4444444444444444444444444444444444444444",
+          "merge_tree_sha": "4444444444444444444444444444444444444444",
+          "as_of": "2026-08-30",
+          "source_date_epoch": 1788091200,
+          "artifacts": {
+            "catalogue": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "site": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "manifest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "tool_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "lock_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ci": {
+            "provider": "github",
+            "workflow": "modelo-ci",
+            "run": "123",
+            "check": "modelo/check",
+            "result": "success",
+            "head_sha": "2222222222222222222222222222222222222222"
+          },
+          "issue": "6",
+          "change_request": "2",
+          "change_delta": [
+            { "operation": "add", "path": "catalogue/models/test-model-1.yaml", "after": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" }
+          ],
+          "approval": {
+            "reviewer_platform_identity": "test-reviewer",
+            "approved_head_sha": "2222222222222222222222222222222222222222",
+            "approval_timestamp": "2026-08-30T13:00:00Z",
+            "actor_policy_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "independence_and_eligibility_result": "eligible-independent",
+            "provider_approval_and_check_reference": "review/1#modelo-check/123"
+          }
+        }
+      ],
+      "invalid": [
+        { "name": "failed CI is not accepting", "op": "set", "path": ["ci", "result"], "value": "failure" },
+        { "name": "receipt missing explicit as-of", "op": "remove", "path": ["as_of"] },
+        { "name": "approval lacks exact head", "op": "remove", "path": ["approval", "approved_head_sha"] },
+        { "name": "approval timestamp lacks timezone", "op": "set", "path": ["approval", "approval_timestamp"], "value": "2026-08-30T13:00:00" },
+        { "name": "delta path terminates in parent traversal", "op": "set", "path": ["change_delta", 0, "path"], "value": "catalogue/models/.." },
+        { "name": "add delta has before digest", "op": "set", "path": ["change_delta", 0, "before"], "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000" }
+      ]
+    },
+    {
+      "schema": "modelo.schema.json",
+      "valid_source": "modelo.yaml",
+      "invalid": [
+        { "name": "Node runtime forbidden", "op": "set", "path": ["toolchain", "required_runtime_is_node"], "value": true },
+        { "name": "required check renamed", "op": "set", "path": ["platform", "required_capabilities", "required_check", "name"], "value": "other/check" },
+        { "name": "silent publication downgrade", "op": "set", "path": ["publication", "silent_private_to_public_downgrade"], "value": true },
+        { "name": "unknown root service", "op": "set", "path": ["application_api"], "value": true }
+      ]
+    }
+  ]
+}

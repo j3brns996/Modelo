@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/providers/aws-bedrock-route.schema.json",
+  "title": "Modelo AWS Bedrock route",
+  "$defs": {
+    "modelEvidence": {
+      "type": "object",
+      "required": ["id", "arn_pointer", "name_pointer", "provider_pointer"],
+      "properties": {
+        "id": { "$ref": "../common.schema.json#/$defs/evidenceId" },
+        "id_pointer": { "$ref": "../common.schema.json#/$defs/nonRootJsonPointer" },
+        "arn_pointer": { "$ref": "../common.schema.json#/$defs/nonRootJsonPointer" },
+        "name_pointer": { "$ref": "../common.schema.json#/$defs/nonRootJsonPointer" },
+        "provider_pointer": { "$ref": "../common.schema.json#/$defs/nonRootJsonPointer" }
+      },
+      "additionalProperties": false
+    },
+    "foundationModelBinding": {
+      "type": "object",
+      "required": ["kind", "model_evidence"],
+      "properties": {
+        "kind": { "const": "foundation-model" },
+        "model_evidence": {
+          "allOf": [
+            { "$ref": "#/$defs/modelEvidence" },
+            { "required": ["id_pointer"] }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "profileEvidence": {
+      "type": "object",
+      "required": ["id", "projection_pointer"],
+      "properties": {
+        "id": { "$ref": "../common.schema.json#/$defs/evidenceId" },
+        "projection_pointer": { "$ref": "../common.schema.json#/$defs/jsonPointer" }
+      },
+      "additionalProperties": false
+    },
+    "destination": {
+      "type": "object",
+      "required": ["destination_pointer", "model_evidence"],
+      "properties": {
+        "destination_pointer": { "$ref": "../common.schema.json#/$defs/nonRootJsonPointer" },
+        "model_evidence": { "$ref": "#/$defs/modelEvidence" }
+      },
+      "additionalProperties": false
+    },
+    "systemProfileBinding": {
+      "type": "object",
+      "required": ["kind", "profile_evidence", "destinations"],
+      "properties": {
+        "kind": { "const": "system-inference-profile" },
+        "profile_evidence": { "$ref": "#/$defs/profileEvidence" },
+        "destinations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/destination" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["id", "adapter", "reference", "model_binding"],
+  "properties": {
+    "id": { "$ref": "../common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
+    "adapter": { "const": "aws-bedrock", "x-modelo-provenance": "internal" },
+    "reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "x-modelo-provenance": "external",
+      "x-modelo-freshness-class": "availability"
+    },
+    "model_binding": {
+      "oneOf": [
+        { "$ref": "#/$defs/foundationModelBinding" },
+        { "$ref": "#/$defs/systemProfileBinding" }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

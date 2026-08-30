@@ -16,6 +16,7 @@ paths:
   catalogue: catalogue
   models: catalogue/models
   offerings: catalogue/offerings
+  evidence: catalogue/evidence
   governance: catalogue/governance
   conditions: catalogue/policies/conditions
   schemas: schemas
@@ -38,8 +39,15 @@ publication:
 platform:
   required_capabilities:
     protected_default_branch: true
+    direct_push: false
     change_request_required: true
     required_check: modelo/check
     code_owner_review: true
+    stale_review_dismissal: true
+    resolved_conversations: true
     force_push: false
+    branch_deletion: false
     protected_release_tags: true
+    pages_visibility: private
+  optional_capabilities:
+    serialised_merge: merge_queue_or_merge_train

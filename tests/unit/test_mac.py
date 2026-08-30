@@ -117,6 +117,9 @@ class MacTests(unittest.TestCase):
         bad = deepcopy(add)
         bad["reason"] = "line one\nline two"
         cases.append(("control character in text", bad))
+        bad = deepcopy(add)
+        bad["candidate_evidence"][0]["uri"] = "https://example.invalid/a path"
+        cases.append(("whitespace in URI", bad))
         for name, payload in cases:
             with self.subTest(name=name), self.assertRaises(MacError):
                 validate_payload(payload, verify_hashes=False)

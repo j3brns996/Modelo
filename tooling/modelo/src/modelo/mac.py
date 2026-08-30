@@ -113,6 +113,8 @@ def _identity(value: Any, name: str) -> str:
 
 def _https(value: Any, name: str) -> str:
     text = _text(value, name)
+    if any(ord(character) <= 32 for character in text):
+        raise MacError(f"{name} contains whitespace or a control character")
     parsed = urlsplit(text)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
         raise MacError(f"{name} must be an https URI without user information")

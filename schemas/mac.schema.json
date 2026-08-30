@@ -201,7 +201,12 @@
           "required": ["type", "uri"],
           "properties": {
             "type": { "enum": ["first-party-read-api", "official-documentation"] },
-            "uri": { "type": "string", "format": "uri", "pattern": "^https://" }
+            "uri": {
+              "type": "string",
+              "format": "uri",
+              "maxLength": 2048,
+              "pattern": "^https://[^\\u0000-\\u0020]+$"
+            }
           }
         },
         "observation_scope": {
@@ -222,10 +227,16 @@
       "additionalProperties": false,
       "required": ["uri", "observed_at", "digest"],
       "properties": {
-        "uri": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "uri": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048,
+          "pattern": "^https://[^\\u0000-\\u0020]+$"
+        },
         "observed_at": {
           "type": "string",
           "format": "date-time",
+          "maxLength": 40,
           "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$"
         },
         "digest": { "$ref": "#/$defs/digest" }

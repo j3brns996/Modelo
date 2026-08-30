@@ -18,8 +18,9 @@
   runners. Publication occurs only after protected-main merge.
 - GitHub Actions use full commit SHAs and least permissions. GitLab images use
   immutable digests. Python `3.12.13`, `uv` `0.11.33` and dependencies are
-  locked. Required CI has
-  no floating images, runtime downloads, `pip install --upgrade` or `npx`.
+  locked. Required CI has no floating images, unpinned executable downloads,
+  `pip install --upgrade` or `npx`. `uv sync --locked` may fetch hash-locked
+  dependencies from the configured registry; recovery uses the archived copy.
 - Agent approval is positively allowlisted only for `catalogue/models/**`,
   `catalogue/offerings/**` and `catalogue/evidence/**`; every other path requires
   human CODEOWNER approval.
@@ -27,6 +28,10 @@
   explicit `as_of`, check identity/result, tool/lock digest, change delta and
   all catalogue/site/manifest hashes. Provider attestations may strengthen but
   do not replace it.
+- The receipt also preserves reviewer platform identity, approved head SHA,
+  approval time, actor-policy digest, independence/eligibility result and the
+  provider approval/check reference. Schema verification rejects stale-head,
+  self-authored or ineligible approval evidence.
 - Pre-merge records the up-to-date head tree. Post-merge proves tree equality,
   builds and validates the final artefact once, and stores its receipt detached
   from the bytes it hashes.

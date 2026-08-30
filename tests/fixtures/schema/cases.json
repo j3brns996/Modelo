@@ -208,6 +208,7 @@
         { "name": "application profile kind deferred", "valid_index": 1, "op": "set", "path": ["model_binding", "kind"], "value": "application-inference-profile", "expect": ["oneOf", ["model_binding"]] },
         { "name": "application profile ARN deferred", "valid_index": 1, "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2:123456789012:application-inference-profile/test", "expect": ["oneOf", ["reference"]] },
         { "name": "account-owned profile ARN forbidden", "valid_index": 1, "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2:123456789012:inference-profile/eu.test.profile-v1", "expect": ["oneOf", ["reference"]] },
+        { "name": "malformed profile ARN", "valid_index": 1, "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2::inference-profile/not-an-arn", "expect": ["oneOf", ["reference"]] },
         { "name": "direct reference line feed", "op": "set", "path": ["reference"], "value": "test.model-v1\n", "expect": ["oneOf", ["reference"]] },
         { "name": "direct reference carriage return", "op": "set", "path": ["reference"], "value": "test.model-v1\r", "expect": ["oneOf", ["reference"]] },
         { "name": "direct reference control", "op": "set", "path": ["reference"], "value": "test.model-\u0000v1", "expect": ["oneOf", ["reference"]] },

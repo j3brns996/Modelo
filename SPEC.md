@@ -615,7 +615,9 @@ AWS routes must also bind to the offering's canonical `model_id`. A direct route
 requires its reference to equal the evidenced model ID/ARN, then requires the
 reported model name and provider name to equal the canonical model name and
 governed vendor name. Every route carries one internal `source_region`: the AWS
-request/processing Region, not a geography label or a profile destination. It
+request Region, not a geography label or a profile destination. It is also the
+processing Region only for a direct route; a profile is processed in its
+explicit evidenced destination Regions. `source_region`
 must equal the Region of explicit AWS Bedrock `Get`/`List` evidence for that
 route. ARN forms must also agree with the evidence partition and Region. A
 system inference profile retains every destination model ARN; CI resolves each
@@ -624,6 +626,11 @@ destination Region and requires a complete one-to-one set bound to that same
 canonical model. This proves the observed route shape, not entitlement, quota,
 health or effective workload permission. Mappings needing transformation are
 deferred.
+
+The generic `/routes/{index}/reference` fact link must be the same explicit
+binding evidence: direct routes use the matching model ID/ARN pointer and
+profiles use the profile reference pointer. A newer documentation record cannot
+mask stale or mismatched first-party route-binding evidence.
 
 ### Illustrative AWS configuration
 

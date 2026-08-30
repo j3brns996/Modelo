@@ -216,6 +216,43 @@ class ValidatorTests(unittest.TestCase):
                     self.repository = original
                     repository.close()
 
+    def test_fresh_document_reference_cannot_mask_stale_route_binding_evidence(self) -> None:
+        self.replace_direct_evidence(
+            lambda record, offering: record.update(observed_at="2020-01-01T00:00:00Z")
+        )
+        document = {
+            "source": {
+                "type": "official-provider-documentation",
+                "uri": "https://example.invalid/current-route",
+            },
+            "retrieved_by": "manual",
+            "observed_at": "2026-08-29T00:00:00Z",
+            "scope": {},
+            "projection": {"modelId": "test.model-v1"},
+            "visibility": "public",
+        }
+        document_id = evidence_id(document)
+        document["id"] = document_id
+        evidence_path = self.repository.root / "catalogue/evidence" / f"{document_id}.yaml"
+        evidence_path.write_text(
+            yaml.safe_dump(document, sort_keys=False), encoding="utf-8", newline="\n"
+        )
+        offering_path = self.repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml"
+        offering = yaml.safe_load(offering_path.read_text(encoding="utf-8"))
+        offering["evidence_refs"]["/routes/0/reference"] = {
+            "id": document_id, "projection_pointer": "/modelId",
+        }
+        offering_path.write_text(
+            yaml.safe_dump(offering, sort_keys=False), encoding="utf-8", newline="\n"
+        )
+        head = self.repository.commit("mask stale route evidence")
+        findings = self.check(head=head)
+        self.assertTrue(any(
+            finding.code == "EVIDENCE_VALUE_MISMATCH"
+            and "not its explicit model binding evidence" in finding.message
+            for finding in findings
+        ))
+
     def test_direct_route_arn_must_match_source_partition_and_region(self) -> None:
         def transform(record, offering):
             wrong = "arn:aws:bedrock:us-east-1::foundation-model/test.model-v1"
@@ -226,6 +263,22 @@ class ValidatorTests(unittest.TestCase):
         self.replace_direct_evidence(transform)
         head = self.repository.commit("wrong direct ARN scope")
         self.assertIn("EVIDENCE_VALUE_MISMATCH", {finding.code for finding in self.check(head=head)})
+
+    def test_direct_model_evidence_rejects_malformed_arn(self) -> None:
+        self.replace_direct_evidence(
+            lambda record, offering: record["projection"].update(modelArn="not-an-arn")
+        )
+        head = self.repository.commit("malformed direct model ARN")
+        findings = self.check(head=head)
+        malformed = [
+            finding for finding in findings
+            if finding.code == "EVIDENCE_VALUE_MISMATCH"
+            and "not a canonical supported ARN" in finding.message
+        ]
+        self.assertEqual(
+            [finding.json_pointer for finding in malformed],
+            ["/routes/0/model_binding/model_evidence"],
+        )
 
     def test_commercial_govcloud_and_china_partition_region_pairs_are_supported(self) -> None:
         cases = (
@@ -330,6 +383,26 @@ class ValidatorTests(unittest.TestCase):
                     self.repository = original
                     repository.close()
 
+    def test_profile_destination_bijection_is_by_pointer_not_repeated_value(self) -> None:
+        def transform(profile, offering):
+            profile["projection"]["models"].append(
+                deepcopy(profile["projection"]["models"][0])
+            )
+
+        self.install_profile(transform)
+        path = self.repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml"
+        offering = yaml.safe_load(path.read_text(encoding="utf-8"))
+        first = offering["routes"][0]["model_binding"]["destinations"][0]
+        offering["routes"][0]["model_binding"]["destinations"].append(deepcopy(first))
+        path.write_text(yaml.safe_dump(offering, sort_keys=False), encoding="utf-8", newline="\n")
+        head = self.repository.commit("duplicate destination pointer")
+        findings = self.check(head=head)
+        self.assertTrue(any(
+            finding.code == "EVIDENCE_VALUE_MISMATCH"
+            and "complete one-to-one projection" in finding.message
+            for finding in findings
+        ))
+
     def test_profile_destination_arn_must_match_destination_evidence_region(self) -> None:
         wrong = "arn:aws:bedrock:us-east-1::foundation-model/test.model-v1"
 
@@ -350,6 +423,29 @@ class ValidatorTests(unittest.TestCase):
         offering_path.write_text(yaml.safe_dump(offering, sort_keys=False), encoding="utf-8", newline="\n")
         head = self.repository.commit("destination Region mismatch")
         self.assertIn("EVIDENCE_VALUE_MISMATCH", {finding.code for finding in self.check(head=head)})
+
+    def test_profile_destination_and_bound_evidence_reject_malformed_arns(self) -> None:
+        self.replace_direct_evidence(
+            lambda record, offering: record["projection"].update(modelArn="not-an-arn")
+        )
+        offering_path = self.repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml"
+        offering = yaml.safe_load(offering_path.read_text(encoding="utf-8"))
+        destination_evidence_id = offering["routes"][0]["model_binding"]["model_evidence"]["id"]
+
+        def profile_transform(profile, ignored):
+            profile["projection"]["models"][0]["modelArn"] = "not-an-arn"
+
+        self.install_profile(profile_transform)
+        offering = yaml.safe_load(offering_path.read_text(encoding="utf-8"))
+        offering["routes"][0]["model_binding"]["destinations"][0]["model_evidence"]["id"] = destination_evidence_id
+        offering_path.write_text(
+            yaml.safe_dump(offering, sort_keys=False), encoding="utf-8", newline="\n"
+        )
+        head = self.repository.commit("malformed profile destination ARNs")
+        self.assertIn(
+            "EVIDENCE_VALUE_MISMATCH",
+            {finding.code for finding in self.check(head=head)},
+        )
 
     def test_profile_arn_must_match_source_partition_and_region(self) -> None:
         wrong = "arn:aws:bedrock:us-east-1::inference-profile/eu.test.profile-v1"

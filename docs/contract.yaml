@@ -136,8 +136,9 @@ provider_boundary:
     adapter: aws-bedrock
     implemented_route_types: [foundation-model, system-inference-profile]
     route_required_internal_fields: [source_region]
-    source_region_meaning: aws_request_and_processing_region
+    source_region_meaning: aws_request_region_and_direct_route_processing_region
     source_region_is_profile_destination: false
+    profile_processing_regions: explicit_evidenced_destinations
     semantic_route_identity: [source_region, model_binding.kind, reference]
     duplicate_semantic_route: error
     source_region_evidence:
@@ -149,6 +150,7 @@ provider_boundary:
       exact_region_match: true
       partition_region_shape_match: true
       arn_partition_region_match_when_arn_form: true
+      route_reference_fact_ref_must_equal_explicit_binding_evidence: true
     operations:
       - ListFoundationModels
       - GetFoundationModel

@@ -79,12 +79,18 @@ hashed with SHA-256, and the lowercase digest is prefixed with `sha256-`.
 - Account-owned application profiles are deferred with those route types.
 
 Every route requires `source_region`, the Region to which the inference request
-is sent and in which direct inference is processed. It is an internal approved
+is sent. Direct inference is processed there; profile inference is processed in
+the profile's explicit evidenced destination Regions. It is an internal approved
 invocation coordinate, not an external fact duplicated into an evidence
 projection. CI correlates it to the `region` metadata of explicit first-party
 AWS Bedrock evidence: `GetFoundationModel`/`ListFoundationModels` for a direct
 route and `GetInferenceProfile`/`ListInferenceProfiles` for a system profile.
 Official documentation alone cannot bind a callable route.
+
+The route's generic reference fact link is not a second evidence choice. It
+must use the same explicit binding evidence ID and exact matching ID/ARN pointer
+for a direct route, or the same profile evidence ID and reference pointer for a
+profile route. This makes first-party binding evidence freshness authoritative.
 
 The evidence partition and Region must form a coherent pair: `aws-cn` with
 `cn-*`, `aws-us-gov` with `us-gov-*`, and `aws` with other Region shapes. Where

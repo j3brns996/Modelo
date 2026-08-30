@@ -5,6 +5,7 @@ from datetime import date
 import json
 import os
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 import sys
@@ -15,8 +16,10 @@ import yaml
 
 import modelo.build as build_module
 from modelo.build import BuildError, BuildRequest, build_candidate, recover_candidate
+from modelo.evidence import evidence_id
 from modelo.mac import compute_keys
 from modelo.receipt import canonical_bytes, manifest_entries, publication_digest, sha256_bytes
+from modelo.validators import check_repository
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests/fixtures/semantic"))
@@ -100,6 +103,159 @@ class BuildTests(unittest.TestCase):
         manifest = json.loads(first_files["site/data/manifest.json"])
         self.assertEqual(set(manifest["files"]), {"data/catalogue.json", "data/change-delta.json"})
         self.assertNotIn("actors", json.loads(first.catalogue_bytes))
+
+    def test_two_source_region_profile_repository_orders_produce_identical_candidate(self) -> None:
+        def evidence_path(repository, identifier):
+            return repository.root / "catalogue/evidence" / f"{identifier}.yaml"
+
+        def write_evidence(repository, record):
+            identifier = evidence_id(record)
+            document = {"id": identifier, **record}
+            evidence_path(repository, identifier).write_text(
+                yaml.safe_dump(document, sort_keys=False), encoding="utf-8", newline="\n"
+            )
+            return identifier
+
+        def make(order):
+            repository = Repository()
+            self.addCleanup(repository.close)
+            eu_model_id = "sha256-3cc6bbaee52dff309202c8aed63c219a8277199cadafdbeeac3b0e2c91c746fb"
+            eu_model = yaml.safe_load(
+                evidence_path(repository, eu_model_id).read_text(encoding="utf-8")
+            )
+            us_model = deepcopy(eu_model)
+            us_model.pop("id")
+            us_model["source"].update(region="us-east-1")
+            us_model["source"]["sanitised_parameters"] = {
+                "modelIdentifier": "test.model-v1"
+            }
+            us_model["scope"]["region"] = "us-east-1"
+            us_model["projection"]["modelArn"] = (
+                "arn:aws:bedrock:us-east-1::foundation-model/test.model-v1"
+            )
+            us_model_id = write_evidence(repository, us_model)
+
+            model_ids = {"eu": eu_model_id, "us": us_model_id}
+            regions = {"eu": "eu-west-2", "us": "us-east-1"}
+            model_arns = {
+                "eu": "arn:aws:bedrock:eu-west-2::foundation-model/test.model-v1",
+                "us": "arn:aws:bedrock:us-east-1::foundation-model/test.model-v1",
+            }
+            profile_ids = {}
+            for key in ("eu", "us"):
+                profile_ids[key] = write_evidence(repository, {
+                    "source": {
+                        "type": "first-party-read-api", "provider": "aws",
+                        "service": "bedrock", "operation": "GetInferenceProfile",
+                        "partition": "aws", "region": regions[key],
+                        "sanitised_parameters": {
+                            "inferenceProfileIdentifier": "global.test.profile-v1"
+                        },
+                        "documentation_uri": "https://example.invalid/aws-profile-api",
+                    },
+                    "retrieved_by": "cli", "observed_at": "2026-08-01T00:00:00Z",
+                    "scope": {"scope_ref": f"synthetic-{key}", "region": regions[key]},
+                    "projection": {
+                        "profileId": "global.test.profile-v1", "type": "SYSTEM_DEFINED",
+                        "status": "ACTIVE", "models": [{"modelArn": model_arns[key]}],
+                    },
+                    "visibility": "public",
+                })
+
+            prices = {
+                "eu": {"dimension": "input", "unit": "token", "quantity": 1000000, "amount": "1.00", "currency": "USD"},
+                "us": {"dimension": "input", "unit": "token", "quantity": 1000000, "amount": "2.00", "currency": "USD"},
+            }
+            price_evidence_id = write_evidence(repository, {
+                "source": {
+                    "type": "official-provider-documentation",
+                    "uri": "https://example.invalid/aws-pricing",
+                },
+                "retrieved_by": "manual", "observed_at": "2026-08-29T00:00:00Z",
+                "scope": {}, "projection": {"prices": prices}, "visibility": "public",
+            })
+
+            routes = {}
+            for key in ("eu", "us"):
+                routes[key] = {
+                    "id": f"{key}-route", "source_region": regions[key],
+                    "reference": "global.test.profile-v1",
+                    "model_binding": {
+                        "kind": "system-inference-profile",
+                        "profile_evidence": {
+                            "id": profile_ids[key], "projection_pointer": "/profileId",
+                            "type_pointer": "/type", "status_pointer": "/status",
+                            "destinations_pointer": "/models",
+                        },
+                        "destinations": [{
+                            "destination_pointer": "/models/0/modelArn",
+                            "model_evidence": {
+                                "id": model_ids[key], "arn_pointer": "/modelArn",
+                                "name_pointer": "/modelName",
+                                "provider_pointer": "/providerName",
+                            },
+                        }],
+                    },
+                }
+            offering = {
+                "id": "test-offering", "inference_service_id": "aws-bedrock",
+                "model_id": "test-model", "routes": [routes[key] for key in order],
+                "pricing": [
+                    {**prices[key], "route_ids": [f"{key}-route"]}
+                    for key in reversed(order)
+                ],
+                "condition_refs": [{"id": "test-condition", "version": 1}],
+                "evidence_refs": {},
+            }
+            for index, key in enumerate(order):
+                offering["evidence_refs"][f"/routes/{index}/reference"] = {
+                    "id": profile_ids[key], "projection_pointer": "/profileId",
+                }
+            for index, key in enumerate(reversed(order)):
+                for field in ("dimension", "unit", "quantity", "amount", "currency"):
+                    offering["evidence_refs"][f"/pricing/{index}/{field}"] = {
+                        "id": price_evidence_id,
+                        "projection_pointer": f"/prices/{key}/{field}",
+                    }
+            offering_path = (
+                repository.root
+                / "catalogue/offerings/aws-bedrock/test-offering.yaml"
+            )
+            offering_path.write_text(
+                yaml.safe_dump(offering, sort_keys=False), encoding="utf-8", newline="\n"
+            )
+            synthetic = repository.root / "tests/fixtures/build/synthetic"
+            shutil.rmtree(synthetic)
+            shutil.copytree(repository.root / "catalogue", synthetic)
+            head = repository.commit("two regional routes")
+            self.assertEqual(
+                check_repository(
+                    repository.root, repository.base, head, date(2026, 8, 30)
+                ),
+                (),
+            )
+            projection = build_module._projection_from_snapshot(
+                repository.root, "synthetic", "a" * 40, "b" * 40,
+                date(2026, 8, 30), build_module._layout(repository.root),
+            )
+            return canonical_bytes(projection), projection
+
+        forward_bytes, forward = make(("eu", "us"))
+        reverse_bytes, reverse = make(("us", "eu"))
+        self.assertEqual(forward_bytes, reverse_bytes)
+        normal = forward["offerings"][0]
+        self.assertEqual(
+            [route["id"] for route in normal["routes"]], ["eu-route", "us-route"]
+        )
+        self.assertEqual(
+            normal["evidence_refs"]["/routes/0/reference"]["id"],
+            normal["routes"][0]["model_binding"]["profile_evidence"]["id"],
+        )
+        self.assertEqual(
+            [price["route_ids"] for price in normal["pricing"]],
+            [["eu-route"], ["us-route"]],
+        )
+        self.assertEqual(forward, reverse)
 
     def test_wrong_correlations_and_paths_fail_closed(self) -> None:
         cases = (

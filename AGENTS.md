@@ -52,5 +52,6 @@ present and passing, do not add or merge catalogue records.
 
 Use open Agent Skills under `.agents/skills/` for portable workflows. `.codex/`
 and `.kiro/` may provide thin adapters, but must not contain the only copy of a
-rule. Cloud CLI and MCP access is read-only for discovery unless a human grants
-a specific exception.
+rule. Modelo cloud adapters, CLI commands and MCP access are always read-only.
+A separately governed cloud change is outside Modelo and cannot be performed by
+its agents or adapters.

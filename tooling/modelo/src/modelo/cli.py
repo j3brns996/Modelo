@@ -38,7 +38,7 @@ def _parser() -> argparse.ArgumentParser:
     build.add_argument("--as-of", required=True)
     build.add_argument("--source-date-epoch", required=True, type=int)
     build.add_argument("--mac-metadata", required=True, type=Path)
-    build.add_argument("--profile", required=True, choices=("synthetic", "private"))
+    build.add_argument("--profile", required=True)
     choice = build.add_mutually_exclusive_group(required=True)
     choice.add_argument("--base-url")
     choice.add_argument("--no-base-url", action="store_true")

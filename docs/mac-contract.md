@@ -70,6 +70,25 @@ input bound to the head SHA. The networkless core check verifies repository,
 immutable platform issue identifier, open state, payload, digest and affected
 identities from that input. Labels are routing hints only.
 
+The input is `schemas/mac-metadata.schema.json`. T8 alone creates it from the
+current same-repository provider context. It contains canonical repository
+identity; immutable issue reference, canonical issue URL and literal open
+state; exact comparison base, head and head-tree SHAs; the complete neutral MAC
+payload; SHA-256 of its RFC 8785 UTF-8 bytes plus one LF; and canonical expected
+`change_delta` using the release-receipt definitions. T5 performs no provider
+or network read and enriches nothing. It rejects any schema/digest error,
+cross-repository or closed issue, flag/envelope base/head/tree mismatch,
+operation/subject mismatch, or inequality with the exact computed Git
+path/content-digest delta. An offering subject identity binds the offering
+filename; its inference-service directory comes only from the computed Git
+delta and must be structurally valid.
+
+For revoke and move, durable `reason`, `effective_at` and optional
+`replacement` exist only in the envelope's expected delta. They must accompany
+the correct neutral operation and subject identities and exactly equal the
+validated delta; T5 never derives them from deletion, payload prose or current
+time.
+
 ## Adapter assets
 
 The canonical examples/schema render to:

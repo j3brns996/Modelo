@@ -41,6 +41,7 @@ paths:
   schemas: schemas
   provider_schemas: schemas/providers
   mac_schema: schemas/mac.schema.json
+  mac_metadata_schema: schemas/mac-metadata.schema.json
   release_receipt_schema: schemas/release-receipt.schema.json
   catalogue_output_schema: schemas/catalogue-output.schema.json
   build_manifest_schema: schemas/build-manifest.schema.json
@@ -96,7 +97,7 @@ toolchain:
     sync: uv sync --locked
     package: uv build --offline --no-cache
     check: uv run --locked modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
-    build: uv run --locked modelo build --kind candidate --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
+    build: uv run --locked modelo build --kind candidate --base-commit BASE_SHA --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
 
 site:
   base_url: null
@@ -123,7 +124,7 @@ publication:
   active_profile: synthetic
   profiles:
     synthetic:
-      source: tests/fixtures/publication/synthetic
+      source: tests/fixtures/build/synthetic
       delivery: pages
       visibility: public
       production_catalogue: false
@@ -138,8 +139,10 @@ publication:
 
 build:
   command: modelo build
-  required_cli_arguments: [kind, source_commit, source_tree, as_of, source_date_epoch, mac_metadata, profile, base_path, output]
-  final_required_cli_arguments: [merge_commit, merge_tree]
+  implemented_kinds: [candidate]
+  deferred_kind: final_until_t6
+  required_cli_arguments: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, mac_metadata, profile, base_path, output]
+  deferred_final_cli_arguments: [merge_commit, merge_tree]
   base_url_choice: exactly_one_of_base_url_or_no_base_url_candidate_only
   ambient_git_or_environment_inference: false
   candidate_root: dist/candidate
@@ -148,7 +151,14 @@ build:
   receipts_root: dist/receipts
   publication_subdir: site
   catalogue_path: data/catalogue.json
+  change_delta_path: data/change-delta.json
   manifest_path: data/manifest.json
+  candidate_output_inventory: [site/data/catalogue.json, site/data/change-delta.json, site/data/manifest.json]
+  candidate_manifest_files: [data/catalogue.json, data/change-delta.json]
+  change_delta_wire: canonical_rfc8785_array_utf8_plus_single_lf
+  change_delta_digest: sha256_exact_bytes_including_single_lf
+  receipt_primitives: library_values_only
+  check_receipt_writer: t8_detached
   check_receipt_path: dist/receipts/check.json
   release_receipt_path: dist/receipts/release.json
   digest_algorithm: sha256
@@ -240,7 +250,7 @@ determinism:
   ignored_timestamps: [committer_time, filesystem_mtime]
   explicit_override_must_be_recorded: true
   source_tree: exact_source_commit_tree
-  build_inputs_explicit: [kind, source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url_choice, base_path, output]
+  build_inputs_explicit: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url_choice, base_path, output]
   core_provider_reads: false
   change_history: local_git_first_parent_deltas
   site_build_requires_complete_first_parent_history: true

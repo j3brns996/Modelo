@@ -183,6 +183,16 @@ mac:
   dedupe_key: hash_of_typed_sorted_reservations_effective_operation_and_purpose
   idempotency_key: hash_of_complete_canonical_intent_also_omitting_request_id
   candidate_issue_evidence_is_accepted_catalogue_evidence: false
+  validated_metadata:
+    schema: schemas/mac-metadata.schema.json
+    creator: t8_same_repository_bounded_provider_adapter
+    consumer: t5_networkless_validator
+    required: [contract_version, repository, open_issue_reference, base_sha, head_sha, head_tree_sha, complete_neutral_payload, canonical_payload_digest, expected_change_delta]
+    payload_digest: sha256_of_rfc8785_payload_utf8_plus_single_lf
+    executable_equalities: [issue_url_to_repository_and_reference, flag_base_head_tree, payload_schema_and_digest, operation_and_subjects_to_delta, exact_computed_git_paths_and_digests_to_delta]
+    enrichment_or_inference: forbidden
+    revoke_move_annotations_source: expected_change_delta_only
+    offering_subject_identity_binding: delta_path_filename_identity_with_inference_service_path_from_computed_git_delta
   revoke:
     deletes_current_record: true
     separate_status_or_tombstone_source_tree: false
@@ -240,7 +250,7 @@ toolchain:
     - uv sync --locked
     - uv build --offline --no-cache
     - uv run --locked modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
-    - uv run --locked modelo build --kind candidate --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
+    - uv run --locked modelo build --kind candidate --base-commit BASE_SHA --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
   solution_tooling_and_publication_are_services: false
   agent_skills_are_build_inputs: false
   network:
@@ -251,14 +261,17 @@ toolchain:
 build:
   catalogue_wire_schema: schemas/catalogue-output.schema.json
   manifest_wire_schema: schemas/build-manifest.schema.json
+  mac_metadata_wire_schema: schemas/mac-metadata.schema.json
   check_receipt_wire_schema: schemas/check-receipt.schema.json
   release_receipt_wire_schema: schemas/release-receipt.schema.json
   actors_registry_schema: schemas/actors-registry.schema.json
-  t5_outputs: [canonical_catalogue_bytes, canonical_change_delta_bytes, receipt_primitives]
-  t5_explicit_inputs: [kind, source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url_choice, base_path, output]
-  cli_required_flags: [kind, source_commit, source_tree, as_of, source_date_epoch, mac_metadata, profile, base_path, output]
+  t5_outputs: [candidate_catalogue_file, candidate_change_delta_file, candidate_manifest_file, receipt_primitives_library_values]
+  t5_implemented_kinds: [candidate]
+  t5_final_kind: unavailable_fail_closed_until_t6
+  t5_explicit_inputs: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url_choice, base_path, output]
+  cli_required_flags: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, mac_metadata, profile, base_path, output]
   cli_base_url_choice: exactly_one_of_base_url_or_candidate_only_no_base_url
-  cli_final_additional_flags: [merge_commit, merge_tree]
+  t6_deferred_final_additional_flags: [merge_commit, merge_tree]
   ambient_inference: forbidden
   local_candidate_base_url_may_be_null: true
   trusted_ci_and_final_base_url: explicit_absolute_https
@@ -277,7 +290,14 @@ build:
     detached_receipts: dist/receipts
   publication_subdir: site
   catalogue_path: data/catalogue.json
+  change_delta_path: data/change-delta.json
   manifest_path: data/manifest.json
+  t5_candidate_output_inventory: [site/data/catalogue.json, site/data/change-delta.json, site/data/manifest.json]
+  t5_candidate_manifest_files: [data/catalogue.json, data/change-delta.json]
+  change_delta_wire: rfc8785_canonical_array_utf8_plus_single_lf
+  change_delta_digest: sha256_exact_emitted_bytes_including_lf
+  t8_check_receipt_path: dist/receipts/check.json
+  t5_writes_check_receipt: false
   digest_algorithm: sha256_exact_bytes
   publication_digest: sha256_of_sorted_path_nul_digest_nul_size_lf_records
   manifest_files_include_manifest: false
@@ -316,6 +336,7 @@ build:
     - schemas/freshness-policy.schema.json
     - schemas/inference-services-registry.schema.json
     - schemas/mac.schema.json
+    - schemas/mac-metadata.schema.json
     - schemas/model.schema.json
     - schemas/modelo.schema.json
     - schemas/offering.schema.json
@@ -323,7 +344,7 @@ build:
     - schemas/release-receipt.schema.json
     - schemas/vendors-registry.schema.json
   manifest_required_derived_files: ["models/{model_id}/index.html", "offerings/{inference_service_id}/{offering_id}/index.html"]
-  manifest_completeness: files_keys_equal_fixed_union_projection_derived_excluding_manifest
+  manifest_completeness: t5_candidate_exact_two_files_or_t6_final_fixed_union_projection_derived_excluding_manifest
   manifest_completeness_executable_owner: t6
   semantic_evidence_projection_arrays_preserve_source_order: true
   writer_lock: exclusive_create_or_fail_fast
@@ -353,6 +374,7 @@ site:
   generator_uses_network: false
   urls_come_from_global_config_only: true
   profiles: [synthetic, private]
+  profile_sources: {synthetic: tests/fixtures/build/synthetic, private: catalogue}
   production_public_field_redaction: deferred
   private_to_public_fallback: forbidden
   change_history_source: local_git_first_parent_deltas

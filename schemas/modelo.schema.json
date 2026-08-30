@@ -121,7 +121,7 @@
     },
     "paths": {
       "type": "object",
-      "required": ["readme", "contributing", "codeowners", "gitignore", "gitattributes", "catalogue", "models", "offerings", "evidence", "governance", "actors_registry", "conditions", "schemas", "provider_schemas", "mac_schema", "release_receipt_schema", "catalogue_output_schema", "build_manifest_schema", "check_receipt_schema", "actors_registry_schema", "tests", "fixtures", "implementation", "site_source", "site_templates", "site_assets", "site_content", "build", "docs", "human_specification", "machine_contract", "implementation_plan", "site_contract", "mac_contract", "security_contract", "agent_rules", "provider_docs", "decisions", "reviews", "open_skills", "codex_adapter", "kiro_adapter", "github_adapter", "gitlab_adapter", "gitlab_ci"],
+      "required": ["readme", "contributing", "codeowners", "gitignore", "gitattributes", "catalogue", "models", "offerings", "evidence", "governance", "actors_registry", "conditions", "schemas", "provider_schemas", "mac_schema", "mac_metadata_schema", "release_receipt_schema", "catalogue_output_schema", "build_manifest_schema", "check_receipt_schema", "actors_registry_schema", "tests", "fixtures", "implementation", "site_source", "site_templates", "site_assets", "site_content", "build", "docs", "human_specification", "machine_contract", "implementation_plan", "site_contract", "mac_contract", "security_contract", "agent_rules", "provider_docs", "decisions", "reviews", "open_skills", "codex_adapter", "kiro_adapter", "github_adapter", "gitlab_adapter", "gitlab_ci"],
       "properties": {
         "readme": { "$ref": "#/$defs/path" },
         "contributing": { "$ref": "#/$defs/path" },
@@ -138,6 +138,7 @@
         "schemas": { "$ref": "#/$defs/path" },
         "provider_schemas": { "$ref": "#/$defs/path" },
         "mac_schema": { "$ref": "#/$defs/path" },
+        "mac_metadata_schema": { "$ref": "#/$defs/path" },
         "release_receipt_schema": { "$ref": "#/$defs/path" },
         "catalogue_output_schema": { "$ref": "#/$defs/path" },
         "build_manifest_schema": { "$ref": "#/$defs/path" },
@@ -294,14 +295,16 @@
     },
     "build": {
       "type": "object",
-      "required": ["command", "required_cli_arguments", "final_required_cli_arguments", "base_url_choice", "ambient_git_or_environment_inference", "candidate_root", "final_root", "target_parent", "receipts_root", "publication_subdir", "catalogue_path", "manifest_path", "check_receipt_path", "release_receipt_path", "digest_algorithm", "canonical_json", "publication_digest", "manifest_hashes_itself", "writer_lock", "lock_acquire", "staging_name", "backup_name", "journal", "promotion_state_machine", "crash_recovery", "atomic_publish", "observable_contract", "final_requires_fsync_durability", "failed_build_cleanup"],
+      "required": ["command", "implemented_kinds", "deferred_kind", "required_cli_arguments", "deferred_final_cli_arguments", "base_url_choice", "ambient_git_or_environment_inference", "candidate_root", "final_root", "target_parent", "receipts_root", "publication_subdir", "catalogue_path", "change_delta_path", "manifest_path", "candidate_output_inventory", "candidate_manifest_files", "change_delta_wire", "change_delta_digest", "receipt_primitives", "check_receipt_writer", "check_receipt_path", "release_receipt_path", "digest_algorithm", "canonical_json", "publication_digest", "manifest_hashes_itself", "writer_lock", "lock_acquire", "staging_name", "backup_name", "journal", "promotion_state_machine", "crash_recovery", "atomic_publish", "observable_contract", "final_requires_fsync_durability", "failed_build_cleanup"],
       "properties": {
         "command": { "const": "modelo build" },
+        "implemented_kinds": { "type": "array", "prefixItems": [{ "const": "candidate" }], "items": false },
+        "deferred_kind": { "const": "final_until_t6" },
         "required_cli_arguments": {
-          "type": "array", "minItems": 9, "maxItems": 9, "uniqueItems": true,
-          "items": { "enum": ["kind", "source_commit", "source_tree", "as_of", "source_date_epoch", "mac_metadata", "profile", "base_path", "output"] }
+          "type": "array", "minItems": 10, "maxItems": 10, "uniqueItems": true,
+          "items": { "enum": ["kind", "base_commit", "source_commit", "source_tree", "as_of", "source_date_epoch", "mac_metadata", "profile", "base_path", "output"] }
         },
-        "final_required_cli_arguments": {
+        "deferred_final_cli_arguments": {
           "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true,
           "items": { "enum": ["merge_commit", "merge_tree"] }
         },
@@ -313,7 +316,20 @@
         "receipts_root": { "const": "dist/receipts" },
         "publication_subdir": { "const": "site" },
         "catalogue_path": { "const": "data/catalogue.json" },
+        "change_delta_path": { "const": "data/change-delta.json" },
         "manifest_path": { "const": "data/manifest.json" },
+        "candidate_output_inventory": {
+          "type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true,
+          "items": { "enum": ["site/data/catalogue.json", "site/data/change-delta.json", "site/data/manifest.json"] }
+        },
+        "candidate_manifest_files": {
+          "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true,
+          "items": { "enum": ["data/catalogue.json", "data/change-delta.json"] }
+        },
+        "change_delta_wire": { "const": "canonical_rfc8785_array_utf8_plus_single_lf" },
+        "change_delta_digest": { "const": "sha256_exact_bytes_including_single_lf" },
+        "receipt_primitives": { "const": "library_values_only" },
+        "check_receipt_writer": { "const": "t8_detached" },
         "check_receipt_path": { "const": "dist/receipts/check.json" },
         "release_receipt_path": { "const": "dist/receipts/release.json" },
         "digest_algorithm": { "const": "sha256" },
@@ -495,10 +511,10 @@
         "source_tree": { "const": "exact_source_commit_tree" },
         "build_inputs_explicit": {
           "type": "array",
-          "minItems": 10,
-          "maxItems": 10,
+          "minItems": 11,
+          "maxItems": 11,
           "uniqueItems": true,
-          "items": { "enum": ["kind", "source_commit", "source_tree", "as_of", "source_date_epoch", "validated_mac_metadata", "publication_profile", "base_url_choice", "base_path", "output"] }
+          "items": { "enum": ["kind", "base_commit", "source_commit", "source_tree", "as_of", "source_date_epoch", "validated_mac_metadata", "publication_profile", "base_url_choice", "base_path", "output"] }
         },
         "core_provider_reads": { "const": false },
         "change_history": { "const": "local_git_first_parent_deltas" },

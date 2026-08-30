@@ -36,15 +36,27 @@ defaults:
 
 ```bash
 uv run --locked modelo build --kind candidate \
-  --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA \
+  --base-commit BASE_SHA --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA \
   --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS \
   --mac-metadata VALIDATED_MAC_JSON --profile synthetic \
   --no-base-url --base-path /Modelo/ --output dist/candidate
 ```
 
-Exactly one of `--base-url` or candidate-only `--no-base-url` is required;
-final builds also require `--merge-commit` and `--merge-tree`. Tool packages
-and solution publications are different outputs; neither creates a service.
+Exactly one of `--base-url` or `--no-base-url` is required. T5 accepts only
+`--kind candidate`; `--kind final` and its future `--merge-commit`/
+`--merge-tree` inputs fail closed until T6 supplies the static publication.
+Tool packages and solution publications are different outputs; neither creates
+a service.
+
+The candidate output is exactly `site/data/catalogue.json`,
+`site/data/change-delta.json` and `site/data/manifest.json` below the selected
+output. The manifest hashes exactly the first two files and never itself. T8,
+not T5, writes detached `dist/receipts/check.json`.
+
+`--mac-metadata` is the closed `schemas/mac-metadata.schema.json` envelope
+created only by T8 from the same repository. It binds the open issue, exact
+base/head/tree, complete neutral MAC payload and digest, and expected Git delta;
+T5 performs no provider read or enrichment.
 
 ## Clean-clone smoke test
 

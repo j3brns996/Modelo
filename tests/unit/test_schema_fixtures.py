@@ -93,6 +93,91 @@ def _canonical_receipt_bytes(value: dict[str, Any]) -> bytes:
     return (canonical_json(value) + "\n").encode("utf-8")
 
 
+def _mac_metadata_errors(
+    envelope: dict[str, Any], flags: dict[str, str], computed_delta: list[dict[str, Any]]
+) -> set[str]:
+    errors: set[str] = set()
+    repository = envelope["repository"]
+    issue = envelope["issue"]
+    issue_prefix = (
+        f"https://{repository['host']}/{repository['namespace']}/{repository['name']}/issues/"
+        if repository["provider"] == "github"
+        else f"https://{repository['host']}/{repository['namespace']}/{repository['name']}/-/issues/"
+    )
+    if issue["url"] != issue_prefix + issue["reference"]:
+        errors.add("issue-repository")
+    for name, flag, field in (
+        ("base", "base_commit", "base_sha"),
+        ("head", "source_commit", "head_sha"),
+        ("head-tree", "source_tree", "head_tree_sha"),
+    ):
+        if flags[flag] != envelope[field]:
+            errors.add(name)
+    digest = "sha256:" + hashlib.sha256(_canonical_receipt_bytes(envelope["payload"])).hexdigest()
+    if digest != envelope["payload_digest"]:
+        errors.add("payload-digest")
+    expected_delta = _sort_delta(envelope["expected_change_delta"])
+    if expected_delta != _sort_delta(computed_delta):
+        errors.add("computed-delta")
+
+    payload = envelope["payload"]
+    subjects = payload["subjects"]
+    operation = payload["item_operation"] if payload["operation"] == "batch" else payload["operation"]
+
+    def path_for(subject: dict[str, str]) -> str:
+        kind, identity = subject["kind"], subject["identity"]
+        if kind == "model":
+            return f"catalogue/models/{identity}.yaml"
+        if kind == "offering":
+            return f"*/{identity}.yaml"
+        if kind == "evidence":
+            return f"catalogue/evidence/{identity}.yaml"
+        if kind == "vendor":
+            return "catalogue/governance/vendors.yaml"
+        if kind == "inference-service":
+            return "catalogue/governance/inference-services.yaml"
+        return f"catalogue/policies/conditions/{identity}.yaml"
+
+    def path_matches(subject: dict[str, str], path: str) -> bool:
+        expected = path_for(subject)
+        return (
+            path.startswith("catalogue/offerings/") and path.endswith(expected[1:])
+            if expected.startswith("*/")
+            else path == expected
+        )
+
+    if payload["operation"] == "move":
+        source = next((item for item in subjects if item.get("role") == "source"), None)
+        destination = next((item for item in subjects if item.get("role") == "destination"), None)
+        if source is None or destination is None or len(expected_delta) != 1:
+            errors.add("operation-subjects")
+        else:
+            delta = expected_delta[0]
+            if (
+                delta["operation"] != "move"
+                or not path_matches(source, delta["source"]["path"])
+                or not path_matches(destination, delta["destination"]["path"])
+            ):
+                errors.add("operation-subjects")
+    else:
+        if len(expected_delta) != len(subjects):
+            errors.add("operation-subjects")
+        else:
+            unmatched = list(expected_delta)
+            for subject in subjects:
+                match = next(
+                    (item for item in unmatched if item["operation"] == operation and path_matches(subject, item["path"])),
+                    None,
+                )
+                if match is None:
+                    errors.add("operation-subjects")
+                    break
+                unmatched.remove(match)
+            if unmatched:
+                errors.add("operation-subjects")
+    return errors
+
+
 def _canonical_site_url_matches(url: str, base_path: str) -> bool:
     parsed = urlsplit(url)
     return (
@@ -350,7 +435,7 @@ class SchemaFixtureTests(unittest.TestCase):
         manifest = self.schemas["build-manifest.schema.json"]
         files = manifest["properties"]["files"]
         self.assertEqual(manifest["additionalProperties"], False)
-        self.assertEqual(files["required"], ["data/catalogue.json"])
+        self.assertEqual(files["required"], ["data/catalogue.json", "data/change-delta.json"])
         self.assertIn(
             {"not": {"const": "data/manifest.json"}},
             files["propertyNames"]["allOf"],
@@ -362,6 +447,13 @@ class SchemaFixtureTests(unittest.TestCase):
         self.assertEqual(
             self.schemas["release-receipt.schema.json"]["properties"]["change_delta"]["$ref"],
             "#/$defs/changeDeltaList",
+        )
+        metadata = self.schemas["mac-metadata.schema.json"]
+        self.assertEqual(metadata["additionalProperties"], False)
+        self.assertEqual(metadata["properties"]["payload"]["$ref"], "mac.schema.json")
+        self.assertEqual(
+            metadata["properties"]["expected_change_delta"]["$ref"],
+            "release-receipt.schema.json#/$defs/changeDeltaList",
         )
 
     def test_modelo_removes_legacy_publication_path_and_disables_agent_approval(self) -> None:
@@ -484,10 +576,10 @@ class SchemaFixtureTests(unittest.TestCase):
     def test_t6_manifest_completeness_has_exact_fixed_and_derived_inventory(self) -> None:
         contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
         manifest_schema = self.schemas["build-manifest.schema.json"]
-        self.assertEqual(manifest_schema["x-modelo-executable-completeness-owner"], "T6")
+        self.assertEqual(manifest_schema["x-modelo-executable-completeness-owner"], "T5-candidate-or-T6-final")
         self.assertEqual(
             manifest_schema["x-modelo-executable-completeness"],
-            "files_keys_equal_contract_fixed_union_projection_derived_excluding_manifest",
+            "candidate_files_exact_catalogue_plus_change_delta;final_files_equal_contract_fixed_union_projection_derived_excluding_manifest",
         )
         configured = set(contract["build"]["manifest_required_fixed_files"])
         self.assertEqual(configured, REQUIRED_PUBLICATION_FILES)
@@ -513,6 +605,154 @@ class SchemaFixtureTests(unittest.TestCase):
         )
         self.assertEqual(errors["unexpected"], {"unexpected.html"})
         self.assertNotIn("data/manifest.json", expected)
+
+    def test_t5_candidate_manifest_inventory_is_exact(self) -> None:
+        config = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
+        build = config["build"]
+        self.assertEqual(build["implemented_kinds"], ["candidate"])
+        self.assertEqual(build["deferred_kind"], "final_until_t6")
+        self.assertEqual(
+            set(build["candidate_output_inventory"]),
+            {
+                "site/data/catalogue.json",
+                "site/data/change-delta.json",
+                "site/data/manifest.json",
+            },
+        )
+        self.assertEqual(
+            set(build["candidate_manifest_files"]),
+            {"data/catalogue.json", "data/change-delta.json"},
+        )
+        manifest = next(
+            case["valid"][0]
+            for case in self.cases
+            if case["schema"] == "build-manifest.schema.json"
+        )
+        self.assertEqual(set(manifest["files"]), set(build["candidate_manifest_files"]))
+        self.assertEqual(manifest["change_delta_path"], "data/change-delta.json")
+        self.assertEqual(
+            config["publication"]["profiles"]["synthetic"]["source"],
+            "tests/fixtures/build/synthetic",
+        )
+
+    def test_t5_required_inputs_and_commands_align_cross_document(self) -> None:
+        config = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
+        contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
+        required = {
+            "kind", "base_commit", "source_commit", "source_tree", "as_of",
+            "source_date_epoch", "mac_metadata", "profile", "base_path", "output",
+        }
+        self.assertEqual(set(config["build"]["required_cli_arguments"]), required)
+        self.assertEqual(set(contract["build"]["cli_required_flags"]), required)
+        self.assertEqual(config["paths"]["mac_metadata_schema"], "schemas/mac-metadata.schema.json")
+        command = config["toolchain"]["clean_clone"]["build"]
+        for flag in (
+            "--kind", "--base-commit", "--source-commit", "--source-tree", "--as-of",
+            "--source-date-epoch", "--mac-metadata", "--profile", "--base-path", "--output",
+        ):
+            self.assertIn(flag, command)
+        for path in (ROOT / "README.md", ROOT / "SPEC.md", ROOT / "docs/implementation-plan.md"):
+            with self.subTest(path=path.name):
+                self.assertIn("--base-commit", path.read_text(encoding="utf-8"))
+
+    def test_validated_mac_metadata_correlates_exact_inputs_and_delta(self) -> None:
+        envelope = next(
+            case["valid"][0]
+            for case in self.cases
+            if case["schema"] == "mac-metadata.schema.json"
+        )
+        flags = {
+            "base_commit": envelope["base_sha"],
+            "source_commit": envelope["head_sha"],
+            "source_tree": envelope["head_tree_sha"],
+        }
+        self.assertEqual(
+            _mac_metadata_errors(envelope, flags, envelope["expected_change_delta"]), set()
+        )
+        mutations = {
+            "base": ("flag", "base_commit", "0" * 40),
+            "head": ("flag", "source_commit", "0" * 40),
+            "head-tree": ("flag", "source_tree", "0" * 40),
+            "issue-repository": ("envelope", ["issue", "url"], "https://github.com/other/Repo/issues/22"),
+            "payload-digest": ("envelope", ["payload_digest"], "sha256:" + "0" * 64),
+            "operation-subjects": ("envelope", ["payload", "subjects", 0, "identity"], "other-model"),
+            "computed-delta": ("computed", [0, "after"], "sha256:" + "0" * 64),
+        }
+        for expected, (target_kind, path, value) in mutations.items():
+            changed_envelope = copy.deepcopy(envelope)
+            changed_flags = copy.deepcopy(flags)
+            changed_delta = copy.deepcopy(envelope["expected_change_delta"])
+            if target_kind == "flag":
+                changed_flags[path] = value
+            else:
+                target = changed_delta if target_kind == "computed" else changed_envelope
+                for component in path[:-1]:
+                    target = target[component]
+                target[path[-1]] = value
+            with self.subTest(expected=expected):
+                self.assertIn(
+                    expected,
+                    _mac_metadata_errors(changed_envelope, changed_flags, changed_delta),
+                )
+        wrong_operation = copy.deepcopy(envelope)
+        wrong_operation["payload"]["operation"] = "change"
+        wrong_operation["payload_digest"] = "sha256:" + hashlib.sha256(
+            _canonical_receipt_bytes(wrong_operation["payload"])
+        ).hexdigest()
+        self.assertIn(
+            "operation-subjects",
+            _mac_metadata_errors(wrong_operation, flags, envelope["expected_change_delta"]),
+        )
+        wrong_path = copy.deepcopy(envelope)
+        wrong_path["expected_change_delta"][0]["path"] = "catalogue/models/other.yaml"
+        errors = _mac_metadata_errors(wrong_path, flags, envelope["expected_change_delta"])
+        self.assertIn("operation-subjects", errors)
+        self.assertIn("computed-delta", errors)
+
+    def test_revoke_and_move_annotations_are_envelope_only_and_exact(self) -> None:
+        base = next(
+            case["valid"][0]
+            for case in self.cases
+            if case["schema"] == "mac-metadata.schema.json"
+        )
+        flags = {
+            "base_commit": base["base_sha"],
+            "source_commit": base["head_sha"],
+            "source_tree": base["head_tree_sha"],
+        }
+        digest_a = "sha256:" + "a" * 64
+        digest_b = "sha256:" + "b" * 64
+        cases = [
+            (
+                "revoke",
+                json.loads((MAC_FIXTURES / "revoke.json").read_text(encoding="utf-8")),
+                [{"operation": "revoke", "path": "catalogue/offerings/aws-bedrock/bedrock-example-model.yaml", "before": digest_a, "reason": "Governance withdrawal.", "effective_at": "2026-08-30T14:00:00Z"}],
+                [0, "reason"],
+                "Different reason.",
+            ),
+            (
+                "move",
+                json.loads((MAC_FIXTURES / "move.json").read_text(encoding="utf-8")),
+                [{"operation": "move", "source": {"operation": "revoke", "path": "catalogue/offerings/aws-bedrock/bedrock-example-old.yaml", "before": digest_a, "reason": "Identity moved.", "effective_at": "2026-08-30T14:00:00Z", "replacement": "catalogue/offerings/aws-bedrock/bedrock-example-new.yaml"}, "destination": {"operation": "add", "path": "catalogue/offerings/aws-bedrock/bedrock-example-new.yaml", "after": digest_b}}],
+                [0, "source", "effective_at"],
+                "2026-08-30T15:00:00Z",
+            ),
+        ]
+        for name, payload, delta, mutation_path, value in cases:
+            envelope = copy.deepcopy(base)
+            envelope["payload"] = payload
+            envelope["payload_digest"] = "sha256:" + hashlib.sha256(
+                _canonical_receipt_bytes(payload)
+            ).hexdigest()
+            envelope["expected_change_delta"] = delta
+            self.assertEqual(_mac_metadata_errors(envelope, flags, delta), set())
+            changed = copy.deepcopy(delta)
+            target = changed
+            for component in mutation_path[:-1]:
+                target = target[component]
+            target[mutation_path[-1]] = value
+            with self.subTest(name=name):
+                self.assertIn("computed-delta", _mac_metadata_errors(envelope, flags, changed))
 
     def test_canonical_base_url_and_path_pairs(self) -> None:
         for url, path in (
@@ -720,9 +960,9 @@ class SchemaFixtureTests(unittest.TestCase):
         build = config["build"]
         self.assertEqual(
             set(build["required_cli_arguments"]),
-            {"kind", "source_commit", "source_tree", "as_of", "source_date_epoch", "mac_metadata", "profile", "base_path", "output"},
+            {"kind", "base_commit", "source_commit", "source_tree", "as_of", "source_date_epoch", "mac_metadata", "profile", "base_path", "output"},
         )
-        self.assertEqual(set(build["final_required_cli_arguments"]), {"merge_commit", "merge_tree"})
+        self.assertEqual(set(build["deferred_final_cli_arguments"]), {"merge_commit", "merge_tree"})
         self.assertIs(build["ambient_git_or_environment_inference"], False)
         self.assertEqual(build["lock_acquire"], "exclusive_create_or_fail_fast")
         self.assertEqual(build["target_parent"], "dist")

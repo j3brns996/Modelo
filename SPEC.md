@@ -276,6 +276,17 @@ validation.
 
 ### Build and receipt wire contract
 
+T8 is the sole producer of `schemas/mac-metadata.schema.json`, a bounded
+same-repository adapter envelope containing canonical repository and open issue
+identity, exact base/head/head-tree SHAs, the complete neutral MAC payload, its
+SHA-256 over RFC 8785 UTF-8 bytes plus one LF, and canonical expected change
+delta. T5 validates the envelope and payload, URL/repository binding, the three
+explicit Git flags, affected identities and exact computed Git paths and blob
+digests. It performs no provider read, supplies no missing fact and rejects all
+mismatches. Revoke/move `reason`, `effective_at` and optional `replacement`
+come only from expected delta; they are never inferred from deletion, prose or
+the clock.
+
 `schemas/catalogue-output.schema.json` defines the sole JSON serialisation of
 validated catalogue state. T5 emits RFC 8785 UTF-8 bytes followed by exactly
 one LF. SHA-256 always covers those exact emitted bytes, including the LF.
@@ -303,11 +314,14 @@ produce different canonical bytes. T6 consumes that projection and adds HTML, lo
 assets and schema copies; it must not independently serialise raw or private
 catalogue state.
 
-Candidate output targets `dist/candidate/`; final post-merge output targets
-`dist/final/`.
-Publication files are below each output's `site/` directory. The catalogue is
-`site/data/catalogue.json`, the manifest is `site/data/manifest.json`, and
-detached receipts are below `dist/receipts/`.
+T5 candidate output targets `dist/candidate/` and contains exactly
+`site/data/catalogue.json`, `site/data/change-delta.json` and
+`site/data/manifest.json`. Change delta is the RFC 8785 canonical expected
+delta array plus one LF; its SHA-256 covers those exact bytes. The candidate
+manifest excludes itself and lists exactly catalogue and change delta. Receipt
+primitives remain library values; T8 alone writes detached
+`dist/receipts/check.json`. T5 rejects final builds. T6 later extends the same
+projection into `dist/final/`; it may not create a second raw serialisation.
 
 Each invocation exclusively creates `dist/.modelo-build.lock` or fails fast;
 it never waits. The lock contains a bounded, fsynced phase journal. Staging is
@@ -342,7 +356,7 @@ recursive and archive-metadata ambiguity.
 
 T6's executable completeness check requires `files` keys to equal, not merely
 contain, the fixed inventory in `docs/contract.yaml` (base routes, local assets,
-canonical catalogue and all sixteen schema copies) union one model detail page
+canonical catalogue and all seventeen schema copies) union one model detail page
 per projected model and one offering detail page per projected offering. The
 manifest itself is excluded. Missing required files, missing projection-derived
 pages and undeclared extra files all fail; schema validation alone is not the
@@ -532,8 +546,10 @@ content-addressed evidence ID and migrates fact references through MAC review.
 The redacted projection is durable Git source, not an expiring CI artefact. It
 contains only the first-party response fields needed to reproduce validation.
 Credentials, tokens, private prices, account identifiers and unrelated response
-fields are excluded. v0.1 publishes either a complete validated catalogue
-privately or a separate synthetic fixture publicly. Production field-level
+fields are excluded. v0.1 builds the public synthetic profile only from
+`tests/fixtures/build/synthetic` and the private profile only from `catalogue`.
+The former belongs to T5; missing future T6 publication fixture paths are never
+substituted. Production field-level
 redaction is deferred because removing facts can silently change meaning.
 
 YAML date and timestamp scalars remain strings. Evidence projections admit only
@@ -725,28 +741,26 @@ cd Modelo
 uv sync --locked
 uv run --locked modelo check --base <protected-base-sha> --head <head-sha> --as-of <YYYY-MM-DD>
 uv run --locked modelo build --kind candidate \
-  --source-commit <head-sha> --source-tree <head-tree-sha> \
+  --base-commit <base-sha> --source-commit <head-sha> --source-tree <head-tree-sha> \
   --as-of <YYYY-MM-DD> --source-date-epoch <author-unix-seconds> \
   --mac-metadata <validated-mac.json> --profile synthetic \
   --no-base-url --base-path /Modelo/ --output dist/candidate
 ```
 
-T5 implements exactly those build inputs. `--kind`, `--source-commit`,
+T5 implements exactly those build inputs. `--kind`, `--base-commit`, `--source-commit`,
 `--source-tree`, `--as-of`, `--source-date-epoch`, `--mac-metadata`,
 `--profile`, `--base-path` and `--output` are required. Exactly one of
 `--base-url <canonical-https-url>` or candidate-only `--no-base-url` is
-required. Final builds forbid `--no-base-url`. The CLI validates that the
-explicit source commit resolves to the explicit tree and timestamp; it never
+required. T5 accepts only `--kind candidate`; final fails closed until T6. The CLI validates that the
+explicit base is the comparison base and the source commit resolves to the explicit tree and timestamp; it never
 infers HEAD, environment values, output, MAC metadata or publication settings.
-Final builds additionally require explicit `--merge-commit` and
-`--merge-tree`, verify the merge tree equals the accepted source tree, and keep
-the accepted source epoch unchanged.
+T6 will add final builds with explicit `--merge-commit` and `--merge-tree`,
+merge-tree equality and the accepted source epoch unchanged.
 
 T8 invokes the candidate build with the trusted provider's base/head/tree,
 validated bounded MAC metadata, explicit epoch/profile/base URL/path and a
-fresh candidate output path, then hashes that exact result. Post-merge invokes
-the same interface with `--kind final`, the accepted source commit/tree/epoch,
-the explicit merge commit/tree, and `dist/final`.
+fresh candidate output path, then hashes that exact result. T5 does not perform
+the post-merge final build; that interface remains deferred to T6.
 
 Codespaces, GitLab Workspaces, Kiro and IDE settings are optional conveniences.
 They cannot be required for a clean clone.

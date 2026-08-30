@@ -16,7 +16,7 @@ API. `npx`, Agent Skills, cloud CLIs and MCP tools are not build dependencies.
 uv sync --locked
 uv build --offline --no-cache
 uv run --locked modelo check --base <protected-base-sha> --head <head-sha> --as-of <YYYY-MM-DD>
-uv run --locked modelo build --kind candidate --source-commit <HEAD> --source-tree <TREE> --as-of <DATE> --source-date-epoch <EPOCH> --mac-metadata <MAC_JSON> --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
+uv run --locked modelo build --kind candidate --base-commit <BASE> --source-commit <HEAD> --source-tree <TREE> --as-of <DATE> --source-date-epoch <EPOCH> --mac-metadata <MAC_JSON> --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
 ```
 
 `uv.lock` controls runtime sync and `uv run --locked`. Tool-package creation is
@@ -45,7 +45,7 @@ The build is split logically, not into services:
 | T2 | `tooling/modelo/src/modelo/{loader,discovery,diagnostics}.py` and `tests/unit/{test_loader,test_discovery,test_diagnostics}.py` | T1 | Malicious YAML/path corpus and diagnostic snapshot tests pass |
 | T3 | Core/AWS/entity/receipt schemas and schema-only fixtures under `schemas/` and `tests/fixtures/schema/` | T1 | Every structural invariant has passing and failing fixtures |
 | T4 | `tooling/modelo/src/modelo/{schemas,evidence,freshness,change,validators}.py`, `tests/fixtures/semantic/` and matching `tests/unit/test_{schemas,evidence,freshness,change,validators}.py` | T2, T3, T7 | Base/head, model binding, equality, immutability, move and revoke tests pass |
-| T5 | `tooling/modelo/src/modelo/{build,receipt}.py`, build/receipt fixtures and tests | T4 | Deterministic canonical catalogue/delta bytes and receipt primitives verify; exact inputs only, no provider reads |
+| T5 | `tooling/modelo/src/modelo/{build,receipt}.py`, `tests/fixtures/build/synthetic`, build/receipt fixtures and tests | T4 | Candidate-only exact three-file output; validated MAC envelope/base-head-tree correlations; deterministic catalogue/delta bytes and receipt primitives; no provider reads |
 | T6 | `tooling/modelo/src/modelo/site.py`, `site/`, `tests/fixtures/publication/` and `tests/site/` | T5 | Exact manifest keys equal fixed routes/assets/data/schema inventory plus every projection-derived model/offering page; missing/extra, base-path, XSS, leakage, accessibility, history and reproducibility gates pass |
 | T7 | `tooling/modelo/src/modelo/mac.py`, MAC schema/examples, GitHub/GitLab issue and change-request template directories, MAC tests | T1, T0 | Adapter fixtures round-trip to identical canonical MAC objects |
 | T8 | `tooling/modelo/src/modelo/platform.py`, `.github/workflows/`, `paths.gitlab_ci`, and `tests/contract/platform/` | T4, T6, T7 | Correlate every trusted provider input with the receipt, including current base/head/tree, provider/workflow/run/check/result and internal head/provider equalities; skipped/failed/stale or drifted checks fail closed |
@@ -94,27 +94,29 @@ tree, builds the final merge-aware artefact once, validates it, creates a
 detached receipt that hashes it, then deploys that exact final artefact without
 another build. A pull request cannot possess a post-merge receipt.
 
-T5 accepts exact commit/tree, `as_of`, source epoch and validated MAC metadata
-as arguments and emits only canonical catalogue/delta bytes and receipt
-primitives. T6 consumes that single projection and writes the complete static
+T5 accepts exact base/head/tree, `as_of`, source epoch and validated MAC metadata
+as arguments and writes exactly candidate `site/data/{catalogue,change-delta,manifest}.json`;
+the manifest hashes exactly catalogue and change delta. Receipt primitives are
+library values and T8 writes the detached check receipt. T6 consumes that single projection and writes the complete static
 publication and non-recursive manifest. T8 supplies trusted provider metadata
 and creates the detached check receipt. Post-merge publication creates the
 final receipt only after exact-tree verification. Core T5/T6 code performs no
 provider read.
 
 The T5 CLI has no ambient defaults: common required flags are `--kind`,
-`--source-commit`, `--source-tree`, `--as-of`, `--source-date-epoch`,
+`--base-commit`, `--source-commit`, `--source-tree`, `--as-of`, `--source-date-epoch`,
 `--mac-metadata`, `--profile`, `--base-path` and `--output`, plus exactly one of
-`--base-url` or candidate-only `--no-base-url`. Final adds `--merge-commit` and
-`--merge-tree`. T8 supplies every value from trusted inputs and rejects any
+`--base-url` or `--no-base-url`. T5 implements candidate only; final and its
+future `--merge-commit`/`--merge-tree` inputs remain unavailable until T6. T8 supplies every value from trusted inputs and rejects any
 receipt correlation mismatch.
 
-T5 also owns the single-writer publication state machine: exclusive fail-fast
-lock, same-filesystem sibling `dist/{candidate|final}.<id>.staging` and matching
-`.backup`, fsynced staged validation, old-target
+T5 defines the shared single-writer publication state machine and exercises it
+only for candidate output: exclusive fail-fast lock, same-filesystem sibling
+`dist/candidate.<id>.staging` and matching `.backup`, fsynced staged validation, old-target
 backup, promoted-target verification and explicit journal recovery. The two
 renames are not claimed as one transaction; the target can be complete-old,
 complete-new or temporarily absent, never partial. Final builds fail closed
+in T5; T6 later reuses the state machine for `dist/final` and fails closed
 without file/directory fsync support.
 
 T6 owns no-JavaScript navigation, link/XSS/non-leakage and accessibility

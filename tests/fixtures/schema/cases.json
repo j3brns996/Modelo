@@ -307,6 +307,7 @@
         {
           "contract_version": "0.1.0",
           "kind": "candidate",
+          "base_commit": "0000000000000000000000000000000000000000",
           "source_commit": "1111111111111111111111111111111111111111",
           "source_tree": "2222222222222222222222222222222222222222",
           "as_of": "2026-08-30",
@@ -316,12 +317,13 @@
           "base_path": "/Modelo/",
           "promotion_durability": "fsync-durable",
           "catalogue_path": "data/catalogue.json",
+          "change_delta_path": "data/change-delta.json",
           "manifest_path": "data/manifest.json",
           "digest_algorithm": "sha256",
           "publication_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "files": {
             "data/catalogue.json": { "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "size": 123, "media_type": "application/json; charset=utf-8" },
-            "index.html": { "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "size": 456, "media_type": "text/html; charset=utf-8" }
+            "data/change-delta.json": { "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "size": 456, "media_type": "application/json; charset=utf-8" }
           }
         }
       ],
@@ -332,11 +334,13 @@
         { "op": "set", "path": ["base_url"], "value": null }
       ],
       "invalid": [
-        { "name": "manifest hashes itself", "op": "rename", "path": ["files", "index.html"], "value": "data/manifest.json", "expect": ["not", ["files"]] },
+        { "name": "manifest hashes itself", "op": "rename", "path": ["files", "data/change-delta.json"], "value": "data/manifest.json", "expect": ["not", ["files"]] },
         { "name": "manifest omits catalogue", "op": "rename", "path": ["files", "data/catalogue.json"], "value": "data/other.json", "expect": ["required", ["files"]] },
-        { "name": "manifest traversal path", "op": "rename", "path": ["files", "index.html"], "value": "../index.html", "expect": ["pattern", ["files"]] },
-        { "name": "manifest negative file size", "op": "set", "path": ["files", "index.html", "size"], "value": -1, "expect": ["minimum", ["files", "index.html", "size"]] },
-        { "name": "manifest malformed media type", "op": "set", "path": ["files", "index.html", "media_type"], "value": "text html", "expect": ["pattern", ["files", "index.html", "media_type"]] },
+        { "name": "candidate manifest omits change delta", "op": "rename", "path": ["files", "data/change-delta.json"], "value": "data/other.json", "expect": ["required", ["files"]] },
+        { "name": "manifest traversal path", "op": "rename", "path": ["files", "data/change-delta.json"], "value": "../index.html", "expect": ["pattern", ["files"]] },
+        { "name": "manifest negative file size", "op": "set", "path": ["files", "data/change-delta.json", "size"], "value": -1, "expect": ["minimum", ["files", "data/change-delta.json", "size"]] },
+        { "name": "manifest malformed media type", "op": "set", "path": ["files", "data/change-delta.json", "media_type"], "value": "text html", "expect": ["pattern", ["files", "data/change-delta.json", "media_type"]] },
+        { "name": "candidate manifest unexpected output file", "op": "set", "path": ["files", "index.html"], "value": { "sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "size": 1, "media_type": "text/html; charset=utf-8" }, "expect": ["maxProperties", ["files"]] },
         { "name": "manifest unsupported digest", "op": "set", "path": ["digest_algorithm"], "value": "sha512", "expect": ["const", ["digest_algorithm"]] },
         { "name": "final manifest requires absolute base URL", "op": "set", "path": ["base_url"], "value": null, "valid_index": 1, "expect": ["type", ["base_url"]] },
         { "name": "final manifest requires fsync durability", "op": "set", "path": ["promotion_durability"], "value": "process-atomic-only", "valid_index": 1, "expect": ["const", ["promotion_durability"]] },
@@ -535,6 +539,55 @@
         { "name": "invalid as-of date", "op": "set", "path": ["as_of"], "value": "2026-02-30", "expect": ["format", ["as_of"]] },
         { "name": "negative source epoch", "op": "set", "path": ["source_date_epoch"], "value": -1, "expect": ["minimum", ["source_date_epoch"]] },
         { "name": "unsupported CI provider", "op": "set", "path": ["ci", "provider"], "value": "jenkins", "expect": ["enum", ["ci", "provider"]] }
+      ]
+    },
+    {
+      "schema": "mac-metadata.schema.json",
+      "valid": [
+        {
+          "contract_version": "0.1.0",
+          "repository": {
+            "provider": "github",
+            "host": "github.com",
+            "namespace": "j3brns",
+            "name": "Modelo"
+          },
+          "issue": {
+            "reference": "22",
+            "url": "https://github.com/j3brns/Modelo/issues/22",
+            "state": "open"
+          },
+          "base_sha": "1111111111111111111111111111111111111111",
+          "head_sha": "2222222222222222222222222222222222222222",
+          "head_tree_sha": "3333333333333333333333333333333333333333",
+          "payload": {
+            "schema_version": "0.1",
+            "request_id": "00000000-0000-4000-8000-000000000001",
+            "operation": "add",
+            "purpose": "approve-model-definition",
+            "subjects": [{ "kind": "model", "identity": "example-model-v1" }],
+            "requested_outcome": "Add the evidenced model definition.",
+            "reason": "The model is required by an approved offering proposal.",
+            "candidate_evidence": [{ "uri": "https://example.invalid/official/model-v1", "observed_at": "2026-08-30T12:00:00Z", "digest": "sha256-1111111111111111111111111111111111111111111111111111111111111111" }],
+            "acceptance": ["The model facts match admissible evidence."],
+            "dedupe_key": "sha256-aa864bc685a1c64485a0bcc579481ea9ece2533e90d93076ef1876e8696995fd",
+            "idempotency_key": "sha256-4f915f916f106699d472ec991b8d7f76dbed90c98c4e9e4145fdecd4f9e4f8c2"
+          },
+          "payload_digest": "sha256:6a2806f4e758288570dfbfee358057bc6fd2a07ce661f351c4e0e8ebae4d1541",
+          "expected_change_delta": [{ "operation": "add", "path": "catalogue/models/example-model-v1.yaml", "after": "sha256:9999999999999999999999999999999999999999999999999999999999999999" }]
+        }
+      ],
+      "invalid": [
+        { "name": "MAC metadata missing base", "op": "remove", "path": ["base_sha"], "expect": ["required", []] },
+        { "name": "MAC metadata missing head", "op": "remove", "path": ["head_sha"], "expect": ["required", []] },
+        { "name": "MAC metadata missing head tree", "op": "remove", "path": ["head_tree_sha"], "expect": ["required", []] },
+        { "name": "MAC metadata closed issue", "op": "set", "path": ["issue", "state"], "value": "closed", "expect": ["const", ["issue", "state"]] },
+        { "name": "MAC metadata noncanonical repository host", "op": "set", "path": ["repository", "host"], "value": "GitHub.com", "expect": ["pattern", ["repository", "host"]] },
+        { "name": "MAC metadata malformed payload digest", "op": "set", "path": ["payload_digest"], "value": "sha256:tampered", "expect": ["pattern", ["payload_digest"]] },
+        { "name": "MAC metadata wrong payload operation", "op": "set", "path": ["payload", "operation"], "value": "unknown", "expect": ["enum", ["payload", "operation"]] },
+        { "name": "MAC metadata wrong subject kind", "op": "set", "path": ["payload", "subjects", 0, "kind"], "value": "service", "expect": ["enum", ["payload", "subjects", 0, "kind"]] },
+        { "name": "MAC metadata delta path traversal", "op": "set", "path": ["expected_change_delta", 0, "path"], "value": "catalogue/models/../x.yaml", "expect": ["pattern", ["expected_change_delta", 0, "path"]] },
+        { "name": "MAC metadata extra field", "op": "set", "path": ["labels"], "value": [], "expect": ["additionalProperties", []] }
       ]
     },
     {

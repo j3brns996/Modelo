@@ -3,7 +3,7 @@ inference_service_id: aws-bedrock
 model_id: test-model
 routes:
   - id: london-direct
-    adapter: aws-bedrock
+    source_region: eu-west-2
     reference: test.model-v1
     model_binding:
       kind: foundation-model

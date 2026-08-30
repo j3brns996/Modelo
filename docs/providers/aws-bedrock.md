@@ -78,7 +78,27 @@ hashed with SHA-256, and the lowercase digest is prefixed with `sha256-`.
   values and first-party fixtures before they are admitted.
 - Account-owned application profiles are deferred with those route types.
 
-Regions and AWS-owned model or system-profile references may appear in routes.
+Every route requires `source_region`, the Region to which the inference request
+is sent and in which direct inference is processed. It is an internal approved
+invocation coordinate, not an external fact duplicated into an evidence
+projection. CI correlates it to the `region` metadata of explicit first-party
+AWS Bedrock evidence: `GetFoundationModel`/`ListFoundationModels` for a direct
+route and `GetInferenceProfile`/`ListInferenceProfiles` for a system profile.
+Official documentation alone cannot bind a callable route.
+
+The evidence partition and Region must form a coherent pair: `aws-cn` with
+`cn-*`, `aws-us-gov` with `us-gov-*`, and `aws` with other Region shapes. Where
+the route or model reference is an ARN, its partition and Region must agree
+with the bound evidence source. This is a structural correlation, not a live
+allow-list of Regions.
+
+AWS-owned model or system-profile references appear in routes. The adapter is
+not repeated there: `inference_service_id` resolves through the governed
+inference-service registry, whose `adapter` dispatches the AWS semantic
+validator at runtime. Service
+aliases may select `aws-bedrock`; unknown services and unsupported adapters fail
+closed. The current offering schema is an honest static AWS-only schema; it is
+not yet a dynamic multi-provider plug-in union.
 Account IDs and account-owned ARNs may exist only in short-lived discovery
 configuration or raw private artefacts and are not retained in v0.1 catalogue
 evidence. None belongs in canonical filenames.
@@ -88,9 +108,22 @@ evidence. None belongs in canonical filenames.
 A direct foundation-model route retains evidenced `modelId`/`modelArn`,
 `modelName` and `providerName` and binds them by exact equality to the canonical
 model's evidenced identity facts. A system inference profile retains every
-destination model ARN. Each destination must resolve through evidenced
-`GetFoundationModel` facts to that same canonical model. If equality would need
-normalisation, aliasing or another transformation, the mapping is deferred.
+destination model ARN and explicitly binds the profile ID, type, status and
+complete destination array. It must report `SYSTEM_DEFINED` and `ACTIVE`.
+Destination bindings are bijective: every and only reported destination ARN is
+bound once. Each destination resolves through evidenced
+`GetFoundationModel`/`ListFoundationModels` facts in the ARN's destination
+Region to that same canonical model.
+
+The source Region and destination Regions are deliberately different fields.
+A direct route has a processing source Region and no profile destination set.
+A profile route has one request source Region plus the evidenced destination
+set selected by AWS. The same ID-form profile reference invoked from two source
+Regions is two routes with distinct route IDs; pricing and evidence bind via
+those IDs. Duplicate `(source_region, model_binding.kind, reference)` routes in
+one offering are invalid. None of these observations proves entitlement,
+quota, health or effective IAM permission. If equality needs normalisation,
+aliasing or another transformation, the mapping is deferred.
 
 ## Cross-cloud path comparison
 

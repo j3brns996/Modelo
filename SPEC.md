@@ -82,9 +82,10 @@ internal ID and contains one or more approved provider routes.
 
 ### Route
 
-An invocable provider reference plus its scope and consumption mode. Provider
-references are opaque to the core schema. AWS, GCP and Azure adapters validate
-their syntax and obtain them from first-party read APIs.
+An invocable provider reference plus provider-owned invocation coordinates and
+consumption mode. The inference-service registry is the sole owner of the
+adapter; routes never repeat it. Provider references are opaque to the core.
+The first implemented provider schema is AWS Bedrock.
 
 ### Observation
 
@@ -442,7 +443,7 @@ inference_service_id: aws-bedrock
 model_id: <stable-canonical-model-id>
 routes:
   - id: <stable-route-id>
-    adapter: aws-bedrock
+    source_region: <aws-request-region>
     reference: <opaque-first-party-reference>
     model_binding:
       kind: foundation-model
@@ -470,14 +471,18 @@ means that no price assertion is made; it does not imply zero or free usage.
 ```yaml
 routes:
   - id: <stable-route-id>
-    adapter: <provider-adapter-id>
     reference: <opaque-first-party-reference>
-    model_binding: <provider-adapter-owned-object>
+    <provider-owned-invocation-coordinate>: <value>
+    model_binding: <provider-owned-object>
 ```
 
-The core validates structure and references. The inference-service adapter validates
-provider-specific values. Route IDs are internal and stable; provider references
-may change through an evidenced MAC change.
+The core validates structure and references. It resolves
+`inference_service_id` through `governance/inference-services.yaml` and dispatches
+the provider validator at runtime by that registry's `adapter`; an alias service therefore
+uses the same provider rules. v0.1 has a static AWS-only route schema, not a
+runtime plug-in union. Unknown services and unsupported adapters fail closed.
+Route IDs are internal and stable; provider references may change through an
+evidenced MAC change.
 
 For an AWS system inference profile, the adapter-owned object contains the
 profile evidence reference and one entry per destination:
@@ -487,7 +492,10 @@ model_binding:
   kind: system-inference-profile
   profile_evidence:
     id: <profile-evidence-id>
-    projection_pointer: ""
+    projection_pointer: /profileId
+    type_pointer: /type
+    status_pointer: /status
+    destinations_pointer: /models
   destinations:
     - destination_pointer: /models/0/modelArn
       model_evidence:
@@ -497,10 +505,12 @@ model_binding:
         provider_pointer: /providerName
 ```
 
-CI requires the destination ARN to equal `arn_pointer`, and the reported model
-and provider names to equal the canonical model name and governed vendor name.
-All references are explicit; the validator never searches globally for a
-plausible or freshest evidence record.
+CI requires `SYSTEM_DEFINED`, `ACTIVE`, and a complete one-to-one binding of
+every reported profile destination. Each destination ARN equals its explicit
+model `arn_pointer`; that ARN's partition and Region equal the destination's
+`GetFoundationModel` evidence source. The reported model and provider names
+equal the canonical model name and governed vendor name. All references are
+explicit; the validator never searches globally for plausible evidence.
 
 ### Dimensional pricing
 
@@ -604,11 +614,16 @@ stored.
 AWS routes must also bind to the offering's canonical `model_id`. A direct route
 requires its reference to equal the evidenced model ID/ARN, then requires the
 reported model name and provider name to equal the canonical model name and
-governed vendor name. A
+governed vendor name. Every route carries one internal `source_region`: the AWS
+request/processing Region, not a geography label or a profile destination. It
+must equal the Region of explicit AWS Bedrock `Get`/`List` evidence for that
+route. ARN forms must also agree with the evidence partition and Region. A
 system inference profile retains every destination model ARN; CI resolves each
-through evidenced `GetFoundationModel` facts and requires all destinations to
-bind to that same canonical model. Mappings needing transformation or
-interpretation are deferred.
+through evidenced `GetFoundationModel`/`ListFoundationModels` facts in the
+destination Region and requires a complete one-to-one set bound to that same
+canonical model. This proves the observed route shape, not entitlement, quota,
+health or effective workload permission. Mappings needing transformation are
+deferred.
 
 ### Illustrative AWS configuration
 
@@ -619,22 +634,25 @@ inference_service_id: aws-bedrock
 model_id: <canonical-model-id>
 routes:
   - id: london-direct
-    adapter: aws-bedrock
+    source_region: eu-west-2
     reference: <bedrock-foundation-model-id>
-    aws:
-      resource_type: foundation-model
-      source_region: eu-west-2
+    model_binding:
+      kind: foundation-model
+      model_evidence: <explicit-evidence-binding>
   - id: eu-cross-region
-    adapter: aws-bedrock
+    source_region: eu-west-2
     reference: <bedrock-system-inference-profile-id>
-    aws:
-      resource_type: system-inference-profile
-      source_region: eu-west-2
+    model_binding:
+      kind: system-inference-profile
+      profile_evidence: <explicit-profile-evidence-binding>
+      destinations: [<complete-explicit-destination-bindings>]
 ```
 
 `uk` is not an AWS inference geography. London is `eu-west-2`. AWS geography
 and global inference profiles are distinct routes, not suffixes on canonical
-model identity.
+model identity. The same profile invoked from two source Regions is represented
+by two route IDs, so pricing and evidence remain bound to the callable regional
+coordinates. Duplicate `(source_region, kind, reference)` routes are invalid.
 
 ## Cross-cloud configuration boundary
 

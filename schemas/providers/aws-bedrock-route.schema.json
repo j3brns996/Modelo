@@ -3,6 +3,10 @@
   "$id": "https://modelo.invalid/schemas/providers/aws-bedrock-route.schema.json",
   "title": "Modelo AWS Bedrock route",
   "$defs": {
+    "awsRegion": {
+      "type": "string",
+      "pattern": "^[a-z]{2}(?:-gov)?-[a-z]+-[0-9]+(?![\\s\\S])"
+    },
     "foundationModelReference": {
       "oneOf": [
         {
@@ -59,10 +63,13 @@
     },
     "profileEvidence": {
       "type": "object",
-      "required": ["id", "projection_pointer"],
+      "required": ["id", "projection_pointer", "type_pointer", "status_pointer", "destinations_pointer"],
       "properties": {
         "id": { "$ref": "../common.schema.json#/$defs/evidenceId" },
-        "projection_pointer": { "$ref": "../common.schema.json#/$defs/jsonPointer" }
+        "projection_pointer": { "$ref": "../common.schema.json#/$defs/nonRootJsonPointer" },
+        "type_pointer": { "$ref": "../common.schema.json#/$defs/nonRootJsonPointer" },
+        "status_pointer": { "$ref": "../common.schema.json#/$defs/nonRootJsonPointer" },
+        "destinations_pointer": { "$ref": "../common.schema.json#/$defs/nonRootJsonPointer" }
       },
       "additionalProperties": false
     },
@@ -91,10 +98,13 @@
     }
   },
   "type": "object",
-  "required": ["id", "adapter", "reference", "model_binding"],
+  "required": ["id", "source_region", "reference", "model_binding"],
   "properties": {
     "id": { "$ref": "../common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
-    "adapter": { "const": "aws-bedrock", "x-modelo-provenance": "internal" },
+    "source_region": {
+      "$ref": "#/$defs/awsRegion",
+      "x-modelo-provenance": "internal"
+    },
     "reference": {
       "type": "string",
       "minLength": 1,

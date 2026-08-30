@@ -44,8 +44,8 @@ class ReceiptTests(unittest.TestCase):
         offering = {
             "id": "o", "inference_service_id": "svc", "model_id": "m",
             "routes": [
-                {"id": "z", "adapter": "a", "reference": "z", "model_binding": {}},
-                {"id": "a", "adapter": "a", "reference": "a", "model_binding": {}},
+                {"id": "z", "source_region": "us-east-1", "reference": "z", "model_binding": {}},
+                {"id": "a", "source_region": "eu-west-2", "reference": "a", "model_binding": {}},
             ],
             "condition_refs": [{"id": "z", "version": 2}, {"id": "a", "version": 1}],
             "pricing": [
@@ -70,6 +70,60 @@ class ReceiptTests(unittest.TestCase):
         self.assertEqual([price["dimension"] for price in normal["pricing"]], ["input", "output"])
         self.assertIn("/pricing/1/amount", normal["evidence_refs"])
         self.assertEqual(projection["evidence"][0]["projection"]["ordered"], [2, 1])
+
+    def test_two_source_region_profile_permutation_is_byte_identical(self) -> None:
+        def offering(order):
+            routes_by_id = {
+                "eu-route": {
+                    "id": "eu-route", "source_region": "eu-west-2",
+                    "reference": "global.test.profile-v1",
+                    "model_binding": {
+                        "kind": "system-inference-profile",
+                        "profile_evidence": {"id": "e-eu", "projection_pointer": "/profileId", "type_pointer": "/type", "status_pointer": "/status", "destinations_pointer": "/models"},
+                        "destinations": [{"destination_pointer": "/models/0/modelArn", "model_evidence": {"id": "m-eu", "arn_pointer": "/modelArn", "name_pointer": "/modelName", "provider_pointer": "/providerName"}}],
+                    },
+                },
+                "us-route": {
+                    "id": "us-route", "source_region": "us-east-1",
+                    "reference": "global.test.profile-v1",
+                    "model_binding": {
+                        "kind": "system-inference-profile",
+                        "profile_evidence": {"id": "e-us", "projection_pointer": "/profileId", "type_pointer": "/type", "status_pointer": "/status", "destinations_pointer": "/models"},
+                        "destinations": [{"destination_pointer": "/models/1/modelArn", "model_evidence": {"id": "m-us", "arn_pointer": "/modelArn", "name_pointer": "/modelName", "provider_pointer": "/providerName"}}],
+                    },
+                },
+            }
+            routes = [routes_by_id[identifier] for identifier in order]
+            return {
+                "id": "o", "inference_service_id": "svc", "model_id": "m",
+                "routes": routes,
+                "pricing": [{"dimension": "input", "unit": "token", "quantity": 1, "amount": "1", "currency": "USD", "route_ids": list(reversed(order))}],
+                "condition_refs": [],
+                "evidence_refs": {
+                    f"/routes/{index}/reference": {
+                        "id": routes_by_id[identifier]["model_binding"]["profile_evidence"]["id"],
+                        "projection_pointer": "/profileId",
+                    }
+                    for index, identifier in enumerate(order)
+                },
+            }
+
+        common = {
+            "contract_version": "0.1.0", "source_commit": "a" * 40,
+            "source_tree": "b" * 40, "as_of": "2026-08-30", "profile": "synthetic",
+            "models": [], "evidence": [], "conditions": [],
+            "vendors": {"vendors": {}},
+            "inference_services": {"inference_services": {}},
+            "freshness": {"classes_days": {}},
+        }
+        first = catalogue_projection(offerings=[offering(["eu-route", "us-route"])], **common)
+        second = catalogue_projection(offerings=[offering(["us-route", "eu-route"])], **common)
+        self.assertEqual(canonical_bytes(first), canonical_bytes(second))
+        normal = first["offerings"][0]
+        self.assertEqual([route["id"] for route in normal["routes"]], ["eu-route", "us-route"])
+        self.assertEqual(normal["pricing"][0]["route_ids"], ["eu-route", "us-route"])
+        self.assertEqual(normal["evidence_refs"]["/routes/0/reference"]["id"], "e-eu")
+        self.assertEqual(normal["evidence_refs"]["/routes/1/reference"]["id"], "e-us")
 
 
 if __name__ == "__main__":

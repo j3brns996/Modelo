@@ -148,7 +148,7 @@
       "valid": [
         {
           "id": "london-direct",
-          "adapter": "aws-bedrock",
+          "source_region": "eu-west-2",
           "reference": "test.model-v1",
           "model_binding": {
             "kind": "foundation-model",
@@ -163,13 +163,16 @@
         },
         {
           "id": "eu-system-profile",
-          "adapter": "aws-bedrock",
+          "source_region": "eu-west-2",
           "reference": "eu.test.profile-v1",
           "model_binding": {
             "kind": "system-inference-profile",
             "profile_evidence": {
               "id": "sha256-ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-              "projection_pointer": ""
+              "projection_pointer": "/profileId",
+              "type_pointer": "/type",
+              "status_pointer": "/status",
+              "destinations_pointer": "/models"
             },
             "destinations": [
               {
@@ -190,7 +193,9 @@
         { "valid_index": 1, "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2::inference-profile/eu.test.profile-v1" }
       ],
       "invalid": [
-        { "name": "provider adapter deferred", "op": "set", "path": ["adapter"], "value": "azure-foundry", "expect": ["const", ["adapter"]] },
+        { "name": "route adapter forbidden", "op": "set", "path": ["adapter"], "value": "aws-bedrock", "expect": ["additionalProperties", []] },
+        { "name": "source Region absent", "op": "remove", "path": ["source_region"], "expect": ["required", []] },
+        { "name": "source Region invalid", "op": "set", "path": ["source_region"], "value": "uk", "expect": ["pattern", ["source_region"]] },
         { "name": "direct binding lacks explicit ID pointer", "op": "remove", "path": ["model_binding", "model_evidence", "id_pointer"], "expect": ["required", ["model_binding", "model_evidence"]] },
         { "name": "profile has no destinations", "valid_index": 1, "op": "set", "path": ["model_binding", "destinations"], "value": [], "expect": ["minItems", ["model_binding", "destinations"]] },
         { "name": "account scope forbidden extra", "op": "set", "path": ["account_id"], "value": "123456789012", "expect": ["additionalProperties", []] },
@@ -220,7 +225,7 @@
           "routes": [
             {
               "id": "london-direct",
-              "adapter": "aws-bedrock",
+              "source_region": "eu-west-2",
               "reference": "test.model-v1",
               "model_binding": {
                 "kind": "foundation-model",

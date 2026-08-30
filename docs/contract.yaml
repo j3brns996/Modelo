@@ -45,7 +45,9 @@ entities:
   route:
     identity: id
     stored_under: offering
-    core_fields: [id, adapter, reference]
+    core_fields: [id, reference]
+    adapter_owner: inference_service_registry
+    adapter_dispatch: static_aws_only_schema_in_v0_1
     provider_reference_is_opaque_to_core: true
   evidence:
     identity: "sha256-{rfc8785_envelope_without_id}"
@@ -133,6 +135,20 @@ provider_boundary:
   aws:
     adapter: aws-bedrock
     implemented_route_types: [foundation-model, system-inference-profile]
+    route_required_internal_fields: [source_region]
+    source_region_meaning: aws_request_and_processing_region
+    source_region_is_profile_destination: false
+    semantic_route_identity: [source_region, model_binding.kind, reference]
+    duplicate_semantic_route: error
+    source_region_evidence:
+      source_type: first-party-read-api
+      provider: aws
+      service: bedrock
+      direct_operations: [GetFoundationModel, ListFoundationModels]
+      profile_operations: [GetInferenceProfile, ListInferenceProfiles]
+      exact_region_match: true
+      partition_region_shape_match: true
+      arn_partition_region_match_when_arn_form: true
     operations:
       - ListFoundationModels
       - GetFoundationModel
@@ -156,8 +172,9 @@ provider_boundary:
         reported_identity_equals: [canonical_model_name, governed_vendor_name]
         explicit_model_evidence_pointers: [id_pointer, arn_pointer, name_pointer, provider_pointer]
       system_inference_profile:
-        requires: [explicit_profile_evidence_ref, explicit_destination_pointer_and_model_evidence_per_destination]
+        requires: [system_defined, active, explicit_profile_evidence_ref, complete_bijective_destination_bindings, explicit_destination_pointer_and_model_evidence_per_destination]
         destination_arn_equals_model_evidence_arn: true
+        destination_arn_partition_region_equals_model_evidence_source: true
         every_reported_identity_equals: [canonical_model_name, governed_vendor_name]
         validator_global_evidence_search: forbidden
       transformed_or_ambiguous_mapping: deferred

@@ -46,7 +46,7 @@ The build is split logically, not into services:
 | T3 | Core/AWS/entity/receipt schemas and schema-only fixtures under `schemas/` and `tests/fixtures/schema/` | T1 | Every structural invariant has passing and failing fixtures |
 | T4 | `tooling/modelo/src/modelo/{schemas,evidence,freshness,change,validators}.py`, `tests/fixtures/semantic/` and matching `tests/unit/test_{schemas,evidence,freshness,change,validators}.py` | T2, T3, T7 | Base/head, model binding, equality, immutability, move and revoke tests pass |
 | T5 | `tooling/modelo/src/modelo/{build,receipt}.py`, `tests/fixtures/build/synthetic`, build/receipt fixtures and tests | T4 | Candidate-only exact three-file output; validated MAC envelope/base-head-tree correlations; deterministic catalogue/delta bytes and receipt primitives; no provider reads |
-| T6 | `tooling/modelo/src/modelo/site.py`, `site/`, `tests/fixtures/publication/` and `tests/site/` | T5 | Exact manifest keys equal fixed routes/assets/data/schema inventory plus every projection-derived model/offering page; missing/extra, base-path, XSS, leakage, accessibility, history and reproducibility gates pass |
+| T6 | `tooling/modelo/src/modelo/site.py`, `site/`, `tests/fixtures/publication/` and `tests/site/` | T5 | Exact manifest keys equal fixed routes/assets/data/schema inventory plus every projection-derived model/offering page; AWS Source/Destination Region view is derived from validated route/evidence bindings without browser ARN parsing; missing/extra, base-path, XSS, leakage, accessibility, history and reproducibility gates pass |
 | T7 | `tooling/modelo/src/modelo/mac.py`, MAC schema/examples, GitHub/GitLab issue and change-request template directories, MAC tests | T1, T0 | Adapter fixtures round-trip to identical canonical MAC objects |
 | T8 | `tooling/modelo/src/modelo/platform.py`, `.github/workflows/`, `paths.gitlab_ci`, and `tests/contract/platform/` | T4, T6, T7 | Correlate every trusted provider input with the receipt, including current base/head/tree, provider/workflow/run/check/result and internal head/provider equalities; skipped/failed/stale or drifted checks fail closed |
 | T9 | `.agents/skills/{modelo-change,modelo-review,modelo-discover}/` and static skill lint | T7, T8 | Skill commands and paths resolve; no skill is a build/runtime input |
@@ -144,9 +144,11 @@ in T5; T6 later reuses the state machine for `dist/final` and fails closed
 without file/directory fsync support.
 
 T6 owns no-JavaScript navigation, link/XSS/non-leakage and accessibility
-structure. T8 owns pinned Python-controlled browser execution outside the core
-build runtime. T10 records human keyboard and screen-reader evidence. Node,
-npm and `npx` are not required.
+structure. Its generator emits AWS Source Region from the route and Destination
+Regions from explicit destination evidence metadata; templates and browser code
+never parse ARNs. T8 owns pinned Python-controlled browser execution outside
+the core build runtime. T10 records human keyboard and screen-reader evidence.
+Node, npm and `npx` are not required.
 
 ## Launch gates
 

@@ -69,6 +69,15 @@ capability, modality, licence, lifecycle and condition. It does not invent a
 cross-cloud geography facet. Every entity/detail link remains usable without
 JavaScript; filters are progressive enhancement.
 
+T6's Python generator produces the AWS Region view from validated T5 data. It
+labels `route.source_region` as **Source Region**. For a direct route it emits
+no destination set. For a system profile it follows each explicit destination
+binding to its foundation-model evidence and labels that evidence source Region
+as **Destination Region**. Templates and browser JavaScript consume only this
+build-produced view; they must not parse ARNs or infer Regions. Two routes that
+use the same ID-form profile reference in different source Regions remain
+separate rows, and pricing remains associated by route ID.
+
 ## Publication profiles
 
 v0.1 permits two profiles only:

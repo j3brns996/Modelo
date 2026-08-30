@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path, PurePosixPath
+import re
 from typing import Any, Mapping
 
 from modelo.change import GitError, changed_paths, require_ancestor, resolve_commit, validate_changes, validate_condition_history, with_snapshot
@@ -192,18 +193,9 @@ def _reference_checks(state: State) -> None:
             state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, "/model_id", "offering model does not exist", "Reference an existing canonical model."))
         if offering["inference_service_id"] not in state.services:
             state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, "/inference_service_id", "offering inference service does not exist", "Reference a governed inference service."))
-        service_record = state.services.get(offering["inference_service_id"])
         route_ids = {route["id"] for route in offering["routes"]}
         if len(route_ids) != len(offering["routes"]):
             state.diagnostics.append(_diag("PATH_IDENTITY_MISMATCH", path, "/routes", "route ids are not unique within the offering", "Give every route a stable unique internal id."))
-        if service_record is not None:
-            for index, route in enumerate(offering["routes"]):
-                if route["adapter"] != service_record["adapter"]:
-                    state.diagnostics.append(_diag(
-                        "UNKNOWN_REFERENCE", path, f"/routes/{index}/adapter",
-                        "route adapter differs from its inference-service adapter",
-                        "Use the adapter governed by the referenced inference service.",
-                    ))
         for index, price in enumerate(offering.get("pricing", [])):
             for route_id in price["route_ids"]:
                 if route_id not in route_ids:
@@ -214,14 +206,109 @@ def _reference_checks(state: State) -> None:
                 state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, f"/condition_refs/{index}", "condition version does not exist", "Reference an existing immutable condition version."))
 
 
+_AWS_ARN = re.compile(
+    r"^arn:(aws|aws-cn|aws-us-gov):bedrock:([^:]+):[^:]*:"
+    r"(foundation-model|inference-profile)/"
+)
+
+
+def _aws_arn_scope(value: Any) -> tuple[str, str, str] | None:
+    if not isinstance(value, str):
+        return None
+    match = _AWS_ARN.match(value)
+    if match is None:
+        return None
+    return match.group(1), match.group(2), match.group(3)
+
+
+def _aws_api_source(
+    state: State,
+    path: str,
+    pointer: str,
+    record: Mapping[str, Any],
+    *,
+    operations: tuple[str, ...],
+    region: str,
+) -> Mapping[str, Any] | None:
+    operation_label = " or ".join(operations)
+    source = record.get("source")
+    if not isinstance(source, Mapping) or source.get("type") != "first-party-read-api":
+        state.diagnostics.append(_diag(
+            "EVIDENCE_VALUE_MISMATCH", path, pointer,
+            "AWS route binding requires first-party read-API evidence",
+            f"Use AWS Bedrock {operation_label} evidence observed in {region}.",
+        ))
+        return None
+    expected = {
+        "provider": "aws", "service": "bedrock", "region": region,
+    }
+    for field, value in expected.items():
+        if source.get(field) != value:
+            state.diagnostics.append(_diag(
+                "EVIDENCE_VALUE_MISMATCH", path, pointer,
+                f"AWS route evidence {field} does not match its invocation binding",
+                f"Use {operation_label} evidence from AWS Bedrock in {region}.",
+            ))
+    if source.get("operation") not in operations:
+        state.diagnostics.append(_diag(
+            "EVIDENCE_VALUE_MISMATCH", path, pointer,
+            "AWS route evidence operation does not match its binding kind",
+            f"Use {operation_label} evidence from AWS Bedrock in {region}.",
+        ))
+    partition = source.get("partition")
+    coherent = (
+        (partition == "aws-cn" and region.startswith("cn-"))
+        or (partition == "aws-us-gov" and region.startswith("us-gov-"))
+        or (
+            partition == "aws"
+            and not region.startswith("cn-")
+            and not region.startswith("us-gov-")
+        )
+    )
+    if not coherent:
+        state.diagnostics.append(_diag(
+            "EVIDENCE_VALUE_MISMATCH", path, pointer,
+            "AWS partition and Region are incoherent",
+            "Use aws-cn with cn-*, aws-us-gov with us-gov-*, and aws for other Regions.",
+        ))
+    return source
+
+
+def _aws_arn_matches_source(
+    state: State,
+    path: str,
+    pointer: str,
+    value: Any,
+    source: Mapping[str, Any] | None,
+    *,
+    resource: str,
+) -> None:
+    scope = _aws_arn_scope(value)
+    if scope is None or source is None:
+        return
+    partition, region, kind = scope
+    if kind != resource or partition != source.get("partition") or region != source.get("region"):
+        state.diagnostics.append(_diag(
+            "EVIDENCE_VALUE_MISMATCH", path, pointer,
+            "AWS ARN partition, Region or resource type differs from its evidence source",
+            "Use an ARN whose partition, Region and resource type match the bound API evidence.",
+        ))
+
+
 def _model_evidence(
-    state: State, path: str, binding: Mapping[str, Any], model: Mapping[str, Any] | None
+    state: State, path: str, pointer: str, binding: Mapping[str, Any],
+    model: Mapping[str, Any] | None, *, expected_region: str | None = None,
 ) -> None:
     identifier = binding.get("id")
     record = state.evidence.get(identifier) if isinstance(identifier, str) else None
     if record is None:
-        state.diagnostics.append(_diag("EVIDENCE_MISSING", path, "/routes", "AWS model binding evidence does not exist", "Reference an explicit evidence record."))
+        state.diagnostics.append(_diag("EVIDENCE_MISSING", path, pointer, "AWS model binding evidence does not exist", "Reference an explicit evidence record."))
         return
+    source = _aws_api_source(
+        state, path, pointer, record,
+        operations=("GetFoundationModel", "ListFoundationModels"),
+        region=expected_region or str(record.get("source", {}).get("region", "")),
+    )
     for field in ("id_pointer", "arn_pointer", "name_pointer", "provider_pointer"):
         pointer = binding.get(field)
         if pointer is None:
@@ -229,7 +316,14 @@ def _model_evidence(
         try:
             resolve_pointer(record["projection"], pointer)
         except (KeyError, IndexError, TypeError):
-            state.diagnostics.append(_diag("EVIDENCE_MISSING", path, "/routes", f"AWS {field} does not resolve", "Use an explicit pointer into the selected evidence projection."))
+            state.diagnostics.append(_diag("EVIDENCE_MISSING", path, pointer, f"AWS {field} does not resolve", "Use an explicit pointer into the selected evidence projection."))
+    try:
+        model_arn = resolve_pointer(record["projection"], binding["arn_pointer"])
+    except (KeyError, IndexError, TypeError):
+        model_arn = None
+    _aws_arn_matches_source(
+        state, path, pointer, model_arn, source, resource="foundation-model"
+    )
     if model is None:
         return
     vendor = state.vendors.get(model.get("vendor_id"))
@@ -240,51 +334,170 @@ def _model_evidence(
         except (KeyError, IndexError, TypeError):
             continue
         if expected is not None and canonical_json(actual) != canonical_json(expected):
-            state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, "/routes", f"AWS {field} differs from governed identity", "Use evidence whose reported model and provider names exactly match governed records."))
+            state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, pointer, f"AWS {field} differs from governed identity", "Use evidence whose reported model and provider names exactly match governed records."))
+
+
+def _aws_offering_checks(
+    state: State, offering: Mapping[str, Any], path: str
+) -> None:
+    model = state.models.get(offering["model_id"])
+    semantic_routes: set[tuple[str, str, str]] = set()
+    for index, route in enumerate(offering["routes"]):
+        route_pointer = f"/routes/{index}"
+        source_region = str(route["source_region"])
+        binding = route["model_binding"]
+        semantic_key = (source_region, str(binding["kind"]), str(route["reference"]))
+        if semantic_key in semantic_routes:
+            state.diagnostics.append(_diag(
+                "PATH_IDENTITY_MISMATCH", path, route_pointer,
+                "AWS route duplicates an existing invocation coordinate",
+                "Keep one route per source Region, binding kind and provider reference.",
+            ))
+        semantic_routes.add(semantic_key)
+        if binding["kind"] == "foundation-model":
+            evidence_binding = binding["model_evidence"]
+            _model_evidence(
+                state, path, f"{route_pointer}/model_binding/model_evidence",
+                evidence_binding, model, expected_region=source_region,
+            )
+            record = state.evidence.get(evidence_binding["id"])
+            if record:
+                source = _aws_api_source(
+                    state, path, f"{route_pointer}/source_region", record,
+                    operations=("GetFoundationModel", "ListFoundationModels"),
+                    region=source_region,
+                )
+                _aws_arn_matches_source(
+                    state, path, f"{route_pointer}/reference", route["reference"],
+                    source, resource="foundation-model",
+                )
+                values = []
+                for field in ("id_pointer", "arn_pointer"):
+                    try:
+                        values.append(resolve_pointer(record["projection"], evidence_binding[field]))
+                    except (KeyError, IndexError, TypeError):
+                        pass
+                if route["reference"] not in values:
+                    state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, f"{route_pointer}/reference", "AWS foundation route reference matches neither evidenced model id nor ARN", "Use the exact evidenced foundation model id or AWS-owned ARN."))
+        else:
+            profile = binding["profile_evidence"]
+            profile_record = state.evidence.get(profile["id"])
+            if profile_record is None:
+                state.diagnostics.append(_diag("EVIDENCE_MISSING", path, f"{route_pointer}/model_binding/profile_evidence", "AWS profile evidence does not exist", "Reference explicit inference-profile evidence."))
+                continue
+            profile_source = _aws_api_source(
+                state, path, f"{route_pointer}/source_region", profile_record,
+                operations=("GetInferenceProfile", "ListInferenceProfiles"),
+                region=source_region,
+            )
+            _aws_arn_matches_source(
+                state, path, f"{route_pointer}/reference", route["reference"],
+                profile_source, resource="inference-profile",
+            )
+            try:
+                profile_value = resolve_pointer(profile_record["projection"], profile["projection_pointer"])
+                if canonical_json(profile_value) != canonical_json(route["reference"]):
+                    state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, f"{route_pointer}/reference", "AWS profile reference differs from its explicit evidence projection", "Use the exact evidenced system inference-profile id or ARN."))
+            except (KeyError, IndexError, TypeError):
+                state.diagnostics.append(_diag("EVIDENCE_MISSING", path, f"{route_pointer}/model_binding/profile_evidence", "AWS profile projection pointer does not resolve", "Use an explicit profile projection pointer."))
+            for field, expected in (("type_pointer", "SYSTEM_DEFINED"), ("status_pointer", "ACTIVE")):
+                try:
+                    actual = resolve_pointer(profile_record["projection"], profile[field])
+                except (KeyError, IndexError, TypeError):
+                    state.diagnostics.append(_diag(
+                        "EVIDENCE_MISSING", path,
+                        f"{route_pointer}/model_binding/profile_evidence/{field}",
+                        f"AWS profile {field} does not resolve",
+                        "Bind the explicit profile type and status projections.",
+                    ))
+                else:
+                    if actual != expected:
+                        state.diagnostics.append(_diag(
+                            "EVIDENCE_VALUE_MISMATCH", path,
+                            f"{route_pointer}/model_binding/profile_evidence/{field}",
+                            f"AWS callable system profile must report {expected}",
+                            f"Use a profile whose first-party evidence reports {expected}.",
+                        ))
+            try:
+                projected_destinations = resolve_pointer(
+                    profile_record["projection"], profile["destinations_pointer"]
+                )
+                if not isinstance(projected_destinations, list):
+                    raise TypeError("profile destinations are not an array")
+            except (KeyError, IndexError, TypeError):
+                projected_destinations = None
+                state.diagnostics.append(_diag(
+                    "EVIDENCE_MISSING", path,
+                    f"{route_pointer}/model_binding/profile_evidence/destinations_pointer",
+                    "AWS profile destinations pointer does not resolve to an array",
+                    "Bind the complete first-party profile destination array.",
+                ))
+            bound_destination_arns: list[Any] = []
+            for destination_index, destination in enumerate(binding["destinations"]):
+                evidence_binding = destination["model_evidence"]
+                model_record = state.evidence.get(evidence_binding["id"])
+                destination_pointer = (
+                    f"{route_pointer}/model_binding/destinations/{destination_index}"
+                )
+                expected_region = None
+                try:
+                    destination_arn = resolve_pointer(
+                        profile_record["projection"], destination["destination_pointer"]
+                    )
+                    destination_scope = _aws_arn_scope(destination_arn)
+                    if destination_scope is not None:
+                        expected_region = destination_scope[1]
+                except (KeyError, IndexError, TypeError):
+                    destination_arn = None
+                else:
+                    bound_destination_arns.append(destination_arn)
+                _model_evidence(
+                    state, path, destination_pointer, evidence_binding, model,
+                    expected_region=expected_region,
+                )
+                if model_record is None:
+                    continue
+                try:
+                    model_arn = resolve_pointer(model_record["projection"], evidence_binding["arn_pointer"])
+                except (KeyError, IndexError, TypeError):
+                    continue
+                if canonical_json(destination_arn) != canonical_json(model_arn):
+                    state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, destination_pointer, "profile destination ARN differs from explicit model evidence", "Use matching explicit profile and foundation-model evidence."))
+            if projected_destinations is not None:
+                projected_arns = [
+                    item.get("modelArn") if isinstance(item, Mapping) else None
+                    for item in projected_destinations
+                ]
+                if (
+                    any(value is None for value in projected_arns)
+                    or sorted(map(canonical_json, projected_arns))
+                    != sorted(map(canonical_json, bound_destination_arns))
+                ):
+                    state.diagnostics.append(_diag(
+                        "EVIDENCE_VALUE_MISMATCH", path,
+                        f"{route_pointer}/model_binding/destinations",
+                        "AWS profile destination bindings are not a complete one-to-one projection",
+                        "Bind every and only destination model ARN reported by the selected profile evidence.",
+                    ))
 
 
 def _aws_checks(state: State) -> None:
     for identifier, offering in state.offerings.items():
         path = state.offering_paths[identifier]
-        model = state.models.get(offering["model_id"])
-        for index, route in enumerate(offering["routes"]):
-            binding = route["model_binding"]
-            if binding["kind"] == "foundation-model":
-                evidence_binding = binding["model_evidence"]
-                _model_evidence(state, path, evidence_binding, model)
-                record = state.evidence.get(evidence_binding["id"])
-                if record:
-                    values = []
-                    for field in ("id_pointer", "arn_pointer"):
-                        try:
-                            values.append(resolve_pointer(record["projection"], evidence_binding[field]))
-                        except (KeyError, IndexError, TypeError):
-                            pass
-                    if route["reference"] not in values:
-                        state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, f"/routes/{index}/reference", "AWS foundation route reference matches neither evidenced model id nor ARN", "Use the exact evidenced foundation model id or AWS-owned ARN."))
-            else:
-                profile = binding["profile_evidence"]
-                profile_record = state.evidence.get(profile["id"])
-                if profile_record is None:
-                    state.diagnostics.append(_diag("EVIDENCE_MISSING", path, f"/routes/{index}/model_binding/profile_evidence", "AWS profile evidence does not exist", "Reference explicit inference-profile evidence."))
-                    continue
-                try:
-                    profile_value = resolve_pointer(profile_record["projection"], profile["projection_pointer"])
-                    if canonical_json(profile_value) != canonical_json(route["reference"]):
-                        state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, f"/routes/{index}/reference", "AWS profile reference differs from its explicit evidence projection", "Use the exact evidenced system inference-profile id or ARN."))
-                except (KeyError, IndexError, TypeError):
-                    state.diagnostics.append(_diag("EVIDENCE_MISSING", path, f"/routes/{index}/model_binding/profile_evidence", "AWS profile projection pointer does not resolve", "Use an explicit profile projection pointer."))
-                for destination in binding["destinations"]:
-                    evidence_binding = destination["model_evidence"]
-                    _model_evidence(state, path, evidence_binding, model)
-                    model_record = state.evidence.get(evidence_binding["id"])
-                    try:
-                        destination_arn = resolve_pointer(profile_record["projection"], destination["destination_pointer"])
-                        model_arn = resolve_pointer(model_record["projection"], evidence_binding["arn_pointer"])  # type: ignore[index]
-                    except (KeyError, IndexError, TypeError):
-                        continue
-                    if canonical_json(destination_arn) != canonical_json(model_arn):
-                        state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, f"/routes/{index}/model_binding/destinations", "profile destination ARN differs from explicit model evidence", "Use matching explicit profile and foundation-model evidence."))
+        service = state.services.get(offering["inference_service_id"])
+        if service is None:
+            # The unknown-service finding is authoritative. Do not guess a
+            # provider adapter and cascade provider-specific diagnostics.
+            continue
+        adapter = service.get("adapter")
+        if adapter == "aws-bedrock":
+            _aws_offering_checks(state, offering, path)
+        else:
+            state.diagnostics.append(_diag(
+                "UNKNOWN_REFERENCE", path, "/inference_service_id",
+                "inference-service adapter has no implemented validator",
+                "Use a service whose governed adapter is implemented.",
+            ))
 
 
 def _evidence_checks(state: State, as_of: date) -> None:

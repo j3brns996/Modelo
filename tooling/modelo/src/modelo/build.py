@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from enum import Enum
+import ctypes
+import errno
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -141,8 +144,8 @@ def _layout(root: Path) -> BuildLayout:
         issue_route = repository["web_routes"]["issue"]
         if not isinstance(issue_route, str) or issue_route.count("{issue_number}") != 1:
             raise BuildError("configured repository issue route must contain {issue_number} exactly once")
-        schema_names = {
-            key: path(key).name for key in (
+        schema_paths = {
+            key: path(key) for key in (
                 "mac_metadata_schema", "catalogue_output_schema", "build_manifest_schema"
             )
         }
@@ -155,22 +158,27 @@ def _layout(root: Path) -> BuildLayout:
     }
     if set(inventory) != expected_inventory or set(manifest_files) != {catalogue_path, delta_path}:
         raise BuildError("configured candidate inventory differs from the T5 contract")
+    schemas_root = path("schemas")
+    if any(value.parent != schemas_root for value in schema_paths.values()):
+        raise BuildError("configured build schemas must be direct children of paths.schemas")
     if candidate_root.parent != target_parent or writer_lock.parent != target_parent:
         raise BuildError("configured candidate root and writer lock must share target_parent")
     input_keys = (
         "catalogue", "schemas", "fixtures", "site_source", "site_templates", "site_assets",
         "site_content", "implementation", "tests", "machine_contract", "human_specification",
     )
-    inputs = tuple(dict.fromkeys([*(path(key) for key in input_keys), *profiles.values()]))
+    inputs = tuple(dict.fromkeys([
+        PurePosixPath("modelo.yaml"), *(path(key) for key in input_keys), *profiles.values()
+    ]))
     for source in inputs:
         if candidate_root == source or candidate_root in source.parents or source in candidate_root.parents:
             raise BuildError("configured candidate output overlaps a configured input")
     return BuildLayout(
         catalogue=path("catalogue"), models=path("models"), offerings=path("offerings"),
         evidence=path("evidence"), governance=path("governance"), conditions=path("conditions"),
-        schemas=path("schemas"), mac_metadata_schema=schema_names["mac_metadata_schema"],
-        catalogue_output_schema=schema_names["catalogue_output_schema"],
-        build_manifest_schema=schema_names["build_manifest_schema"], candidate_root=candidate_root,
+        schemas=schemas_root, mac_metadata_schema=schema_paths["mac_metadata_schema"].name,
+        catalogue_output_schema=schema_paths["catalogue_output_schema"].name,
+        build_manifest_schema=schema_paths["build_manifest_schema"].name, candidate_root=candidate_root,
         target_parent=target_parent, publication_subdir=publication_subdir,
         catalogue_path=catalogue_path, change_delta_path=delta_path, manifest_path=manifest_path,
         candidate_inventory=inventory, candidate_manifest_files=manifest_files,
@@ -422,14 +430,48 @@ def _metadata_semantics(
             if bool(transitions) != (len(matches) == 1):
                 raise BuildError("MAC registry file delta is unclaimed or duplicated")
 
-    def matches(subject: Mapping[str, Any], path: str) -> bool:
+    def loaded_record(path: str, record_operation: str) -> Mapping[str, Any]:
+        commit = request.base_commit if record_operation == "revoke" else request.source_commit
+        raw = _blob(request.root, commit, path)
+        with TemporaryDirectory(prefix="modelo-subject-") as raw_temporary:
+            temporary = Path(raw_temporary)
+            (temporary / "record.yaml").write_bytes(raw)
+            return dict(load_yaml_mapping(temporary, PurePosixPath("record.yaml")))
+
+    def relative_parts(path: str, root: PurePosixPath) -> tuple[str, ...] | None:
+        value = PurePosixPath(path)
+        try:
+            return value.relative_to(root).parts
+        except ValueError:
+            return None
+
+    def matches(subject: Mapping[str, Any], path: str, record_operation: str) -> bool:
         kind, identity = subject["kind"], subject["identity"]
-        if kind == "model": expected_path = (layout.models / f"{identity}.yaml").as_posix()
-        elif kind == "offering": return path.startswith(layout.offerings.as_posix() + "/") and path.endswith(f"/{identity}.yaml")
-        elif kind == "evidence": expected_path = (layout.evidence / f"{identity}.yaml").as_posix()
-        elif kind == "condition": return path.startswith(layout.conditions.as_posix() + "/") and f"/{identity}/" in path
-        else: return False
-        return path == expected_path
+        if any(character in identity for character in "/\\"):
+            return False
+        try:
+            record = loaded_record(path, record_operation)
+        except (BuildError, OSError, KeyError, TypeError):
+            return False
+        if kind == "model":
+            parts = relative_parts(path, layout.models)
+            return parts == (f"{identity}.yaml",) and record.get("id") == identity
+        if kind == "evidence":
+            parts = relative_parts(path, layout.evidence)
+            return parts == (f"{identity}.yaml",) and record.get("id") == identity
+        if kind == "offering":
+            parts = relative_parts(path, layout.offerings)
+            return (
+                parts is not None and len(parts) == 2 and parts[1] == f"{identity}.yaml"
+                and record.get("id") == identity and record.get("inference_service_id") == parts[0]
+            )
+        if kind == "condition":
+            parts = relative_parts(path, layout.conditions)
+            if parts is None or len(parts) != 2 or parts[0] != identity or not parts[1].endswith(".yaml"):
+                return False
+            version = parts[1][:-5]
+            return version.isdigit() and record.get("id") == identity and str(record.get("version")) == version
+        return False
 
     ordinary_subjects = [item for item in subjects if item["kind"] not in registry_paths]
     if normal_payload["operation"] == "move":
@@ -438,7 +480,7 @@ def _metadata_semantics(
         source = next(item for item in ordinary_subjects if item.get("role") == "source")
         destination = next(item for item in ordinary_subjects if item.get("role") == "destination")
         delta = expected_delta[0]
-        if not matches(source, delta["source"]["path"]) or not matches(destination, delta["destination"]["path"]):
+        if not matches(source, delta["source"]["path"], "revoke") or not matches(destination, delta["destination"]["path"], "add"):
             raise BuildError("move subjects differ from delta paths")
         if delta["source"].get("replacement") != delta["destination"]["path"]:
             raise BuildError("move replacement must equal its destination")
@@ -446,7 +488,10 @@ def _metadata_semantics(
         ordinary_delta = [item for item in expected_delta if item not in registry_delta]
         unmatched = list(ordinary_delta)
         for subject in ordinary_subjects:
-            match = next((item for item in unmatched if item["operation"] == operation and matches(subject, item["path"])), None)
+            match = next((
+                item for item in unmatched
+                if item["operation"] == operation and matches(subject, item["path"], operation)
+            ), None)
             if match is None:
                 raise BuildError("MAC subjects/operation differ from delta")
             unmatched.remove(match)
@@ -515,22 +560,39 @@ def _projection_from_snapshot(snapshot: Path, profile: str, source_commit: str, 
     return projection
 
 
-def _fsync_file(path: Path) -> None:
-    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_CLOEXEC", 0))
-    try: os.fsync(descriptor)
-    finally: os.close(descriptor)
-
-
 def _fsync_dir(path: Path) -> None:
     descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
     try: os.fsync(descriptor)
     finally: os.close(descriptor)
 
 
+def _rename_noreplace(source: Path, destination: Path) -> None:
+    """Atomically rename only when destination is absent; never clobber a race."""
+    if os.name == "nt":
+        os.rename(source, destination)
+        return
+    libc = ctypes.CDLL(None, use_errno=True)
+    renameat2 = getattr(libc, "renameat2", None)
+    if renameat2 is None:
+        raise BuildError("platform cannot enforce collision-free atomic rename")
+    result = renameat2(
+        ctypes.c_int(-100), ctypes.c_char_p(os.fsencode(source)),
+        ctypes.c_int(-100), ctypes.c_char_p(os.fsencode(destination)), ctypes.c_uint(1),
+    )
+    if result != 0:
+        code = ctypes.get_errno()
+        if code in {errno.EEXIST, errno.ENOTEMPTY}:
+            raise BuildError("atomic publication rename destination already exists")
+        raise OSError(code, "collision-free atomic rename failed")
+
+
 PHASES = (
     "lock", "stage", "fsync_stage", "validate_stage", "backup_old",
     "promote_new", "fsync_parent", "verify_target", "remove_backup", "unlock",
 )
+class RecoveryOutcome(Enum):
+    ROLLED_BACK = "rolled-back"
+    COMMITTED = "committed"
 
 
 def _inventory(files: Mapping[str, bytes]) -> dict[str, Any]:
@@ -552,7 +614,10 @@ def _inventory_digest(files: Mapping[str, Mapping[str, Any]]) -> str:
     return sha256_bytes(bytes(records))
 
 
-def _record(phase: str, target: str, token: str, old: Mapping[str, Any] | None, new: Mapping[str, Any]) -> dict[str, Any]:
+def _record(
+    phase: str, target: str, token: str,
+    old: Mapping[str, Any] | None, new: Mapping[str, Any],
+) -> dict[str, Any]:
     body = {
         "version": 2, "sequence": PHASES.index(phase), "phase": phase,
         "target": target, "token": token, "old": old, "new": new,
@@ -629,7 +694,26 @@ def _persist_journal(parent: Path, lock: Path, value: Mapping[str, Any], *, init
             os.replace(temporary, lock)
         _fsync_dir(parent)
     finally:
-        temporary.unlink(missing_ok=True)
+        if temporary.exists() or temporary.is_symlink():
+            if temporary.is_symlink() or not temporary.is_file():
+                raise BuildError("journal temporary path is unsafe")
+            temporary.unlink()
+            _fsync_dir(parent)
+
+
+def _cleanup_journal_temporaries(parent: Path, lock: Path, token: str) -> None:
+    prefix = f".{lock.name}.{token}."
+    changed = False
+    for path in parent.iterdir():
+        if not path.name.startswith(prefix) or not path.name.endswith(".tmp"):
+            continue
+        sequence = path.name[len(prefix):-4]
+        if not sequence.isdigit() or path.is_symlink() or not path.is_file():
+            raise BuildError("stale journal temporary path is unsafe")
+        path.unlink()
+        changed = True
+    if changed:
+        _fsync_dir(parent)
 
 
 def _walk_regular_tree(target: Path) -> dict[str, bytes]:
@@ -720,11 +804,10 @@ def _verified_subset(target: Path, expected: Mapping[str, Any]) -> bool:
         return False
 
 
-def _remove_verified_tree(target: Path, expected: Mapping[str, Any], *, subset: bool = False) -> None:
+def _remove_verified_tree(target: Path, expected: Mapping[str, Any]) -> None:
     if not target.exists():
         return
-    valid = _verified_subset(target, expected) if subset else False
-    if not valid:
+    if not _verified_subset(target, expected):
         raise BuildError("refusing to remove an unrecorded or unsafe candidate tree")
     raw_paths = sorted(_walk_regular_tree(target), key=lambda item: (item.count("/"), item), reverse=True)
     for relative in raw_paths:
@@ -759,16 +842,16 @@ def _remove_owned_partial_staging(target: Path, expected: Mapping[str, Any]) -> 
     target.rmdir()
 
 
-def recover_candidate(root: Path) -> None:
+def recover_candidate(root: Path) -> RecoveryOutcome | None:
     try:
-        _recover_candidate(root)
+        return _recover_candidate(root)
     except BuildError:
         raise
     except (ConfigError, OSError, UnicodeError, RecursionError, subprocess.SubprocessError) as exc:
         raise BuildError(f"build recovery system error ({type(exc).__name__})") from exc
 
 
-def _recover_candidate(root: Path) -> None:
+def _recover_candidate(root: Path) -> RecoveryOutcome | None:
     """Complete the single digest-bound action authorised by a durable journal."""
 
     repository = root.resolve()
@@ -782,68 +865,98 @@ def _recover_candidate(root: Path) -> None:
         if current.is_symlink():
             raise BuildError("build recovery target parent traverses a symlink")
     if not lock.exists() and not lock.is_symlink():
-        return
+        return None
     journal = _validate_record(_strict_json_file(lock), layout)
     token = journal["token"]
+    _cleanup_journal_temporaries(parent, lock, token)
     target = repository.joinpath(*layout.candidate_root.parts)
     staging = parent / f"{target.name}.{token}.staging"
     backup = parent / f"{target.name}.{token}.backup"
     old, new, phase = journal["old"], journal["new"], journal["phase"]
     present = lambda path: path.exists() or path.is_symlink()
-    target_old = old is not None and present(target) and _matches_inventory(repository, target, layout, old)
-    target_new = present(target) and _matches_inventory(repository, target, layout, new)
-    backup_old = old is not None and present(backup) and _matches_inventory(repository, backup, layout, old)
-    staging_new = present(staging) and _matches_inventory(repository, staging, layout, new)
-    staging_partial = present(staging) and _owned_partial_staging(staging, new)
-    # Validate the complete state before the first mutation.  Digest identity,
-    # not generic self-validity, selects the old and new candidates.
-    precommit = phase not in {"remove_backup", "unlock"}
-    if precommit:
-        p_target, p_stage, p_backup = present(target), present(staging), present(backup)
-        old_at_target = target_old if old is not None else not p_target
-        if phase == "lock":
-            valid = old_at_target and not p_stage and not p_backup
-        elif phase == "stage":
-            valid = old_at_target and not p_backup and (not p_stage or staging_partial)
-        elif phase in {"fsync_stage", "validate_stage"}:
-            valid = old_at_target and staging_new and not p_backup
-        elif phase == "backup_old":
-            if old is None:
-                valid = not p_target and staging_new and not p_backup
-            else:
-                valid = staging_new and ((target_old and not p_backup) or (not p_target and backup_old))
-        elif phase == "promote_new":
-            valid = (backup_old if old is not None else not p_backup) and (
-                (not p_target and staging_new) or (target_new and not p_stage)
-            )
-        elif phase in {"fsync_parent", "verify_target"}:
-            valid = target_new and not p_stage and (backup_old if old is not None else not p_backup)
-        else:
-            valid = False
-        if not valid:
-            raise BuildError("build recovery state is ambiguous or differs from its journal")
-        if target_new:
-            _remove_verified_tree(target, new, subset=True)
-        if present(staging):
-            if phase == "stage" and not staging_new:
-                _remove_owned_partial_staging(staging, new)
-            else:
-                _remove_verified_tree(staging, new, subset=True)
-        if backup_old:
-            os.replace(backup, target)
+    p_target, p_stage, p_backup = present(target), present(staging), present(backup)
+    target_old = old is not None and p_target and _matches_inventory(repository, target, layout, old)
+    target_new = p_target and _matches_inventory(repository, target, layout, new)
+    backup_old = old is not None and p_backup and _matches_inventory(repository, backup, layout, old)
+    backup_subset = old is not None and p_backup and _verified_subset(backup, old)
+    staging_new = p_stage and _matches_inventory(repository, staging, layout, new)
+    staging_subset = p_stage and _verified_subset(staging, new)
+    staging_partial = p_stage and _owned_partial_staging(staging, new)
+
+    def finish(outcome: RecoveryOutcome) -> RecoveryOutcome:
+        lock.unlink()
         _fsync_dir(parent)
-    else:
-        if not target_new or present(staging):
-            raise BuildError("committed build recovery lacks the recorded new target")
-        if phase == "unlock" and present(backup):
+        return outcome
+
+    # The initial lock is durable before old-state capture.  No publication
+    # path has been touched, so recovery merely releases it if its namespace is
+    # still empty; the visible target is deliberately not interpreted.
+    if phase == "lock":
+        if p_stage or p_backup:
+            raise BuildError("initial-lock recovery found a mutated publication namespace")
+        return finish(RecoveryOutcome.ROLLED_BACK)
+
+    if phase in {"remove_backup", "unlock"}:
+        if not target_new or p_stage:
+            raise BuildError("committed build recovery lacks the recorded complete new target")
+        if phase == "unlock" and p_backup:
             raise BuildError("unlock recovery state still contains a backup")
-        if present(backup):
-            if old is None or not _verified_subset(backup, old):
-                raise BuildError("committed build recovery backup is unrecorded or unsafe")
-            _remove_verified_tree(backup, old, subset=True)
+        if p_backup:
+            if old is None or not backup_subset:
+                raise BuildError("committed backup is unrecorded or unsafe")
+            _remove_verified_tree(backup, old)
+            _fsync_dir(parent)
+        return finish(RecoveryOutcome.COMMITTED)
+
+    base_target = target_old if old is not None else not p_target
+    if phase == "stage":
+        valid = base_target and not p_backup and (not p_stage or staging_partial)
+    elif phase in {"fsync_stage", "validate_stage"}:
+        valid = base_target and not p_backup and (not p_stage or staging_subset)
+    elif phase == "backup_old":
+        valid = (
+            (base_target and not p_backup and (not p_stage or staging_subset))
+            or (old is not None and not p_target and backup_old and staging_subset)
+        )
+    elif phase in {"promote_new", "fsync_parent", "verify_target"}:
+        if old is None:
+            valid = (
+                (not p_target and not p_backup and (not p_stage or staging_subset))
+                or (target_new and not p_stage and not p_backup)
+            )
+        else:
+            valid = (
+                (not p_target and backup_old and staging_subset)
+                or (target_new and not p_stage and backup_old)
+                or (target_old and not p_backup and (not p_stage or staging_subset))
+            )
+    else:
+        valid = False
+    if not valid:
+        raise BuildError("build recovery state is ambiguous or differs from its journal")
+
+    # A visible promoted target is moved atomically off-path before rollback;
+    # readers therefore observe complete-new, absence, then complete-old.
+    promoted_target = target_new and (old is None or backup_old)
+    if promoted_target:
+        if p_stage:
+            raise BuildError("rollback staging path is already occupied")
+        _rename_noreplace(target, staging)
         _fsync_dir(parent)
-    lock.unlink()
-    _fsync_dir(parent)
+        p_target, p_stage, staging_subset = False, True, True
+    if old is not None and not target_old:
+        if not backup_old or p_target:
+            raise BuildError("rollback cannot prove the recorded old backup")
+        _rename_noreplace(backup, target)
+        _fsync_dir(parent)
+        target_old, p_target, p_backup = True, True, False
+    if p_stage:
+        if phase == "stage" and not staging_subset:
+            _remove_owned_partial_staging(staging, new)
+        else:
+            _remove_verified_tree(staging, new)
+        _fsync_dir(parent)
+    return finish(RecoveryOutcome.ROLLED_BACK)
 
 
 def _publish(root: Path, output: Path, files: Mapping[str, bytes], manifest: Mapping[str, Any], layout: BuildLayout) -> None:
@@ -856,26 +969,37 @@ def _publish(root: Path, output: Path, files: Mapping[str, bytes], manifest: Map
     }
     publication_files[(layout.publication_subdir / layout.manifest_path).as_posix()] = manifest_bytes
     new_inventory = _inventory(publication_files)
-    old_inventory = None
-    if output.exists():
-        old_inventory = _candidate_inventory(root, output, layout)
     for _ in range(16):
         token = secrets.token_hex(16)
         staging = parent / f"{output.name}.{token}.staging"
         backup = parent / f"{output.name}.{token}.backup"
-        if not staging.exists() and not staging.is_symlink() and not backup.exists() and not backup.is_symlink():
+        journal = _record("lock", output.name, token, None, new_inventory)
+        try:
+            _persist_journal(parent, lock, journal, initial=True)
+        except FileExistsError as exc:
+            raise BuildError("another build is active or explicit recovery is required") from exc
+        except Exception as original:
+            if lock.exists() or lock.is_symlink():
+                try:
+                    recover_candidate(root)
+                except Exception:
+                    raise BuildError(
+                        "initial lock persistence failed and explicit recovery is required"
+                    ) from original
+            raise
+        if not (staging.exists() or staging.is_symlink() or backup.exists() or backup.is_symlink()):
             break
+        lock.unlink()
+        _fsync_dir(parent)
     else:
         raise BuildError("cannot allocate collision-free staging and backup paths")
-    journal = _record("lock", output.name, token, old_inventory, new_inventory)
     try:
-        _persist_journal(parent, lock, journal, initial=True)
-    except FileExistsError as exc:
-        raise BuildError("another build is active or explicit recovery is required") from exc
-    committed = False
-    try:
-        if staging.exists() or staging.is_symlink() or backup.exists() or backup.is_symlink():
-            raise BuildError("publication sibling collision occurred after lock acquisition")
+        # Capture the visible target only after exclusive durable lock
+        # acquisition.  A stale invocation can therefore never overwrite a
+        # newer writer using an inventory sampled before its turn.
+        old_inventory = None
+        if output.exists() or output.is_symlink():
+            old_inventory = _candidate_inventory(root, output, layout)
         journal = _record("stage", output.name, token, old_inventory, new_inventory)
         _persist_journal(parent, lock, journal)
         staging.mkdir(mode=0o755)
@@ -898,14 +1022,15 @@ def _publish(root: Path, output: Path, files: Mapping[str, bytes], manifest: Map
             raise BuildError("staged candidate differs from its journal")
         journal = _record("backup_old", output.name, token, old_inventory, new_inventory)
         _persist_journal(parent, lock, journal)
-        if output.exists():
+        if output.exists() or output.is_symlink():
             if output.is_symlink() or not output.is_dir():
                 raise BuildError("candidate target is not a regular directory")
-            backup.mkdir(mode=0o755)
-            os.replace(output, backup)
+            if backup.exists() or backup.is_symlink():
+                raise BuildError("backup path collision occurred before target rename")
+            _rename_noreplace(output, backup)
         journal = _record("promote_new", output.name, token, old_inventory, new_inventory)
         _persist_journal(parent, lock, journal)
-        os.replace(staging, output)
+        _rename_noreplace(staging, output)
         journal = _record("fsync_parent", output.name, token, old_inventory, new_inventory)
         _persist_journal(parent, lock, journal)
         _fsync_dir(parent)
@@ -915,9 +1040,8 @@ def _publish(root: Path, output: Path, files: Mapping[str, bytes], manifest: Map
             raise BuildError("promoted candidate differs from its journal")
         journal = _record("remove_backup", output.name, token, old_inventory, new_inventory)
         _persist_journal(parent, lock, journal)
-        committed = True
         if backup.exists():
-            _remove_verified_tree(backup, old_inventory, subset=True)  # type: ignore[arg-type]
+            _remove_verified_tree(backup, old_inventory)  # type: ignore[arg-type]
         _fsync_dir(parent)
         journal = _record("unlock", output.name, token, old_inventory, new_inventory)
         _persist_journal(parent, lock, journal)
@@ -925,12 +1049,12 @@ def _publish(root: Path, output: Path, files: Mapping[str, bytes], manifest: Map
         _fsync_dir(parent)
     except Exception as original:
         try:
-            recover_candidate(root)
-        except Exception as recovery_error:
+            outcome = recover_candidate(root)
+        except Exception:
             raise BuildError(
                 "publication failed and automatic recovery could not prove a safe state; explicit recovery required"
             ) from original
-        if committed:
+        if outcome is RecoveryOutcome.COMMITTED:
             return
         raise
 

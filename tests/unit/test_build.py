@@ -227,6 +227,23 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(result.output.joinpath("site/data/catalogue.json").read_bytes(), files["data/catalogue.json"])
         self.assertFalse((result.output.parent / ".modelo-build.lock").exists())
 
+    def test_failed_final_lock_deletion_fsync_never_reports_success(self) -> None:
+        result = build_candidate(self.request())
+        files, manifest = self.changed_publication(result)
+        layout = build_module._layout(self.repository.root)
+        lock = result.output.parent / ".modelo-build.lock"
+        real_fsync = build_module._fsync_dir
+
+        def injected(path):
+            if path == result.output.parent and not lock.exists():
+                raise OSError("injected final parent fsync")
+            return real_fsync(path)
+
+        with patch.object(build_module, "_fsync_dir", side_effect=injected), self.assertRaises(OSError):
+            build_module._publish(self.repository.root, result.output, files, manifest, layout)
+        self.assertEqual(result.output.joinpath("site/data/catalogue.json").read_bytes(), files["data/catalogue.json"])
+        self.assertFalse(lock.exists())
+
     def test_recovery_rejects_symlink_and_impossible_lock_state_without_mutation(self) -> None:
         result = build_candidate(self.request())
         layout = build_module._layout(self.repository.root)
@@ -274,6 +291,62 @@ class BuildTests(unittest.TestCase):
             )
         self.assertEqual(collision.read_text(encoding="utf-8"), "owned by another process")
 
+    def test_old_inventory_is_read_only_after_durable_exclusive_lock(self) -> None:
+        result = build_candidate(self.request())
+        real_inventory = build_module._candidate_inventory
+        observed = []
+
+        def inspected(root, target, layout):
+            if target == result.output:
+                observed.append((result.output.parent / ".modelo-build.lock").is_file())
+            return real_inventory(root, target, layout)
+
+        with patch.object(build_module, "_candidate_inventory", side_effect=inspected):
+            build_candidate(self.request())
+        self.assertTrue(observed)
+        self.assertTrue(all(observed))
+
+    def test_backup_rename_has_no_placeholder_window(self) -> None:
+        result = build_candidate(self.request())
+        files, manifest = self.changed_publication(result)
+        real_replace = build_module._rename_noreplace
+        observed = []
+
+        def inspected(source, destination):
+            source_path, destination_path = Path(source), Path(destination)
+            if source_path == result.output and destination_path.name.endswith(".backup"):
+                observed.append(not destination_path.exists() and not destination_path.is_symlink())
+            return real_replace(source, destination)
+
+        with patch.object(build_module, "_rename_noreplace", side_effect=inspected):
+            build_module._publish(
+                self.repository.root, result.output, files, manifest,
+                build_module._layout(self.repository.root),
+            )
+        self.assertEqual(observed, [True])
+
+    def test_durable_commit_journal_fault_rolls_forward_as_success(self) -> None:
+        result = build_candidate(self.request())
+        files, manifest = self.changed_publication(result)
+        real_persist = build_module._persist_journal
+        raised = False
+
+        def persisted_then_failed(parent, lock, journal, *, initial=False):
+            nonlocal raised
+            real_persist(parent, lock, journal, initial=initial)
+            if journal["phase"] == "remove_backup" and not raised:
+                raised = True
+                raise OSError("injected after durable commit journal")
+
+        with patch.object(build_module, "_persist_journal", side_effect=persisted_then_failed):
+            build_module._publish(
+                self.repository.root, result.output, files, manifest,
+                build_module._layout(self.repository.root),
+            )
+        self.assertTrue(raised)
+        self.assertEqual(result.output.joinpath("site/data/catalogue.json").read_bytes(), files["data/catalogue.json"])
+        self.assertFalse((result.output.parent / ".modelo-build.lock").exists())
+
     def test_corrupt_journal_digest_fails_without_mutation(self) -> None:
         result = build_candidate(self.request())
         layout = build_module._layout(self.repository.root)
@@ -313,6 +386,53 @@ class BuildTests(unittest.TestCase):
             build_module._metadata_semantics(
                 envelope, self.request(), list(envelope["expected_change_delta"]), layout
             )
+
+    def test_condition_and_offering_composite_subject_aliases_are_rejected(self) -> None:
+        layout = build_module._layout(self.repository.root)
+        condition_envelope = json.loads(self.metadata_path.read_bytes())
+        condition_envelope["payload"]["subjects"][0]["identity"] = "policies/conditions/test-condition"
+        condition_envelope["payload"]["dedupe_key"] = condition_envelope["payload"]["idempotency_key"] = "sha256-" + "0" * 64
+        condition_envelope["payload"]["dedupe_key"], condition_envelope["payload"]["idempotency_key"] = compute_keys(condition_envelope["payload"])
+        condition_envelope["payload_digest"] = sha256_bytes(canonical_bytes(condition_envelope["payload"]))
+        with self.assertRaises(BuildError):
+            build_module._metadata_semantics(
+                condition_envelope, self.request(), list(condition_envelope["expected_change_delta"]), layout
+            )
+
+        base = self.head
+        offering_path = "catalogue/offerings/aws-bedrock/test-offering.yaml"
+        offering = self.repository.root / offering_path
+        before = offering.read_bytes()
+        offering.write_bytes(before + b"# representation-only change\n")
+        head = self.repository.commit("change offering representation")
+        tree = self.repository.git("rev-parse", f"{head}^{{tree}}").strip()
+        payload = json.loads((ROOT / "tests/fixtures/mac/change.json").read_text(encoding="utf-8"))
+        payload["subjects"] = [{"kind": "offering", "identity": "aws-bedrock/test-offering"}]
+        payload["dedupe_key"] = payload["idempotency_key"] = "sha256-" + "0" * 64
+        payload["dedupe_key"], payload["idempotency_key"] = compute_keys(payload)
+        delta = [{
+            "operation": "change", "path": offering_path,
+            "before": sha256_bytes(before), "after": sha256_bytes(offering.read_bytes()),
+        }]
+        envelope = {
+            "contract_version": "0.1.0",
+            "repository": {"provider": "github", "host": "github.com", "namespace": "j3brns", "name": "Modelo"},
+            "issue": {"reference": "21", "url": "https://github.com/j3brns/Modelo/issues/21", "state": "open"},
+            "base_sha": base, "head_sha": head, "head_tree_sha": tree,
+            "payload": payload, "payload_digest": sha256_bytes(canonical_bytes(payload)),
+            "expected_change_delta": delta,
+        }
+        request = self.request(
+            base_commit=base, source_commit=head, source_tree=tree,
+            source_date_epoch=int(self.repository.git("show", "-s", "--format=%at", head).strip()),
+        )
+        with self.assertRaises(BuildError):
+            build_module._metadata_semantics(envelope, request, delta, layout)
+        payload["subjects"][0]["identity"] = "test-offering"
+        payload["dedupe_key"] = payload["idempotency_key"] = "sha256-" + "0" * 64
+        payload["dedupe_key"], payload["idempotency_key"] = compute_keys(payload)
+        envelope["payload_digest"] = sha256_bytes(canonical_bytes(payload))
+        build_module._metadata_semantics(envelope, request, delta, layout)
 
     def test_git_archive_and_filesystem_faults_are_stable_build_errors(self) -> None:
         messages = []
@@ -404,8 +524,13 @@ class BuildTests(unittest.TestCase):
         lock = parent / ".modelo-build.lock"
         cases = (
             ("lock", "7" * 32, "none", False),
+            ("stage", "7" * 31 + "0", "staging", False),
+            ("fsync_stage", "7" * 31 + "1", "staging", False),
+            ("validate_stage", "7" * 31 + "2", "staging", False),
             ("backup_old", "8" * 32, "staging", False),
             ("promote_new", "9" * 32, "target", False),
+            ("fsync_parent", "9" * 31 + "0", "target", False),
+            ("verify_target", "9" * 31 + "1", "target", False),
             ("remove_backup", "a" * 32, "target", True),
             ("unlock", "b" * 32, "target", True),
         )
@@ -492,6 +617,67 @@ class BuildTests(unittest.TestCase):
             build_module._candidate_inventory(self.repository.root, result.output, layout), new_inventory
         )
         self.assertFalse(backup.exists()); self.assertFalse(lock.exists())
+
+    def test_old_absent_caught_failure_matrix_is_restart_safe(self) -> None:
+        result = build_candidate(self.request())
+        files, manifest = self.changed_publication(result)
+        layout = build_module._layout(self.repository.root)
+        __import__("shutil").rmtree(result.output)
+        real_persist = build_module._persist_journal
+        phases = (
+            "lock", "stage", "fsync_stage", "validate_stage", "backup_old",
+            "promote_new", "fsync_parent", "verify_target", "remove_backup",
+        )
+        for phase in phases:
+            with self.subTest(phase=phase):
+                def injected(parent, lock, journal, *, initial=False, selected=phase):
+                    if journal["phase"] == selected:
+                        raise OSError(f"injected {selected}")
+                    return real_persist(parent, lock, journal, initial=initial)
+                with patch.object(build_module, "_persist_journal", side_effect=injected), self.assertRaises(OSError):
+                    build_module._publish(self.repository.root, result.output, files, manifest, layout)
+                self.assertFalse(result.output.exists())
+                self.assertFalse((result.output.parent / ".modelo-build.lock").exists())
+
+    def test_partial_off_path_staging_and_backup_cleanup_resume(self) -> None:
+        result = build_candidate(self.request())
+        layout = build_module._layout(self.repository.root)
+        parent = result.output.parent
+        old = build_module._candidate_inventory(self.repository.root, result.output, layout)
+        files, manifest = self.changed_publication(result)
+        build_module._publish(self.repository.root, result.output, files, manifest, layout)
+        new = build_module._candidate_inventory(self.repository.root, result.output, layout)
+        new_source = Path(tempfile.mkdtemp(prefix="modelo-partial-new-")) / "candidate"
+        __import__("shutil").copytree(result.output, new_source)
+        self.addCleanup(__import__("shutil").rmtree, new_source.parent, ignore_errors=True)
+        # Resume a precommit rollback after old was restored and deletion of
+        # the off-path new staging tree had already begun.
+        old_source = Path(tempfile.mkdtemp(prefix="modelo-partial-old-")) / "candidate"
+        build_candidate(self.request())
+        __import__("shutil").copytree(result.output, old_source)
+        self.addCleanup(__import__("shutil").rmtree, old_source.parent, ignore_errors=True)
+        token = "6" * 31 + "0"
+        staging = parent / f"candidate.{token}.staging"
+        __import__("shutil").copytree(new_source, staging)
+        (staging / "site/data/catalogue.json").unlink()
+        (parent / ".modelo-build.lock").write_bytes(canonical_bytes(
+            build_module._record("verify_target", "candidate", token, old, new)
+        ))
+        recover_candidate(self.repository.root)
+        self.assertFalse(staging.exists())
+        self.assertEqual(build_module._candidate_inventory(self.repository.root, result.output, layout), old)
+        # Resume committed cleanup after backup deletion had partially run.
+        token = "6" * 31 + "1"
+        build_module._publish(self.repository.root, result.output, files, manifest, layout)
+        backup = parent / f"candidate.{token}.backup"
+        __import__("shutil").copytree(old_source, backup)
+        (backup / "site/data/change-delta.json").unlink()
+        (parent / ".modelo-build.lock").write_bytes(canonical_bytes(
+            build_module._record("remove_backup", "candidate", token, old, new)
+        ))
+        self.assertIs(recover_candidate(self.repository.root), build_module.RecoveryOutcome.COMMITTED)
+        self.assertFalse(backup.exists())
+        self.assertEqual(build_module._candidate_inventory(self.repository.root, result.output, layout), new)
 
 
 if __name__ == "__main__":

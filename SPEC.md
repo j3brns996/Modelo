@@ -184,7 +184,8 @@ evidence about themselves.
 
 Each evidence record contains:
 
-- an official source URL or first-party API operation;
+- an official source URI;
+- for first-party API evidence, the exact operation as an additional required field;
 - source type;
 - observation date and time;
 - retrieval method and scope;
@@ -339,7 +340,7 @@ id: sha256-<digest-of-canonical-envelope-without-id>
 source:
   type: first-party-read-api | official-provider-documentation | official-vendor-documentation
   uri: <official-source-uri>
-  operation: <optional-first-party-operation>
+  operation: <required-for-first-party-read-api>
 retrieved_by: cli | mcp | manual
 observed_at: <RFC-3339-timestamp>
 scope: {}
@@ -353,6 +354,12 @@ support several facts. CI expands ancestor pointers, checks that every externall
 sourced leaf is covered, verifies that pointers resolve, checks the projection
 digest, and verifies that the filename and `id` equal the SHA-256 of the
 canonical evidence envelope with `id` omitted.
+
+Canonical means: parse the restricted YAML into the JSON data model, omit the
+root `id`, serialise with the
+[JSON Canonicalization Scheme (RFC 8785)](https://www.rfc-editor.org/rfc/rfc8785),
+hash the UTF-8 bytes with SHA-256, and prefix the lowercase digest with
+`sha256-`. `content_sha256` applies the same process to `projection` alone.
 
 A referenced evidence record is immutable once it has ever been merged to the
 protected default branch. A correction or refreshed observation creates a new

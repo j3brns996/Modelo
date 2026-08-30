@@ -35,11 +35,11 @@ The build is split logically, not into services:
 | T1 | Root metadata, exact Python/uv pins and CLI/config skeleton: root files plus `tooling/modelo/src/modelo/{cli,config}.py` | T0 | Clean clone runs locked commands; CLI/config smoke tests |
 | T2 | `tooling/modelo/src/modelo/{loader,discovery,diagnostics}.py` and `tests/unit/{test_loader,test_discovery,test_diagnostics}.py` | T1 | Malicious YAML/path corpus and diagnostic snapshot tests pass |
 | T3 | Core/AWS/entity/receipt schemas and schema-only fixtures under `schemas/` and `tests/fixtures/schema/` | T1 | Every structural invariant has passing and failing fixtures |
-| T4 | `tooling/modelo/src/modelo/{schemas,evidence,freshness,change,validators}.py`, semantic fixtures and focused unit tests | T2, T3 | Base/head, model binding, equality, immutability, move and revoke tests pass |
+| T4 | `tooling/modelo/src/modelo/{schemas,evidence,freshness,change,validators}.py`, `tests/fixtures/semantic/` and matching `tests/unit/test_{schemas,evidence,freshness,change,validators}.py` | T2, T3, T7 | Base/head, model binding, equality, immutability, move and revoke tests pass |
 | T5 | `tooling/modelo/src/modelo/{build,receipt}.py` and build/receipt tests | T4 | Candidate and final builds are deterministic; detached receipt and deltas verify |
 | T6 | `tooling/modelo/src/modelo/site.py`, `site/`, `publication/` and `tests/site/` | T5 | Route, base-path, XSS, leakage, accessibility, history and reproducibility gates pass |
 | T7 | `tooling/modelo/src/modelo/mac.py`, MAC schema/examples, GitHub/GitLab issue and change-request template directories, MAC tests | T1, T0 | Adapter fixtures round-trip to identical canonical MAC objects |
-| T8 | `tooling/modelo/src/modelo/platform.py`, `.github/workflows/`, root `.gitlab-ci.yml`, and `tests/contract/platform/` | T4, T6, T7 | Exact-head trusted final check; skipped/failed/stale checks fail closed |
+| T8 | `tooling/modelo/src/modelo/platform.py`, `.github/workflows/`, `paths.gitlab_ci`, and `tests/contract/platform/` | T4, T6, T7 | Exact-head trusted final check; skipped/failed/stale checks fail closed |
 | T9 | `.agents/skills/{modelo-change,modelo-review,modelo-discover}/` and static skill lint | T7, T8 | Skill commands and paths resolve; no skill is a build/runtime input |
 | T10 | Remote platform check, synthetic Pages deployment, release and mirror-restore rehearsal | T1–T9 | Protection/capability report, exact artefact deployment, verified receipt and restore log |
 

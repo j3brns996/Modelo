@@ -28,13 +28,13 @@ enhancement. Node, npm and `npx` are not required.
 | `offering` | `/offerings/{inference_service_id}/{offering_id}/` | Routes, price, conditions, evidence and approval receipt |
 | `changes` | `/changes/` | Add/change/revoke history from local Git first-parent deltas |
 | `process` | `/process/` | MAC, CI, approval and evidence rules |
-| `propose` | `/propose/` | Links to configured provider add/change/revoke/move intake |
+| `propose` | `/propose/` | Links to configured provider add/change/revoke/move/batch intake |
 | `docs` | `/docs/` | Specification, contract, schemas and clone commands |
 | `not_found` | `/404.html` | Recovery navigation |
 
 One route resolver owns every internal URL and Git receipt link. Its inputs are
 the configured repository web base; commit, issue, change-request, tag and
-release templates; four MAC intake templates; and the effective build
+release templates; five MAC intake templates; and the effective build
 `base_url`/`base_path`. CI adapter overrides are explicit receipt-bound inputs.
 Templates must not concatenate provider hosts, repository names or project base
 paths. CI tests both `/` and a non-root base such as `/Modelo/` and rejects

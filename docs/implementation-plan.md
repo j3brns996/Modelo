@@ -14,9 +14,16 @@ API. `npx`, Agent Skills, cloud CLIs and MCP tools are not build dependencies.
 
 ```bash
 uv sync --locked
+uv build --offline --no-cache
 uv run --locked modelo check --base <protected-base-sha> --head <head-sha> --as-of <YYYY-MM-DD>
 uv run --locked modelo build --kind candidate --source-commit <HEAD> --source-tree <TREE> --as-of <DATE> --source-date-epoch <EPOCH> --mac-metadata <MAC_JSON> --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
 ```
+
+`uv.lock` controls runtime sync and `uv run --locked`. Tool-package creation is
+the separate supported command `uv build --offline --no-cache`; its PEP 517
+backend is exactly pinned as `uv_build==0.11.33` in `pyproject.toml`, alongside
+the required bootstrap `uv==0.11.33`. Solution publication continues to use
+`uv run --locked modelo build ...`.
 
 The build is split logically, not into services:
 

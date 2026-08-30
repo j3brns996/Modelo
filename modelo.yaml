@@ -80,6 +80,9 @@ toolchain:
   python_version_file: .python-version
   python_version: "3.12.13"
   uv_version: "0.11.33"
+  runtime_lock_scope: uv_lock_governs_sync_and_uv_run_locked
+  pep517_build_pin: uv_build==0.11.33_in_pyproject
+  package_build: uv build --offline --no-cache
   bootstrap_config_limits:
     max_bytes: 131072
     max_depth: 20
@@ -91,6 +94,7 @@ toolchain:
   platform_adapter_network: same_repository_git_provider_read_only
   clean_clone:
     sync: uv sync --locked
+    package: uv build --offline --no-cache
     check: uv run --locked modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
     build: uv run --locked modelo build --kind candidate --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
 

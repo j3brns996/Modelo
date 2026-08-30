@@ -27,7 +27,10 @@ not executable build inputs: an agent uses a skill before invoking the ordinary
 locked CLI. Required CI contains no Node, npm or `npx` step and produces the
 same bytes when no skills are installed.
 
-`uv build --locked` packages the Python tooling. The future `modelo build`
+`uv build --offline --no-cache` packages the Python tooling. `uv.lock` governs
+runtime dependency sync and `uv run --locked`; it is not a `uv build` flag.
+PEP 517 build requirements are exactly pinned in `pyproject.toml`, which also
+requires the bootstrapped `uv 0.11.33`. The future `modelo build`
 compiles the catalogue/static publication and deliberately has no ambient
 defaults:
 
@@ -49,6 +52,7 @@ Prerequisites are Git, Python `3.12.13` and `uv 0.11.33`.
 
 ```bash
 uv sync --locked
+uv build --offline --no-cache
 uv run --locked modelo --version
 uv run --locked modelo --help
 uv run --locked modelo check --help

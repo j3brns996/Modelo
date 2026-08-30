@@ -140,6 +140,12 @@ Top-level `models/`, `offerings/`, `governance/` and `data/` are forbidden.
 Generated site data belongs in the configured candidate/final `dist/` roots
 and is published as a CI artefact; it is never committed to the source branch.
 
+`uv.lock` governs runtime dependency sync and `uv run --locked`; it is not a
+package-build option. The tooling distribution uses
+`uv build --offline --no-cache`. `pyproject.toml` pins the PEP 517 backend to
+`uv_build==0.11.33` and requires bootstrap `uv==0.11.33`. Catalogue and site
+publication remains `uv run --locked modelo build ...` and is a separate output.
+
 ## Invariants
 
 ### 1. Protected-default-branch presence is approval

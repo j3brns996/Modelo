@@ -173,7 +173,7 @@
     },
     "toolchain": {
       "type": "object",
-      "required": ["language", "environment_manager", "lock_file", "package_config", "python_version_file", "python_version", "uv_version", "bootstrap_config_limits", "required_runtime_is_node", "npx_allowed_in_required_ci", "skills_are_build_inputs", "core_check_network", "platform_adapter_network", "clean_clone"],
+      "required": ["language", "environment_manager", "lock_file", "package_config", "python_version_file", "python_version", "uv_version", "runtime_lock_scope", "pep517_build_pin", "package_build", "bootstrap_config_limits", "required_runtime_is_node", "npx_allowed_in_required_ci", "skills_are_build_inputs", "core_check_network", "platform_adapter_network", "clean_clone"],
       "properties": {
         "language": { "const": "python" },
         "environment_manager": { "const": "uv" },
@@ -182,6 +182,9 @@
         "python_version_file": { "$ref": "#/$defs/path" },
         "python_version": { "const": "3.12.13" },
         "uv_version": { "const": "0.11.33" },
+        "runtime_lock_scope": { "const": "uv_lock_governs_sync_and_uv_run_locked" },
+        "pep517_build_pin": { "const": "uv_build==0.11.33_in_pyproject" },
+        "package_build": { "const": "uv build --offline --no-cache" },
         "bootstrap_config_limits": {
           "type": "object",
           "required": ["max_bytes", "max_depth", "max_nodes"],
@@ -199,9 +202,10 @@
         "platform_adapter_network": { "const": "same_repository_git_provider_read_only" },
         "clean_clone": {
           "type": "object",
-          "required": ["sync", "check", "build"],
+          "required": ["sync", "package", "check", "build"],
           "properties": {
             "sync": { "type": "string", "minLength": 1 },
+            "package": { "const": "uv build --offline --no-cache" },
             "check": { "type": "string", "minLength": 1 },
             "build": { "type": "string", "minLength": 1 }
           },

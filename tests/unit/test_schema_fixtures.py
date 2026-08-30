@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import subprocess
 import unittest
 from pathlib import Path
 from typing import Any
@@ -407,10 +408,59 @@ class SchemaFixtureTests(unittest.TestCase):
     def test_change_delta_sort_is_total_when_declared_keys_tie(self) -> None:
         digest = "sha256:" + "a" * 64
         tied = [
-            {"operation": "add", "path": "catalogue/models/a.yaml", "after": digest},
-            {"operation": "add", "path": "catalogue/models/a.yaml", "after": digest, "note": "tie"},
+            {
+                "operation": "move",
+                "source": {
+                    "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/a.yaml",
+                    "before": digest, "reason": "First admissible reason.",
+                    "effective_at": "2026-08-30T14:00:00Z",
+                },
+                "destination": {
+                    "operation": "add", "path": "catalogue/offerings/aws-bedrock/b.yaml",
+                    "after": digest,
+                },
+            },
+            {
+                "operation": "move",
+                "source": {
+                    "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/a.yaml",
+                    "before": digest, "reason": "Second admissible reason.",
+                    "effective_at": "2026-08-30T15:00:00Z",
+                    "replacement": "catalogue/offerings/aws-bedrock/b.yaml",
+                },
+                "destination": {
+                    "operation": "add", "path": "catalogue/offerings/aws-bedrock/b.yaml",
+                    "after": digest,
+                },
+            },
         ]
+        release_case = next(
+            case for case in self.cases if case["schema"] == "release-receipt.schema.json"
+        )
+        release = copy.deepcopy(release_case["valid"][0])
+        release["change_delta"] = tied
+        validator = Draft202012Validator(
+            self.schemas["release-receipt.schema.json"],
+            registry=self.registry,
+            format_checker=FormatChecker(),
+        )
+        self.assertEqual(list(validator.iter_errors(release)), [])
         self.assertEqual(_sort_delta(tied), _sort_delta(list(reversed(tied))))
+
+    def test_documented_package_build_command_is_supported_by_pinned_uv(self) -> None:
+        config = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
+        command = "uv build --offline --no-cache"
+        self.assertEqual(config["toolchain"]["package_build"], command)
+        self.assertIn(command, (ROOT / "README.md").read_text(encoding="utf-8"))
+        version = subprocess.run(
+            ["uv", "--version"], check=True, capture_output=True, text=True
+        )
+        self.assertEqual(version.stdout.split()[:2], ["uv", "0.11.33"])
+        help_result = subprocess.run(
+            ["uv", "build", "--help"], check=True, capture_output=True, text=True
+        )
+        self.assertIn("--offline", help_result.stdout)
+        self.assertIn("--no-cache", help_result.stdout)
 
     def test_catalogue_sort_contract_covers_unordered_arrays(self) -> None:
         contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))

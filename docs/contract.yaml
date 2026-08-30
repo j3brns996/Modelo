@@ -232,9 +232,13 @@ toolchain:
   python_version: "3.12.13"
   uv_version: "0.11.33"
   environment_and_lock: uv
+  runtime_lock_scope: uv.lock governs sync and uv run --locked
+  pep517_build_requirement: uv_build==0.11.33 pinned in pyproject.toml
+  package_build: uv build --offline --no-cache
   required_ci_uses_npx: false
   clean_clone_commands:
     - uv sync --locked
+    - uv build --offline --no-cache
     - uv run --locked modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
     - uv run --locked modelo build --kind candidate --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
   solution_tooling_and_publication_are_services: false

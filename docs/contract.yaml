@@ -53,6 +53,9 @@ identity:
     field: id
     path_config_key: paths.evidence
     filename_template: "{evidence_id}.yaml"
+    id_format: "sha256-{canonical_envelope_without_id_digest}"
+    filename_matches_id: true
+    ever_merged_record_is_immutable: true
   condition:
     fields:
       - id
@@ -60,7 +63,7 @@ identity:
     path_config_key: paths.conditions
     filename_template: "{condition_id}/{version}.yaml"
     version_type: positive_integer
-    used_version_is_immutable: true
+    ever_merged_or_referenced_version_is_immutable: true
   provider_scope_in_canonical_path: false
   move_semantics: add_new_and_revoke_old
 
@@ -82,8 +85,13 @@ approval:
     - workflow_state
 
 evidence:
-  required_for: every_non_identity_assertion
+  required_for: every_externally_sourced_leaf_in_model_offering_or_external_governance
   fact_links: entity_json_pointer_to_evidence_id
+  ancestor_pointer_allowed_when: all_external_descendant_leaves_share_evidence
+  exempt_from_external_evidence:
+    - internal_ids_and_references
+    - enterprise_authored_conditions
+    - evidence_envelopes
   admissible_sources:
     - first_party_read_api
     - official_provider_documentation
@@ -102,11 +110,18 @@ evidence:
       - uri
     optional:
       - operation
+    conditional:
+      first_party_read_api_requires:
+        - operation
   retention:
     canonical_projection: durable_git_source
     raw_response: optional_short_lived_private_artefact
   public_projection_default: excluded
   canonical_projection_digest_required: true
+  content_address:
+    algorithm: sha256
+    input: canonical_evidence_envelope_without_id
+  correction_or_refresh: new_evidence_id_and_mac_reference_migration
   unsupported_fact_action: omit
   discovery_absence_can_revoke: false
 
@@ -167,12 +182,12 @@ platform:
     - protected_release
   adapters:
     github:
-      directory: .github/
+      directory_config_key: paths.github_adapter
       change_request: pull_request
       ci: actions
       site: pages
     gitlab:
-      directory: .gitlab/
+      directory_config_key: paths.gitlab_adapter
       change_request: merge_request
       ci: gitlab_ci
       site: pages
@@ -212,10 +227,10 @@ agents:
   planner: codex_work
   planner_is_system_of_record: false
   canonical_rules: AGENTS.md
-  canonical_open_skills: .agents/skills/
+  canonical_open_skills_config_key: paths.open_skills
   optional_adapters:
-    - .codex/
-    - .kiro/
+    - paths.codex_adapter
+    - paths.kiro_adapter
   write_owner: root_agent
   subagents_default: read_only
   may_push: false
@@ -233,6 +248,12 @@ validation:
   writes_must_be_parsed_and_re_read: true
   platform_controls_check: modelo platform check
   missing_executable_validator_blocks_catalogue_merge: true
+  publication_projection:
+    private_pages: may_include_redacted_internal_evidence
+    public_or_synthetic:
+      publish_fact_only_with_included_public_evidence: true
+      otherwise_remove_fact_and_reference_together: true
+    dangling_or_unsupported_fact: error
 
 technical_debt:
   implicit_debt_allowed: false

@@ -58,6 +58,10 @@ The evidence ID is content-addressed from the full canonical envelope, excluding
 the ID itself. Once merged, an evidence record is immutable; refreshes create a
 new record and migrate references through MAC review.
 
+Canonicalisation uses the JSON data model produced by the restricted YAML
+loader and RFC 8785 JCS. The root `id` is omitted, the canonical UTF-8 bytes are
+hashed with SHA-256, and the lowercase digest is prefixed with `sha256-`.
+
 ## AWS route types
 
 - `foundation-model`: a direct Bedrock foundation-model ID or ARN, generally

@@ -1,0 +1,15 @@
+schema_version: "0.1.0"
+name: Modelo
+status: draft
+description: ""
+owners: []
+
+specification:
+  path: ../SPEC.md
+
+scope:
+  includes: []
+  excludes: []
+
+requirements: []
+acceptance_criteria: []

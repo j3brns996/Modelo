@@ -25,6 +25,10 @@ Provider APIs, CLIs and read-only MCP tools form an observation plane. Their
 output may supply evidence and initiate an issue, but cannot directly approve,
 change or revoke catalogue state.
 
+Each accepted fact keeps a durable, redacted canonical evidence projection in
+Git with its digest. Expiring CI artefacts may retain raw responses, but are not
+the sole evidence record.
+
 Keep the kernel platform-neutral. GitHub and GitLab integrations are thin
 adapters. `modelo.yaml` owns global paths, relative routes and the selected
 adapter.

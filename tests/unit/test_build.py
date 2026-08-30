@@ -179,7 +179,8 @@ class BuildTests(unittest.TestCase):
                     if journal["phase"] == selected:
                         raise OSError(f"injected {selected}")
                     return real_write(parent, lock, journal, initial=initial)
-                with patch.object(build_module, "_persist_journal", side_effect=injected), self.assertRaises(OSError):
+                expected_error = BuildError if phase == "stage" else OSError
+                with patch.object(build_module, "_persist_journal", side_effect=injected), self.assertRaises(expected_error):
                     build_module._publish(
                         self.repository.root, result.output, new_files, new_manifest,
                         build_module._layout(self.repository.root),
@@ -189,7 +190,10 @@ class BuildTests(unittest.TestCase):
                     for path in result.output.rglob("*") if path.is_file()
                 }
                 self.assertEqual(current, old)
-                self.assertFalse((result.output.parent / ".modelo-build.lock").exists())
+                lock = result.output.parent / ".modelo-build.lock"
+                self.assertEqual(lock.exists(), phase == "stage")
+                if lock.exists():
+                    lock.unlink()
 
         def fail_unlock(parent, lock, journal, *, initial=False):
             if journal["phase"] == "unlock":
@@ -567,7 +571,6 @@ class BuildTests(unittest.TestCase):
         self.addCleanup(__import__("shutil").rmtree, new_source.parent, ignore_errors=True)
         lock = parent / ".modelo-build.lock"
         cases = (
-            ("lock", "c" * 32, "old", "none", "none"),
             ("stage", "d" * 32, "old", "new", "none"),
             ("fsync_stage", "e" * 32, "old", "new", "none"),
             ("validate_stage", "f" * 32, "old", "new", "none"),
@@ -617,6 +620,110 @@ class BuildTests(unittest.TestCase):
             build_module._candidate_inventory(self.repository.root, result.output, layout), new_inventory
         )
         self.assertFalse(backup.exists()); self.assertFalse(lock.exists())
+
+    def test_journal_phase_semantics_and_uncaptured_lock_fail_closed(self) -> None:
+        result = build_candidate(self.request())
+        layout = build_module._layout(self.repository.root)
+        inventory = build_module._candidate_inventory(self.repository.root, result.output, layout)
+        lock = result.output.parent / ".modelo-build.lock"
+        before = {
+            path.relative_to(result.output).as_posix(): path.read_bytes()
+            for path in result.output.rglob("*") if path.is_file()
+        }
+        for phase in build_module.PHASES:
+            with self.subTest(phase=phase):
+                record = build_module._record(phase, "candidate", "c" * 32, inventory, inventory)
+                record["sequence"] = (record["sequence"] + 1) % len(build_module.PHASES)
+                body = {key: value for key, value in record.items() if key != "record_digest"}
+                record["record_digest"] = sha256_bytes(canonical_bytes(body))
+                with self.assertRaisesRegex(BuildError, "phase/sequence"):
+                    build_module._validate_record(record, layout)
+
+        for sequence in (False, True):
+            record = build_module._record("lock", "candidate", "c" * 32, None, inventory)
+            record["sequence"] = sequence
+            body = {key: value for key, value in record.items() if key != "record_digest"}
+            record["record_digest"] = sha256_bytes(canonical_bytes(body))
+            with self.assertRaisesRegex(BuildError, "phase/sequence"):
+                build_module._validate_record(record, layout)
+
+        for old in (inventory, None):
+            with self.subTest(lock_old=old is not None):
+                record = build_module._record("lock", "candidate", "c" * 32, old, inventory)
+                lock.write_bytes(canonical_bytes(record))
+                with self.assertRaises(BuildError):
+                    recover_candidate(self.repository.root)
+                self.assertEqual(
+                    {
+                        path.relative_to(result.output).as_posix(): path.read_bytes()
+                        for path in result.output.rglob("*") if path.is_file()
+                    },
+                    before,
+                )
+                self.assertEqual(lock.read_bytes(), canonical_bytes(record))
+                lock.unlink()
+
+    def test_recovery_removes_only_proven_hard_link_journal_temporary(self) -> None:
+        result = build_candidate(self.request())
+        layout = build_module._layout(self.repository.root)
+        inventory = build_module._candidate_inventory(self.repository.root, result.output, layout)
+        __import__("shutil").rmtree(result.output)
+        parent = result.output.parent
+        lock = parent / ".modelo-build.lock"
+        record = build_module._record("lock", "candidate", "d" * 32, None, inventory)
+        lock.write_bytes(canonical_bytes(record))
+        temporary = parent / f".{lock.name}.{record['token']}.0.tmp"
+        os.link(lock, temporary)
+        real_fsync_dir = build_module._fsync_dir
+        with patch.object(build_module, "_fsync_dir", wraps=real_fsync_dir) as fsync_dir:
+            self.assertIs(
+                recover_candidate(self.repository.root), build_module.RecoveryOutcome.ROLLED_BACK
+            )
+        self.assertFalse(lock.exists()); self.assertFalse(temporary.exists())
+        self.assertGreaterEqual(
+            sum(call.args == (parent,) for call in fsync_dir.call_args_list), 2
+        )
+
+    def test_foreign_journal_temporaries_are_ambiguous_and_never_removed(self) -> None:
+        result = build_candidate(self.request())
+        layout = build_module._layout(self.repository.root)
+        inventory = build_module._candidate_inventory(self.repository.root, result.output, layout)
+        parent = result.output.parent
+        lock = parent / ".modelo-build.lock"
+        record = build_module._record("stage", "candidate", "e" * 32, inventory, inventory)
+        raw = canonical_bytes(record)
+        for index, kind in enumerate(("foreign-bytes", "forged-record", "symlink", "directory"), start=999):
+            with self.subTest(kind=kind):
+                lock.write_bytes(raw)
+                temporary = parent / f".{lock.name}.{record['token']}.{index}.tmp"
+                if kind == "foreign-bytes":
+                    temporary.write_bytes(b"foreign")
+                elif kind == "forged-record":
+                    temporary.write_bytes(raw)
+                elif kind == "symlink":
+                    temporary.symlink_to(lock)
+                else:
+                    temporary.mkdir()
+                before = {
+                    path.relative_to(result.output).as_posix(): path.read_bytes()
+                    for path in result.output.rglob("*") if path.is_file()
+                }
+                with self.assertRaisesRegex(BuildError, "ambiguous build recovery journal temporary"):
+                    recover_candidate(self.repository.root)
+                self.assertEqual(lock.read_bytes(), raw)
+                self.assertTrue(temporary.exists() or temporary.is_symlink())
+                self.assertEqual(
+                    {
+                        path.relative_to(result.output).as_posix(): path.read_bytes()
+                        for path in result.output.rglob("*") if path.is_file()
+                    },
+                    before,
+                )
+                if temporary.is_dir() and not temporary.is_symlink():
+                    temporary.rmdir()
+                else:
+                    temporary.unlink()
+                lock.unlink()
 
     def test_old_absent_caught_failure_matrix_is_restart_safe(self) -> None:
         result = build_candidate(self.request())

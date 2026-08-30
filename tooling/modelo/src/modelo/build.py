@@ -628,10 +628,18 @@ def _record(
 
 def _validate_record(value: Mapping[str, Any], layout: BuildLayout) -> dict[str, Any]:
     expected_keys = {"version", "sequence", "phase", "target", "token", "old", "new", "record_digest"}
-    if set(value) != expected_keys or value.get("version") != 2:
+    if (
+        set(value) != expected_keys
+        or type(value.get("version")) is not int
+        or value.get("version") != 2
+    ):
         raise BuildError("build recovery journal has an unknown shape")
     phase = value.get("phase")
-    if phase not in PHASES or value.get("sequence") != PHASES.index(phase):
+    sequence = value.get("sequence")
+    if (
+        not isinstance(phase, str) or phase not in PHASES
+        or type(sequence) is not int or sequence != PHASES.index(phase)
+    ):
         raise BuildError("build recovery journal phase/sequence is invalid")
     token = value.get("token")
     if (
@@ -642,6 +650,8 @@ def _validate_record(value: Mapping[str, Any], layout: BuildLayout) -> dict[str,
     body = {key: value[key] for key in value if key != "record_digest"}
     if value["record_digest"] != sha256_bytes(canonical_bytes(body)):
         raise BuildError("build recovery journal digest is invalid")
+    if phase == "lock" and value["old"] is not None:
+        raise BuildError("initial build recovery journal cannot contain an old inventory")
     expected_paths = {path.as_posix() for path in layout.candidate_inventory}
     for name in ("old", "new"):
         inventory = value[name]
@@ -701,18 +711,50 @@ def _persist_journal(parent: Path, lock: Path, value: Mapping[str, Any], *, init
             _fsync_dir(parent)
 
 
-def _cleanup_journal_temporaries(parent: Path, lock: Path, token: str) -> None:
-    prefix = f".{lock.name}.{token}."
-    changed = False
+def _cleanup_journal_temporaries(
+    parent: Path, lock: Path, journal: Mapping[str, Any], lock_raw: bytes,
+) -> None:
+    """Remove only initial-journal hard links proven identical to the lock.
+
+    A token-shaped name is not an ownership claim.  Classification is
+    completed before the first unlink so an unrelated matching entry leaves
+    the entire publication namespace untouched.
+    """
+
+    prefix = f".{lock.name}.{journal['token']}."
+    try:
+        lock_status = os.lstat(lock)
+    except OSError as exc:
+        raise BuildError("build recovery lock changed during temporary validation") from exc
+    if not stat.S_ISREG(lock_status.st_mode):
+        raise BuildError("build recovery lock is not a regular file")
+    expected_raw = canonical_bytes(dict(journal))
+    if lock_raw != expected_raw:
+        raise BuildError("build recovery journal is not canonical")
+    removable: list[Path] = []
     for path in parent.iterdir():
         if not path.name.startswith(prefix) or not path.name.endswith(".tmp"):
             continue
-        sequence = path.name[len(prefix):-4]
-        if not sequence.isdigit() or path.is_symlink() or not path.is_file():
-            raise BuildError("stale journal temporary path is unsafe")
+        try:
+            temporary_status = os.lstat(path)
+            raw = _read_regular_nofollow(
+                path, limit=32_768, label="build recovery journal temporary"
+            )
+        except (BuildError, OSError) as exc:
+            raise BuildError("ambiguous build recovery journal temporary") from exc
+        same_inode = (
+            temporary_status.st_dev == lock_status.st_dev
+            and temporary_status.st_ino == lock_status.st_ino
+        )
+        if (
+            not stat.S_ISREG(temporary_status.st_mode)
+            or not same_inode or raw != lock_raw or raw != expected_raw
+        ):
+            raise BuildError("ambiguous build recovery journal temporary")
+        removable.append(path)
+    for path in removable:
         path.unlink()
-        changed = True
-    if changed:
+    if removable:
         _fsync_dir(parent)
 
 
@@ -866,9 +908,14 @@ def _recover_candidate(root: Path) -> RecoveryOutcome | None:
             raise BuildError("build recovery target parent traverses a symlink")
     if not lock.exists() and not lock.is_symlink():
         return None
-    journal = _validate_record(_strict_json_file(lock), layout)
+    lock_raw = _read_regular_nofollow(
+        lock, limit=32_768, label="build recovery journal"
+    )
+    journal = _validate_record(
+        _strict_json_bytes(lock_raw, "build recovery journal"), layout
+    )
     token = journal["token"]
-    _cleanup_journal_temporaries(parent, lock, token)
+    _cleanup_journal_temporaries(parent, lock, journal, lock_raw)
     target = repository.joinpath(*layout.candidate_root.parts)
     staging = parent / f"{target.name}.{token}.staging"
     backup = parent / f"{target.name}.{token}.backup"
@@ -890,9 +937,10 @@ def _recover_candidate(root: Path) -> RecoveryOutcome | None:
 
     # The initial lock is durable before old-state capture.  No publication
     # path has been touched, so recovery merely releases it if its namespace is
-    # still empty; the visible target is deliberately not interpreted.
+    # still empty.  A target cannot be interpreted before its old inventory was
+    # captured, even when it happens to be a structurally valid candidate.
     if phase == "lock":
-        if p_stage or p_backup:
+        if p_target or p_stage or p_backup:
             raise BuildError("initial-lock recovery found a mutated publication namespace")
         return finish(RecoveryOutcome.ROLLED_BACK)
 

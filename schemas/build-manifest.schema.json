@@ -3,6 +3,12 @@
   "$id": "https://modelo.invalid/schemas/build-manifest.schema.json",
   "title": "Modelo non-recursive publication manifest",
   "$defs": {
+    "canonicalBaseUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://(?!.*(?:/\\.{1,2})(?:/|(?![\\s\\S])))[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*(?:/[A-Za-z0-9._~-]+)*/(?![\\s\\S])",
+      "maxLength": 2048
+    },
     "file": {
       "type": "object",
       "required": ["sha256", "size", "media_type"],
@@ -19,7 +25,7 @@
     }
   },
   "type": "object",
-  "required": ["contract_version", "kind", "source_commit", "source_tree", "as_of", "source_date_epoch", "profile", "base_url", "base_path", "catalogue_path", "manifest_path", "digest_algorithm", "publication_digest", "files"],
+  "required": ["contract_version", "kind", "source_commit", "source_tree", "as_of", "source_date_epoch", "profile", "base_url", "base_path", "promotion_durability", "catalogue_path", "manifest_path", "digest_algorithm", "publication_digest", "files"],
   "properties": {
     "contract_version": { "const": "0.1.0" },
     "kind": { "enum": ["candidate", "final"] },
@@ -28,11 +34,12 @@
     "as_of": { "type": "string", "format": "date" },
     "source_date_epoch": { "type": "integer", "minimum": 0 },
     "profile": { "enum": ["synthetic", "private"] },
-    "base_url": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/httpsUri" }] },
+    "base_url": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/canonicalBaseUrl" }] },
     "base_path": {
       "type": "string",
       "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~-]+/)*(?![\\s\\S])"
     },
+    "promotion_durability": { "enum": ["fsync-durable", "process-atomic-only"] },
     "catalogue_path": { "const": "data/catalogue.json" },
     "manifest_path": { "const": "data/manifest.json" },
     "digest_algorithm": { "const": "sha256" },
@@ -53,7 +60,12 @@
   "allOf": [
     {
       "if": { "properties": { "kind": { "const": "final" } }, "required": ["kind"] },
-      "then": { "properties": { "base_url": { "$ref": "common.schema.json#/$defs/httpsUri" } } }
+      "then": {
+        "properties": {
+          "base_url": { "$ref": "#/$defs/canonicalBaseUrl" },
+          "promotion_durability": { "const": "fsync-durable" }
+        }
+      }
     }
   ],
   "additionalProperties": false

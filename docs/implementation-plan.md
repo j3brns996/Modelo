@@ -15,7 +15,7 @@ API. `npx`, Agent Skills, cloud CLIs and MCP tools are not build dependencies.
 ```bash
 uv sync --locked
 uv run --locked modelo check --base <protected-base-sha> --head <head-sha> --as-of <YYYY-MM-DD>
-uv run --locked modelo build --as-of <YYYY-MM-DD>
+uv run --locked modelo build --kind candidate --source-commit <HEAD> --source-tree <TREE> --as-of <DATE> --source-date-epoch <EPOCH> --mac-metadata <MAC_JSON> --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
 ```
 
 The build is split logically, not into services:
@@ -94,6 +94,20 @@ publication and non-recursive manifest. T8 supplies trusted provider metadata
 and creates the detached check receipt. Post-merge publication creates the
 final receipt only after exact-tree verification. Core T5/T6 code performs no
 provider read.
+
+The T5 CLI has no ambient defaults: common required flags are `--kind`,
+`--source-commit`, `--source-tree`, `--as-of`, `--source-date-epoch`,
+`--mac-metadata`, `--profile`, `--base-path` and `--output`, plus exactly one of
+`--base-url` or candidate-only `--no-base-url`. Final adds `--merge-commit` and
+`--merge-tree`. T8 supplies every value from trusted inputs and rejects any
+receipt correlation mismatch.
+
+T5 also owns the single-writer publication state machine: exclusive fail-fast
+lock, same-filesystem CSPRNG staging, fsynced staged validation, old-target
+backup, promoted-target verification and explicit journal recovery. The two
+renames are not claimed as one transaction; the target can be complete-old,
+complete-new or temporarily absent, never partial. Final builds fail closed
+without file/directory fsync support.
 
 T6 owns no-JavaScript navigation, link/XSS/non-leakage and accessibility
 structure. T8 owns pinned Python-controlled browser execution outside the core

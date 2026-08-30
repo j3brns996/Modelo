@@ -56,6 +56,12 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 128
+    },
+    "canonicalBaseUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://(?!.*(?:/\\.{1,2})(?:/|(?![\\s\\S])))[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*(?:/[A-Za-z0-9._~-]+)*/(?![\\s\\S])",
+      "maxLength": 2048
     }
   },
   "type": "object",
@@ -208,7 +214,7 @@
       "type": "object",
       "required": ["base_url", "base_path", "routes", "data_routes", "urls_resolved_from_config_only", "effective_base_url_and_path_are_receipt_inputs", "ci_requires_explicit_base_url"],
       "properties": {
-        "base_url": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/httpsUri" }] },
+        "base_url": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/canonicalBaseUrl" }] },
         "base_path": { "type": "string", "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~-]+/)*(?![\\s\\S])" },
         "routes": {
           "type": "object",
@@ -284,8 +290,19 @@
     },
     "build": {
       "type": "object",
-      "required": ["candidate_root", "final_root", "staging_parent", "receipts_root", "publication_subdir", "catalogue_path", "manifest_path", "check_receipt_path", "release_receipt_path", "digest_algorithm", "canonical_json", "publication_digest", "manifest_hashes_itself", "atomic_publish", "failed_build_cleanup"],
+      "required": ["command", "required_cli_arguments", "final_required_cli_arguments", "base_url_choice", "ambient_git_or_environment_inference", "candidate_root", "final_root", "staging_parent", "receipts_root", "publication_subdir", "catalogue_path", "manifest_path", "check_receipt_path", "release_receipt_path", "digest_algorithm", "canonical_json", "publication_digest", "manifest_hashes_itself", "writer_lock", "lock_acquire", "staging_name", "backup_name", "journal", "promotion_state_machine", "crash_recovery", "atomic_publish", "observable_contract", "final_requires_fsync_durability", "failed_build_cleanup"],
       "properties": {
+        "command": { "const": "modelo build" },
+        "required_cli_arguments": {
+          "type": "array", "minItems": 9, "maxItems": 9, "uniqueItems": true,
+          "items": { "enum": ["kind", "source_commit", "source_tree", "as_of", "source_date_epoch", "mac_metadata", "profile", "base_path", "output"] }
+        },
+        "final_required_cli_arguments": {
+          "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true,
+          "items": { "enum": ["merge_commit", "merge_tree"] }
+        },
+        "base_url_choice": { "const": "exactly_one_of_base_url_or_no_base_url_candidate_only" },
+        "ambient_git_or_environment_inference": { "const": false },
         "candidate_root": { "const": "dist/candidate" },
         "final_root": { "const": "dist/final" },
         "staging_parent": { "const": "dist/.staging" },
@@ -299,8 +316,26 @@
         "canonical_json": { "const": "rfc8785_utf8_plus_single_lf" },
         "publication_digest": { "const": "sha256_of_sorted_path_nul_digest_nul_size_lf_records" },
         "manifest_hashes_itself": { "const": false },
-        "atomic_publish": { "const": "stage_validate_then_rename" },
-        "failed_build_cleanup": { "const": "remove_staging_preserve_previous_complete_output" }
+        "writer_lock": { "const": "dist/.modelo-build.lock" },
+        "lock_acquire": { "const": "exclusive_create_or_fail_fast" },
+        "staging_name": { "const": "sibling_target_dot_128_bit_csprng_hex" },
+        "backup_name": { "const": "sibling_target_dot_backup_dot_invocation_id" },
+        "journal": { "const": "bounded_fsync_state_file_in_lock" },
+        "promotion_state_machine": {
+          "type": "array", "minItems": 10, "maxItems": 10, "uniqueItems": true,
+          "prefixItems": [
+            { "const": "lock" }, { "const": "stage" }, { "const": "fsync_stage" },
+            { "const": "validate_stage" }, { "const": "backup_old" },
+            { "const": "promote_new" }, { "const": "fsync_parent" },
+            { "const": "verify_target" }, { "const": "remove_backup" }, { "const": "unlock" }
+          ],
+          "items": false
+        },
+        "crash_recovery": { "const": "explicit_recover_from_journal_or_fail_closed_on_ambiguity" },
+        "atomic_publish": { "const": "per_rename_same_filesystem_only" },
+        "observable_contract": { "const": "target_is_complete_old_complete_new_or_temporarily_absent_never_partial" },
+        "final_requires_fsync_durability": { "const": true },
+        "failed_build_cleanup": { "const": "restore_backup_if_needed_remove_staging_preserve_previous_complete_output" }
       },
       "additionalProperties": false
     },
@@ -456,10 +491,10 @@
         "source_tree": { "const": "exact_source_commit_tree" },
         "build_inputs_explicit": {
           "type": "array",
-          "minItems": 8,
-          "maxItems": 8,
+          "minItems": 10,
+          "maxItems": 10,
           "uniqueItems": true,
-          "items": { "enum": ["source_commit", "source_tree", "as_of", "source_date_epoch", "validated_mac_metadata", "publication_profile", "base_url", "base_path"] }
+          "items": { "enum": ["kind", "source_commit", "source_tree", "as_of", "source_date_epoch", "validated_mac_metadata", "publication_profile", "base_url_choice", "base_path", "output"] }
         },
         "core_provider_reads": { "const": false },
         "change_history": { "const": "local_git_first_parent_deltas" },

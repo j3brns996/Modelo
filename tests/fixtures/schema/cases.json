@@ -314,6 +314,7 @@
           "profile": "synthetic",
           "base_url": "https://example.invalid/Modelo/",
           "base_path": "/Modelo/",
+          "promotion_durability": "fsync-durable",
           "catalogue_path": "data/catalogue.json",
           "manifest_path": "data/manifest.json",
           "digest_algorithm": "sha256",
@@ -338,6 +339,14 @@
         { "name": "manifest malformed media type", "op": "set", "path": ["files", "index.html", "media_type"], "value": "text html", "expect": ["pattern", ["files", "index.html", "media_type"]] },
         { "name": "manifest unsupported digest", "op": "set", "path": ["digest_algorithm"], "value": "sha512", "expect": ["const", ["digest_algorithm"]] },
         { "name": "final manifest requires absolute base URL", "op": "set", "path": ["base_url"], "value": null, "valid_index": 1, "expect": ["type", ["base_url"]] },
+        { "name": "final manifest requires fsync durability", "op": "set", "path": ["promotion_durability"], "value": "process-atomic-only", "valid_index": 1, "expect": ["const", ["promotion_durability"]] },
+        { "name": "manifest URL userinfo forbidden", "op": "set", "path": ["base_url"], "value": "https://user@example.invalid/Modelo/", "expect": ["pattern", ["base_url"]] },
+        { "name": "manifest URL query forbidden", "op": "set", "path": ["base_url"], "value": "https://example.invalid/Modelo/?x=1", "expect": ["pattern", ["base_url"]] },
+        { "name": "manifest URL fragment forbidden", "op": "set", "path": ["base_url"], "value": "https://example.invalid/Modelo/#x", "expect": ["pattern", ["base_url"]] },
+        { "name": "manifest URL explicit default port forbidden", "op": "set", "path": ["base_url"], "value": "https://example.invalid:443/Modelo/", "expect": ["pattern", ["base_url"]] },
+        { "name": "manifest URL uppercase host forbidden", "op": "set", "path": ["base_url"], "value": "https://Example.invalid/Modelo/", "expect": ["pattern", ["base_url"]] },
+        { "name": "manifest URL trailing slash required", "op": "set", "path": ["base_url"], "value": "https://example.invalid/Modelo", "expect": ["pattern", ["base_url"]] },
+        { "name": "manifest URL dot segment forbidden", "op": "set", "path": ["base_url"], "value": "https://example.invalid/../Modelo/", "expect": ["pattern", ["base_url"]] },
         { "name": "manifest unexpected field", "op": "set", "path": ["archive"], "value": "site.zip", "expect": ["additionalProperties", []] }
       ]
     },
@@ -346,6 +355,7 @@
       "valid": [
         {
           "contract_version": "0.1.0",
+          "repository": { "provider": "github", "host": "github.com", "namespace": "j3brns", "name": "Modelo" },
           "base_sha": "1111111111111111111111111111111111111111",
           "head_sha": "2222222222222222222222222222222222222222",
           "head_tree_sha": "3333333333333333333333333333333333333333",
@@ -354,13 +364,15 @@
           "profile": "synthetic",
           "base_url": "https://example.invalid/Modelo/",
           "base_path": "/Modelo/",
+          "promotion_durability": "fsync-durable",
           "artifacts": {
-            "catalogue": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "publication": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "manifest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            "catalogue": { "path": "site/data/catalogue.json", "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+            "publication": { "path": "site", "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+            "manifest": { "path": "site/data/manifest.json", "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
           },
           "tool_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
           "lock_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "actors_registry_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
           "mac_issue": "19",
           "mac_payload_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
           "change_delta": [
@@ -381,7 +393,11 @@
         { "name": "check receipt skipped result", "op": "set", "path": ["ci", "result"], "value": "skipped", "expect": ["const", ["ci", "result"]] },
         { "name": "check receipt lacks run identity", "op": "remove", "path": ["ci", "run_id"], "expect": ["required", ["ci"]] },
         { "name": "check receipt lacks MAC digest", "op": "remove", "path": ["mac_payload_digest"], "expect": ["required", []] },
+        { "name": "check receipt lacks actor registry digest", "op": "remove", "path": ["actors_registry_digest"], "expect": ["required", []] },
         { "name": "check receipt lacks publication digest", "op": "remove", "path": ["artifacts", "publication"], "expect": ["required", ["artifacts"]] },
+        { "name": "check receipt catalogue artifact renamed", "op": "set", "path": ["artifacts", "catalogue", "path"], "value": "site/data/models.json", "expect": ["const", ["artifacts", "catalogue", "path"]] },
+        { "name": "check receipt repository absent", "op": "remove", "path": ["repository"], "expect": ["required", []] },
+        { "name": "check receipt noncanonical URL", "op": "set", "path": ["base_url"], "value": "https://Example.invalid/Modelo/", "expect": ["pattern", ["base_url"]] },
         { "name": "check receipt base path traversal", "op": "set", "path": ["base_path"], "value": "/../", "expect": ["pattern", ["base_path"]] },
         { "name": "check receipt has merge SHA", "op": "set", "path": ["merge_sha"], "value": "4444444444444444444444444444444444444444", "expect": ["additionalProperties", []] },
         { "name": "check receipt invalid as-of", "op": "set", "path": ["as_of"], "value": "2026-02-30", "expect": ["format", ["as_of"]] }
@@ -422,24 +438,26 @@
         {
           "contract_version": "0.1.0",
           "release": "catalogue-20260830.1",
+          "repository": { "provider": "github", "host": "github.com", "namespace": "j3brns", "name": "Modelo" },
           "base_sha": "1111111111111111111111111111111111111111",
           "source_sha": "2222222222222222222222222222222222222222",
           "merge_sha": "3333333333333333333333333333333333333333",
-          "head_tree_sha": "4444444444444444444444444444444444444444",
-          "merge_tree_sha": "4444444444444444444444444444444444444444",
+          "head_tree_sha": "3333333333333333333333333333333333333333",
+          "merge_tree_sha": "3333333333333333333333333333333333333333",
           "as_of": "2026-08-30",
           "source_date_epoch": 1788091200,
           "profile": "synthetic",
           "base_url": "https://example.invalid/Modelo/",
           "base_path": "/Modelo/",
+          "promotion_durability": "fsync-durable",
           "artifacts": {
-            "catalogue": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "publication": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "manifest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            "catalogue": { "path": "site/data/catalogue.json", "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+            "publication": { "path": "site", "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+            "manifest": { "path": "site/data/manifest.json", "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
           },
           "tool_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
           "lock_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-          "accepted_check_receipt_digest": "sha256:abababababababababababababababababababababababababababababababab",
+          "accepted_check_receipt_digest": "sha256:efc9a0d6cb124d8106ff6d4445bc6aff9178f10b57f47ca7248da1155d7821c0",
           "ci": {
             "provider": "github",
             "workflow_identity": "j3brns/Modelo/.github/workflows/modelo.yml@main",
@@ -448,17 +466,17 @@
             "result": "success",
             "head_sha": "2222222222222222222222222222222222222222"
           },
-          "mac_issue": "6",
+          "mac_issue": "19",
           "change_request": "2",
           "change_delta": [
-            { "operation": "add", "path": "catalogue/models/test-model-1.yaml", "after": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" }
+            { "operation": "add", "path": "catalogue/models/test-model.yaml", "after": "sha256:9999999999999999999999999999999999999999999999999999999999999999" }
           ],
           "approval": {
             "reviewer_platform_identity": "test-reviewer",
             "reviewer_kind": "human",
             "approved_head_sha": "2222222222222222222222222222222222222222",
             "approval_timestamp": "2026-08-30T13:00:00Z",
-            "actors_registry_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "actors_registry_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
             "independence_and_eligibility_result": "eligible-independent",
             "provider_approval_and_check_reference": "review/1#modelo-check/123"
           }
@@ -508,6 +526,9 @@
         { "name": "revocation replacement must be offering", "op": "set", "path": ["change_delta", 0], "value": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reason": "Withdrawn.", "effective_at": "2026-08-30T14:00:00Z", "replacement": "catalogue/models/test.yaml" }, "expect": ["pattern", ["change_delta", 0, "replacement"]] },
         { "name": "unknown delta field", "op": "set", "path": ["change_delta", 0, "status"], "value": "approved", "expect": ["additionalProperties", ["change_delta", 0]] },
         { "name": "artifact digest absent", "op": "remove", "path": ["artifacts", "publication"], "expect": ["required", ["artifacts"]] },
+        { "name": "release manifest artifact renamed", "op": "set", "path": ["artifacts", "manifest", "path"], "value": "site/manifest.json", "expect": ["const", ["artifacts", "manifest", "path"]] },
+        { "name": "release repository absent", "op": "remove", "path": ["repository"], "expect": ["required", []] },
+        { "name": "release URL query forbidden", "op": "set", "path": ["base_url"], "value": "https://example.invalid/Modelo/?x=1", "expect": ["pattern", ["base_url"]] },
         { "name": "accepted check receipt digest absent", "op": "remove", "path": ["accepted_check_receipt_digest"], "expect": ["required", []] },
         { "name": "release base path traversal", "op": "set", "path": ["base_path"], "value": "/../", "expect": ["pattern", ["base_path"]] },
         { "name": "unknown approval field", "op": "set", "path": ["approval", "human"], "value": true, "expect": ["additionalProperties", ["approval"]] },
@@ -567,6 +588,10 @@
         { "name": "legacy publication profiles path forbidden", "op": "set", "path": ["paths", "publication_profiles"], "value": "publication", "expect": ["additionalProperties", ["paths"]] },
         { "name": "manifest self hashing enabled", "op": "set", "path": ["build", "manifest_hashes_itself"], "value": true, "expect": ["const", ["build", "manifest_hashes_itself"]] },
         { "name": "non-atomic publication forbidden", "op": "set", "path": ["build", "atomic_publish"], "value": "write_in_place", "expect": ["const", ["build", "atomic_publish"]] },
+        { "name": "ambient Git inference forbidden", "op": "set", "path": ["build", "ambient_git_or_environment_inference"], "value": true, "expect": ["const", ["build", "ambient_git_or_environment_inference"]] },
+        { "name": "writer lock must fail fast", "op": "set", "path": ["build", "lock_acquire"], "value": "wait", "expect": ["const", ["build", "lock_acquire"]] },
+        { "name": "promotion state order immutable", "op": "set", "path": ["build", "promotion_state_machine", 4], "value": "promote_new", "expect": ["const", ["build", "promotion_state_machine", 4]] },
+        { "name": "final fsync durability cannot be disabled", "op": "set", "path": ["build", "final_requires_fsync_durability"], "value": false, "expect": ["const", ["build", "final_requires_fsync_durability"]] },
         { "name": "provider reads in core forbidden", "op": "set", "path": ["determinism", "core_provider_reads"], "value": true, "expect": ["const", ["determinism", "core_provider_reads"]] },
         { "name": "filesystem timestamp input forbidden", "op": "set", "path": ["determinism", "ignored_timestamps", 1], "value": "author_time", "expect": ["enum", ["determinism", "ignored_timestamps", 1]] },
         { "name": "agent approval cannot be enabled by repository file", "op": "set", "path": ["platform", "optional_capabilities", "agent_approval", "enabled"], "value": true, "expect": ["const", ["platform", "optional_capabilities", "agent_approval", "enabled"]] },

@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import unittest
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
+from urllib.parse import urlsplit
 
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
+
+from modelo.evidence import canonical_json
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -68,6 +72,84 @@ def _walk_json(value: Any):
     elif isinstance(value, list):
         for child in value:
             yield from _walk_json(child)
+
+
+def _canonical_receipt_bytes(value: dict[str, Any]) -> bytes:
+    return (canonical_json(value) + "\n").encode("utf-8")
+
+
+def _canonical_site_url_matches(url: str, base_path: str) -> bool:
+    parsed = urlsplit(url)
+    return (
+        parsed.scheme == "https"
+        and parsed.hostname is not None
+        and parsed.hostname == parsed.hostname.lower()
+        and parsed.username is None
+        and parsed.password is None
+        and parsed.port is None
+        and parsed.query == ""
+        and parsed.fragment == ""
+        and "%" not in parsed.path
+        and all(segment not in {".", ".."} for segment in parsed.path.split("/"))
+        and parsed.path == base_path
+        and url.endswith("/")
+    )
+
+
+def _sort_delta(value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rank = {"add": 0, "change": 1, "revoke": 2, "move": 3}
+
+    def key(item: dict[str, Any]) -> tuple[Any, ...]:
+        if item["operation"] == "move":
+            primary = item["source"]["path"]
+            destination = item["destination"]["path"]
+            before = item["source"].get("before", "")
+            after = item["destination"].get("after", "")
+        else:
+            primary = item["path"]
+            destination = ""
+            before = item.get("before", "")
+            after = item.get("after", "")
+        return rank[item["operation"]], primary.encode(), destination.encode(), before, after
+
+    return sorted(value, key=key)
+
+
+def _agent_paths_allowed(paths: list[str]) -> bool:
+    prefixes = ("catalogue/models/", "catalogue/offerings/", "catalogue/evidence/")
+    return bool(paths) and all(path.startswith(prefixes) for path in paths)
+
+
+def _release_correlation_errors(check: dict[str, Any], release: dict[str, Any]) -> set[str]:
+    errors: set[str] = set()
+    pairs = {
+        "repository": (check["repository"], release["repository"]),
+        "base": (check["base_sha"], release["base_sha"]),
+        "source": (check["head_sha"], release["source_sha"]),
+        "ci-head": (check["head_sha"], release["ci"]["head_sha"]),
+        "approval-head": (check["head_sha"], release["approval"]["approved_head_sha"]),
+        "head-tree": (check["head_tree_sha"], release["head_tree_sha"]),
+        "merge-tree": (release["head_tree_sha"], release["merge_tree_sha"]),
+        "as-of": (check["as_of"], release["as_of"]),
+        "epoch": (check["source_date_epoch"], release["source_date_epoch"]),
+        "profile": (check["profile"], release["profile"]),
+        "base-url": (check["base_url"], release["base_url"]),
+        "base-path": (check["base_path"], release["base_path"]),
+        "delta": (check["change_delta"], release["change_delta"]),
+        "catalogue": (check["artifacts"]["catalogue"], release["artifacts"]["catalogue"]),
+        "tool": (check["tool_digest"], release["tool_digest"]),
+        "lock": (check["lock_digest"], release["lock_digest"]),
+        "actors": (check["actors_registry_digest"], release["approval"]["actors_registry_digest"]),
+        "workflow": (check["ci"]["workflow_identity"], release["ci"]["workflow_identity"]),
+    }
+    errors.update(name for name, values in pairs.items() if values[0] != values[1])
+    expected_digest = "sha256:" + hashlib.sha256(_canonical_receipt_bytes(check)).hexdigest()
+    if release["accepted_check_receipt_digest"] != expected_digest:
+        errors.add("check-digest")
+    for name in ("publication", "manifest"):
+        if check["artifacts"][name]["path"] != release["artifacts"][name]["path"]:
+            errors.add(f"{name}-path")
+    return errors
 
 
 class SchemaFixtureTests(unittest.TestCase):
@@ -197,6 +279,182 @@ class SchemaFixtureTests(unittest.TestCase):
         output = self.schemas["catalogue-output.schema.json"]
         self.assertNotIn("actors", output["properties"])
         self.assertEqual(output["additionalProperties"], False)
+
+    def test_check_receipt_digest_is_canonical_bytes_plus_one_lf(self) -> None:
+        case = next(case for case in self.cases if case["schema"] == "check-receipt.schema.json")
+        receipt = case["valid"][0]
+        reordered = dict(reversed(list(receipt.items())))
+        exact = _canonical_receipt_bytes(receipt)
+        self.assertEqual(exact, _canonical_receipt_bytes(reordered))
+        self.assertTrue(exact.endswith(b"\n"))
+        self.assertFalse(exact.endswith(b"\n\n"))
+        digest = hashlib.sha256(exact).hexdigest()
+        self.assertEqual(digest, hashlib.sha256(_canonical_receipt_bytes(reordered)).hexdigest())
+        self.assertNotEqual(digest, hashlib.sha256(exact[:-1]).hexdigest())
+
+    def test_change_delta_permutations_have_one_canonical_order(self) -> None:
+        digest = "sha256:" + "a" * 64
+        values = [
+            {"operation": "revoke", "path": "catalogue/offerings/x/z.yaml", "before": digest},
+            {"operation": "add", "path": "catalogue/models/b.yaml", "after": digest},
+            {"operation": "change", "path": "catalogue/models/a.yaml", "before": digest, "after": digest},
+        ]
+        expected = _sort_delta(values)
+        self.assertEqual(expected, _sort_delta(list(reversed(values))))
+        self.assertEqual([item["operation"] for item in expected], ["add", "change", "revoke"])
+        self.assertEqual(_canonical_receipt_bytes({"change_delta": expected}), _canonical_receipt_bytes({"change_delta": _sort_delta(values[1:] + values[:1])}))
+
+    def test_catalogue_sort_contract_covers_unordered_arrays(self) -> None:
+        contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(
+            contract["build"]["catalogue_sort_keys"],
+            {
+                "models": ["id"],
+                "offerings": ["inference_service_id", "id"],
+                "evidence": ["id"],
+                "conditions": ["id", "version"],
+                "routes": ["id"],
+                "route_destinations": ["destination_pointer"],
+                "pricing": ["dimension", "unit", "quantity", "amount", "currency", "sorted_route_ids"],
+                "condition_refs": ["id", "version"],
+                "id_arrays": "ascii_id",
+            },
+        )
+        self.assertTrue(contract["build"]["semantic_evidence_projection_arrays_preserve_source_order"])
+
+    def test_canonical_base_url_and_path_pairs(self) -> None:
+        for url, path in (
+            ("https://example.invalid/", "/"),
+            ("https://example.invalid/Modelo/", "/Modelo/"),
+        ):
+            with self.subTest(url=url, path=path):
+                self.assertTrue(_canonical_site_url_matches(url, path))
+        for url, path in (
+            ("https://example.invalid/Other/", "/Modelo/"),
+            ("https://user@example.invalid/Modelo/", "/Modelo/"),
+            ("https://example.invalid:443/Modelo/", "/Modelo/"),
+            ("https://example.invalid/Modelo/?x=1", "/Modelo/"),
+            ("https://example.invalid/Modelo", "/Modelo/"),
+            ("https://example.invalid/../Modelo/", "/../Modelo/"),
+        ):
+            with self.subTest(url=url, path=path):
+                self.assertFalse(_canonical_site_url_matches(url, path))
+
+    def test_release_fixture_correlates_with_accepted_check_fixture(self) -> None:
+        by_schema = {case["schema"]: case for case in self.cases}
+        check = by_schema["check-receipt.schema.json"]["valid"][0]
+        release = by_schema["release-receipt.schema.json"]["valid"][0]
+        equalities = {
+            "repository": (check["repository"], release["repository"]),
+            "check provider": (check["repository"]["provider"], check["ci"]["provider"]),
+            "release provider": (release["repository"]["provider"], release["ci"]["provider"]),
+            "base": (check["base_sha"], release["base_sha"]),
+            "head": (check["head_sha"], release["source_sha"]),
+            "ci head": (check["head_sha"], release["ci"]["head_sha"]),
+            "approval head": (check["head_sha"], release["approval"]["approved_head_sha"]),
+            "tree": (check["head_tree_sha"], release["head_tree_sha"]),
+            "merge tree": (release["head_tree_sha"], release["merge_tree_sha"]),
+            "as-of": (check["as_of"], release["as_of"]),
+            "epoch": (check["source_date_epoch"], release["source_date_epoch"]),
+            "profile": (check["profile"], release["profile"]),
+            "base URL": (check["base_url"], release["base_url"]),
+            "base path": (check["base_path"], release["base_path"]),
+            "delta": (check["change_delta"], release["change_delta"]),
+            "catalogue": (check["artifacts"]["catalogue"], release["artifacts"]["catalogue"]),
+            "tool": (check["tool_digest"], release["tool_digest"]),
+            "lock": (check["lock_digest"], release["lock_digest"]),
+            "actors": (check["actors_registry_digest"], release["approval"]["actors_registry_digest"]),
+            "workflow": (check["ci"]["workflow_identity"], release["ci"]["workflow_identity"]),
+        }
+        for name, (accepted, final) in equalities.items():
+            with self.subTest(name=name):
+                self.assertEqual(accepted, final)
+        self.assertEqual(
+            release["accepted_check_receipt_digest"],
+            "sha256:" + hashlib.sha256(_canonical_receipt_bytes(check)).hexdigest(),
+        )
+        self.assertEqual(_release_correlation_errors(check, release), set())
+
+    def test_release_correlations_fail_independently(self) -> None:
+        by_schema = {case["schema"]: case for case in self.cases}
+        check = by_schema["check-receipt.schema.json"]["valid"][0]
+        release = by_schema["release-receipt.schema.json"]["valid"][0]
+        mutations = {
+            "repository": (["repository", "name"], "Other"),
+            "base": (["base_sha"], "0" * 40),
+            "source": (["source_sha"], "0" * 40),
+            "ci-head": (["ci", "head_sha"], "0" * 40),
+            "approval-head": (["approval", "approved_head_sha"], "0" * 40),
+            "merge-tree": (["merge_tree_sha"], "0" * 40),
+            "epoch": (["source_date_epoch"], 1),
+            "base-url": (["base_url"], "https://example.invalid/Other/"),
+            "delta": (["change_delta", 0, "path"], "catalogue/models/other.yaml"),
+            "catalogue": (["artifacts", "catalogue", "sha256"], "sha256:" + "0" * 64),
+            "tool": (["tool_digest"], "sha256:" + "0" * 64),
+            "actors": (["approval", "actors_registry_digest"], "sha256:" + "0" * 64),
+            "workflow": (["ci", "workflow_identity"], "untrusted"),
+            "check-digest": (["accepted_check_receipt_digest"], "sha256:" + "0" * 64),
+            "manifest-path": (["artifacts", "manifest", "path"], "site/other.json"),
+        }
+        for expected, (path, value) in mutations.items():
+            changed = copy.deepcopy(release)
+            target = changed
+            for component in path[:-1]:
+                target = target[component]
+            target[path[-1]] = value
+            with self.subTest(expected=expected):
+                self.assertIn(expected, _release_correlation_errors(check, changed))
+
+    def test_agent_approval_requires_every_path_to_be_data_only(self) -> None:
+        self.assertTrue(_agent_paths_allowed(["catalogue/models/a.yaml", "catalogue/evidence/sha256-a.yaml"]))
+        self.assertFalse(_agent_paths_allowed([]))
+        for control_path in (
+            "schemas/model.schema.json",
+            "modelo.yaml",
+            "tooling/modelo/src/modelo/build.py",
+            ".github/workflows/modelo.yml",
+            "docs/contract.yaml",
+        ):
+            with self.subTest(path=control_path):
+                self.assertFalse(_agent_paths_allowed(["catalogue/models/a.yaml", control_path]))
+
+    def test_contract_assigns_all_cross_document_checks_to_t8(self) -> None:
+        contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(
+            set(contract["validation"]["t8_check_receipt_correlations"]),
+            {
+                "repository_identity",
+                "base_head_and_head_tree",
+                "as_of_source_epoch_profile_base_url_and_base_path",
+                "mac_payload_and_canonical_change_delta",
+                "named_artifact_paths_and_digests",
+                "tool_and_lock_digests",
+                "actors_registry_digest_and_actor_eligibility",
+                "trusted_workflow_identity_result_and_exact_head",
+            },
+        )
+        self.assertEqual(
+            set(contract["validation"]["postmerge_publication"]["final_only_digest_exceptions"]),
+            {"publication", "manifest"},
+        )
+        self.assertTrue(contract["approval"]["agent_approval"]["every_changed_path_must_match_allowlist"])
+
+    def test_atomic_publication_contract_is_ordered_and_not_overclaimed(self) -> None:
+        config = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
+        build = config["build"]
+        self.assertEqual(
+            set(build["required_cli_arguments"]),
+            {"kind", "source_commit", "source_tree", "as_of", "source_date_epoch", "mac_metadata", "profile", "base_path", "output"},
+        )
+        self.assertEqual(set(build["final_required_cli_arguments"]), {"merge_commit", "merge_tree"})
+        self.assertIs(build["ambient_git_or_environment_inference"], False)
+        self.assertEqual(build["lock_acquire"], "exclusive_create_or_fail_fast")
+        self.assertEqual(build["atomic_publish"], "per_rename_same_filesystem_only")
+        self.assertEqual(
+            build["promotion_state_machine"],
+            ["lock", "stage", "fsync_stage", "validate_stage", "backup_old", "promote_new", "fsync_parent", "verify_target", "remove_backup", "unlock"],
+        )
+        self.assertEqual(build["crash_recovery"], "explicit_recover_from_journal_or_fail_closed_on_ambiguity")
 
 
 if __name__ == "__main__":

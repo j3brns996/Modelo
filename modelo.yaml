@@ -92,7 +92,7 @@ toolchain:
   clean_clone:
     sync: uv sync --locked
     check: uv run --locked modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
-    build: uv run --locked modelo build --as-of YYYY-MM-DD
+    build: uv run --locked modelo build --kind candidate --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
 
 site:
   base_url: null
@@ -133,6 +133,11 @@ publication:
   silent_private_to_public_downgrade: false
 
 build:
+  command: modelo build
+  required_cli_arguments: [kind, source_commit, source_tree, as_of, source_date_epoch, mac_metadata, profile, base_path, output]
+  final_required_cli_arguments: [merge_commit, merge_tree]
+  base_url_choice: exactly_one_of_base_url_or_no_base_url_candidate_only
+  ambient_git_or_environment_inference: false
   candidate_root: dist/candidate
   final_root: dist/final
   staging_parent: dist/.staging
@@ -146,8 +151,17 @@ build:
   canonical_json: rfc8785_utf8_plus_single_lf
   publication_digest: sha256_of_sorted_path_nul_digest_nul_size_lf_records
   manifest_hashes_itself: false
-  atomic_publish: stage_validate_then_rename
-  failed_build_cleanup: remove_staging_preserve_previous_complete_output
+  writer_lock: dist/.modelo-build.lock
+  lock_acquire: exclusive_create_or_fail_fast
+  staging_name: sibling_target_dot_128_bit_csprng_hex
+  backup_name: sibling_target_dot_backup_dot_invocation_id
+  journal: bounded_fsync_state_file_in_lock
+  promotion_state_machine: [lock, stage, fsync_stage, validate_stage, backup_old, promote_new, fsync_parent, verify_target, remove_backup, unlock]
+  crash_recovery: explicit_recover_from_journal_or_fail_closed_on_ambiguity
+  atomic_publish: per_rename_same_filesystem_only
+  observable_contract: target_is_complete_old_complete_new_or_temporarily_absent_never_partial
+  final_requires_fsync_durability: true
+  failed_build_cleanup: restore_backup_if_needed_remove_staging_preserve_previous_complete_output
 
 platform:
   identities:
@@ -222,7 +236,7 @@ determinism:
   ignored_timestamps: [committer_time, filesystem_mtime]
   explicit_override_must_be_recorded: true
   source_tree: exact_source_commit_tree
-  build_inputs_explicit: [source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url, base_path]
+  build_inputs_explicit: [kind, source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url_choice, base_path, output]
   core_provider_reads: false
   change_history: local_git_first_parent_deltas
   site_build_requires_complete_first_parent_history: true

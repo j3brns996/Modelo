@@ -27,9 +27,21 @@ not executable build inputs: an agent uses a skill before invoking the ordinary
 locked CLI. Required CI contains no Node, npm or `npx` step and produces the
 same bytes when no skills are installed.
 
-`uv build --locked` packages the Python tooling. `uv run --locked modelo build
---as-of YYYY-MM-DD` will compile the catalogue/static publication. These are
-different outputs; neither creates a service.
+`uv build --locked` packages the Python tooling. The future `modelo build`
+compiles the catalogue/static publication and deliberately has no ambient
+defaults:
+
+```bash
+uv run --locked modelo build --kind candidate \
+  --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA \
+  --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS \
+  --mac-metadata VALIDATED_MAC_JSON --profile synthetic \
+  --no-base-url --base-path /Modelo/ --output dist/candidate
+```
+
+Exactly one of `--base-url` or candidate-only `--no-base-url` is required;
+final builds also require `--merge-commit` and `--merge-tree`. Tool packages
+and solution publications are different outputs; neither creates a service.
 
 ## Clean-clone smoke test
 

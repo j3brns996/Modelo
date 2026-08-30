@@ -41,6 +41,13 @@
   approval time, actors-registry digest, independence/eligibility result and the
   provider approval/check reference. Schema verification rejects stale-head,
   self-authored or ineligible approval evidence.
+- T8 rejects any mismatch between the accepted check receipt and trusted
+  repository/base/head/tree, date/epoch/profile/URL, MAC delta, named artefact,
+  tool/lock or workflow input. The final receipt digest binds the exact RFC
+  8785 check-receipt bytes plus LF; source, CI and approval heads must agree,
+  and merge tree must equal the accepted head tree. Agent eligibility applies
+  only when every changed path is data-only; one control-plane path makes the
+  complete change human-only.
 - GitHub requires a trusted required workflow sourced from the protected
   default branch. GitLab requires a Pipeline Execution Policy or equivalent
   control outside contributor modification; absence is an incapable platform,
@@ -48,6 +55,11 @@
 - Pre-merge records the up-to-date head tree. Post-merge proves tree equality,
   builds and validates the final artefact once, and stores its receipt detached
   from the bytes it hashes.
+- Publication uses an exclusive fail-fast writer lock, same-filesystem CSPRNG
+  staging, fsynced phase journal, validated staging, backup/promote renames and
+  explicit recovery. It does not claim that two renames are globally atomic;
+  final publication fails closed when required filesystem durability primitives
+  are unavailable.
 - Diagnostics and host-adapter inputs are schema-valid bounded JSON. Workflow
   code never copies validator-controlled text directly into environment files,
   shell commands or PR/MR comments.

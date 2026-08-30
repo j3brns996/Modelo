@@ -261,21 +261,64 @@ resolved from `base_path`. Trusted CI and every final build must supply and
 receipt-bind an absolute HTTPS base URL; the adapter may not infer it from an
 untrusted change.
 
+A non-null base URL is canonical: lowercase DNS host, implicit HTTPS port 443
+(no explicit port), no userinfo/query/fragment, normalised path segments, and a
+required trailing slash. Its URL path must equal the normalised `base_path`
+exactly: `/` pairs with `https://host/`, and `/Modelo/` pairs only with
+`https://host/Modelo/`. T8 enforces this cross-field equality after schema
+validation.
+
 ### Build and receipt wire contract
 
 `schemas/catalogue-output.schema.json` defines the sole JSON serialisation of
 validated catalogue state. T5 emits RFC 8785 UTF-8 bytes followed by exactly
-one LF, and
-canonical change-delta bytes. T6 consumes that projection and adds HTML, local
+one LF. SHA-256 always covers those exact emitted bytes, including the LF.
+Object members use RFC 8785 ordering. Before serialisation T5 sorts models by
+`id`; offerings by `(inference_service_id, id)`; evidence by `id`; conditions
+by `(id, version)`; model capabilities and modalities by ASCII ID; offering
+routes by `id`; route destinations by `destination_pointer`; pricing by
+`(dimension, unit, quantity, amount, currency, joined sorted route_ids)`;
+`route_ids` by ID; and condition references by `(id, version)`. When routes or
+pricing move, T5 deterministically rewrites the corresponding JSON Pointer keys
+in `evidence_refs` before RFC 8785 orders that object. Evidence projection
+arrays retain source order because provider order can be meaningful; that order
+is therefore part of the evidence fact, not an unordered set.
+
+Canonical change-delta order is operation rank `add`, `change`, `revoke`,
+`move`, then primary path (ordinary `path`, or move source path), move
+destination path, `before`, then `after`, all compared as UTF-8 bytes with a
+missing component equal to the empty string. These rules apply before both
+receipt serialisation and digesting; two otherwise-valid permutations cannot
+produce different canonical bytes. T6 consumes that projection and adds HTML, local
 assets and schema copies; it must not independently serialise raw or private
 catalogue state.
 
-Candidate output is staged beneath `dist/.staging/` and atomically promoted to
-`dist/candidate/`; final post-merge output is promoted to `dist/final/`.
+Candidate output targets `dist/candidate/`; final post-merge output targets
+`dist/final/`.
 Publication files are below each output's `site/` directory. The catalogue is
 `site/data/catalogue.json`, the manifest is `site/data/manifest.json`, and
-detached receipts are below `dist/receipts/`. A failed build removes only its
-staging directory and preserves the previous complete output.
+detached receipts are below `dist/receipts/`.
+
+Each invocation exclusively creates `dist/.modelo-build.lock` or fails fast;
+it never waits. The lock contains a bounded, fsynced phase journal. Staging is
+a same-filesystem sibling named from the target plus 128 bits from the OS CSPRNG
+and created exclusively; collision retries create a fresh name. After every
+file is closed, eligible builds fsync files and directories, validate the
+complete staged tree, rename an existing target to an invocation-specific
+backup, rename staging to target, fsync the parent, verify the promoted target,
+remove the backup, fsync the parent and release the lock. A handled failure
+restores the backup before cleanup. A crash leaves the journal and lock; the
+next build fails closed until an explicit recovery verifies recorded digests
+and performs the single unambiguous restore/cleanup action. Ambiguous states
+require manual recovery and never delete either complete candidate.
+
+Two renames are not a global atomic transaction. The observable contract is
+therefore precise: a reader may see the complete old target, the complete new
+target or a temporarily absent target, but never a partially written target.
+Pages/release deployment reads only after successful promotion. Final and CI
+acceptance builds require file and directory fsync support; an incapable
+filesystem/platform fails closed. A local candidate may record
+`process-atomic-only`, but cannot produce an accepting check receipt.
 
 `schemas/build-manifest.schema.json` defines the complete publication manifest.
 Its `files` map hashes every emitted publication file except the manifest
@@ -287,7 +330,23 @@ recursive and archive-metadata ambiguity.
 
 `schemas/check-receipt.schema.json` is the detached pre-merge envelope. T8,
 not T5, supplies trusted Git-provider workflow identity, run and exact-head
-result and assembles it. A change request has no final receipt. Post-merge CI
+result and assembles it. Its digest is SHA-256 of the RFC 8785 serialisation of
+the complete receipt plus exactly one LF. T8 validates equality between the
+receipt and trusted inputs for repository identity, base/head/head-tree,
+`as_of`, source epoch, profile, canonical base URL/path, validated MAC payload
+and canonical delta, named artefact paths/digests, tool/lock digests and trusted
+workflow identity/result. Missing or unequal input is an error; there is no
+field-by-field fallback.
+
+A change request has no final receipt. Post-merge CI dereferences the accepted
+check receipt by its canonical-byte digest; requires release `source_sha`, CI
+`head_sha` and approval `approved_head_sha` to equal the accepted head; requires
+release base and head-tree to equal the accepted values; and requires
+`merge_tree_sha == head_tree_sha`. Repository, `as_of`, epoch, profile, base
+URL/path, MAC delta, tool/lock digest, workflow identity and catalogue artefact
+name/digest must remain equal. Publication and manifest names remain fixed but
+their digests may differ only because the final build adds merge-history
+content; those are the only final-only digest exceptions. Post-merge CI
 proves the merge tree equals the accepted head tree, validates the final
 publication once, creates the detached release receipt, and deploys those exact
 bytes without rebuilding.
@@ -609,7 +668,12 @@ agent approval is disabled by default. It can be enabled only when
 `catalogue/governance/actors.yaml` registers an enabled actor with a distinct
 platform identity and data-only scope, the reviewer is independent of author,
 committer and last pusher, and the current exact head has a successful trusted
-check receipt. Control-plane changes always require a human CODEOWNER. The
+check receipt whose repository/base/head and actor-registry digest still match.
+T8 computes the complete base/head changed-path set and permits agent approval
+only when every path matches one of those three data allowlist patterns; one
+schema, tooling, lock, configuration, governance, publication, workflow,
+template, skill or documentation path makes the entire change human-only.
+Control-plane changes always require a human CODEOWNER. The
 topic branch must be up to date
 with the protected base, and a merge queue/train is deferred until it has a
 candidate-tree contract. Repository
@@ -638,8 +702,29 @@ git clone <repository-url>
 cd Modelo
 uv sync --locked
 uv run --locked modelo check --base <protected-base-sha> --head <head-sha> --as-of <YYYY-MM-DD>
-uv run --locked modelo build --as-of <YYYY-MM-DD>
+uv run --locked modelo build --kind candidate \
+  --source-commit <head-sha> --source-tree <head-tree-sha> \
+  --as-of <YYYY-MM-DD> --source-date-epoch <author-unix-seconds> \
+  --mac-metadata <validated-mac.json> --profile synthetic \
+  --no-base-url --base-path /Modelo/ --output dist/candidate
 ```
+
+T5 implements exactly those build inputs. `--kind`, `--source-commit`,
+`--source-tree`, `--as-of`, `--source-date-epoch`, `--mac-metadata`,
+`--profile`, `--base-path` and `--output` are required. Exactly one of
+`--base-url <canonical-https-url>` or candidate-only `--no-base-url` is
+required. Final builds forbid `--no-base-url`. The CLI validates that the
+explicit source commit resolves to the explicit tree and timestamp; it never
+infers HEAD, environment values, output, MAC metadata or publication settings.
+Final builds additionally require explicit `--merge-commit` and
+`--merge-tree`, verify the merge tree equals the accepted source tree, and keep
+the accepted source epoch unchanged.
+
+T8 invokes the candidate build with the trusted provider's base/head/tree,
+validated bounded MAC metadata, explicit epoch/profile/base URL/path and a
+fresh candidate output path, then hashes that exact result. Post-merge invokes
+the same interface with `--kind final`, the accepted source commit/tree/epoch,
+the explicit merge commit/tree, and `dist/final`.
 
 Codespaces, GitLab Workspaces, Kiro and IDE settings are optional conveniences.
 They cannot be required for a clean clone.

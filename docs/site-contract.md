@@ -113,11 +113,20 @@ merge-aware artefact once, validates it, creates a detached release receipt that
 hashes it, and deploys that exact final artefact without rebuilding. The receipt
 is not stored inside the artefact whose digest it records.
 
-The build stages beneath `dist/.staging/`, validates the complete result, then
-atomically renames it to `dist/candidate/` or `dist/final/`. Failure removes the
-new staging directory and preserves the previous complete output. File digests
-are SHA-256 over exact bytes; the publication digest hashes sorted
+Each build exclusively acquires the fail-fast writer lock, journals its phase,
+creates a same-filesystem sibling staging name from 128 OS-CSPRNG bits, fsyncs
+and validates the staged tree, renames the old target to a backup, renames the
+stage to target, fsyncs and verifies it, then removes the backup and lock.
+Handled failure restores the backup. Crash recovery is explicit and
+journal-driven; ambiguity fails closed. The two renames are not one globally
+atomic transaction: readers may see complete-old, complete-new or temporarily
+absent, never partial. Final builds require file and directory fsync support.
+File digests are SHA-256 over exact bytes; the publication digest hashes sorted
 path/NUL/digest/NUL/size/LF records, so archive metadata is irrelevant.
+
+The effective URL is lowercase-host HTTPS with implicit port 443, no
+userinfo/query/fragment and a trailing slash. T8 requires its URL path to equal
+normalised `base_path` exactly and tests both `/` and `/Modelo/`.
 
 CI must prove canonical detail-page coverage, link integrity at both base paths,
 deterministic rebuilds, manifest integrity, search/filter behaviour, stable

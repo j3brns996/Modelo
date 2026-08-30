@@ -74,6 +74,8 @@ approval:
     successful_trusted_exact_head_ci_evidence_required: true
     registry_config_key: paths.actors_registry
     empty_or_missing_registry_means: disabled
+    every_changed_path_must_match_allowlist: true
+    any_control_plane_path_makes_entire_change_human_only: true
   human_codeowner_required_for: every_path_outside_agent_approval_allowlist
 
 evidence:
@@ -234,7 +236,7 @@ toolchain:
   clean_clone_commands:
     - uv sync --locked
     - uv run --locked modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
-    - uv run --locked modelo build --as-of YYYY-MM-DD
+    - uv run --locked modelo build --kind candidate --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
   solution_tooling_and_publication_are_services: false
   agent_skills_are_build_inputs: false
   network:
@@ -249,7 +251,11 @@ build:
   release_receipt_wire_schema: schemas/release-receipt.schema.json
   actors_registry_schema: schemas/actors-registry.schema.json
   t5_outputs: [canonical_catalogue_bytes, canonical_change_delta_bytes, receipt_primitives]
-  t5_explicit_inputs: [source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url, base_path]
+  t5_explicit_inputs: [kind, source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url_choice, base_path, output]
+  cli_required_flags: [kind, source_commit, source_tree, as_of, source_date_epoch, mac_metadata, profile, base_path, output]
+  cli_base_url_choice: exactly_one_of_base_url_or_candidate_only_no_base_url
+  cli_final_additional_flags: [merge_commit, merge_tree]
+  ambient_inference: forbidden
   local_candidate_base_url_may_be_null: true
   trusted_ci_and_final_base_url: explicit_absolute_https
   default_source_epoch: exact_source_commit_author_unix_seconds
@@ -272,8 +278,36 @@ build:
   publication_digest: sha256_of_sorted_path_nul_digest_nul_size_lf_records
   manifest_files_include_manifest: false
   canonical_json: rfc8785_utf8_plus_single_lf
-  atomic_publish: stage_validate_then_rename
-  failure: remove_new_staging_and_preserve_previous_complete_output
+  canonical_sha256_scope: exact_rfc8785_bytes_including_single_lf
+  catalogue_sort_keys:
+    models: [id]
+    offerings: [inference_service_id, id]
+    evidence: [id]
+    conditions: [id, version]
+    routes: [id]
+    route_destinations: [destination_pointer]
+    pricing: [dimension, unit, quantity, amount, currency, sorted_route_ids]
+    condition_refs: [id, version]
+    id_arrays: ascii_id
+  change_delta_sort: [operation_rank_add_change_revoke_move, primary_path, destination_path, before, after]
+  semantic_evidence_projection_arrays_preserve_source_order: true
+  writer_lock: exclusive_create_or_fail_fast
+  staging: same_filesystem_sibling_exclusive_128_bit_csprng_name
+  promotion: [lock, stage, fsync_stage, validate_stage, backup_old, promote_new, fsync_parent, verify_target, remove_backup, unlock]
+  atomicity_scope: each_same_filesystem_rename_not_whole_multi_rename_transaction
+  observable_target: complete_old_complete_new_or_temporarily_absent_never_partial
+  final_durability: fsync_files_and_directories_or_incapable
+  recovery: explicit_bounded_journal_restore_or_fail_closed_on_ambiguity
+  failure: restore_backup_remove_new_staging_preserve_previous_complete_output
+
+canonical_site_url:
+  scheme: https
+  host: lowercase_dns
+  port: implicit_443_only
+  forbidden: [userinfo, query, fragment, dot_segments, percent_encoding]
+  trailing_slash: required
+  path_must_equal_normalised_base_path: true
+  examples: ["https://host.invalid/ + /", "https://host.invalid/Modelo/ + /Modelo/"]
 
 site:
   contract_config_key: paths.site_contract
@@ -328,12 +362,25 @@ validation:
     protected_branch_must_be_up_to_date: true
     merge_gate_requires_current_base_equal_receipt_base: true
     purpose: candidate_content_validation_not_release
+  t8_check_receipt_correlations:
+    - repository_identity
+    - base_head_and_head_tree
+    - as_of_source_epoch_profile_base_url_and_base_path
+    - mac_payload_and_canonical_change_delta
+    - named_artifact_paths_and_digests
+    - tool_and_lock_digests
+    - actors_registry_digest_and_actor_eligibility
+    - trusted_workflow_identity_result_and_exact_head
+  accepted_check_receipt_digest: sha256_of_complete_rfc8785_utf8_plus_single_lf
   postmerge_publication:
     merge_tree_must_equal_accepted_head_tree: true
     builds_final_merge_aware_artifact_once: true
     validates_and_deploys_that_exact_artifact_without_rebuild: true
     detached_receipt_hashes_final_artifact: true
     receipt_is_not_inside_hashed_artifact: true
+    required_equalities: [release_source_equals_check_head, release_ci_head_equals_check_head, approval_head_equals_check_head, base_equals_check_base, head_tree_equals_check_head_tree, merge_tree_equals_head_tree]
+    continuity: [repository, as_of, source_date_epoch, profile, base_url, base_path, mac_delta, catalogue_artifact, tool_digest, lock_digest, workflow_identity]
+    final_only_digest_exceptions: [publication, manifest]
 
 platform:
   neutral_terms: [issue, change_request, required_check, protected_default_branch, static_site, release]

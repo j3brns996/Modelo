@@ -18,6 +18,8 @@ from typing import Any, Literal
 from urllib.parse import urlsplit
 from uuid import UUID
 
+from jsonschema import FormatChecker
+
 
 Adapter = Literal["github", "gitlab"]
 MAX_BODY_BYTES = 65_536
@@ -29,6 +31,11 @@ PAYLOAD_START = "<!-- modelo:mac-payload:start -->"
 PAYLOAD_END = "<!-- modelo:mac-payload:end -->"
 _HASH_PATTERN = re.compile(r"^sha256-[0-9a-f]{64}$")
 _IDENTITY_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9._:/@+-]*[a-z0-9])?$")
+_HOST_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+_HTTPS_PATTERN = re.compile(
+    rf"^https://(?:{_HOST_LABEL}\.)*{_HOST_LABEL}(?:[/?#][\u0021-\u007e]*)?$"
+)
+_FORMAT_CHECKER = FormatChecker()
 _KINDS = {"model", "offering", "evidence", "vendor", "inference-service", "condition"}
 _OPERATIONS = {"add", "change", "revoke", "move", "batch"}
 _ITEM_OPERATIONS = {"add", "change", "revoke"}
@@ -96,7 +103,7 @@ def _mapping(value: Any, name: str, allowed: set[str], required: set[str]) -> Ma
 def _text(value: Any, name: str, *, maximum: int = 2_048) -> str:
     if not isinstance(value, str) or not value or value != value.strip() or len(value) > maximum:
         raise MacError(f"{name} must be a non-empty trimmed string of at most {maximum} characters")
-    if any(ord(character) < 32 for character in value):
+    if any(ord(character) < 32 or 0x7F <= ord(character) <= 0x9F for character in value):
         raise MacError(f"{name} contains a control character")
     return value
 
@@ -113,11 +120,20 @@ def _identity(value: Any, name: str) -> str:
 
 def _https(value: Any, name: str) -> str:
     text = _text(value, name)
-    if any(ord(character) <= 32 for character in text):
-        raise MacError(f"{name} contains whitespace or a control character")
+    if not _HTTPS_PATTERN.fullmatch(text) or not _FORMAT_CHECKER.conforms(text, "uri"):
+        raise MacError(
+            f"{name} must be an ASCII https URI with a DNS-style host, no user information "
+            "or explicit port; path, query and fragment are permitted"
+        )
     parsed = urlsplit(text)
-    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
-        raise MacError(f"{name} must be an https URI without user information")
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.port is not None
+    ):
+        raise MacError(f"{name} violates the https URI policy")
     return text
 
 

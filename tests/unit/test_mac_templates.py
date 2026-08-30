@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 import yaml
+from jsonschema import Draft202012Validator, FormatChecker
 
 from modelo.mac import (
     MAX_ADAPTER_OVERHEAD_BYTES,
@@ -13,6 +14,7 @@ from modelo.mac import (
     extract_adapter_issue_payload,
     payload_digest,
     with_computed_keys,
+    validate_payload,
 )
 
 
@@ -62,7 +64,7 @@ class MacTemplateTests(unittest.TestCase):
         )
         self.assertEqual(
             schema["$defs"]["text"]["pattern"],
-            "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$",
+            "^[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000](?:[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000])?$",
         )
         for definition in ("subject", "batchScope", "candidateEvidence"):
             self.assertFalse(schema["$defs"][definition]["additionalProperties"])
@@ -153,6 +155,85 @@ class MacTemplateTests(unittest.TestCase):
     def test_t7_does_not_add_workflows_site_skills_or_catalogue(self) -> None:
         for relative in (".github/workflows", "site", ".agents/skills", "catalogue"):
             self.assertFalse((ROOT / relative).exists(), relative)
+
+    def test_schema_and_module_text_parity_corpus(self) -> None:
+        schema = json.loads((ROOT / "schemas/mac.schema.json").read_text(encoding="utf-8"))
+        validator = Draft202012Validator(schema, format_checker=FormatChecker())
+        base = self.fixtures()["add"]
+        cases = (
+            ("", False),
+            ("plain", True),
+            ("two words", True),
+            ("internal\u00a0space", True),
+            ("Unicode café", True),
+            (" leading", False),
+            ("trailing ", False),
+            ("\u00a0leading-nbsp", False),
+            ("trailing-nbsp\u00a0", False),
+            ("\u1680leading-ogham", False),
+            ("trailing-em-space\u2003", False),
+            ("line\nbreak", False),
+            ("tab\tinside", False),
+            ("c1\u0085control", False),
+            ("delete\u007fcontrol", False),
+            ("a" * 2_048, True),
+            ("a" * 2_049, False),
+        )
+        for value, expected in cases:
+            payload = json.loads(json.dumps(base))
+            payload["reason"] = value
+            schema_accepts = not list(validator.iter_errors(payload))
+            try:
+                validate_payload(payload, verify_hashes=False)
+                module_accepts = True
+            except ValueError:
+                module_accepts = False
+            with self.subTest(value=repr(value)):
+                self.assertEqual(schema_accepts, expected)
+                self.assertEqual(module_accepts, expected)
+                self.assertEqual(schema_accepts, module_accepts)
+
+    def test_schema_and_module_https_uri_parity_corpus(self) -> None:
+        schema = json.loads((ROOT / "schemas/mac.schema.json").read_text(encoding="utf-8"))
+        validator = Draft202012Validator(schema, format_checker=FormatChecker())
+        cases = (
+            ("https://example.invalid", True),
+            ("https://docs.example.invalid/path/to/item", True),
+            ("https://example.invalid/path?key=value&other=2#section", True),
+            ("https://EXAMPLE.invalid/Path", True),
+            ("https://127.0.0.1/resource", True),
+            ("http://example.invalid/path", False),
+            ("HTTPS://example.invalid/path", False),
+            ("https://user@example.invalid/path", False),
+            ("https://user:secret@example.invalid/path", False),
+            ("https://example.invalid:443/path", False),
+            ("https://[2001:db8::1]/path", False),
+            ("https://example_invalid/path", False),
+            ("https://example.invalid./path", False),
+            ("https:///missing-host", False),
+            ("https://example.invalid/a path", False),
+            ("https://example.invalid/café", False),
+            ("https://example.invalid/line\nbreak", False),
+            ("https://example.invalid/" + "a" * 2_024, True),
+            ("https://example.invalid/" + "a" * 2_025, False),
+        )
+        for uri, expected in cases:
+            for fixture, pointer in (("add", "candidate"), ("batch", "source")):
+                payload = self.fixtures()[fixture]
+                if pointer == "candidate":
+                    payload["candidate_evidence"][0]["uri"] = uri
+                else:
+                    payload["batch_scope"]["source"]["uri"] = uri
+                schema_accepts = not list(validator.iter_errors(payload))
+                try:
+                    validate_payload(payload, verify_hashes=False)
+                    module_accepts = True
+                except ValueError:
+                    module_accepts = False
+                with self.subTest(uri=uri, pointer=pointer):
+                    self.assertEqual(schema_accepts, expected)
+                    self.assertEqual(module_accepts, expected)
+                    self.assertEqual(schema_accepts, module_accepts)
 
 
 if __name__ == "__main__":

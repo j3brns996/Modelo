@@ -143,8 +143,15 @@ provider_boundary:
     sensitive_fields_never_retained: [credentials, offerToken]
     deferred_route_types: [application-profile, provisioned, custom, imported]
     model_binding:
-      foundation_model: evidenced_model_id_arn_name_and_provider_equal_canonical_model_evidence
-      system_inference_profile: every_evidenced_destination_resolves_through_get_foundation_model_to_same_canonical_model
+      foundation_model:
+        route_reference_equals: evidenced_model_id_or_arn
+        reported_identity_equals: [canonical_model_name, governed_vendor_name]
+        explicit_model_evidence_pointers: [id_pointer, arn_pointer, name_pointer, provider_pointer]
+      system_inference_profile:
+        requires: [explicit_profile_evidence_ref, explicit_destination_pointer_and_model_evidence_per_destination]
+        destination_arn_equals_model_evidence_arn: true
+        every_reported_identity_equals: [canonical_model_name, governed_vendor_name]
+        validator_global_evidence_search: forbidden
       transformed_or_ambiguous_mapping: deferred
   gcp_vertex_ai: deferred_until_first_party_fixtures
   azure_ai_foundry: deferred_until_first_party_fixtures
@@ -157,9 +164,11 @@ mac:
   move:
     subject_kind: offering_only
     action: atomic_add_destination_and_revoke_source
+    subject_roles: exactly_one_source_and_one_destination
   revoke_subject_kind: offering_only
   batch_max_subjects: 25
   batch_requires_homogeneous_item_operation: [add, change, revoke]
+  batch_scope_required_fields: [source, observation_scope, inference_service_id]
   issue_payload_digest_bound_to_change_and_release_receipt: true
   hash_canonicalisation: RFC_8785_JCS
   hash_input_omits: [dedupe_key, idempotency_key]
@@ -265,6 +274,12 @@ validation:
     - change_delta
     - head_and_merge_tree_shas
     - source_date_epoch
+    - reviewer_platform_identity
+    - approved_head_sha
+    - approval_timestamp
+    - actor_policy_digest
+    - independence_and_eligibility_result
+    - provider_approval_and_check_reference
   premerge_artifact:
     records_head_tree_sha: true
     protected_branch_must_be_up_to_date: true
@@ -281,6 +296,7 @@ platform:
   neutral_terms: [issue, change_request, required_check, protected_default_branch, static_site, release]
   github_adapter_config_key: paths.github_adapter
   gitlab_adapter_config_key: paths.gitlab_adapter
+  gitlab_ci_config_key: paths.gitlab_ci
   host_switch_changes_core_records: false
   platform_check: modelo platform check
   missing_required_capability: fail_closed

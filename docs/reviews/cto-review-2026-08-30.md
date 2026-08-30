@@ -102,3 +102,7 @@ actual templates and routes, neutral MAC hashes, CI trust/approval boundary,
 locked Python/`uv` build, task graph and verification gates. `npx` and Agent
 Skills are not build inputs. Agent approval is data-only; control-plane changes
 require human CODEOWNER review.
+
+The omitted Addy Osmani assessment is now explicit in
+`docs/reviews/agent-skills-2026-08-30.md`: use a manually reviewed, pinned subset
+at T9; do not install the pack wholesale or run `npx` in CI.

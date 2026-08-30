@@ -59,7 +59,7 @@ Version `0.1.0` does not:
 | Repository paths, relative public routes and selected host adapter | `modelo.yaml` |
 | Entity structure and allowed values | `schemas/` |
 | Path, reference, evidence and change rules | Validator |
-| Acceptance command | `modelo check` |
+| Technical acceptance | Required CI check running `modelo check` at the exact change-request head SHA |
 | Remote branch, review and publication controls | Platform adapter and host settings |
 | Human rationale | `SPEC.md` and ADRs |
 | Compact agent context | `docs/contract.yaml` |
@@ -144,8 +144,16 @@ it is never committed back to the source branch.
 ### 1. Protected-default-branch presence is approval
 
 Approval applies only to valid records beneath `catalogue/`. It requires a
-linked MAC issue, a reviewed change request, required checks and merge to the
-protected default branch.
+linked MAC issue, successful trusted CI for the exact change-request head
+commit, an eligible independent approved review, and merge to the protected
+default branch.
+
+CI is the technical arbiter: a missing, stale or failed required check is a
+rejection that no human or agent approval can override. Review is a separate
+attestation that the diff and CI evidence were independently examined. The
+reviewer may be a human or an agent, but must have a distinct eligible platform
+identity and must not have authored, committed or modified the change. Any new
+commit invalidates the prior CI result and approval.
 
 The issue is intake. The merged files and commit are the approved state.
 
@@ -216,7 +224,7 @@ The catalogue, schemas, validator, builder and tests use neutral terms:
 - change request;
 - protected default branch;
 - required check;
-- code-owner review;
+- independent review, with code ownership where configured;
 - static-site publication;
 - protected release.
 
@@ -443,8 +451,9 @@ Scheduled native CI
   -> compare factual fields with approved state
   -> open or update one MAC issue
   -> human or agent prepares a branch and change request
-  -> modelo check
-  -> code-owner review
+  -> trusted CI runs modelo check for the exact head commit
+  -> independent human or agent inspects the diff and CI evidence
+  -> eligible reviewer approves that exact head commit
   -> protected-default-branch merge
   -> deterministic Pages artefact and protected release
 ```
@@ -468,7 +477,7 @@ limit of 25 identities.
 | Change review | Pull request | Merge request |
 | Validation | Actions | GitLab CI |
 | Concurrency | Merge queue | Merge train |
-| Ownership | CODEOWNERS and ruleset | CODEOWNERS and approval rules |
+| Independent review | Required review, CODEOWNERS and ruleset | Approval rules, CODEOWNERS and contributor restrictions |
 | Publication | Pages Actions artefact | Pages CI artefact |
 | Release | Protected tag and release | Protected tag and release |
 
@@ -478,10 +487,11 @@ synthetic/public data or stop at a private CI artefact. It must not acquire an
 authentication proxy merely to compensate for a hosting-plan limitation.
 
 `modelo platform check` will verify the remote control profile: protected
-default branch, no direct or force pushes, required validation, code-owner
-approval, stale-review dismissal, resolved conversations, protected tags and
-appropriate Pages visibility. Repository files alone cannot prove those remote
-settings are active.
+default branch, no direct or force pushes, required validation at the exact
+head commit, independent-review eligibility, prevention of contributor
+self-approval where the platform supports it, stale-review dismissal, resolved
+conversations, protected tags and appropriate Pages visibility. Repository
+files alone cannot prove those remote settings are active.
 
 There is no Modelo service endpoint to port. Switching from GitHub to GitLab
 changes the platform adapter and `modelo.yaml`; it does not change the core
@@ -514,9 +524,13 @@ not as the planning system of record or an approval authority.
 
 - The MAC issue records intent and acceptance criteria.
 - Read-only specialist agents may research independent questions in parallel.
-- One root agent owns writes.
-- Every write receives targeted validation; `modelo check` runs before hand-off.
-- The platform change request exposes the diff for human review.
+- One authoring agent owns writes for a change.
+- A separate review agent may approve only when it has a distinct eligible
+  platform identity, did not contribute to the change, and verifies successful
+  trusted-CI evidence for the exact head commit.
+- Every write receives targeted validation; trusted CI reruns `modelo check`.
+- The platform change request exposes the diff and immutable test evidence for
+  independent human or agent review.
 
 `AGENTS.md` and `.agents/skills/` are the portable workflow layer. Skills follow
 the open Agent Skills format. `.codex/` and `.kiro/` are optional adapters and
@@ -536,6 +550,20 @@ are:
 2. `tests`: unit and fixture tests;
 3. `build-and-site`: deterministic catalogue and static-site build with smoke tests;
 4. `release-and-clean-tree`: release-contract and clean-tree verification.
+
+The required CI check `modelo/check` is the technical acceptance arbiter. Its
+evidence binds `head_sha`, provider workflow or pipeline ID, check name,
+completion time, result, test summary, and manifest or artefact digests. Only a
+successful result for the current change-request head is admissible. A skipped,
+neutral, missing, cancelled, stale or failed result does not establish Modelo
+acceptance, even if a Git platform would otherwise describe some of those
+states as mergeable.
+
+Approval is not a second implementation of validation. An eligible independent
+reviewer inspects the diff and this CI evidence, records the evidence identifiers
+in the review, and may then approve. An agent using the author's platform
+identity is not independent and may only leave a review report. Any new commit
+requires both CI and approval again.
 
 Lint, dependency lock, secret scanning and document-drift checks are internal
 stages of those outcomes, not eleven independently promised products. A control
@@ -565,6 +593,8 @@ The initial explicit contracts are:
 - **Platform:** core code contains no GitHub or GitLab URL logic.
 - **Schema:** shape changes include compatibility, migration and rollback.
 - **Audit:** claim tamper evidence, not WORM immutability.
+- **Arbiter:** CI decides technical acceptance; independent review attests that
+  the exact-head diff and evidence were examined.
 - **Exit:** measure when Git stops fitting.
 
 ## Sustainability exit criteria

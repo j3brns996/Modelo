@@ -1,400 +1,242 @@
-# Model Catalogue v0.1.0 - machine-readable agent contract
-# Human explanation: SPEC.md
+# Modelo v0.1.0 - compact machine-readable contract
+# Human rationale and examples: SPEC.md
 
 contract:
-  name: model-catalogue
+  name: modelo
   version: "0.1.0"
-  status: draft
-  purpose: agent_navigation
+  status: target
+  executable_config: modelo.yaml
   human_specification: SPEC.md
-  version_file: VERSION
-  maintenance:
-    update_with:
-      - schemas
-      - validator_rules
-      - diagnostic_codes
-      - ci_gates
-    drift_severity: error
+  drift_is_error: true
+
+purpose:
+  system: git_backed_approval_and_publication_ledger
+  live_inventory: false
+  runtime_policy_engine: false
+  application_api: false
+  workflow_api: selected_git_provider_only
+  consumer_interfaces:
+    - static_pages
+    - release_artefact
+    - git_clone
+  principle: provider_observation_is_evidence_not_approval
 
 authority:
-  structural_validation: schemas/
-  cross_file_validation: scripts/validators.py
-  pipeline: scripts/ci_local.py
-  approval: github_protected_main
-  conflict_policy: executable_validation_wins_and_document_drift_is_a_defect
+  paths_and_routes: modelo.yaml
+  entity_shapes: schemas/
+  semantic_rules: validator
+  acceptance_command: modelo check
+  remote_controls: platform_adapter
+  rationale: SPEC.md
 
-repository:
-  provider: github
-  default_branch: main
-  source_root: catalogue/
-  protected_paths:
-    - catalogue/models/**
-    - catalogue/offerings/**
-    - catalogue/governance/**
-    - schemas/**
-    - scripts/**
-  forbidden_top_level_directories:
-    - models/
-    - offerings/
-    - governance/
-    - data/
-    - registries/
-    - operators/
-    - tools/
-    - services/
+concepts:
+  model: canonical_named_model_release
+  offering: approved_operator_model_relationship
+  route: provider_scoped_invocation_reference
+  observation: time_bounded_first_party_evidence
+  condition: versioned_enterprise_policy
 
-paths:
-  models: "catalogue/models/{model_id}.yaml"
-  offerings: "catalogue/offerings/{operator_id}/{model_id}.{geo}.yaml"
-  vendors_registry: catalogue/governance/vendors.yaml
-  operators_registry: catalogue/governance/operators.yaml
-  freshness_policy: catalogue/governance/freshness.yaml
-  conditions_guidance: docs/conditions.yaml
-  schemas: schemas/
-  scripts: scripts/
-  tests: tests/
-  fixtures_valid: tests/fixtures/valid/
-  fixtures_invalid: tests/fixtures/invalid/
-  site: public-docs/
-  skills: .kiro/skills/
-  agent_config: .kiro/agents/model-catalogue-maintainer.json
-  github_workflow: .github/workflows/ci.yml
-  codeowners: .github/CODEOWNERS
+identity:
+  model:
+    field: id
+    path_template: catalogue/models/{model_id}.yaml
+  offering:
+    field: id
+    path_template: catalogue/offerings/{operator_id}/{offering_id}.yaml
+  route:
+    field: id
+    stored_under: offering
+  provider_scope_in_canonical_path: false
+  move_semantics: add_new_and_revoke_old
 
 approval:
-  mechanism: merge_to_protected_main
-  approved_entity_paths:
-    - catalogue/models/**
-    - catalogue/offerings/**
-    - catalogue/governance/**
-  receipt:
-    - pull_request
-    - reviews
-    - resulting_commit
-  model_record_alone_is_consumable: false
+  applies_to: valid_catalogue_records
+  requires:
+    - linked_mac_issue
+    - reviewed_change_request
+    - required_checks
+    - merge_to_protected_default_branch
+  issue_is_approval: false
+  provider_availability_is_approval: false
+  model_alone_is_consumable: false
   offering_required_for_consumption: true
-  revocation: delete_offering_via_pull_request
-  forbidden_workflow_fields:
+  forbidden_record_fields:
     - approval_status
     - approval_flag
     - workflow_state
-  lifecycle_is_approval_state: false
 
-identity:
-  identifier_pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
-  model:
-    key:
-      - model_id
-    field: id
-    path_field_match: filename_stem
-    mutable_family_aliases_allowed: false
-  offering:
-    key:
-      - operator_id
-      - model_id
-      - geo
-    path_matches:
-      operator_id: parent_directory
-      model_id: filename_model_component
-      geo: filename_geo_component
-
-semantics:
-  geo:
-    meaning: catalogue_market
-    proves_data_residency: false
-  available_regions:
-    meaning: operator_deployment_region_identifiers
-    proves_data_residency: false
-  conditions:
-    format: free_form_strings
-    machine_enforced: false
-    guidance: docs/conditions.yaml
-  pricing:
-    scope: token_priced_inference
-    other_units_supported: false
-
-schemas:
-  dialect: https://json-schema.org/draft/2020-12/schema
-  format_checking: enforced
-  unknown_properties: rejected
-  model: schemas/model.schema.json
-  offering: schemas/offering.schema.json
-  vendors: schemas/vendors-registry.schema.json
-  operators: schemas/operators-registry.schema.json
-  freshness: schemas/freshness-policy.schema.json
-  summaries_are_informative: true
-
-model:
-  required:
-    - id
-    - vendor
-    - name
-    - description
-    - capabilities
-    - modalities
-    - context_window
-    - licensing
-  optional:
-    - lifecycle
-    - evidence
-  references:
-    vendor: catalogue/governance/vendors.yaml
-  lifecycle_values:
-    - active
-    - legacy
-    - eol
-
-offering:
-  required:
-    - model_id
-    - operator_id
-    - provider_model_name
-    - geo
-    - pricing
-    - available_regions
-  optional:
-    - conditions
-  references:
-    model_id: catalogue/models/
-    operator_id: catalogue/governance/operators.yaml
-  geo_values:
-    - uk
-    - eu
-    - us
-    - global
+evidence:
+  required_for: every_non_identity_assertion
+  fact_links: json_pointer
+  admissible_sources:
+    - first_party_read_api
+    - official_provider_documentation
+    - official_vendor_documentation
+  required_metadata:
+    - source
+    - source_type
+    - observed_at
+    - retrieval_method
+    - scope
+  digest_when_safe_and_stable: true
+  unsupported_fact_action: omit
+  discovery_absence_can_revoke: false
 
 pricing:
-  required:
-    - input_per_million
-    - output_per_million
-    - currency
-    - source_url
-    - checked_at
-  minimum:
-    input_per_million: 0
-    output_per_million: 0
-  currency_pattern: "^[A-Z]{3}$"
-  source_url_format: uri
-  checked_at_format: date
+  representation: dimensional
+  dimensions_are_provider_adapter_values: true
+  amount:
+    value_type: decimal_string
+    currency: iso_4217
+    unit: explicit
+  private_terms_in_public_site: false
 
-yaml_loader:
-  implementation: scripts/loader.py
-  root_type: mapping
-  max_depth: 10
-  encoding: utf-8
-  newline: lf
-  yaml_boolean_mode: yaml_1_2
-  implicit_dates: disabled
-  rejected:
-    duplicate_key: DUPLICATE_KEY
-    alias: ALIAS_FOUND
-    anchor: ANCHOR_FOUND
-    custom_tag: CUSTOM_TAG
-    multiple_documents: MULTI_DOCUMENT
-    non_mapping_root: INVALID_ROOT
-    excessive_nesting: EXCESSIVE_NESTING
-    parse_error: YAML_PARSE_ERROR
-    file_read_error: FILE_READ_ERROR
+provider_boundary:
+  core_treats_operator_reference_as: opaque
+  syntax_owner: provider_adapter_schema
+  discovery_source: first_party_read_api_or_cli
+  cloud_api_access: read_only_evidence
+  account_project_subscription_in_canonical_path: false
+  aws:
+    adapter: aws-bedrock
+    first_party_operations:
+      - ListFoundationModels
+      - GetFoundationModel
+      - GetFoundationModelAvailability
+      - ListInferenceProfiles
+      - ListFoundationModelAgreementOffers
+    availability_scope:
+      - account
+      - region
+    uk_region_example: eu-west-2
+    sensitive_ephemeral_fields:
+      - offerToken
+  gcp:
+    adapter: gcp-vertex-ai
+    route_parts:
+      - project
+      - location
+      - publisher
+      - model
+      - version
+      - endpoint
+  azure:
+    adapter: azure-ai-foundry
+    route_parts:
+      - subscription
+      - resource_group
+      - account
+      - location
+      - publisher
+      - model
+      - version
+      - deployment
+
+platform:
+  kernel_terms:
+    - issue
+    - change_request
+    - protected_default_branch
+    - required_check
+    - code_owner_review
+    - static_site
+    - protected_release
+  adapters:
+    github:
+      directory: .github/
+      change_request: pull_request
+      ci: actions
+      site: pages
+    gitlab:
+      directory: .gitlab/
+      change_request: merge_request
+      ci: gitlab_ci
+      site: pages
+  host_switch_changes_catalogue: false
+  urls_constructed_only_by_adapter: true
+  workflow_writes_use_git_provider_api_only: true
+  new_service_api_allowed: false
+  site_routes_are_relative: true
+  git_is_worm_immutable: false
+  receipt_requires:
+    - source_commit
+    - catalogue_revision
+    - manifest_digest
+    - validation_result
+    - issue_reference
+    - change_request_reference
+    - protected_tag
+
+mac:
+  initiation: issue
+  operations:
+    - move
+    - add
+    - change
+    - revoke
+  approval_unit: change_request
+  duplicate_proposal_files: false
+  batch:
+    max_identities: 25
+    same_source_scope: true
+    same_observation_date: true
+    same_operator: true
+    same_semantic_operation: true
+
+agents:
+  planner: codex_work
+  planner_is_system_of_record: false
+  canonical_rules: AGENTS.md
+  canonical_open_skills: .agents/skills/
+  optional_adapters:
+    - .codex/
+    - .kiro/
+  write_owner: root_agent
+  subagents_default: read_only
+  may_push: false
+  may_merge: false
+  may_invent_facts: false
 
 validation:
-  path_integrity: enforced
-  reference_integrity: enforced
-  duplicate_identity: error
-  prerequisite_failure:
-    dependent_checks: suppressed
-    original_diagnostic: error
-    overall_result: failure
-  freshness:
-    policy: catalogue/governance/freshness.yaml
-    pricing_field: pricing_days
-    capabilities_field: capabilities_days
-    future_dates: error
-  ci_date: current_utc_date
-  fixed_as_of_allowed_in:
-    - tests
-    - local_diagnostics
-
-commands:
-  full_pipeline: python scripts/ci_local.py
-  validate: python scripts/validate.py
-  validate_json: python scripts/validate.py --format json
-  validate_as_of: python scripts/validate.py --as-of YYYY-MM-DD
-  build_dev: python scripts/build.py
-  build_without_validation: python scripts/build.py --skip-validation
-  build_release: SOURCE_DATE_EPOCH={epoch} CATALOGUE_RELEASE_SEQ={seq} python scripts/build.py --release
-
-exit_codes:
-  "0": success
-  "1": validation_or_gate_failure
-  "2": invocation_or_layout_error
-
-ci:
-  gate_count: 11
-  fail_fast: true
-  gates:
-    - lock-check
-    - lint
-    - validate
-    - test
-    - site-test
-    - skill-test
+  command: modelo check
+  externally_visible_outcomes:
+    - format
+    - facts
+    - change
     - build
-    - scan
-    - reproducibility-check
-    - generated-output-check
-    - clean-tree-check
-  scan:
-    dependencies:
-      - detect-secrets
-      - .secrets.baseline
-    unavailable: visible_warning
-    blocking_when_unavailable: false
+  deterministic: true
+  writes_must_be_parsed_and_re_read: true
+  platform_controls_check: modelo platform check
+  missing_executable_validator_blocks_catalogue_merge: true
 
-build:
-  output_directory: dist/
-  outputs:
-    catalogue: dist/catalogue.json
-    manifest: dist/manifest.json
-    site_catalogue_copy: public-docs/data/catalogue.json
-    site_schema_bundle: public-docs/data/schemas-bundle.json
-  tracked: false
-  serialisation:
-    encoding: utf-8
-    newline: lf
-    sort_keys: true
-    indent: 2
-    ensure_ascii: false
-  reproducibility_inputs:
-    - source_tree
-    - SOURCE_DATE_EPOCH
-    - python_version
-    - locked_dependencies
-  manifest_self_hash: false
-  release_requires:
-    - clean_worktree
-    - known_source_commit
-    - successful_validation
-    - SOURCE_DATE_EPOCH
-    - CATALOGUE_RELEASE_SEQ
-  skip_validation_is_releasable: false
+technical_debt:
+  implicit_debt_allowed: false
+  exception_requires:
+    - linked_issue
+    - owner
+    - rationale
+    - removal_criterion
+    - target_date_or_release
+    - failing_or_skipped_test_reference
 
-proposal_workflow:
-  issue_form:
-    provider: github
-    approval: false
-  public_form:
-    permitted_actions:
-      - validate_locally
-      - preview_yaml
-      - download_yaml
-      - open_prefilled_github_issue
-    browser_token_storage: forbidden
-    direct_pull_request_creation: false
-  pull_request:
-    branch_pattern: "proposal/*"
-    required_checks:
-      - catalogue-ci
-    codeowners_review: required
-    merge_to_main: approval
+sustainability:
+  intended_rate: 10_to_20_approved_changes_per_working_day
+  review_window_days: 90
+  reconsider_git_if_two_persist_for_four_weeks:
+    - accepted_changes_over_50_per_day
+    - repeated_bursts_over_10_per_hour_with_sub_hour_sla
+    - conflict_or_manual_rebase_rate_over_10_percent
+    - p95_issue_to_site_over_one_business_day_below_70_percent_reviewer_utilisation
+    - p95_check_over_five_minutes_or_site_publish_over_ten_minutes
+    - bypass_rate_over_5_percent
+    - same_identity_normally_changes_more_than_once_per_day
+    - transactional_row_level_or_live_state_required
+    - clean_clone_bootstrap_over_60_seconds
 
-agent:
-  policy_nature: guidance
-  enforcement:
-    - runtime_sandbox
-    - github_permissions
-    - branch_protection
-  writable:
-    - proposals/**
-    - artifacts/**
-    - tests/fixtures/**
-  protected:
-    - catalogue/**
-    - schemas/**
-    - scripts/**
-    - .kiro/**
-    - public-docs/**
-  allowed_actions:
-    - inspect_repository
-    - create_proposal_branch
-    - write_proposal_artifacts
-    - add_test_fixtures
-    - run_validation
-    - run_tests
-    - run_build
-    - inspect_git_status_diff_log
-  forbidden_actions:
-    - approve_pull_request
-    - merge_pull_request
-    - push_to_protected_branch
-    - weaken_validation
-    - invent_catalogue_facts
-    - infer_revocation_from_discovery_absence
-
-diagnostic_codes:
-  yaml:
-    - DUPLICATE_KEY
-    - ALIAS_FOUND
-    - ANCHOR_FOUND
-    - CUSTOM_TAG
-    - MULTI_DOCUMENT
-    - INVALID_ROOT
-    - EXCESSIVE_NESTING
-    - YAML_PARSE_ERROR
-    - FILE_READ_ERROR
-  schema:
-    - SCHEMA_VIOLATION
-  path:
-    - MODEL_PATH_MISMATCH
-    - OFFERING_OPERATOR_MISMATCH
-    - OFFERING_PATH_MISMATCH
-    - OFFERING_GEO_MISMATCH
-    - DUPLICATE_IDENTITY
-  reference:
-    - UNKNOWN_VENDOR
-    - UNKNOWN_OPERATOR
-    - UNKNOWN_MODEL
-  evidence:
-    - STALE_PRICING
-    - STALE_EVIDENCE
-    - FUTURE_DATE
-  build:
-    - DIRTY_TREE
-    - UNKNOWN_COMMIT
-  system:
-    - MISSING_SCHEMAS
-  stability:
-    add: additive_for_tolerant_consumers
-    rename: breaking
-    remove: breaking
-    semantic_change: breaking
-
-fixtures:
-  valid_dir: tests/fixtures/valid/
-  invalid_dir: tests/fixtures/invalid/
-  layout: miniature_repository_with_catalogue_root
-  expected_file: expected_diagnostics.json
-  prefixes:
-    yaml--: yaml_loader
-    schema--: json_schema
-    path--: path_integrity
-    ref--: reference_integrity
-    evidence--: freshness
-  auto_discovered: true
-  synthetic_only: true
-
-compatibility:
-  pre_one_zero_breaking_version: increment_minor
-  patch_release_changes_accepted_shape: false
-  optional_field:
-    schema_only: additive
-    emitted_before_consumer_upgrade: breaking_for_old_validators
-  enum_value_addition: requires_consumer_coordination
-
-deferred:
-  target_version: "0.2.0"
-  items:
-    - unit_based_pricing
-    - condition_referential_integrity
-    - structured_modalities
-    - structured_context
-    - deletion_aware_validation
+deferred_until_contract_and_tests_exist:
+  - live_operational_store
+  - automatic_revocation_from_discovery
+  - private_pricing_publication
+  - cross_cloud_resource_path_normalisation
+  - bespoke_authentication_service
+  - bespoke_audit_service

@@ -21,7 +21,7 @@ The build is split logically, not into services:
 | Plane | Source | Rule |
 |---|---|---|
 | Governed solution | `catalogue/`, `schemas/`, `modelo.yaml`, specification | Reviewed source of truth |
-| Deterministic tooling | `tooling/modelo/`, `pyproject.toml`, `uv.lock` | Implements the contract; no network during required checks |
+| Deterministic tooling | `tooling/modelo/`, `pyproject.toml`, `uv.lock` | Core validation/build has no network; a bounded adapter pre-step may read same-repository MAC metadata |
 | Presentation | `site/` | Templates, content and local assets only |
 | Publication | `dist/` | Generated once, tested and deployed unchanged; never committed |
 | Host adapters | `.github/`, `.gitlab/` | Map platform variables and call the same CLI; contain no catalogue rules |
@@ -32,21 +32,22 @@ The build is split logically, not into services:
 | ID | Deliverable and owned paths | Depends on | Acceptance evidence |
 |---|---|---|---|
 | T0 | Reconciled target contract, site/MAC/security contracts and repository review under `docs/`; freeze `modelo.yaml` | — | Structured files parse; contradiction checklist is closed; independent review |
-| T1 | Root metadata and Python/uv CLI skeleton: `README.md`, `CONTRIBUTING.md`, `CODEOWNERS`, `.gitignore`, `.gitattributes`, `.python-version`, `pyproject.toml`, `uv.lock`, `tooling/modelo/` | T0 | Clean clone runs locked commands offline after dependency sync; CLI smoke tests |
-| T2 | Restricted loader, configuration, discovery and stable diagnostics in `tooling/modelo/`; unit tests | T1 | Malicious YAML/path corpus and diagnostic snapshot tests pass |
-| T3 | Core and AWS schemas plus synthetic valid/invalid fixtures in `schemas/`, `tests/fixtures/` | T1 | Every invariant has at least one passing and failing fixture |
-| T4 | Path/reference/evidence/freshness/change-aware validation | T2, T3 | Base/head, equality, immutability, move and revoke tests pass |
-| T5 | Deterministic catalogue, manifest and release-receipt builder | T4 | Double build is byte-identical; digests and delta receipt verify |
-| T6 | Static templates/assets/generator and site tests in `site/`, `tests/site/` | T5 | Route, base-path, XSS, leakage, accessibility and reproducibility gates pass |
-| T7 | Neutral MAC schema/examples and GitHub/GitLab issue/change-request templates | T1, T0 | Adapter fixtures round-trip to identical canonical MAC objects |
-| T8 | GitHub and GitLab CI adapters plus parity fixtures | T4, T6, T7 | Exact-head trusted final check; skipped/failed/stale checks fail closed |
+| T1 | Root metadata, exact Python/uv pins and CLI/config skeleton: root files plus `tooling/modelo/src/modelo/{cli,config}.py` | T0 | Clean clone runs locked commands; CLI/config smoke tests |
+| T2 | `tooling/modelo/src/modelo/{loader,discovery,diagnostics}.py` and `tests/unit/{test_loader,test_discovery,test_diagnostics}.py` | T1 | Malicious YAML/path corpus and diagnostic snapshot tests pass |
+| T3 | Core/AWS/entity/receipt schemas and schema-only fixtures under `schemas/` and `tests/fixtures/schema/` | T1 | Every structural invariant has passing and failing fixtures |
+| T4 | `tooling/modelo/src/modelo/{schemas,evidence,freshness,change,validators}.py`, semantic fixtures and focused unit tests | T2, T3 | Base/head, model binding, equality, immutability, move and revoke tests pass |
+| T5 | `tooling/modelo/src/modelo/{build,receipt}.py` and build/receipt tests | T4 | Candidate and final builds are deterministic; detached receipt and deltas verify |
+| T6 | `tooling/modelo/src/modelo/site.py`, `site/`, `publication/` and `tests/site/` | T5 | Route, base-path, XSS, leakage, accessibility, history and reproducibility gates pass |
+| T7 | `tooling/modelo/src/modelo/mac.py`, MAC schema/examples, GitHub/GitLab issue and change-request template directories, MAC tests | T1, T0 | Adapter fixtures round-trip to identical canonical MAC objects |
+| T8 | `tooling/modelo/src/modelo/platform.py`, `.github/workflows/`, root `.gitlab-ci.yml`, and `tests/contract/platform/` | T4, T6, T7 | Exact-head trusted final check; skipped/failed/stale checks fail closed |
 | T9 | `.agents/skills/{modelo-change,modelo-review,modelo-discover}/` and static skill lint | T7, T8 | Skill commands and paths resolve; no skill is a build/runtime input |
 | T10 | Remote platform check, synthetic Pages deployment, release and mirror-restore rehearsal | T1–T9 | Protection/capability report, exact artefact deployment, verified receipt and restore log |
 
-T2 and T3 may run concurrently. T7 may start after T0/T1. All other edges are
-hard dependencies. Each task uses a separate branch/worktree and one writer.
-Review agents are read-only. The integration writer alone updates the target
-branch after validating each task's exact head.
+T2, T3 and T7 may run concurrently because the table gives them disjoint paths.
+All other edges are hard dependencies and later tasks run sequentially where
+they extend the same package. Each task uses a separate branch/worktree and one
+writer. Review agents are read-only. The integration writer alone updates the
+target branch after validating each task's exact head.
 
 ## CI is the arbiter
 
@@ -62,9 +63,13 @@ head. It cannot have authored, committed or modified the change. Control-plane
 changes—CI, tooling, schemas, locks, `modelo.yaml`, governance, publication or
 skills—require a human CODEOWNER. Any new commit invalidates checks and review.
 
-Post-merge publication generates the neutral release receipt and deploys the
-already checked artefact. A pull request cannot be required to possess a
-post-merge receipt.
+Pre-merge CI validates a deterministic candidate content artefact and records
+the current base, exact head and head-tree SHA. The protected branch must remain
+up to date; immediately before merge, the adapter requires the current base SHA
+to equal the accepted receipt base SHA. Post-merge CI proves that the merge tree equals the accepted head
+tree, builds the final merge-aware artefact once, validates it, creates a
+detached receipt that hashes it, then deploys that exact final artefact without
+another build. A pull request cannot possess a post-merge receipt.
 
 ## Launch gates
 
@@ -77,6 +82,7 @@ The swarm may start only when T0 is committed and independently verified:
 - the neutral MAC payload, hashes, revocation and adapter mappings agree;
 - evidence equality, freshness, versioning, diagnostics and receipt rules agree;
 - `openmodels.run` and other repositories have a dated adopt/adapt/reject review;
+- Addy Osmani/open skill candidates have a dated trust and fit review;
 - Python + `uv` and the no-required-`npx` decision are explicit;
 - every task above has disjoint path ownership and acceptance tests.
 
@@ -97,4 +103,3 @@ cannot substitute for host controls.
 | Executable validator and CI | Missing |
 | Static site and platform templates | Missing |
 | Production catalogue launch | Blocked through T10 |
-

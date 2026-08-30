@@ -1,6 +1,7 @@
 # Modelo v0.1 implementation and verification plan
 
-Status: Slice 0 contract reconciliation. No catalogue record may merge yet.
+Status: Slice 0 contract reconciled and independently P0-gated. T1 is ready to
+start. No catalogue record may merge yet.
 
 ## Outcome
 
@@ -98,8 +99,8 @@ cannot substitute for host controls.
 | Gate | Status |
 |---|---|
 | Six independent read-only architecture reviews | Complete |
-| T0 contract reconciliation | In progress |
-| Implementation swarm | Paused |
+| T0 contract reconciliation | Complete; four independent exact-head gates returned READY |
+| Implementation swarm | Ready for T1 only; T2/T3/T7 wait for T1 integration |
 | Executable validator and CI | Missing |
 | Static site and platform templates | Missing |
 | Production catalogue launch | Blocked through T10 |

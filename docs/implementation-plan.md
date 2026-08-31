@@ -159,6 +159,11 @@ never parse ARNs. T10 owns pinned Python-controlled browser execution outside
 the core build runtime and records human keyboard and screen-reader evidence.
 Node, npm and `npx` are not required.
 
+Every CI checkout that runs the test suite or generates change history fetches
+complete reachable history. A shallow checkout is an explicit failure because
+the tests create repository fixtures from that checkout and immutable-condition
+and `/changes/` validation require first-parent history.
+
 ## Launch gates
 
 ### Implementation swarm

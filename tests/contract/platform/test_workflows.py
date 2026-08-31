@@ -47,6 +47,8 @@ def test_github_trusted_workflow_is_pinned_read_only_and_node_free() -> None:
     assert "unset auth GH_TOKEN" in proposed
     assert "github-prepare-control" in raw and "platform control-check" in raw
     assert "curl --fail --silent --show-error --location" not in raw
+    assert "--depth=1" not in raw
+    assert raw.count("fetch --no-tags origin") >= 3
 
 
 def test_skills_are_not_workflow_or_package_inputs() -> None:

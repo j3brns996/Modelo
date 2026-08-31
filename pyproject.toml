@@ -8,6 +8,11 @@ dependencies = [
   "PyYAML==6.0.3",
 ]
 
+[dependency-groups]
+dev = [
+  "pytest==8.4.2",
+]
+
 [project.scripts]
 modelo = "modelo.cli:main"
 

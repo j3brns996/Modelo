@@ -15,15 +15,23 @@ import modelo.build as build_module
 from modelo.build import BuildError, _layout, _projection_from_snapshot, recover_candidate
 from modelo.change import with_snapshot
 from modelo.mac import compute_keys
+from modelo.mac import render_adapter_issue_body
+from modelo.github_adapter import prepare_github, prepare_github_control
+from modelo.platform import (
+    TrustedCheckRequest, TrustedControlCheckRequest, run_trusted_check,
+    run_trusted_control_check,
+)
 from modelo.receipt import canonical_bytes, manifest_entries, publication_digest, sha256_bytes
 from modelo.site import (
     FinalBuildRequest,
+    ValidationBuildRequest,
     _Resolver,
     _entry,
     _history_html,
     _pricing_rows,
     _route_rows,
     build_final_site,
+    build_validation_site,
 )
 
 
@@ -57,8 +65,12 @@ class FinalSiteTests(unittest.TestCase):
             ignore=shutil.ignore_patterns(".git", "dist", "__pycache__", "*.pyc"),
         )
         shutil.copytree(
-            self.root / "tests/fixtures/build/synthetic", self.root / "catalogue"
+            self.root / "tests/fixtures/build/synthetic", self.root / "catalogue",
+            dirs_exist_ok=True,
         )
+        actors = self.root / "catalogue/governance/actors.yaml"
+        actors.parent.mkdir(parents=True, exist_ok=True)
+        actors.write_text("version: 1\nagents: {}\n", encoding="utf-8", newline="\n")
         git(self.root, "init", "-b", "main")
         git(self.root, "config", "user.name", "Site fixture")
         git(self.root, "config", "user.email", "site@example.invalid")
@@ -204,6 +216,244 @@ class FinalSiteTests(unittest.TestCase):
             for item in second.output.rglob("*") if item.is_file()
         }
         self.assertEqual(first_bytes, second_bytes)
+
+    def test_validation_site_binds_exact_test_merge_without_claiming_approval(self) -> None:
+        validation = git(
+            self.root, "commit-tree", self.tree,
+            "-p", self.base, "-p", self.source,
+            "-m", "synthetic validation integration",
+        )
+        git(self.root, "checkout", "--detach", validation)
+        request = ValidationBuildRequest(
+            root=self.root, base_commit=self.base, source_commit=self.source,
+            source_tree=self.tree, validation_commit=validation,
+            validation_tree=self.tree, as_of=date(2026, 8, 30),
+            source_date_epoch=self.epoch, profile="synthetic",
+            base_url="https://example.invalid/Modelo/", base_path="/Modelo/",
+            output="dist/validation", mac_metadata=self.metadata_path,
+            publication_capability="public-pages",
+        )
+        result = build_validation_site(request)
+        manifest = json.loads(
+            (result.output / "site/data/manifest.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(manifest["kind"], "validation")
+        self.assertEqual(manifest["validation_commit"], validation)
+        self.assertEqual(manifest["validation_tree"], self.tree)
+        self.assertNotIn("merge_commit", manifest)
+        home = (result.output / "site/index.html").read_text(encoding="utf-8")
+        offering = (
+            result.output / "site/offerings/aws-bedrock/test-offering/index.html"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Validation integration", home)
+        self.assertNotIn("Approval merge", home)
+        self.assertIn("Validation coordinates", offering)
+        self.assertIn("not approval", offering)
+
+        wrong_order = git(
+            self.root, "commit-tree", self.tree,
+            "-p", self.source, "-p", self.base,
+            "-m", "wrong validation parents",
+        )
+        git(self.root, "checkout", "--detach", wrong_order)
+        with self.assertRaisesRegex(BuildError, "exact base and source parents"):
+            build_validation_site(replace(request, validation_commit=wrong_order))
+
+    def test_trusted_platform_check_binds_validation_and_writes_detached_receipt(self) -> None:
+        validation = git(
+            self.root, "commit-tree", self.tree, "-p", self.base, "-p", self.source,
+            "-m", "trusted validation integration",
+        )
+        git(self.root, "checkout", "--detach", validation)
+        context = {
+            "contract_version": "0.1.0",
+            "repository": {"provider": "github", "host": "github.com", "namespace": "j3brns996", "name": "Modelo"},
+            "change_request": "29", "base_sha": self.base, "head_sha": self.source,
+            "head_tree_sha": self.tree, "validation_sha": validation,
+            "validation_tree_sha": self.tree, "as_of": "2026-08-30",
+            "source_date_epoch": self.epoch, "profile": "synthetic",
+            "base_url": "https://j3brns996.github.io/Modelo/", "base_path": "/Modelo/",
+            "publication_capability": "public-pages",
+            "workflow_identity": "j3brns996/Modelo/.github/workflows/modelo.yml@main",
+            "workflow_sha": self.base, "run_id": "123", "check_name": "modelo/check",
+            "gates": {"lock": "success", "schema": "success", "tests": "success", "package": "success"},
+        }
+        context_path = self.root / "trusted-context.json"
+        context_path.write_bytes(canonical_bytes(context))
+        git(self.root, "add", "trusted-context.json")
+        # The adapter context is external in production; keep this fixture untracked
+        # while allowing the trusted builder's clean-tree check to see a clean tree.
+        git(self.root, "reset", "--", "trusted-context.json")
+        context_path.unlink()
+        external = Path(self.temporary.name) / "trusted-context.json"
+        external.write_bytes(canonical_bytes(context))
+        output = self.root / "dist/receipts/check.json"
+        receipt = run_trusted_check(TrustedCheckRequest(
+            root=self.root, context=external, mac_metadata=self.metadata_path, output=output,
+        ))
+        self.assertEqual(receipt["validation_sha"], validation)
+        self.assertEqual(receipt["validation_tree_sha"], self.tree)
+        self.assertEqual(receipt["ci"]["head_sha"], self.source)
+        self.assertEqual(receipt["ci"]["workflow_sha"], self.base)
+        self.assertEqual(output.read_bytes(), canonical_bytes(receipt))
+        bad = dict(context); bad["workflow_sha"] = self.source
+        external.write_bytes(canonical_bytes(bad))
+        with self.assertRaisesRegex(BuildError, "workflow SHA"):
+            run_trusted_check(TrustedCheckRequest(
+                root=self.root, context=external, mac_metadata=self.metadata_path, output=output,
+            ))
+        external.write_text('{"contract_version":"0.1.0","contract_version":"0.1.0"}\n', encoding="utf-8")
+        with self.assertRaisesRegex(BuildError, "strict trusted check context JSON"):
+            run_trusted_check(TrustedCheckRequest(
+                root=self.root, context=external, mac_metadata=self.metadata_path, output=output,
+            ))
+
+    def test_github_adapter_binds_issue_pr_and_git_coordinates(self) -> None:
+        validation = git(
+            self.root, "commit-tree", self.tree, "-p", self.base, "-p", self.source,
+            "-m", "adapter validation integration",
+        )
+        metadata = json.loads(self.metadata_path.read_text(encoding="utf-8"))
+        delta = json.dumps(metadata["expected_change_delta"], sort_keys=True, indent=2)
+        body = (
+            "## Linked MAC\n\n- Issue: <!-- modelo:mac-issue -->"
+            "https://github.com/j3brns996/Modelo/issues/27<!-- /modelo:mac-issue -->\n\n"
+            f"- Neutral payload digest: `{metadata['payload_digest']}`\n\n"
+            "## Expected change delta\n\n<!-- modelo:change-delta -->\n```json\n"
+            + delta + "\n```\n<!-- /modelo:change-delta -->\n"
+        )
+        event = {
+            "repository": {"full_name": "j3brns996/Modelo", "default_branch": "main"},
+            "pull_request": {
+                "number": 29, "state": "open", "body": body,
+                "base": {"sha": self.base, "ref": "main"},
+                "head": {"sha": self.source, "repo": {"full_name": "j3brns996/Modelo"}},
+            },
+        }
+        issue = {
+            "number": 27, "state": "open",
+            "html_url": "https://github.com/j3brns996/Modelo/issues/27",
+            "body": render_adapter_issue_body(metadata["payload"], "github"),
+        }
+        event_path = Path(self.temporary.name) / "event.json"
+        issue_path = Path(self.temporary.name) / "issue.json"
+        prepared_metadata = Path(self.temporary.name) / "prepared-metadata.json"
+        prepared_context = Path(self.temporary.name) / "prepared-context.json"
+        event_path.write_bytes(canonical_bytes(event)); issue_path.write_bytes(canonical_bytes(issue))
+        prepare_github(
+            root=self.root, event_path=event_path, issue_path=issue_path,
+            validation_sha=validation, validation_tree=self.tree, as_of=date(2026, 8, 30),
+            metadata_output=prepared_metadata, context_output=prepared_context,
+        )
+        actual_metadata = json.loads(prepared_metadata.read_text(encoding="utf-8"))
+        actual_context = json.loads(prepared_context.read_text(encoding="utf-8"))
+        self.assertEqual(actual_metadata["expected_change_delta"], metadata["expected_change_delta"])
+        self.assertEqual(actual_metadata["payload_digest"], metadata["payload_digest"])
+        self.assertEqual(actual_context["head_sha"], self.source)
+        self.assertEqual(actual_context["validation_sha"], validation)
+        wrong_branch = json.loads(json.dumps(event))
+        wrong_branch["pull_request"]["base"]["ref"] = "develop"
+        event_path.write_bytes(canonical_bytes(wrong_branch))
+        with self.assertRaisesRegex(BuildError, "default branch"):
+            prepare_github(
+                root=self.root, event_path=event_path, issue_path=issue_path,
+                validation_sha=validation, validation_tree=self.tree,
+                as_of=date(2026, 8, 30), metadata_output=prepared_metadata,
+                context_output=prepared_context,
+            )
+        duplicate_marker = json.loads(json.dumps(event))
+        duplicate_marker["pull_request"]["body"] += (
+            "\n- Issue: <!-- modelo:mac-issue -->https://github.com/j3brns996/Modelo/issues/27"
+            "<!-- /modelo:mac-issue -->\n"
+        )
+        event_path.write_bytes(canonical_bytes(duplicate_marker))
+        with self.assertRaisesRegex(BuildError, "one same-repository MAC issue"):
+            prepare_github(
+                root=self.root, event_path=event_path, issue_path=issue_path,
+                validation_sha=validation, validation_tree=self.tree,
+                as_of=date(2026, 8, 30), metadata_output=prepared_metadata,
+                context_output=prepared_context,
+            )
+
+    def test_control_plane_mode_is_exact_head_and_human_only(self) -> None:
+        git(self.root, "checkout", "--detach", self.source)
+        marker = self.root / "docs/control-test.md"
+        marker.write_text("synthetic control change\n", encoding="utf-8", newline="\n")
+        git(self.root, "add", "docs/control-test.md")
+        git(self.root, "commit", "-m", "synthetic control change")
+        head = git(self.root, "rev-parse", "HEAD")
+        tree = git(self.root, "rev-parse", "HEAD^{tree}")
+        validation = git(
+            self.root, "commit-tree", tree, "-p", self.source, "-p", head,
+            "-m", "control validation integration",
+        )
+        event = {
+            "repository": {"full_name": "j3brns996/Modelo", "default_branch": "main"},
+            "pull_request": {
+                "number": 30, "state": "open",
+                "body": "- Issue: <!-- modelo:control-issue -->https://github.com/j3brns996/Modelo/issues/28<!-- /modelo:control-issue -->",
+                "base": {"sha": self.source, "ref": "main"},
+                "head": {"sha": head, "repo": {"full_name": "j3brns996/Modelo"}},
+            },
+        }
+        event_path = Path(self.temporary.name) / "control-event.json"
+        issue_path = Path(self.temporary.name) / "control-issue.json"
+        context_path = Path(self.temporary.name) / "control-context.json"
+        event_path.write_bytes(canonical_bytes(event))
+        issue_path.write_bytes(canonical_bytes({
+            "number": 28, "state": "open",
+            "html_url": "https://github.com/j3brns996/Modelo/issues/28",
+            "body": "Bootstrap trusted CI, portable skills and launch rehearsal.",
+        }))
+        prepare_github_control(
+            root=self.root, event_path=event_path, issue_path=issue_path,
+            validation_sha=validation,
+            validation_tree=tree, as_of=date(2026, 8, 30), context_output=context_path,
+        )
+        git(self.root, "checkout", "--detach", validation)
+        output = self.root / "dist/receipts/control-check.json"
+        receipt = run_trusted_control_check(TrustedControlCheckRequest(
+            root=self.root, context=context_path, output=output,
+        ))
+        self.assertEqual(receipt["kind"], "control-plane")
+        self.assertEqual(receipt["approval_mode"], "human-codeowner-only")
+        self.assertEqual(receipt["changed_paths"], ["docs/control-test.md"])
+        self.assertEqual(receipt["control_issue"], "28")
+        self.assertEqual(receipt["ci"]["workflow_sha"], self.source)
+
+        forged_context = json.loads(context_path.read_text(encoding="utf-8"))
+        forged_context["workflow_identity"] = "j3brns996/Modelo/.github/workflows/forged.yml@main"
+        context_path.write_bytes(canonical_bytes(forged_context))
+        with self.assertRaisesRegex(BuildError, "workflow identity"):
+            run_trusted_control_check(TrustedControlCheckRequest(
+                root=self.root, context=context_path, output=output,
+            ))
+
+        # A control-plane change may never smuggle catalogue data around the
+        # MAC issue/payload contract. Mixed changes are rejected fail-closed.
+        git(self.root, "checkout", "--detach", head)
+        mixed = self.root / "catalogue/mixed-marker.yaml"
+        mixed.write_text("marker: rejected\n", encoding="utf-8", newline="\n")
+        git(self.root, "add", "catalogue/mixed-marker.yaml")
+        git(self.root, "commit", "-m", "synthetic mixed change")
+        mixed_head = git(self.root, "rev-parse", "HEAD")
+        mixed_tree = git(self.root, "rev-parse", "HEAD^{tree}")
+        mixed_validation = git(
+            self.root, "commit-tree", mixed_tree, "-p", self.source, "-p", mixed_head,
+            "-m", "mixed validation integration",
+        )
+        event["pull_request"]["head"]["sha"] = mixed_head
+        event_path.write_bytes(canonical_bytes(event))
+        prepare_github_control(
+            root=self.root, event_path=event_path, issue_path=issue_path,
+            validation_sha=mixed_validation, validation_tree=mixed_tree,
+            as_of=date(2026, 8, 30), context_output=context_path,
+        )
+        git(self.root, "checkout", "--detach", mixed_validation)
+        with self.assertRaisesRegex(BuildError, "forbids catalogue paths"):
+            run_trusted_control_check(TrustedControlCheckRequest(
+                root=self.root, context=context_path, output=output,
+            ))
 
     def test_final_output_uses_the_configured_build_layout(self) -> None:
         current = _layout(self.root)

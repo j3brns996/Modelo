@@ -47,7 +47,7 @@ adapter.
 - No database, bespoke API, authentication service, audit service or message
   bus is introduced in v0.1.0.
 - Git history is described as tamper-evident, not absolutely immutable or WORM.
-- Remote protections must be verified separately by `modelo platform check`.
+- Remote protections must be verified separately by `modelo platform capabilities`.
 - A GitHub plan that cannot provide private Pages may publish only the synthetic
   fixture profile publicly; the private catalogue remains a restricted
   CI/release artefact. It does not justify an authentication proxy or silent

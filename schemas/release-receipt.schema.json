@@ -30,14 +30,16 @@
     },
     "ciResult": {
       "type": "object",
-      "required": ["provider", "workflow_identity", "run_id", "check", "result", "head_sha"],
+      "required": ["provider", "workflow_identity", "workflow_sha", "run_id", "check", "result", "head_sha", "gates"],
       "properties": {
         "provider": { "enum": ["github", "gitlab"] },
         "workflow_identity": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "workflow_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
         "run_id": { "type": "string", "minLength": 1, "maxLength": 256 },
         "check": { "const": "modelo/check" },
         "result": { "const": "success" },
-        "head_sha": { "$ref": "common.schema.json#/$defs/gitSha" }
+        "head_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+        "gates": { "$ref": "check-receipt.schema.json#/$defs/ci/properties/gates" }
       },
       "additionalProperties": false
     },

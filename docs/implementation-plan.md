@@ -1,9 +1,10 @@
 # Modelo v0.1 implementation and verification plan
 
-Status: T1–T7 are implemented. T5 and the AWS route correction are present at
-the accepted base `970e245a1c98f65ec21ff4937eb35d26262815d7`; T6 is the
-current MAC and still requires independent exact-head review. T8–T10 remain
-absent, so no production catalogue record may merge.
+Status: T8 pre-merge CI and T9 are implemented on the release-candidate branch.
+The accepted T6 head is `8694053c3366e162e0da6991ad08729aa8c95ad5`.
+T8 post-merge Pages/release automation and the T10 remote sentinel,
+release/receipt and mirror-restore rehearsal remain launch gates, so no
+production catalogue record may merge.
 
 ## Outcome
 
@@ -50,9 +51,9 @@ The build is split logically, not into services:
 | T5 | `tooling/modelo/src/modelo/{build,receipt}.py`, `tests/fixtures/build/synthetic`, build/receipt fixtures and tests | T4 | Candidate-only exact three-file output; validated MAC envelope/base-head-tree correlations; deterministic catalogue/delta bytes and receipt primitives; no provider reads |
 | T6 | `tooling/modelo/src/modelo/site.py`, `site/`, `tests/fixtures/publication/` and `tests/site/` | T5, T7 | Exact manifest keys equal fixed routes/assets/data/schema inventory plus every projection-derived model/offering page; AWS Source/Destination Region view is derived from validated route/evidence bindings without browser ARN parsing; missing/extra, base-path, XSS, leakage, accessibility, history and reproducibility gates pass |
 | T7 | `tooling/modelo/src/modelo/mac.py`, MAC schema/examples, GitHub/GitLab issue and change-request template directories, MAC tests | T1, T0 | Adapter fixtures round-trip to identical canonical MAC objects |
-| T8 | `tooling/modelo/src/modelo/platform.py`, `.github/workflows/`, `paths.gitlab_ci`, and `tests/contract/platform/` | T4, T6, T7 | Correlate every trusted provider input with the receipt, including current base/head/tree, provider/workflow/run/check/result and internal head/provider equalities; skipped/failed/stale or drifted checks fail closed |
+| T8 | `tooling/modelo/src/modelo/platform.py`, `.github/workflows/`, fail-closed `paths.gitlab_ci` capability probe, and `tests/contract/platform/` | T4, T6, T7 | Correlate every trusted provider input with the receipt, including current base/head/tree, provider/workflow/run/check/result and internal head/provider equalities; skipped/failed/stale or drifted checks fail closed |
 | T9 | `.agents/skills/{modelo-change,modelo-review,modelo-discover}/` and static skill lint | T7, T8 | Skill commands and paths resolve; no skill is a build/runtime input |
-| T10 | Remote platform check, synthetic Pages deployment, release and mirror-restore rehearsal | T1–T9 | Protection/capability report, exact artefact deployment, verified receipt and restore log |
+| T10 | Remote `modelo platform capabilities`, synthetic Pages deployment, release and mirror-restore rehearsal | T1–T9 | Protection/capability report, exact artefact deployment, verified receipt and restore log |
 
 T2, T3 and T7 may run concurrently because the table gives them disjoint paths.
 All other edges are hard dependencies and later tasks run sequentially where
@@ -79,8 +80,8 @@ mandatory input is missing, skipped, neutral, cancelled, stale or failed. Its
 receipt binds base SHA, exact head SHA, workflow/pipeline identity, tool and lock
 digests, test result and build artefact digests.
 
-Governance approval is separate. Agent approval is disabled until the actors
-registry contains a distinct enabled platform identity and the platform control
+Governance approval is separate. Agent approval is disabled until a
+post-bootstrap MAC seeds the actors registry with a distinct enabled platform identity and the platform control
 is explicitly enabled. An independently eligible agent may then approve a
 data-only MAC only after verifying the successful trusted receipt for the exact
 current base and head. It cannot be author, committer, last pusher or change
@@ -96,8 +97,9 @@ tree, builds the final merge-aware artefact once, validates it, creates a
 detached receipt that hashes it, then deploys that exact final artefact without
 another build. A pull request cannot possess a post-merge receipt.
 
-T5 accepts exact base/head/tree, `as_of`, source epoch and an explicit path to validated MAC metadata
-as arguments and writes exactly candidate `site/data/{catalogue,change-delta,manifest}.json`;
+T5 accepts exact base/head/tree, `as_of`, source epoch and an explicit path to
+validated MAC metadata as arguments and writes exactly candidate
+`site/data/{catalogue,change-delta,manifest}.json`;
 the manifest hashes exactly catalogue and change delta. Receipt primitives are
 library values and T8 writes the detached check receipt. T6 rebuilds that single
 projection from the accepted commit and validated MAC metadata, without trusting
@@ -152,8 +154,8 @@ without file/directory fsync support.
 T6 owns no-JavaScript navigation, link/XSS/non-leakage and accessibility
 structure. Its generator emits AWS Source Region from the route and Destination
 Regions from explicit destination evidence metadata; templates and browser code
-never parse ARNs. T8 owns pinned Python-controlled browser execution outside
-the core build runtime. T10 records human keyboard and screen-reader evidence.
+never parse ARNs. T10 owns pinned Python-controlled browser execution outside
+the core build runtime and records human keyboard and screen-reader evidence.
 Node, npm and `npx` are not required.
 
 ## Launch gates
@@ -184,7 +186,7 @@ cannot substitute for host controls.
 |---|---|
 | Six independent read-only architecture reviews | Complete |
 | T0 contract reconciliation | Complete; four independent exact-head gates returned READY |
-| Implementation swarm | T1–T5 and T7 accepted at the `970e245…` base; T6 implemented in the current MAC and awaiting independent gate |
-| Executable validator and CI | Validator implemented; trusted CI adapter missing |
-| Static site and platform templates | Static site implemented in T6; platform workflow remains missing |
+| Implementation swarm | T1–T7 accepted; T8 trusted pre-merge checks and T9 portable skills implemented in the bootstrap candidate |
+| Executable validator and CI | Validator and GitHub trusted pre-merge adapter implemented; remote host-control rehearsal remains T10 |
+| Static site and platform templates | Static site, issue templates and PR/MR templates implemented; Pages publication remains T10 |
 | Production catalogue launch | Blocked through T10 |

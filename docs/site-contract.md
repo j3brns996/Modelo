@@ -167,5 +167,5 @@ only durable consumer copy.
 
 Test ownership is deliberately split. T6 owns static no-JavaScript navigation,
 links, inert malicious fixtures, non-leakage and automated accessibility
-structure. T8 owns pinned Python-controlled browser execution outside the core
-build runtime. T10 records human keyboard and screen-reader smoke evidence.
+structure. T10 owns pinned Python-controlled browser execution outside the core
+build runtime and records human keyboard and screen-reader smoke evidence.

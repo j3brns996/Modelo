@@ -661,7 +661,8 @@ class BuildTests(unittest.TestCase):
     def test_configured_output_overlap_fails_before_mutation(self) -> None:
         document = yaml.safe_load((self.repository.root / "modelo.yaml").read_text(encoding="utf-8"))
         document["build"].update({
-            "candidate_root": "tests/candidate", "final_root": "tests/final",
+            "candidate_root": "tests/candidate", "validation_root": "tests/validation",
+            "final_root": "tests/final",
             "target_parent": "tests",
             "writer_lock": "tests/.modelo-build.lock",
         })

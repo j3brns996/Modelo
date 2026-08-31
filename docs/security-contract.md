@@ -50,6 +50,12 @@
   and merge tree must equal the accepted head tree. Agent eligibility applies
   only when every changed path is data-only; one control-plane path makes the
   complete change human-only.
+- The required check has two mutually exclusive modes. A catalogue-only MAC
+  binds the open MAC issue, data delta and validation publication. Any
+  non-catalogue path selects control-plane mode, binds an open implementation
+  or security issue, runs both protected-base and proposed-head test/package
+  gates, emits `control-check.json`, and requires a human CODEOWNER. A control
+  change can never inherit agent approval eligibility.
 - GitHub requires a trusted required workflow sourced from the protected
   default branch. GitLab requires a Pipeline Execution Policy or equivalent
   control outside contributor modification; absence is an incapable platform,

@@ -467,6 +467,8 @@ def _release_correlation_errors(
         "actors": (check["actors_registry_digest"], release["approval"]["actors_registry_digest"]),
         "ci-provider": (check["ci"]["provider"], release["ci"]["provider"]),
         "workflow": (check["ci"]["workflow_identity"], release["ci"]["workflow_identity"]),
+        "workflow-sha": (check["ci"]["workflow_sha"], release["ci"]["workflow_sha"]),
+        "workflow-gates": (check["ci"]["gates"], release["ci"]["gates"]),
         "ci-run": (check["ci"]["run_id"], release["ci"]["run_id"]),
         "ci-check": (check["ci"]["check"], release["ci"]["check"]),
         "ci-result": (check["ci"]["result"], release["ci"]["result"]),
@@ -609,7 +611,7 @@ class SchemaFixtureTests(unittest.TestCase):
         self.assertEqual(approval["registry"], config["paths"]["actors_registry"])
         self.assertEqual(
             config["platform"]["required_capabilities"]["trusted_pipeline"]["gitlab"],
-            "pipeline_execution_policy_or_equivalent",
+            "protected_pipeline_policy_if_available_otherwise_protected_branch_adapter",
         )
 
     def test_catalogue_output_cannot_publish_actor_registry(self) -> None:
@@ -720,10 +722,10 @@ class SchemaFixtureTests(unittest.TestCase):
     def test_t6_manifest_completeness_has_exact_fixed_and_derived_inventory(self) -> None:
         contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
         manifest_schema = self.schemas["build-manifest.schema.json"]
-        self.assertEqual(manifest_schema["x-modelo-executable-completeness-owner"], "candidate:T5;final:T6")
+        self.assertEqual(manifest_schema["x-modelo-executable-completeness-owner"], "candidate:T5;validation:T8;final:T6")
         self.assertEqual(
             manifest_schema["x-modelo-executable-completeness"],
-            "candidate_files_exact_catalogue_plus_change_delta;final_files_equal_contract_fixed_union_all_source_commit_schemas_union_projection_derived_excluding_manifest",
+            "candidate_files_exact_catalogue_plus_change_delta;validation_and_final_files_equal_contract_fixed_union_all_source_commit_schemas_union_projection_derived_excluding_manifest",
         )
         configured = set(contract["build"]["manifest_required_fixed_files"])
         self.assertEqual(configured, REQUIRED_FIXED_PUBLICATION_FILES)
@@ -1314,6 +1316,8 @@ class SchemaFixtureTests(unittest.TestCase):
             "lock": (check["lock_digest"], release["lock_digest"]),
             "actors": (check["actors_registry_digest"], release["approval"]["actors_registry_digest"]),
             "workflow": (check["ci"]["workflow_identity"], release["ci"]["workflow_identity"]),
+            "workflow SHA": (check["ci"]["workflow_sha"], release["ci"]["workflow_sha"]),
+            "workflow gates": (check["ci"]["gates"], release["ci"]["gates"]),
             "ci run": (check["ci"]["run_id"], release["ci"]["run_id"]),
             "ci check": (check["ci"]["check"], release["ci"]["check"]),
             "ci result": (check["ci"]["result"], release["ci"]["result"]),

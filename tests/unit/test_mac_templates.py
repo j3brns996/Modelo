@@ -172,9 +172,13 @@ class MacTemplateTests(unittest.TestCase):
             self.assertIn(required, github)
         self.assertIn("assertions, not evidence", github)
 
-    def test_t7_and_t6_do_not_add_workflows_skills_or_catalogue(self) -> None:
-        for relative in (".github/workflows", ".agents/skills", "catalogue"):
-            self.assertFalse((ROOT / relative).exists(), relative)
+    def test_later_slices_add_only_the_declared_bootstrap_surfaces(self) -> None:
+        self.assertTrue((ROOT / ".github/workflows/modelo.yml").is_file())
+        self.assertTrue((ROOT / ".agents/skills").is_dir())
+        self.assertEqual(
+            {path.relative_to(ROOT / "catalogue").as_posix() for path in (ROOT / "catalogue").rglob("*") if path.is_file()},
+            set(),
+        )
         self.assertTrue((ROOT / "site").is_dir())
 
     def test_schema_and_module_text_parity_corpus(self) -> None:

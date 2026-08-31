@@ -3,10 +3,10 @@
 contract:
   name: modelo
   version: "0.1.0"
-  status: implemented_through_t6_local_remote_launch_controls_absent
-  implemented_slices: [T1, T2, T3, T4, T5, T6, T7]
-  accepted_pre_t6_head: "970e245a1c98f65ec21ff4937eb35d26262815d7"
-  unimplemented_slices: [T8, T9, T10]
+  status: t8_premerge_and_t9_implemented_postmerge_launch_slice_pending
+  implemented_slices: [T1, T2, T3, T4, T5, T6, T7, T8-premerge, T9]
+  accepted_pre_t8_head: "8694053c3366e162e0da6991ad08729aa8c95ad5"
+  unimplemented_slices: [T8-postmerge-release-and-pages, T10]
   executable_config: modelo.yaml
   implementation_plan_config_key: paths.implementation_plan
   drift_is_error: true
@@ -427,11 +427,23 @@ site:
   final_postmerge_artifact_is_validated_then_deployed_without_rebuild: true
   test_ownership:
     t6: [no_javascript_navigation, link_integrity, inert_xss, publication_non_leakage, accessibility_structure]
-    t8: pinned_python_controlled_browser_outside_core_build
-    t10: human_keyboard_and_screen_reader_evidence
+    t10: [pinned_python_controlled_browser_outside_core_build, human_keyboard_and_screen_reader_evidence]
 
 validation:
   command: modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
+  change_modes:
+    mac_data:
+      paths: catalogue/**
+      receipt: dist/receipts/check.json
+      approval: independent_human_or_explicitly_enabled_eligible_agent
+    control_plane:
+      trigger: any_non_catalogue_path
+      linked_open_implementation_issue: required
+      issue_body_digest_bound_to_receipt: true
+      receipt: dist/receipts/control-check.json
+      gates: [trusted_base_tests, proposed_head_tests, trusted_base_package, proposed_head_package]
+      approval: human_codeowner_only
+    mutually_exclusive: true
   restricted_yaml: true
   change_aware: true
   deterministic: true
@@ -493,14 +505,17 @@ platform:
   gitlab_adapter_config_key: paths.gitlab_adapter
   gitlab_ci_config_key: paths.gitlab_ci
   host_switch_changes_core_records: false
-  platform_check: modelo platform check
+  platform_receipt_assembly: modelo platform check
+  remote_capability_check: modelo platform capabilities
+  remote_capability_check_status: t10_unimplemented
   missing_required_capability: fail_closed
   private_pages_missing: restricted_artifact_not_public_pages
   merge_queue_or_train: deferred_until_candidate_tree_contract
   actors_registry_config_key: paths.actors_registry
   unconfigured_agent_identity_mode: human_only
-  github_trusted_pipeline: required_workflow_from_protected_default_branch
-  gitlab_trusted_pipeline: pipeline_execution_policy_or_equivalent
+  github_trusted_pipeline: protected_main_pull_request_target_without_secrets
+  gitlab_trusted_pipeline: protected_pipeline_policy_if_available_otherwise_protected_branch_adapter
+  gitlab_adapter_status: fail_closed_capability_probe_pending_t10_host_switch_rehearsal
   missing_trusted_pipeline_result: incapable
 
 recovery:
@@ -531,4 +546,5 @@ deferred:
   - private_or_negotiated_pricing
   - account_owned_provider_routes
   - gcp_and_azure_adapters
+  - gitlab_remote_adapter_activation_until_host_switch_rehearsal
   - live_telemetry_and_runtime_health

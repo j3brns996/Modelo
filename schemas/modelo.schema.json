@@ -122,7 +122,7 @@
     },
     "paths": {
       "type": "object",
-      "required": ["readme", "contributing", "codeowners", "gitignore", "gitattributes", "catalogue", "models", "offerings", "evidence", "governance", "actors_registry", "conditions", "schemas", "provider_schemas", "mac_schema", "mac_metadata_schema", "release_receipt_schema", "catalogue_output_schema", "build_manifest_schema", "check_receipt_schema", "actors_registry_schema", "tests", "fixtures", "implementation", "site_source", "site_templates", "site_assets", "site_content", "build", "docs", "human_specification", "machine_contract", "implementation_plan", "site_contract", "mac_contract", "security_contract", "agent_rules", "provider_docs", "decisions", "reviews", "open_skills", "codex_adapter", "kiro_adapter", "github_adapter", "gitlab_adapter", "gitlab_ci"],
+      "required": ["readme", "contributing", "codeowners", "gitignore", "gitattributes", "catalogue", "models", "offerings", "evidence", "governance", "actors_registry", "conditions", "schemas", "provider_schemas", "mac_schema", "mac_metadata_schema", "release_receipt_schema", "catalogue_output_schema", "build_manifest_schema", "check_receipt_schema", "trusted_check_context_schema", "trusted_control_context_schema", "control_check_receipt_schema", "actors_registry_schema", "tests", "fixtures", "implementation", "site_source", "site_templates", "site_assets", "site_content", "build", "docs", "human_specification", "machine_contract", "implementation_plan", "site_contract", "mac_contract", "security_contract", "launch_runbook", "agent_rules", "provider_docs", "decisions", "reviews", "open_skills", "codex_adapter", "kiro_adapter", "github_adapter", "gitlab_adapter", "gitlab_ci"],
       "properties": {
         "readme": { "$ref": "#/$defs/path" },
         "contributing": { "$ref": "#/$defs/path" },
@@ -144,6 +144,9 @@
         "catalogue_output_schema": { "$ref": "#/$defs/path" },
         "build_manifest_schema": { "$ref": "#/$defs/path" },
         "check_receipt_schema": { "$ref": "#/$defs/path" },
+        "trusted_check_context_schema": { "$ref": "#/$defs/path" },
+        "trusted_control_context_schema": { "$ref": "#/$defs/path" },
+        "control_check_receipt_schema": { "$ref": "#/$defs/path" },
         "actors_registry_schema": { "$ref": "#/$defs/path" },
         "tests": { "$ref": "#/$defs/path" },
         "fixtures": { "$ref": "#/$defs/path" },
@@ -160,6 +163,7 @@
         "site_contract": { "$ref": "#/$defs/path" },
         "mac_contract": { "$ref": "#/$defs/path" },
         "security_contract": { "$ref": "#/$defs/path" },
+        "launch_runbook": { "$ref": "#/$defs/path" },
         "agent_rules": { "$ref": "#/$defs/path" },
         "provider_docs": { "$ref": "#/$defs/path" },
         "decisions": { "$ref": "#/$defs/path" },
@@ -315,7 +319,7 @@
     },
     "build": {
       "type": "object",
-      "required": ["command", "implemented_kinds", "required_cli_arguments", "final_cli_arguments", "base_url_choice", "ambient_git_or_environment_inference", "candidate_root", "final_root", "output_argument", "output_resolution", "target_parent", "receipts_root", "publication_subdir", "catalogue_path", "change_delta_path", "manifest_path", "candidate_output_inventory", "candidate_manifest_files", "final_fixed_files", "mac_metadata_ingestion", "change_delta_wire", "change_delta_digest", "receipt_primitives", "check_receipt_writer", "check_receipt_path", "release_receipt_path", "digest_algorithm", "canonical_json", "publication_digest", "manifest_hashes_itself", "writer_lock", "lock_acquire", "staging_name", "backup_name", "journal", "promotion_state_machine", "crash_recovery", "atomic_publish", "observable_contract", "final_requires_fsync_durability", "failed_build_cleanup"],
+      "required": ["command", "implemented_kinds", "required_cli_arguments", "final_cli_arguments", "base_url_choice", "ambient_git_or_environment_inference", "candidate_root", "validation_root", "final_root", "output_argument", "output_resolution", "target_parent", "receipts_root", "publication_subdir", "catalogue_path", "change_delta_path", "manifest_path", "candidate_output_inventory", "candidate_manifest_files", "final_fixed_files", "mac_metadata_ingestion", "change_delta_wire", "change_delta_digest", "receipt_primitives", "check_receipt_writer", "check_receipt_path", "control_check_receipt_path", "release_receipt_path", "digest_algorithm", "canonical_json", "publication_digest", "manifest_hashes_itself", "writer_lock", "lock_acquire", "staging_name", "backup_name", "journal", "promotion_state_machine", "crash_recovery", "atomic_publish", "observable_contract", "final_requires_fsync_durability", "failed_build_cleanup"],
       "properties": {
         "command": { "const": "modelo build" },
         "implemented_kinds": { "type": "array", "prefixItems": [{ "const": "candidate" }, { "const": "final" }], "items": false },
@@ -330,6 +334,7 @@
         "base_url_choice": { "const": "candidate_exactly_one_of_base_url_or_no_base_url_final_requires_base_url" },
         "ambient_git_or_environment_inference": { "const": false },
         "candidate_root": { "const": "dist/candidate" },
+        "validation_root": { "const": "dist/validation" },
         "final_root": { "const": "dist/final" },
         "output_argument": { "const": "candidate_equals_candidate_root_final_equals_final_root" },
         "output_resolution": { "const": "exact_repo_relative_safe_path_no_symlink_no_traversal_not_inside_any_input" },
@@ -383,6 +388,7 @@
         "receipt_primitives": { "const": "library_values_only" },
         "check_receipt_writer": { "const": "t8_detached" },
         "check_receipt_path": { "const": "dist/receipts/check.json" },
+        "control_check_receipt_path": { "const": "dist/receipts/control-check.json" },
         "release_receipt_path": { "const": "dist/receipts/release.json" },
         "digest_algorithm": { "const": "sha256" },
         "canonical_json": { "const": "rfc8785_utf8_plus_single_lf" },
@@ -461,8 +467,8 @@
               "type": "object",
               "required": ["github", "gitlab", "fail_closed_if_unavailable"],
               "properties": {
-                "github": { "const": "required_workflow_from_protected_default_branch" },
-                "gitlab": { "const": "pipeline_execution_policy_or_equivalent" },
+                "github": { "const": "protected_main_pull_request_target_without_secrets" },
+                "gitlab": { "const": "protected_pipeline_policy_if_available_otherwise_protected_branch_adapter" },
                 "fail_closed_if_unavailable": { "const": true }
               },
               "additionalProperties": false

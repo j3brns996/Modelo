@@ -20,7 +20,7 @@ class Repository:
             dirs_exist_ok=True,
             ignore=shutil.ignore_patterns(".venv", "dist", "__pycache__"),
         )
-        shutil.copytree(VALID / "catalogue", self.root / "catalogue")
+        shutil.copytree(VALID / "catalogue", self.root / "catalogue", dirs_exist_ok=True)
         self.git("init", "-q")
         self.git("config", "user.name", "Modelo Tests")
         self.git("config", "user.email", "modelo@example.invalid")

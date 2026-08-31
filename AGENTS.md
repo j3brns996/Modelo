@@ -5,10 +5,10 @@ These rules apply to every agent and every repository path. More specific
 
 ## Current state
 
-This repository contains the implemented validator, deterministic candidate
-builder and static final-site generator. Trusted provider CI, deployment and
-launch rehearsal remain absent. Do not add or merge production catalogue
-records until T8–T10 pass remotely.
+This repository contains the validator, deterministic candidate/final builders,
+static-site generator and trusted pre-merge GitHub adapter. Post-merge Pages,
+release/receipt automation and launch rehearsal remain absent. Do not add or
+merge production catalogue records until T10 passes remotely.
 
 ## Authority and workflow
 
@@ -70,8 +70,8 @@ records until T8–T10 pass remotely.
 
 Use open Agent Skills under `.agents/skills/` for portable workflows. Skills
 guide authorship and review; they are not build inputs or CI evidence. Required
-build commands use the locked Python/`uv` toolchain. `npx` may be used only for
-optional skill import outside required CI. `.codex/` and `.kiro/` may provide
+build commands use the locked Python/`uv` toolchain. Modelo does not use `npx`.
+`.codex/` and `.kiro/` may provide
 thin adapters, but must not contain the only copy of a rule. Modelo cloud
 adapters, CLI commands and MCP access are always read-only. A separately
 governed cloud change is outside Modelo and cannot be performed by its agents

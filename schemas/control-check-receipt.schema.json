@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/control-check-receipt.schema.json",
+  "title": "Modelo exact-head control-plane technical receipt",
+  "type": "object",
+  "required": ["contract_version", "kind", "repository", "control_issue", "control_issue_digest", "change_request", "base_sha", "head_sha", "head_tree_sha", "validation_sha", "validation_tree_sha", "as_of", "source_date_epoch", "changed_paths", "trusted_tool_digest", "proposed_tool_digest", "trusted_lock_digest", "proposed_lock_digest", "approval_mode", "ci"],
+  "properties": {
+    "contract_version": { "const": "0.1.0" }, "kind": { "const": "control-plane" },
+    "repository": { "$ref": "check-receipt.schema.json#/$defs/repository" },
+    "control_issue": { "type": "string", "pattern": "^[1-9][0-9]{0,19}(?![\\s\\S])" },
+    "control_issue_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "change_request": { "type": "string", "pattern": "^[1-9][0-9]{0,19}(?![\\s\\S])" },
+    "base_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "head_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "head_tree_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "validation_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "validation_tree_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "as_of": { "type": "string", "format": "date" },
+    "source_date_epoch": { "type": "integer", "minimum": 0 },
+    "changed_paths": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/safeRelativePath" } },
+    "trusted_tool_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "proposed_tool_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "trusted_lock_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "proposed_lock_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "approval_mode": { "const": "human-codeowner-only" },
+    "ci": {
+      "type": "object",
+      "required": ["provider", "workflow_identity", "workflow_sha", "run_id", "check", "result", "head_sha", "gates"],
+      "properties": {
+        "provider": { "enum": ["github", "gitlab"] },
+        "workflow_identity": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "workflow_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+        "run_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "check": { "const": "modelo/check" }, "result": { "const": "success" },
+        "head_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+        "gates": { "$ref": "trusted-control-context.schema.json#/properties/gates" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

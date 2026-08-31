@@ -47,6 +47,9 @@ paths:
   catalogue_output_schema: schemas/catalogue-output.schema.json
   build_manifest_schema: schemas/build-manifest.schema.json
   check_receipt_schema: schemas/check-receipt.schema.json
+  trusted_check_context_schema: schemas/trusted-check-context.schema.json
+  trusted_control_context_schema: schemas/trusted-control-context.schema.json
+  control_check_receipt_schema: schemas/control-check-receipt.schema.json
   actors_registry_schema: schemas/actors-registry.schema.json
   tests: tests
   fixtures: tests/fixtures
@@ -63,6 +66,7 @@ paths:
   site_contract: docs/site-contract.md
   mac_contract: docs/mac-contract.md
   security_contract: docs/security-contract.md
+  launch_runbook: docs/launch-runbook.md
   agent_rules: AGENTS.md
   provider_docs: docs/providers
   decisions: docs/adr
@@ -101,7 +105,7 @@ toolchain:
     build: uv run --locked modelo build --kind candidate --base-commit BASE_SHA --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON_PATH --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
 
 site:
-  base_url: null
+  base_url: https://j3brns996.github.io/Modelo/
   base_path: /Modelo/
   routes:
     home: /
@@ -153,6 +157,7 @@ build:
   base_url_choice: candidate_exactly_one_of_base_url_or_no_base_url_final_requires_base_url
   ambient_git_or_environment_inference: false
   candidate_root: dist/candidate
+  validation_root: dist/validation
   final_root: dist/final
   output_argument: candidate_equals_candidate_root_final_equals_final_root
   output_resolution: exact_repo_relative_safe_path_no_symlink_no_traversal_not_inside_any_input
@@ -200,6 +205,7 @@ build:
   receipt_primitives: library_values_only
   check_receipt_writer: t8_detached
   check_receipt_path: dist/receipts/check.json
+  control_check_receipt_path: dist/receipts/control-check.json
   release_receipt_path: dist/receipts/release.json
   digest_algorithm: sha256
   canonical_json: rfc8785_utf8_plus_single_lf
@@ -240,8 +246,8 @@ platform:
     branch_deletion: false
     protected_release_tags: true
     trusted_pipeline:
-      github: required_workflow_from_protected_default_branch
-      gitlab: pipeline_execution_policy_or_equivalent
+      github: protected_main_pull_request_target_without_secrets
+      gitlab: protected_pipeline_policy_if_available_otherwise_protected_branch_adapter
       fail_closed_if_unavailable: true
   conditional_capabilities:
     code_owner_review:

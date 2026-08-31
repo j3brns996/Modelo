@@ -384,14 +384,83 @@
       ]
     },
     {
+      "schema": "trusted-control-context.schema.json",
+      "valid": [{
+        "contract_version": "0.1.0",
+        "repository": { "provider": "github", "host": "github.com", "namespace": "j3brns996", "name": "Modelo" },
+        "control_issue": "28", "control_issue_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "change_request": "30", "base_sha": "1111111111111111111111111111111111111111",
+        "head_sha": "2222222222222222222222222222222222222222",
+        "head_tree_sha": "3333333333333333333333333333333333333333",
+        "validation_sha": "4444444444444444444444444444444444444444",
+        "validation_tree_sha": "3333333333333333333333333333333333333333",
+        "as_of": "2026-08-31", "source_date_epoch": 1788091200,
+        "workflow_identity": "j3brns996/Modelo/.github/workflows/modelo.yml@main",
+        "workflow_sha": "1111111111111111111111111111111111111111", "run_id": "123",
+        "check_name": "modelo/check",
+        "gates": { "lock": "success", "schema": "success", "trusted_tests": "success", "proposed_tests": "success", "trusted_package": "success", "proposed_package": "success" }
+      }],
+      "invalid": [{ "name": "control context skipped proposed tests", "op": "set", "path": ["gates", "proposed_tests"], "value": "skipped", "expect": ["const", ["gates", "proposed_tests"]] }]
+    },
+    {
+      "schema": "control-check-receipt.schema.json",
+      "valid": [{
+        "contract_version": "0.1.0", "kind": "control-plane",
+        "repository": { "provider": "github", "host": "github.com", "namespace": "j3brns996", "name": "Modelo" },
+        "control_issue": "28", "control_issue_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "change_request": "30", "base_sha": "1111111111111111111111111111111111111111",
+        "head_sha": "2222222222222222222222222222222222222222",
+        "head_tree_sha": "3333333333333333333333333333333333333333",
+        "validation_sha": "4444444444444444444444444444444444444444",
+        "validation_tree_sha": "3333333333333333333333333333333333333333",
+        "as_of": "2026-08-31", "source_date_epoch": 1788091200,
+        "changed_paths": ["tooling/modelo/src/modelo/platform.py"],
+        "trusted_tool_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "proposed_tool_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trusted_lock_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "proposed_lock_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "approval_mode": "human-codeowner-only",
+        "ci": { "provider": "github", "workflow_identity": "j3brns996/Modelo/.github/workflows/modelo.yml@main", "workflow_sha": "1111111111111111111111111111111111111111", "run_id": "123", "check": "modelo/check", "result": "success", "head_sha": "2222222222222222222222222222222222222222", "gates": { "lock": "success", "schema": "success", "trusted_tests": "success", "proposed_tests": "success", "trusted_package": "success", "proposed_package": "success" } }
+      }],
+      "invalid": [
+        { "name": "control receipt permits agent", "op": "set", "path": ["approval_mode"], "value": "agent", "expect": ["const", ["approval_mode"]] },
+        { "name": "control receipt has no paths", "op": "set", "path": ["changed_paths"], "value": [], "expect": ["minItems", ["changed_paths"]] }
+      ]
+    },
+    {
+      "schema": "trusted-check-context.schema.json",
+      "valid": [{
+        "contract_version": "0.1.0",
+        "repository": { "provider": "github", "host": "github.com", "namespace": "j3brns996", "name": "Modelo" },
+        "change_request": "29",
+        "base_sha": "1111111111111111111111111111111111111111",
+        "head_sha": "2222222222222222222222222222222222222222",
+        "head_tree_sha": "3333333333333333333333333333333333333333",
+        "validation_sha": "4444444444444444444444444444444444444444",
+        "validation_tree_sha": "3333333333333333333333333333333333333333",
+        "as_of": "2026-08-31", "source_date_epoch": 1788091200,
+        "profile": "synthetic", "base_url": "https://j3brns996.github.io/Modelo/",
+        "base_path": "/Modelo/", "publication_capability": "public-pages",
+        "workflow_identity": "j3brns996/Modelo/.github/workflows/modelo.yml@main",
+        "workflow_sha": "1111111111111111111111111111111111111111", "run_id": "123",
+        "check_name": "modelo/check",
+        "gates": { "lock": "success", "schema": "success", "tests": "success", "package": "success" }
+      }],
+      "invalid": [
+        { "name": "context skipped gate", "op": "set", "path": ["gates", "tests"], "value": "skipped", "expect": ["const", ["gates", "tests"]] },
+        { "name": "context unexpected secret", "op": "set", "path": ["token"], "value": "x", "expect": ["additionalProperties", []] }
+      ]
+    },
+    {
       "schema": "check-receipt.schema.json",
       "valid": [
         {
           "contract_version": "0.1.0",
           "repository": { "provider": "github", "host": "github.com", "namespace": "j3brns", "name": "Modelo" },
+          "change_request": "20",
           "base_sha": "1111111111111111111111111111111111111111",
           "head_sha": "2222222222222222222222222222222222222222",
           "head_tree_sha": "3333333333333333333333333333333333333333",
+          "validation_sha": "4444444444444444444444444444444444444444",
+          "validation_tree_sha": "3333333333333333333333333333333333333333",
           "as_of": "2026-08-30",
           "source_date_epoch": 1788091200,
           "profile": "synthetic",
@@ -414,10 +483,12 @@
           "ci": {
             "provider": "github",
             "workflow_identity": "j3brns/Modelo/.github/workflows/modelo.yml@main",
+            "workflow_sha": "1111111111111111111111111111111111111111",
             "run_id": "123",
             "check": "modelo/check",
             "result": "success",
-            "head_sha": "2222222222222222222222222222222222222222"
+            "head_sha": "2222222222222222222222222222222222222222",
+            "gates": { "lock": "success", "schema": "success", "tests": "success", "package": "success", "validation_site": "success" }
           }
         }
       ],
@@ -490,14 +561,16 @@
           },
           "tool_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
           "lock_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-          "accepted_check_receipt_digest": "sha256:efc9a0d6cb124d8106ff6d4445bc6aff9178f10b57f47ca7248da1155d7821c0",
+          "accepted_check_receipt_digest": "sha256:7ae108e2d3993001a8b3c5a3cae351c8e5d52a2d0ef0c82ffb74d4823a41f257",
           "ci": {
             "provider": "github",
             "workflow_identity": "j3brns/Modelo/.github/workflows/modelo.yml@main",
+            "workflow_sha": "1111111111111111111111111111111111111111",
             "run_id": "123",
             "check": "modelo/check",
             "result": "success",
-            "head_sha": "2222222222222222222222222222222222222222"
+            "head_sha": "2222222222222222222222222222222222222222",
+            "gates": { "lock": "success", "schema": "success", "tests": "success", "package": "success", "validation_site": "success" }
           },
           "mac_issue": "19",
           "change_request": "2",

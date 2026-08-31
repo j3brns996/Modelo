@@ -1,9 +1,17 @@
 ## Linked MAC
 
-- Issue: <!-- immutable Git-provider issue URL -->
-- Neutral payload digest: `sha256-...`
+- Issue: <!-- modelo:mac-issue -->https://HOST/NAMESPACE/REPOSITORY/ISSUE_PATH<!-- /modelo:mac-issue -->
+- Neutral payload digest: `sha256:...`
 - Operation: <!-- add | change | revoke | move | batch -->
 - Affected logical identities: <!-- exact kind/identity reservations -->
+
+## Expected change delta
+
+<!-- modelo:change-delta -->
+```json
+[]
+```
+<!-- /modelo:change-delta -->
 
 ## Acceptance
 

@@ -13,6 +13,14 @@ from modelo.build import BuildError, BuildRequest, build_candidate, recover_cand
 from modelo.diagnostics import Diagnostic, diagnostics_json
 from modelo.freshness import parse_as_of
 from modelo.site import FinalBuildRequest, build_final_site
+from modelo.platform import (
+    TrustedCheckRequest, TrustedControlCheckRequest, run_trusted_check,
+    run_trusted_control_check,
+)
+from modelo.github_adapter import (
+    github_control_issue_reference, github_issue_reference, prepare_github,
+    prepare_github_control,
+)
 from modelo.validators import CheckSystemError, check_repository
 
 
@@ -52,6 +60,34 @@ def _parser() -> argparse.ArgumentParser:
         choices=("public-pages", "restricted-artifact", "access-controlled-pages"),
     )
     subparsers.add_parser("recover", help="recover an interrupted candidate or final publication")
+    platform = subparsers.add_parser("platform", help="run a trusted Git-provider adapter operation")
+    platform_subparsers = platform.add_subparsers(dest="platform_command", required=True)
+    platform_check = platform_subparsers.add_parser("check", help="assemble an exact-head check receipt")
+    platform_check.add_argument("--context", type=Path, required=True)
+    platform_check.add_argument("--mac-metadata", type=Path, required=True)
+    platform_check.add_argument("--output", type=Path, required=True)
+    control_check = platform_subparsers.add_parser("control-check", help="assemble an exact-head control receipt")
+    control_check.add_argument("--context", type=Path, required=True)
+    control_check.add_argument("--output", type=Path, required=True)
+    github_issue = platform_subparsers.add_parser("github-issue", help="extract the linked MAC issue")
+    github_issue.add_argument("--event", type=Path, required=True)
+    github_control_issue = platform_subparsers.add_parser("github-control-issue", help="extract the linked control issue")
+    github_control_issue.add_argument("--event", type=Path, required=True)
+    github_prepare = platform_subparsers.add_parser("github-prepare", help="prepare trusted GitHub inputs")
+    github_prepare.add_argument("--event", type=Path, required=True)
+    github_prepare.add_argument("--issue", type=Path, required=True)
+    github_prepare.add_argument("--validation-sha", required=True)
+    github_prepare.add_argument("--validation-tree", required=True)
+    github_prepare.add_argument("--as-of", required=True)
+    github_prepare.add_argument("--metadata-output", type=Path, required=True)
+    github_prepare.add_argument("--context-output", type=Path, required=True)
+    github_control = platform_subparsers.add_parser("github-prepare-control", help="prepare trusted GitHub control inputs")
+    github_control.add_argument("--event", type=Path, required=True)
+    github_control.add_argument("--issue", type=Path, required=True)
+    github_control.add_argument("--validation-sha", required=True)
+    github_control.add_argument("--validation-tree", required=True)
+    github_control.add_argument("--as-of", required=True)
+    github_control.add_argument("--context-output", type=Path, required=True)
     return parser
 
 
@@ -82,6 +118,56 @@ def main(argv: Sequence[str] | None = None) -> int:
             recover_candidate(arguments.root.resolve())
             return 0
         except (ConfigError, BuildError) as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "check":
+        try:
+            run_trusted_check(TrustedCheckRequest(
+                root=arguments.root, context=arguments.context,
+                mac_metadata=arguments.mac_metadata, output=arguments.output,
+            ))
+            return 0
+        except (ValueError, ConfigError, BuildError) as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "control-check":
+        try:
+            run_trusted_control_check(TrustedControlCheckRequest(
+                root=arguments.root, context=arguments.context, output=arguments.output,
+            ))
+            return 0
+        except (ValueError, ConfigError, BuildError) as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "github-issue":
+        try:
+            print(github_issue_reference(arguments.event))
+            return 0
+        except BuildError as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "github-control-issue":
+        try:
+            print(github_control_issue_reference(arguments.event))
+            return 0
+        except BuildError as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "github-prepare":
+        try:
+            prepare_github(
+                root=arguments.root, event_path=arguments.event, issue_path=arguments.issue,
+                validation_sha=arguments.validation_sha, validation_tree=arguments.validation_tree,
+                as_of=parse_as_of(arguments.as_of), metadata_output=arguments.metadata_output,
+                context_output=arguments.context_output,
+            )
+            return 0
+        except (ValueError, BuildError) as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "github-prepare-control":
+        try:
+            prepare_github_control(
+                root=arguments.root, event_path=arguments.event, issue_path=arguments.issue,
+                validation_sha=arguments.validation_sha, validation_tree=arguments.validation_tree,
+                as_of=parse_as_of(arguments.as_of), context_output=arguments.context_output,
+            )
+            return 0
+        except (ValueError, BuildError) as exc:
             parser.exit(2, f"modelo: {exc}\n")
     if arguments.command == "build":
         try:

@@ -89,7 +89,7 @@ Do not merge catalogue data until the next implementation slice supplies:
 - AWS provider-reference schema and captured first-party fixtures;
 - one deterministic `modelo check` command;
 - valid and invalid fixtures for every invariant;
-- GitHub adapter workflows and a remote `modelo platform check`;
+- GitHub adapter workflows and a remote `modelo platform capabilities` check;
 - a Pages build that publishes no private terms;
 - a GitLab adapter conformance fixture proving core data is unchanged.
 

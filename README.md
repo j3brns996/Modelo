@@ -5,12 +5,11 @@ enterprise AI model catalogue. Git provider issues initiate move/add/change
 (MAC) work; pull or merge requests and trusted CI arbitrate acceptance. Modelo
 does not expose an application API.
 
-> **Implementation status:** T1, T2, T3, T4 and T7 are implemented and
-> independently gated. The accepted T4 head is
-> `76b6fe8f3e74a34299851b6bae9411c719154e9d`. Change-aware `modelo check`,
-> schemas and MAC templates exist. Build/receipt tooling, the static site,
-> trusted CI adapters, Agent Skills, Pages and release/restore rehearsal remain
-> unimplemented. Agent approval is disabled.
+> **Implementation status:** T8 pre-merge CI and T9 are implemented on the
+> release-candidate branch. The static generator, detached trusted-check
+> receipt, GitHub adapter and three portable Agent Skills exist. Post-merge
+> Pages/release automation and T10 remote sentinel/restore evidence remain
+> explicit launch blockers. Agent approval is disabled.
 > Do not add real catalogue data before T10 passes.
 
 ## Repository planes
@@ -30,7 +29,7 @@ same bytes when no skills are installed.
 `uv build --offline --no-cache` packages the Python tooling. `uv.lock` governs
 runtime dependency sync and `uv run --locked`; it is not a `uv build` flag.
 PEP 517 build requirements are exactly pinned in `pyproject.toml`, which also
-requires the bootstrapped `uv 0.11.33`. The future `modelo build`
+requires the bootstrapped `uv 0.11.33`. `modelo build`
 compiles the catalogue/static publication and deliberately has no ambient
 defaults:
 
@@ -42,9 +41,9 @@ uv run --locked modelo build --kind candidate \
   --no-base-url --base-path /Modelo/ --output dist/candidate
 ```
 
-Exactly one of `--base-url` or `--no-base-url` is required. T5 accepts only
-`--kind candidate`; `--kind final` and its future `--merge-commit`/
-`--merge-tree` inputs fail closed until T6 supplies the static publication.
+Exactly one of `--base-url` or `--no-base-url` is required. Candidate and final
+builds are implemented; the trusted `modelo platform check` builds the distinct
+validation site for the Git provider's exact test-merge commit.
 Tool packages and solution publications are different outputs; neither creates
 a service.
 
@@ -81,12 +80,15 @@ uv run --locked modelo check --help
 uv run --locked modelo build --help
 ```
 
-`modelo check` is implemented. `modelo build` still exits with status 2 until
-T5/T6 land. The static site and its templates are specified under `site/` but
-not implemented or deployed; `site.base_url` remains unset.
+`modelo check`, `modelo build` and `modelo platform check` are implemented. The
+templates and local assets are under `site/`; generated validation/final sites
+are under `dist/validation` and `dist/final`. The canonical synthetic Pages URL
+is `https://j3brns996.github.io/Modelo/`, but deployment remains blocked until
+the T10 remote launch rehearsal passes.
 
 Read [SPEC.md](SPEC.md), [the machine contract](docs/contract.yaml),
 [the implementation plan](docs/implementation-plan.md),
 [the MAC contract](docs/mac-contract.md), [the site contract](docs/site-contract.md),
 [the security contract](docs/security-contract.md) and
+[the launch runbook](docs/launch-runbook.md) and
 [CONTRIBUTING.md](CONTRIBUTING.md) before making changes.

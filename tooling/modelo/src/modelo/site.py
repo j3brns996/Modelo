@@ -1,4 +1,4 @@
-"""Deterministic final static-site projection and durable publisher."""
+"""Deterministic validation/final static-site projection and durable publisher."""
 
 from __future__ import annotations
 
@@ -36,6 +36,43 @@ class FinalBuildRequest:
     source_tree: str
     merge_commit: str
     merge_tree: str
+    as_of: date
+    source_date_epoch: int
+    profile: str
+    base_url: str
+    base_path: str
+    output: str
+    mac_metadata: Path
+    publication_capability: str
+
+
+@dataclass(frozen=True, slots=True)
+class ValidationBuildRequest:
+    root: Path
+    base_commit: str
+    source_commit: str
+    source_tree: str
+    validation_commit: str
+    validation_tree: str
+    as_of: date
+    source_date_epoch: int
+    profile: str
+    base_url: str
+    base_path: str
+    output: str
+    mac_metadata: Path
+    publication_capability: str
+
+
+@dataclass(frozen=True, slots=True)
+class _SiteBuildRequest:
+    kind: str
+    root: Path
+    base_commit: str
+    source_commit: str
+    source_tree: str
+    integration_commit: str
+    integration_tree: str
     as_of: date
     source_date_epoch: int
     profile: str
@@ -300,7 +337,7 @@ def _navigation(resolver: _Resolver) -> str:
     return "".join('<a href="' + escape(resolver.site(key), quote=True) + '">' + label + "</a>" for key, label in labels)
 
 
-def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, request: FinalBuildRequest, name: str, title: str, content: str, route: str, route_values: Mapping[str, str] | None = None) -> bytes:
+def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, request: _SiteBuildRequest, name: str, title: str, content: str, route: str, route_values: Mapping[str, str] | None = None) -> bytes:
     base = _template(root, source, templates_path, "base")
     values = {
         "canonical_url": escape(resolver.canonical(route, **dict(route_values or {})), quote=True),
@@ -309,14 +346,15 @@ def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, req
         "title": escape(title), "navigation": _navigation(resolver), "content": content,
         "home_url": escape(resolver.site("home"), quote=True),
         "source_commit_url": escape(resolver.repository_url("commit", commit_sha=request.source_commit), quote=True),
-        "merge_commit_url": escape(resolver.repository_url("commit", commit_sha=request.merge_commit), quote=True),
+        "integration_label": "Approval merge" if request.kind == "final" else "Validation integration",
+        "integration_commit_url": escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True),
         "source_commit_short": escape(request.source_commit[:12]), "as_of": request.as_of.isoformat(),
-        "merge_commit_short": escape(request.merge_commit[:12]),
+        "integration_commit_short": escape(request.integration_commit[:12]),
     }
     return (_substitute(base, values, name) + "\n").encode("utf-8")
 
 
-def _site_files(root: Path, request: FinalBuildRequest, catalogue_raw: bytes, delta_raw: bytes, catalogue: Mapping[str, Any], document: Mapping[str, Any]) -> dict[str, bytes]:
+def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, delta_raw: bytes, catalogue: Mapping[str, Any], document: Mapping[str, Any]) -> dict[str, bytes]:
     all_routes = dict(document["site"]["routes"])
     all_routes.update({key + "_data": value for key, value in document["site"]["data_routes"].items()})
     all_routes.update(document["site"]["asset_routes"])
@@ -328,7 +366,7 @@ def _site_files(root: Path, request: FinalBuildRequest, catalogue_raw: bytes, de
     offerings_by_model: dict[str, list[Mapping[str, Any]]] = {}
     for item in catalogue["offerings"]:
         offerings_by_model.setdefault(item["model_id"], []).append(item)
-    history = _history(root, request.merge_commit, document["publication"]["profiles"][request.profile]["source"], resolver)
+    history = _history(root, request.integration_commit, document["publication"]["profiles"][request.profile]["source"], resolver)
     summary = '<div class="cards"><section class="card"><strong>' + str(len(catalogue["models"])) + '</strong><br>Models</section><section class="card"><strong>' + str(len(catalogue["offerings"])) + "</strong><br>Offerings</section></div>"
     home_content = _substitute(templates["home"], {"summary": summary, "recent_changes": _history_html(history[:3])}, "home")
     rows = []
@@ -383,7 +421,10 @@ def _site_files(root: Path, request: FinalBuildRequest, catalogue_raw: bytes, de
         files[resolver.output_path("model", model_id=model["id"])] = _page(root, request.source_commit, templates_path, resolver, request, "model", model.get("name", model["id"]), content, "model", {"model_id": model["id"]})
     releases_url = str(document["repository"]["web_base"]).rstrip("/") + document["repository"]["web_routes"]["releases"]
     for offering in catalogue["offerings"]:
-        approval = '<section class="card"><h2>Approval coordinates</h2><dl><dt>Accepted source</dt><dd><code>' + escape(request.source_commit) + '</code></dd><dt>Accepted tree</dt><dd><code>' + escape(request.source_tree) + '</code></dd><dt>Merge commit</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.merge_commit), quote=True) + '"><code>' + escape(request.merge_commit) + '</code></a></dd></dl><p><a rel="noopener noreferrer" href="' + escape(releases_url, quote=True) + '">Discover protected releases and detached receipts</a>. No approval receipt is embedded in this site.</p></section>'
+        if request.kind == "final":
+            approval = '<section class="card"><h2>Approval coordinates</h2><dl><dt>Accepted source</dt><dd><code>' + escape(request.source_commit) + '</code></dd><dt>Accepted tree</dt><dd><code>' + escape(request.source_tree) + '</code></dd><dt>Merge commit</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True) + '"><code>' + escape(request.integration_commit) + '</code></a></dd></dl><p><a rel="noopener noreferrer" href="' + escape(releases_url, quote=True) + '">Discover protected releases and detached receipts</a>. No approval receipt is embedded in this site.</p></section>'
+        else:
+            approval = '<section class="card"><h2>Validation coordinates</h2><dl><dt>Proposed source</dt><dd><code>' + escape(request.source_commit) + '</code></dd><dt>Proposed tree</dt><dd><code>' + escape(request.source_tree) + '</code></dd><dt>Validation integration</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True) + '"><code>' + escape(request.integration_commit) + '</code></a></dd></dl><p>This validation publication is not approval and is never deployed as the catalogue.</p></section>'
         refs = sorted({reference["id"] for reference in offering.get("evidence_refs", {}).values()})
         conditions = [f'{item["id"]}@{item["version"]}' for item in offering.get("condition_refs", [])]
         content = _substitute(templates["offering"], {"offering_name": escape(offering["id"]), "approval": approval, "route_table": _route_rows(offering, evidence), "pricing_table": _pricing_rows(offering), "conditions_evidence": "<p>Conditions: " + (_tags(conditions) or "None") + "</p><p>Evidence: " + (_tags(refs) or "None") + "</p>"}, "offering")
@@ -433,8 +474,35 @@ def _tree_inventory(path: Path) -> dict[str, dict[str, Any]]:
 
 
 def build_final_site(request: FinalBuildRequest) -> FinalBuildResult:
+    return _build_site(_SiteBuildRequest(
+        kind="final", root=request.root, base_commit=request.base_commit,
+        source_commit=request.source_commit, source_tree=request.source_tree,
+        integration_commit=request.merge_commit, integration_tree=request.merge_tree,
+        as_of=request.as_of, source_date_epoch=request.source_date_epoch,
+        profile=request.profile, base_url=request.base_url, base_path=request.base_path,
+        output=request.output, mac_metadata=request.mac_metadata,
+        publication_capability=request.publication_capability,
+    ))
+
+
+def build_validation_site(request: ValidationBuildRequest) -> FinalBuildResult:
+    return _build_site(_SiteBuildRequest(
+        kind="validation", root=request.root, base_commit=request.base_commit,
+        source_commit=request.source_commit, source_tree=request.source_tree,
+        integration_commit=request.validation_commit,
+        integration_tree=request.validation_tree, as_of=request.as_of,
+        source_date_epoch=request.source_date_epoch, profile=request.profile,
+        base_url=request.base_url, base_path=request.base_path, output=request.output,
+        mac_metadata=request.mac_metadata,
+        publication_capability=request.publication_capability,
+    ))
+
+
+def _build_site(request: _SiteBuildRequest) -> FinalBuildResult:
     root = request.root.resolve()
     load_config(root)
+    if request.kind not in {"validation", "final"}:
+        raise BuildError("unknown site publication kind")
     if request.profile not in {"synthetic", "private"}:
         raise BuildError("unknown publication profile")
     allowed_capabilities = {"public-pages", "restricted-artifact", "access-controlled-pages"}
@@ -445,24 +513,30 @@ def build_final_site(request: FinalBuildRequest) -> FinalBuildResult:
     }:
         raise BuildError("private publication requires an explicit restricted capability")
     if not request.base_url:
-        raise BuildError("final build requires an explicit canonical HTTPS base URL")
+        raise BuildError(f"{request.kind} build requires an explicit canonical HTTPS base URL")
     base = _canonical_commit(root, request.base_commit, "base commit")
     source = _canonical_commit(root, request.source_commit, "source commit")
-    merge = _canonical_commit(root, request.merge_commit, "merge commit")
+    integration = _canonical_commit(root, request.integration_commit, f"{request.kind} integration commit")
     layout = with_snapshot(root, source, lambda snapshot: _layout(snapshot))
-    if request.output != layout.final_root.as_posix():
-        raise BuildError("final output must equal configured final_root")
+    configured_output = layout.validation_root if request.kind == "validation" else layout.final_root
+    if request.output != configured_output.as_posix():
+        raise BuildError(f"{request.kind} output must equal configured {request.kind}_root")
     if str(_git(root, "rev-parse", f"{source}^{{tree}}")).strip() != request.source_tree:
         raise BuildError("source tree does not match source commit")
-    actual_merge_tree = str(_git(root, "rev-parse", f"{merge}^{{tree}}")).strip()
-    if actual_merge_tree != request.merge_tree or request.merge_tree != request.source_tree:
-        raise BuildError("merge tree must equal both the explicit merge tree and accepted source tree")
-    if str(_git(root, "rev-parse", "HEAD")).strip() != merge:
-        raise BuildError("checked-out HEAD differs from explicit merge commit")
+    actual_integration_tree = str(_git(root, "rev-parse", f"{integration}^{{tree}}")).strip()
+    if actual_integration_tree != request.integration_tree or request.integration_tree != request.source_tree:
+        coordinate = "merge tree" if request.kind == "final" else "validation tree"
+        raise BuildError(f"{coordinate} must equal both the explicit integration tree and source tree")
+    if request.kind == "validation":
+        parents = str(_git(root, "rev-list", "--parents", "-n", "1", integration)).split()
+        if parents != [integration, base, source]:
+            raise BuildError("validation commit must have exact base and source parents in that order")
+    if str(_git(root, "rev-parse", "HEAD")).strip() != integration:
+        raise BuildError(f"checked-out HEAD differs from explicit {request.kind} integration commit")
     if str(_git(root, "status", "--porcelain=v1", "--untracked-files=all")).strip():
         raise BuildError("working tree is dirty")
-    if subprocess.run(["git", "merge-base", "--is-ancestor", base, merge], cwd=root).returncode:
-        raise BuildError("base commit is not an ancestor of merge commit")
+    if subprocess.run(["git", "merge-base", "--is-ancestor", base, integration], cwd=root).returncode:
+        raise BuildError(f"base commit is not an ancestor of {request.kind} integration commit")
     author_epoch = int(str(_git(root, "show", "-s", "--format=%at", source)).strip())
     if request.source_date_epoch != author_epoch:
         raise BuildError("source date epoch differs from accepted source commit author time")
@@ -484,10 +558,9 @@ def build_final_site(request: FinalBuildRequest) -> FinalBuildResult:
     if request.profile == "synthetic" and any(_PRIVATE_CANARY in data for data in files.values()):
         raise BuildError("synthetic publication contains a private leakage canary")
     entries = {path: _entry(data, path) for path, data in files.items()}
-    manifest = {
-        "contract_version": "0.1.0", "kind": "final", "base_commit": base,
+    manifest: dict[str, Any] = {
+        "contract_version": "0.1.0", "kind": request.kind, "base_commit": base,
         "source_commit": source, "source_tree": request.source_tree,
-        "merge_commit": merge, "merge_tree": request.merge_tree,
         "as_of": request.as_of.isoformat(), "source_date_epoch": request.source_date_epoch,
         "profile": request.profile, "base_url": request.base_url, "base_path": request.base_path,
         "promotion_durability": "fsync-durable",
@@ -496,6 +569,13 @@ def build_final_site(request: FinalBuildRequest) -> FinalBuildResult:
         "manifest_path": layout.manifest_path.as_posix(),
         "digest_algorithm": "sha256", "publication_digest": publication_digest(files), "files": entries,
     }
+    if request.kind == "validation":
+        manifest.update({
+            "validation_commit": integration,
+            "validation_tree": request.integration_tree,
+        })
+    else:
+        manifest.update({"merge_commit": integration, "merge_tree": request.integration_tree})
     findings = with_snapshot(
         root, source,
         lambda snapshot: SchemaSet(snapshot, layout.schemas).validate(
@@ -503,9 +583,9 @@ def build_final_site(request: FinalBuildRequest) -> FinalBuildResult:
         ),
     )
     if findings:
-        raise BuildError(f"final manifest violates schema: {findings[0].message}")
+        raise BuildError(f"{request.kind} manifest violates schema: {findings[0].message}")
     manifest_raw = canonical_bytes(manifest)
-    output = root.joinpath(*layout.final_root.parts)
+    output = root.joinpath(*configured_output.parts)
     _publish(root, output, files, manifest, layout)
     expected_physical = {
         (layout.publication_subdir / path).as_posix(): entry
@@ -515,7 +595,7 @@ def build_final_site(request: FinalBuildRequest) -> FinalBuildResult:
         manifest_raw, layout.manifest_path.as_posix()
     )
     if _tree_inventory(output) != expected_physical:
-        raise BuildError("final publication verification failed after promotion")
+        raise BuildError(f"{request.kind} publication verification failed after promotion")
     return FinalBuildResult(output, manifest_raw, manifest["publication_digest"], len(files))
 
 

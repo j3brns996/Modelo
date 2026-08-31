@@ -117,7 +117,7 @@ catalogue/
     vendors.yaml                     Vendor identities
     inference-services.yaml          Inference-service identities and adapters
     freshness.yaml                   Evidence freshness policy
-    actors.yaml                       Eligible agent actors; empty means disabled
+    actors.yaml                       Eligible agents; seeded by a post-bootstrap MAC
   policies/conditions/
     {condition_id}/{version}.yaml    Immutable condition versions
 schemas/                             Core and provider-adapter schemas
@@ -740,7 +740,7 @@ only through the selected adapter; the effective values are receipt-bound.
 history plus validated base/head deltas. Release receipts are detached release
 assets, not recursive site inputs.
 
-`modelo platform check` will verify the remote control profile: protected
+`modelo platform capabilities` will verify the remote control profile: protected
 default branch, no direct or force pushes, trusted exact-head validation,
 independent approval, stale-review dismissal, resolved conversations, protected
 tags and appropriate Pages visibility. Human CODEOWNER approval is mandatory
@@ -763,7 +763,7 @@ files alone cannot prove those remote settings are active.
 
 GitLab must enforce the trusted pipeline through a Pipeline Execution Policy or
 an equivalent control outside change-request authors' control. If that cannot
-be proved, `modelo platform check` reports the repository incapable rather than
+be proved, `modelo platform capabilities` reports the repository incapable rather than
 accepting project-local CI.
 
 There is no Modelo service endpoint to port. Switching from GitHub to GitLab
@@ -834,8 +834,8 @@ not as the planning system of record or an approval authority.
 the open Agent Skills format. They guide authors and reviewers; CI may lint
 their metadata but never executes skill prose or treats agent output as
 acceptance. `.codex/` and `.kiro/` are optional adapters and must not redefine
-catalogue rules. `npx` may be an optional skill-import convenience, never a
-required build or CI runtime.
+catalogue rules. Modelo does not use `npx`; skills are checked-in native
+guidance, never a required build or CI runtime.
 
 Skills participate before the build: an author or reviewer invokes a skill to
 prepare or inspect repository source, then the ordinary locked `modelo check`
@@ -868,9 +868,9 @@ is not inside the artefact whose digest it records. Pre-merge and post-merge
 artefacts are not claimed to be byte-identical.
 
 T6 owns static no-JavaScript navigation, link integrity, inert-XSS fixtures,
-publication non-leakage and accessibility-structure tests. T8 owns pinned
-Python-controlled browser execution outside the deterministic core build
-runtime. T10 records human keyboard and screen-reader launch evidence. None
+publication non-leakage and accessibility-structure tests. T10 owns pinned
+Python-controlled browser execution outside the deterministic core build and
+records human keyboard and screen-reader launch evidence. None
 requires Node, npm or `npx`.
 
 Lint, dependency lock, secret scanning and document-drift checks are internal
@@ -936,9 +936,9 @@ No production catalogue launches until the executable validator, schemas,
 fixtures, templates, GitHub/GitLab adapters, synthetic Pages build, protected
 host controls, release receipt and mirror-restore rehearsal all pass.
 
-Implementation status at this revision: T1–T7 are implemented. T5 and the AWS
-route correction are present at accepted base
-`970e245a1c98f65ec21ff4937eb35d26262815d7`; T6 still requires independent
-exact-head review. T8, T9 and T10 remain unimplemented. No trusted CI or static
-site is deployed, production catalogue launch remains blocked and agent
-approval is disabled.
+Implementation status at this revision: T8 pre-merge CI and T9 are implemented. The accepted T6
+head is `8694053c3366e162e0da6991ad08729aa8c95ad5`; the release-candidate adds the
+trusted GitHub check adapter, exact validation-site receipt and portable Agent
+Skills. T8 post-merge Pages/release automation and T10 remote sentinel,
+release/restore rehearsal and host enforcement remain required. No static site is deployed, production
+catalogue launch remains blocked and agent approval is disabled.

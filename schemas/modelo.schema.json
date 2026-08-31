@@ -94,13 +94,14 @@
         "web_base": { "$ref": "common.schema.json#/$defs/httpsUri" },
         "web_routes": {
           "type": "object",
-          "required": ["issue", "change_request", "commit", "tag", "release", "mac_intake"],
+          "required": ["issue", "change_request", "commit", "tag", "release", "releases", "mac_intake"],
           "properties": {
             "issue": { "$ref": "#/$defs/issueRoute" },
             "change_request": { "$ref": "#/$defs/changeRequestRoute" },
             "commit": { "$ref": "#/$defs/commitRoute" },
             "tag": { "$ref": "#/$defs/tagRoute" },
             "release": { "$ref": "#/$defs/tagRoute" },
+            "releases": { "$ref": "#/$defs/noParameterRoute" },
             "mac_intake": {
               "type": "object",
               "required": ["add", "change", "revoke", "move", "batch"],
@@ -217,7 +218,7 @@
     },
     "site": {
       "type": "object",
-      "required": ["base_url", "base_path", "routes", "data_routes", "urls_resolved_from_config_only", "effective_base_url_and_path_are_receipt_inputs", "ci_requires_explicit_base_url"],
+      "required": ["base_url", "base_path", "routes", "data_routes", "asset_routes", "document_routes", "urls_resolved_from_config_only", "effective_base_url_and_path_are_receipt_inputs", "ci_requires_explicit_base_url"],
       "properties": {
         "base_url": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/canonicalBaseUrl" }] },
         "base_path": { "type": "string", "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~-]+/)*(?![\\s\\S])" },
@@ -239,11 +240,30 @@
         },
         "data_routes": {
           "type": "object",
-          "required": ["catalogue", "manifest", "schemas"],
+          "required": ["catalogue", "change_delta", "manifest", "schemas"],
           "properties": {
             "catalogue": { "$ref": "#/$defs/noParameterRoute" },
+            "change_delta": { "$ref": "#/$defs/noParameterRoute" },
             "manifest": { "$ref": "#/$defs/noParameterRoute" },
             "schemas": { "$ref": "#/$defs/noParameterRoute" }
+          },
+          "additionalProperties": false
+        },
+        "asset_routes": {
+          "type": "object",
+          "required": ["asset_css", "asset_js"],
+          "properties": {
+            "asset_css": { "$ref": "#/$defs/noParameterRoute" },
+            "asset_js": { "$ref": "#/$defs/noParameterRoute" }
+          },
+          "additionalProperties": false
+        },
+        "document_routes": {
+          "type": "object",
+          "required": ["human_specification", "machine_contract"],
+          "properties": {
+            "human_specification": { "$ref": "#/$defs/noParameterRoute" },
+            "machine_contract": { "$ref": "#/$defs/noParameterRoute" }
           },
           "additionalProperties": false
         },
@@ -295,24 +315,23 @@
     },
     "build": {
       "type": "object",
-      "required": ["command", "implemented_kinds", "deferred_kind", "required_cli_arguments", "deferred_final_cli_arguments", "base_url_choice", "ambient_git_or_environment_inference", "candidate_root", "final_root", "output_argument", "output_resolution", "target_parent", "receipts_root", "publication_subdir", "catalogue_path", "change_delta_path", "manifest_path", "candidate_output_inventory", "candidate_manifest_files", "mac_metadata_ingestion", "change_delta_wire", "change_delta_digest", "receipt_primitives", "check_receipt_writer", "check_receipt_path", "release_receipt_path", "digest_algorithm", "canonical_json", "publication_digest", "manifest_hashes_itself", "writer_lock", "lock_acquire", "staging_name", "backup_name", "journal", "promotion_state_machine", "crash_recovery", "atomic_publish", "observable_contract", "final_requires_fsync_durability", "failed_build_cleanup"],
+      "required": ["command", "implemented_kinds", "required_cli_arguments", "final_cli_arguments", "base_url_choice", "ambient_git_or_environment_inference", "candidate_root", "final_root", "output_argument", "output_resolution", "target_parent", "receipts_root", "publication_subdir", "catalogue_path", "change_delta_path", "manifest_path", "candidate_output_inventory", "candidate_manifest_files", "final_fixed_files", "mac_metadata_ingestion", "change_delta_wire", "change_delta_digest", "receipt_primitives", "check_receipt_writer", "check_receipt_path", "release_receipt_path", "digest_algorithm", "canonical_json", "publication_digest", "manifest_hashes_itself", "writer_lock", "lock_acquire", "staging_name", "backup_name", "journal", "promotion_state_machine", "crash_recovery", "atomic_publish", "observable_contract", "final_requires_fsync_durability", "failed_build_cleanup"],
       "properties": {
         "command": { "const": "modelo build" },
-        "implemented_kinds": { "type": "array", "prefixItems": [{ "const": "candidate" }], "items": false },
-        "deferred_kind": { "const": "final_until_t6" },
+        "implemented_kinds": { "type": "array", "prefixItems": [{ "const": "candidate" }, { "const": "final" }], "items": false },
         "required_cli_arguments": {
           "type": "array", "minItems": 10, "maxItems": 10, "uniqueItems": true,
           "items": { "enum": ["kind", "base_commit", "source_commit", "source_tree", "as_of", "source_date_epoch", "mac_metadata", "profile", "base_path", "output"] }
         },
-        "deferred_final_cli_arguments": {
-          "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true,
-          "items": { "enum": ["merge_commit", "merge_tree"] }
+        "final_cli_arguments": {
+          "type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true,
+          "items": { "enum": ["merge_commit", "merge_tree", "publication_capability"] }
         },
-        "base_url_choice": { "const": "exactly_one_of_base_url_or_no_base_url_candidate_only" },
+        "base_url_choice": { "const": "candidate_exactly_one_of_base_url_or_no_base_url_final_requires_base_url" },
         "ambient_git_or_environment_inference": { "const": false },
         "candidate_root": { "const": "dist/candidate" },
         "final_root": { "const": "dist/final" },
-        "output_argument": { "const": "candidate_equals_candidate_root_final_later_equals_final_root" },
+        "output_argument": { "const": "candidate_equals_candidate_root_final_equals_final_root" },
         "output_resolution": { "const": "exact_repo_relative_safe_path_no_symlink_no_traversal_not_inside_any_input" },
         "target_parent": { "const": "dist" },
         "receipts_root": { "const": "dist/receipts" },
@@ -327,6 +346,10 @@
         "candidate_manifest_files": {
           "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true,
           "items": { "enum": ["data/catalogue.json", "data/change-delta.json"] }
+        },
+        "final_fixed_files": {
+          "type": "array", "minItems": 13, "maxItems": 13, "uniqueItems": true,
+          "items": { "$ref": "#/$defs/path" }
         },
         "mac_metadata_ingestion": {
           "type": "object",

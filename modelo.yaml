@@ -9,15 +9,16 @@ project:
 repository:
   adapter: github
   host: github.com
-  namespace: j3brns
+  namespace: j3brns996
   name: Modelo
-  web_base: https://github.com/j3brns/Modelo
+  web_base: https://github.com/j3brns996/Modelo
   web_routes:
     issue: /issues/{issue_number}
     change_request: /pull/{change_request_number}
     commit: /commit/{commit_sha}
     tag: /releases/tag/{tag_name}
     release: /releases/tag/{tag_name}
+    releases: /releases
     mac_intake:
       add: /issues/new?template=mac-add.yml
       change: /issues/new?template=mac-change.yml
@@ -114,8 +115,15 @@ site:
     not_found: /404.html
   data_routes:
     catalogue: /data/catalogue.json
+    change_delta: /data/change-delta.json
     manifest: /data/manifest.json
     schemas: /data/schemas/
+  asset_routes:
+    asset_css: /assets/site.css
+    asset_js: /assets/catalogue.js
+  document_routes:
+    human_specification: /docs/SPEC.md
+    machine_contract: /docs/contract.yaml
   urls_resolved_from_config_only: true
   effective_base_url_and_path_are_receipt_inputs: true
   ci_requires_explicit_base_url: true
@@ -139,15 +147,14 @@ publication:
 
 build:
   command: modelo build
-  implemented_kinds: [candidate]
-  deferred_kind: final_until_t6
+  implemented_kinds: [candidate, final]
   required_cli_arguments: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, mac_metadata, profile, base_path, output]
-  deferred_final_cli_arguments: [merge_commit, merge_tree]
-  base_url_choice: exactly_one_of_base_url_or_no_base_url_candidate_only
+  final_cli_arguments: [merge_commit, merge_tree, publication_capability]
+  base_url_choice: candidate_exactly_one_of_base_url_or_no_base_url_final_requires_base_url
   ambient_git_or_environment_inference: false
   candidate_root: dist/candidate
   final_root: dist/final
-  output_argument: candidate_equals_candidate_root_final_later_equals_final_root
+  output_argument: candidate_equals_candidate_root_final_equals_final_root
   output_resolution: exact_repo_relative_safe_path_no_symlink_no_traversal_not_inside_any_input
   target_parent: dist
   receipts_root: dist/receipts
@@ -157,6 +164,20 @@ build:
   manifest_path: data/manifest.json
   candidate_output_inventory: [site/data/catalogue.json, site/data/change-delta.json, site/data/manifest.json]
   candidate_manifest_files: [data/catalogue.json, data/change-delta.json]
+  final_fixed_files:
+    - index.html
+    - 404.html
+    - catalogue/index.html
+    - changes/index.html
+    - process/index.html
+    - propose/index.html
+    - docs/index.html
+    - assets/site.css
+    - assets/catalogue.js
+    - data/catalogue.json
+    - data/change-delta.json
+    - docs/SPEC.md
+    - docs/contract.yaml
   mac_metadata_ingestion:
     cli_value: explicit_file_path
     file_type: regular_non_symlink

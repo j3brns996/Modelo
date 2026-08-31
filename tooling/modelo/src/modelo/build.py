@@ -88,6 +88,7 @@ class BuildLayout:
     catalogue_output_schema: str
     build_manifest_schema: str
     candidate_root: PurePosixPath
+    final_root: PurePosixPath
     target_parent: PurePosixPath
     publication_subdir: PurePosixPath
     catalogue_path: PurePosixPath
@@ -124,6 +125,7 @@ def _layout(root: Path) -> BuildLayout:
             for name, value in profiles_raw.items()
         }
         candidate_root = _safe_config_path(build["candidate_root"], "build.candidate_root")
+        final_root = _safe_config_path(build["final_root"], "build.final_root")
         target_parent = _safe_config_path(build["target_parent"], "build.target_parent")
         publication_subdir = _safe_config_path(build["publication_subdir"], "build.publication_subdir")
         catalogue_path = _safe_config_path(build["catalogue_path"], "build.catalogue_path")
@@ -161,8 +163,16 @@ def _layout(root: Path) -> BuildLayout:
     schemas_root = path("schemas")
     if any(value.parent != schemas_root for value in schema_paths.values()):
         raise BuildError("configured build schemas must be direct children of paths.schemas")
-    if candidate_root.parent != target_parent or writer_lock.parent != target_parent:
-        raise BuildError("configured candidate root and writer lock must share target_parent")
+    if (
+        candidate_root == final_root
+        or writer_lock in {candidate_root, final_root}
+        or candidate_root.parent != target_parent
+        or final_root.parent != target_parent
+        or writer_lock.parent != target_parent
+    ):
+        raise BuildError(
+            "configured candidate root, final root and writer lock must be distinct under target_parent"
+        )
     input_keys = (
         "catalogue", "schemas", "fixtures", "site_source", "site_templates", "site_assets",
         "site_content", "implementation", "tests", "machine_contract", "human_specification",
@@ -170,15 +180,17 @@ def _layout(root: Path) -> BuildLayout:
     inputs = tuple(dict.fromkeys([
         PurePosixPath("modelo.yaml"), *(path(key) for key in input_keys), *profiles.values()
     ]))
-    for source in inputs:
-        if candidate_root == source or candidate_root in source.parents or source in candidate_root.parents:
-            raise BuildError("configured candidate output overlaps a configured input")
+    for output in (candidate_root, final_root):
+        for source in inputs:
+            if output == source or output in source.parents or source in output.parents:
+                raise BuildError("configured build output overlaps a configured input")
     return BuildLayout(
         catalogue=path("catalogue"), models=path("models"), offerings=path("offerings"),
         evidence=path("evidence"), governance=path("governance"), conditions=path("conditions"),
         schemas=schemas_root, mac_metadata_schema=schema_paths["mac_metadata_schema"].name,
         catalogue_output_schema=schema_paths["catalogue_output_schema"].name,
         build_manifest_schema=schema_paths["build_manifest_schema"].name, candidate_root=candidate_root,
+        final_root=final_root,
         target_parent=target_parent, publication_subdir=publication_subdir,
         catalogue_path=catalogue_path, change_delta_path=delta_path, manifest_path=manifest_path,
         candidate_inventory=inventory, candidate_manifest_files=manifest_files,
@@ -626,6 +638,14 @@ def _record(
     return body
 
 
+def _safe_inventory_path(value: str) -> bool:
+    path = PurePosixPath(value)
+    return (
+        bool(value) and not path.is_absolute() and path.as_posix() == value
+        and all(part not in {"", ".", ".."} for part in path.parts)
+    )
+
+
 def _validate_record(value: Mapping[str, Any], layout: BuildLayout) -> dict[str, Any]:
     expected_keys = {"version", "sequence", "phase", "target", "token", "old", "new", "record_digest"}
     if (
@@ -643,7 +663,8 @@ def _validate_record(value: Mapping[str, Any], layout: BuildLayout) -> dict[str,
         raise BuildError("build recovery journal phase/sequence is invalid")
     token = value.get("token")
     if (
-        value.get("target") != layout.candidate_root.name or not isinstance(token, str)
+        value.get("target") not in {layout.candidate_root.name, layout.final_root.name}
+        or not isinstance(token, str)
         or len(token) != 32 or any(character not in "0123456789abcdef" for character in token)
     ):
         raise BuildError("build recovery journal contains unsafe paths")
@@ -652,6 +673,7 @@ def _validate_record(value: Mapping[str, Any], layout: BuildLayout) -> dict[str,
         raise BuildError("build recovery journal digest is invalid")
     if phase == "lock" and value["old"] is not None:
         raise BuildError("initial build recovery journal cannot contain an old inventory")
+    candidate = value["target"] == layout.candidate_root.name
     expected_paths = {path.as_posix() for path in layout.candidate_inventory}
     for name in ("old", "new"):
         inventory = value[name]
@@ -660,7 +682,15 @@ def _validate_record(value: Mapping[str, Any], layout: BuildLayout) -> dict[str,
         if not isinstance(inventory, dict) or set(inventory) != {"files", "tree_digest"}:
             raise BuildError("build recovery journal inventory is invalid")
         files = inventory["files"]
-        if not isinstance(files, dict) or set(files) != expected_paths:
+        if (
+            not isinstance(files, dict)
+            or (candidate and set(files) != expected_paths)
+            or (not candidate and (
+                not files or len(files) > 10_000
+                or (layout.publication_subdir / layout.manifest_path).as_posix() not in files
+                or any(not isinstance(path, str) or not _safe_inventory_path(path) for path in files)
+            ))
+        ):
             raise BuildError("build recovery journal inventory paths are invalid")
         for item in files.values():
             if (
@@ -758,7 +788,9 @@ def _candidate_inventory(root: Path, target: Path, layout: BuildLayout) -> dict[
     if canonical_bytes(manifest) != raw[manifest_relative]:
         raise BuildError("candidate manifest is not canonical")
     schemas = SchemaSet(root, layout.schemas)
-    findings = schemas.validate(layout.build_manifest_schema, manifest, layout.manifest_path.as_posix())
+    findings = schemas.validate(
+        layout.build_manifest_schema, manifest, layout.manifest_path.as_posix()
+    )
     if findings:
         raise BuildError("candidate manifest violates its configured schema")
     catalogue = _strict_json_bytes(raw[catalogue_relative], "candidate catalogue")
@@ -788,9 +820,49 @@ def _candidate_inventory(root: Path, target: Path, layout: BuildLayout) -> dict[
     return _inventory(raw)
 
 
+def _publication_inventory(root: Path, target: Path, layout: BuildLayout) -> dict[str, Any]:
+    """Validate a publication tree according to its configured target kind."""
+    candidate_name = layout.candidate_root.name
+    final_name = layout.final_root.name
+    if target.name == candidate_name or target.name.startswith(candidate_name + "."):
+        return _candidate_inventory(root, target, layout)
+    if target.name != final_name and not target.name.startswith(final_name + "."):
+        raise BuildError("publication target is not configured")
+    raw = _walk_regular_tree(target)
+    manifest_path = (layout.publication_subdir / layout.manifest_path).as_posix()
+    if manifest_path not in raw:
+        raise BuildError("final publication lacks its manifest")
+    manifest = _strict_json_bytes(raw[manifest_path], "final manifest")
+    if canonical_bytes(manifest) != raw[manifest_path] or manifest.get("kind") != "final":
+        raise BuildError("final manifest is not canonical final metadata")
+    files = {
+        PurePosixPath(path).relative_to(layout.publication_subdir).as_posix(): data
+        for path, data in raw.items() if path != manifest_path
+    }
+    recorded = manifest.get("files")
+    file_entries_match = (
+        isinstance(recorded, dict) and set(recorded) == set(files)
+        and all(
+            isinstance(recorded[path], dict)
+            and recorded[path].get("sha256") == sha256_bytes(data)
+            and recorded[path].get("size") == len(data)
+            for path, data in files.items()
+        )
+    )
+    if not file_entries_match or manifest.get("publication_digest") != publication_digest(files):
+        raise BuildError("final manifest correlations are invalid")
+    schemas = SchemaSet(root, layout.schemas)
+    findings = schemas.validate(
+        layout.build_manifest_schema, manifest, layout.manifest_path.as_posix()
+    )
+    if findings:
+        raise BuildError("final manifest violates its configured schema")
+    return _inventory(raw)
+
+
 def _matches_inventory(root: Path, target: Path, layout: BuildLayout, expected: Mapping[str, Any]) -> bool:
     try:
-        return _candidate_inventory(root, target, layout) == expected
+        return _publication_inventory(root, target, layout) == expected
     except (BuildError, OSError, RecursionError):
         return False
 
@@ -878,7 +950,8 @@ def _recover_candidate(root: Path) -> RecoveryOutcome | None:
     )
     token = journal["token"]
     _reject_journal_temporaries(parent, lock, journal, lock_raw)
-    target = repository.joinpath(*layout.candidate_root.parts)
+    selected = layout.candidate_root if journal["target"] == layout.candidate_root.name else layout.final_root
+    target = repository.joinpath(*selected.parts)
     staging = parent / f"{target.name}.{token}.staging"
     backup = parent / f"{target.name}.{token}.backup"
     old, new, phase = journal["old"], journal["new"], journal["phase"]
@@ -954,7 +1027,11 @@ def _recover_candidate(root: Path) -> RecoveryOutcome | None:
         _rename_noreplace(target, staging)
         _fsync_dir(parent)
         p_target, p_stage, staging_subset = False, True, True
-    if old is not None and not target_old:
+    # Re-evaluate path presence after a promoted target is moved aside.  When
+    # old and new bytes are identical, the pre-move target matched both
+    # inventories; the cached target_old classification must not suppress
+    # restoration of the recorded backup.
+    if old is not None and not p_target:
         if not backup_old or p_target:
             raise BuildError("rollback cannot prove the recorded old backup")
         _rename_noreplace(backup, target)
@@ -1009,7 +1086,7 @@ def _publish(root: Path, output: Path, files: Mapping[str, bytes], manifest: Map
         # newer writer using an inventory sampled before its turn.
         old_inventory = None
         if output.exists() or output.is_symlink():
-            old_inventory = _candidate_inventory(root, output, layout)
+            old_inventory = _publication_inventory(root, output, layout)
         journal = _record("stage", output.name, token, old_inventory, new_inventory)
         _persist_journal(parent, lock, journal)
         staging.mkdir(mode=0o755)
@@ -1028,7 +1105,7 @@ def _publish(root: Path, output: Path, files: Mapping[str, bytes], manifest: Map
         _fsync_dir(staging)
         journal = _record("validate_stage", output.name, token, old_inventory, new_inventory)
         _persist_journal(parent, lock, journal)
-        if _candidate_inventory(root, staging, layout) != new_inventory:
+        if _publication_inventory(root, staging, layout) != new_inventory:
             raise BuildError("staged candidate differs from its journal")
         journal = _record("backup_old", output.name, token, old_inventory, new_inventory)
         _persist_journal(parent, lock, journal)
@@ -1046,7 +1123,7 @@ def _publish(root: Path, output: Path, files: Mapping[str, bytes], manifest: Map
         _fsync_dir(parent)
         journal = _record("verify_target", output.name, token, old_inventory, new_inventory)
         _persist_journal(parent, lock, journal)
-        if _candidate_inventory(root, output, layout) != new_inventory:
+        if _publication_inventory(root, output, layout) != new_inventory:
             raise BuildError("promoted candidate differs from its journal")
         journal = _record("remove_backup", output.name, token, old_inventory, new_inventory)
         _persist_journal(parent, lock, journal)
@@ -1137,8 +1214,12 @@ def _build_candidate(request: BuildRequest) -> BuildResult:
     if diagnostics:
         raise BuildError(f"repository validation failed: {diagnostics[0].code}")
     envelope = _strict_json_file(request.mac_metadata)
-    schemas = SchemaSet(root, layout.schemas)
-    findings = schemas.validate(layout.mac_metadata_schema, envelope, str(request.mac_metadata))
+    findings = with_snapshot(
+        root, head,
+        lambda snapshot: SchemaSet(snapshot, layout.schemas).validate(
+            layout.mac_metadata_schema, envelope, str(request.mac_metadata)
+        ),
+    )
     if findings:
         raise BuildError(f"MAC metadata violates schema: {findings[0].message}")
     expected = list(envelope["expected_change_delta"])
@@ -1161,7 +1242,12 @@ def _build_candidate(request: BuildRequest) -> BuildResult:
         "digest_algorithm": "sha256", "publication_digest": publication_digest(files),
         "files": manifest_entries(files),
     }
-    findings = schemas.validate(layout.build_manifest_schema, manifest, layout.manifest_path.as_posix())
+    findings = with_snapshot(
+        root, head,
+        lambda snapshot: SchemaSet(snapshot, layout.schemas).validate(
+            layout.build_manifest_schema, manifest, layout.manifest_path.as_posix()
+        ),
+    )
     if findings:
         raise BuildError(f"candidate manifest violates schema: {findings[0].message}")
     _publish(root, output, files, manifest, layout)
@@ -1170,3 +1256,59 @@ def _build_candidate(request: BuildRequest) -> BuildResult:
         catalogue_data, delta_data, manifest_data, sha256_bytes(catalogue_data),
         sha256_bytes(delta_data), sha256_bytes(manifest_data), manifest["publication_digest"], output,
     )
+
+
+def rebuild_candidate_inputs(request: BuildRequest) -> tuple[bytes, bytes, dict[str, Any]]:
+    """Rebuild and validate candidate bytes without publishing them.
+
+    Final publication uses this at a merge commit whose tree is exactly the
+    accepted source tree.  The function intentionally repeats the candidate
+    acceptance boundary rather than trusting mutable files under ``dist``.
+    """
+    root = request.root.resolve()
+    load_config(root)
+    layout = _layout(root)
+    if request.profile not in layout.profiles:
+        raise BuildError(f"unknown publication profile {request.profile!r}")
+    _safe_url(request.base_url, request.base_path)
+    try:
+        base = resolve_commit(root, request.base_commit)
+        head = resolve_commit(root, request.source_commit)
+        require_ancestor(root, base, head)
+    except GitError as exc:
+        raise BuildError("local Git validation failed") from exc
+    if base != request.base_commit or head != request.source_commit:
+        raise BuildError("base and source commit must be complete canonical SHAs")
+    actual_tree = str(_git(root, "rev-parse", f"{head}^{{tree}}")).strip()
+    if actual_tree != request.source_tree:
+        raise BuildError("source tree does not match source commit")
+    author_epoch = int(str(_git(root, "show", "-s", "--format=%at", head)).strip())
+    if author_epoch != request.source_date_epoch:
+        raise BuildError("source date epoch differs from source commit author time")
+    try:
+        diagnostics = check_repository(root, base, head, request.as_of)
+    except CheckSystemError as exc:
+        raise BuildError(str(exc)) from exc
+    if diagnostics:
+        raise BuildError(f"repository validation failed: {diagnostics[0].code}")
+    envelope = _strict_json_file(request.mac_metadata)
+    findings = with_snapshot(
+        root, head,
+        lambda snapshot: SchemaSet(snapshot, layout.schemas).validate(
+            layout.mac_metadata_schema, envelope, str(request.mac_metadata)
+        ),
+    )
+    if findings:
+        raise BuildError(f"MAC metadata violates schema: {findings[0].message}")
+    expected = list(envelope["expected_change_delta"])
+    computed = _computed_delta(root, base, head, expected, layout)
+    _metadata_semantics(envelope, request, computed, layout)
+    projection = with_snapshot(
+        root, head,
+        lambda snapshot: _projection_from_snapshot(
+            snapshot, request.profile, head, actual_tree, request.as_of, layout
+        ),
+    )
+    catalogue_data = canonical_bytes(projection)
+    delta_data = change_delta_bytes(expected)
+    return catalogue_data, delta_data, projection

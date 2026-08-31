@@ -50,8 +50,8 @@ class BuildTests(unittest.TestCase):
         payload["dedupe_key"], payload["idempotency_key"] = compute_keys(payload)
         metadata = {
             "contract_version": "0.1.0",
-            "repository": {"provider": "github", "host": "github.com", "namespace": "j3brns", "name": "Modelo"},
-            "issue": {"reference": "21", "url": "https://github.com/j3brns/Modelo/issues/21", "state": "open"},
+            "repository": {"provider": "github", "host": "github.com", "namespace": "j3brns996", "name": "Modelo"},
+            "issue": {"reference": "21", "url": "https://github.com/j3brns996/Modelo/issues/21", "state": "open"},
             "base_sha": self.repository.base, "head_sha": self.head, "head_tree_sha": self.tree,
             "payload": payload, "payload_digest": sha256_bytes(canonical_bytes(payload)),
             "expected_change_delta": delta,
@@ -576,8 +576,8 @@ class BuildTests(unittest.TestCase):
         }]
         envelope = {
             "contract_version": "0.1.0",
-            "repository": {"provider": "github", "host": "github.com", "namespace": "j3brns", "name": "Modelo"},
-            "issue": {"reference": "21", "url": "https://github.com/j3brns/Modelo/issues/21", "state": "open"},
+            "repository": {"provider": "github", "host": "github.com", "namespace": "j3brns996", "name": "Modelo"},
+            "issue": {"reference": "21", "url": "https://github.com/j3brns996/Modelo/issues/21", "state": "open"},
             "base_sha": base, "head_sha": head, "head_tree_sha": tree,
             "payload": payload, "payload_digest": sha256_bytes(canonical_bytes(payload)),
             "expected_change_delta": delta,
@@ -639,8 +639,8 @@ class BuildTests(unittest.TestCase):
         payload["dedupe_key"], payload["idempotency_key"] = compute_keys(payload)
         envelope = {
             "contract_version": "0.1.0",
-            "repository": {"provider": "github", "host": "github.com", "namespace": "j3brns", "name": "Modelo"},
-            "issue": {"reference": "21", "url": "https://github.com/j3brns/Modelo/issues/21", "state": "open"},
+            "repository": {"provider": "github", "host": "github.com", "namespace": "j3brns996", "name": "Modelo"},
+            "issue": {"reference": "21", "url": "https://github.com/j3brns996/Modelo/issues/21", "state": "open"},
             "base_sha": base, "head_sha": head, "head_tree_sha": tree,
             "payload": payload, "payload_digest": sha256_bytes(canonical_bytes(payload)),
             "expected_change_delta": delta,
@@ -661,7 +661,8 @@ class BuildTests(unittest.TestCase):
     def test_configured_output_overlap_fails_before_mutation(self) -> None:
         document = yaml.safe_load((self.repository.root / "modelo.yaml").read_text(encoding="utf-8"))
         document["build"].update({
-            "candidate_root": "tests/candidate", "target_parent": "tests",
+            "candidate_root": "tests/candidate", "final_root": "tests/final",
+            "target_parent": "tests",
             "writer_lock": "tests/.modelo-build.lock",
         })
         (self.repository.root / "modelo.yaml").write_text(

@@ -5,9 +5,10 @@ These rules apply to every agent and every repository path. More specific
 
 ## Current state
 
-This repository is in contract design. `SPEC.md` describes the target, not an
-implemented system. Until schemas, fixtures and the `modelo check` command are
-present and passing, do not add or merge catalogue records.
+This repository contains the implemented validator, deterministic candidate
+builder and static final-site generator. Trusted provider CI, deployment and
+launch rehearsal remain absent. Do not add or merge production catalogue
+records until T8–T10 pass remotely.
 
 ## Authority and workflow
 

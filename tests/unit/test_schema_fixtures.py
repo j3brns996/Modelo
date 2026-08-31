@@ -34,6 +34,8 @@ REQUIRED_FIXED_PUBLICATION_FILES = {
     "data/catalogue.json",
     "data/change-delta.json",
     "docs/index.html",
+    "docs/SPEC.md",
+    "docs/contract.yaml",
     "index.html",
     "process/index.html",
     "propose/index.html",
@@ -766,8 +768,8 @@ class SchemaFixtureTests(unittest.TestCase):
     def test_t5_candidate_manifest_inventory_is_exact(self) -> None:
         config = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
         build = config["build"]
-        self.assertEqual(build["implemented_kinds"], ["candidate"])
-        self.assertEqual(build["deferred_kind"], "final_until_t6")
+        self.assertEqual(build["implemented_kinds"], ["candidate", "final"])
+        self.assertEqual(build["final_cli_arguments"], ["merge_commit", "merge_tree", "publication_capability"])
         self.assertEqual(
             set(build["candidate_output_inventory"]),
             {
@@ -800,7 +802,15 @@ class SchemaFixtureTests(unittest.TestCase):
             "source_date_epoch", "mac_metadata", "profile", "base_path", "output",
         }
         self.assertEqual(set(config["build"]["required_cli_arguments"]), required)
-        self.assertEqual(set(contract["build"]["cli_required_flags"]), required)
+        self.assertEqual(set(contract["build"]["candidate_cli_required_flags"]), required)
+        self.assertEqual(
+            set(contract["build"]["final_cli_required_flags"]),
+            {
+                "kind", "base_commit", "source_commit", "source_tree",
+                "merge_commit", "merge_tree", "as_of", "source_date_epoch",
+                "mac_metadata", "profile", "publication_capability", "base_url", "base_path", "output",
+            },
+        )
         self.assertEqual(config["paths"]["mac_metadata_schema"], "schemas/mac-metadata.schema.json")
         command = config["toolchain"]["clean_clone"]["build"]
         for flag in (
@@ -1469,7 +1479,7 @@ class SchemaFixtureTests(unittest.TestCase):
             set(build["required_cli_arguments"]),
             {"kind", "base_commit", "source_commit", "source_tree", "as_of", "source_date_epoch", "mac_metadata", "profile", "base_path", "output"},
         )
-        self.assertEqual(set(build["deferred_final_cli_arguments"]), {"merge_commit", "merge_tree"})
+        self.assertEqual(set(build["final_cli_arguments"]), {"merge_commit", "merge_tree", "publication_capability"})
         self.assertIs(build["ambient_git_or_environment_inference"], False)
         self.assertEqual(build["lock_acquire"], "exclusive_create_or_fail_fast")
         self.assertEqual(build["target_parent"], "dist")

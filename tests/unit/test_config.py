@@ -138,7 +138,7 @@ class ConfigTests(unittest.TestCase):
 
     def test_adapter_and_web_base_mismatch_fail(self) -> None:
         for old, new in (("adapter: github", "adapter: unknown"),
-                         ("web_base: https://github.com/j3brns/Modelo", "web_base: https://example.invalid/repo")):
+                         ("web_base: https://github.com/j3brns996/Modelo", "web_base: https://example.invalid/repo")):
             root = self.clone_bootstrap()
             path = root / "modelo.yaml"
             path.write_text(path.read_text(encoding="utf-8").replace(old, new, 1), encoding="utf-8")

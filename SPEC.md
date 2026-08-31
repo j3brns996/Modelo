@@ -325,7 +325,8 @@ destination path, `before`, then `after`, and finally the complete delta's RFC
 8785 canonical JSON bytes, all compared bytewise with a missing component equal
 to the empty string. These rules apply before both
 receipt serialisation and digesting; two otherwise-valid permutations cannot
-produce different canonical bytes. T6 consumes that projection and adds HTML, local
+produce different canonical bytes. T6 deterministically rebuilds that projection
+from the accepted source commit and validated MAC metadata, then adds HTML, local
 assets and schema copies; it must not independently serialise raw or private
 catalogue state.
 
@@ -335,8 +336,11 @@ T5 candidate output targets `dist/candidate/` and contains exactly
 delta array plus one LF; its SHA-256 covers those exact bytes. The candidate
 manifest excludes itself and lists exactly catalogue and change delta. Receipt
 primitives remain library values; T8 alone writes detached
-`dist/receipts/check.json`. T5 rejects final builds. T6 later extends the same
-projection into `dist/final/`; it may not create a second raw serialisation.
+`dist/receipts/check.json`. T6 never trusts mutable `dist/candidate` bytes. It
+re-runs the T5 acceptance boundary from the accepted source commit and validated
+MAC metadata, obtains byte-identical catalogue and change-delta bytes, and extends
+the projection into `dist/final/site/`; it may not create a second raw or private
+serialisation.
 
 Each invocation exclusively creates `dist/.modelo-build.lock` or fails fast;
 it never waits. The lock contains a bounded, fsynced phase journal. Staging is
@@ -791,22 +795,26 @@ T5 implements exactly those build inputs. `--kind`, `--base-commit`, `--source-c
 `--source-tree`, `--as-of`, `--source-date-epoch`, `--mac-metadata`,
 `--profile`, `--base-path` and `--output` are required. Exactly one of
 `--base-url <canonical-https-url>` or candidate-only `--no-base-url` is
-required. T5 accepts only `--kind candidate`; final fails closed until T6. The CLI validates that the
+required for candidate. T6 accepts `--kind final` only with explicit
+`--merge-commit`, `--merge-tree`, canonical `--base-url`, `--mac-metadata` and an
+explicit `--publication-capability`; final rebuilds the validated candidate
+inputs rather than reading mutable output. The CLI validates that the
 explicit base is the comparison base and the source commit resolves to the explicit tree and timestamp; it never
 infers HEAD, environment values, output, MAC metadata or publication settings.
 The explicit output is not freely selectable: candidate must equal the
 configured repository-relative `candidate_root` (`dist/candidate`) after safe
-resolution. T6 will require final to equal `final_root` (`dist/final`). An
+resolution. Final must equal `final_root` (`dist/final`). An
 absolute, traversing or symlinked path, any alternative directory, or an output
 inside catalogue, schema, fixture, template, asset or other input roots fails.
 T8 supplies the exact configured value for the requested kind.
-T6 will add final builds with explicit `--merge-commit` and `--merge-tree`,
-merge-tree equality and the accepted source epoch unchanged.
+T6 final builds require explicit merge coordinates, merge-tree equality with
+the accepted source tree and the accepted source epoch unchanged.
 
 T8 invokes the candidate build with the trusted provider's base/head/tree,
-the explicit path to validated bounded MAC metadata, explicit epoch/profile/base URL/path and a
-fresh candidate output path, then hashes that exact result. T5 does not perform
-the post-merge final build; that interface remains deferred to T6.
+the explicit path to validated bounded MAC metadata, explicit epoch/profile/base URL/path and the
+configured candidate output path, then hashes that exact result. Post-merge T6
+reconstructs those exact bytes from the accepted commit and metadata after proving
+the merge-tree equality.
 
 Codespaces, GitLab Workspaces, Kiro and IDE settings are optional conveniences.
 They cannot be required for a clean clone.
@@ -928,8 +936,9 @@ No production catalogue launches until the executable validator, schemas,
 fixtures, templates, GitHub/GitLab adapters, synthetic Pages build, protected
 host controls, release receipt and mirror-restore rehearsal all pass.
 
-Implementation status at this contract revision: T1, T2, T3, T4 and T7 are
-implemented and independently gated. The accepted T4 head is
-`76b6fe8f3e74a34299851b6bae9411c719154e9d`. T5, T6, T8, T9 and T10 remain
-unimplemented; no static site or trusted CI is deployed and agent approval is
-disabled.
+Implementation status at this revision: T1–T7 are implemented. T5 and the AWS
+route correction are present at accepted base
+`970e245a1c98f65ec21ff4937eb35d26262815d7`; T6 still requires independent
+exact-head review. T8, T9 and T10 remain unimplemented. No trusted CI or static
+site is deployed, production catalogue launch remains blocked and agent
+approval is disabled.

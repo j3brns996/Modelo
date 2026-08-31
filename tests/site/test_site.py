@@ -1,0 +1,496 @@
+from __future__ import annotations
+
+from dataclasses import replace
+from datetime import date
+import json
+from html.parser import HTMLParser
+from pathlib import Path, PurePosixPath
+import shutil
+import subprocess
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import modelo.build as build_module
+from modelo.build import BuildError, _layout, _projection_from_snapshot, recover_candidate
+from modelo.change import with_snapshot
+from modelo.mac import compute_keys
+from modelo.receipt import canonical_bytes, manifest_entries, publication_digest, sha256_bytes
+from modelo.site import (
+    FinalBuildRequest,
+    _Resolver,
+    _entry,
+    _history_html,
+    _pricing_rows,
+    _route_rows,
+    build_final_site,
+)
+
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+class LinkParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(); self.links = []; self.ids = set(); self.tables = []
+    def handle_starttag(self, tag, attributes):
+        attrs = dict(attributes)
+        if "id" in attrs: self.ids.add(attrs["id"])
+        if tag == "a" and "href" in attrs: self.links.append((attrs["href"], attrs.get("rel", "")))
+        if tag == "table": self.tables.append(False)
+        if tag == "caption" and self.tables: self.tables[-1] = True
+
+
+def git(root: Path, *arguments: str) -> str:
+    return subprocess.run(
+        ["git", *arguments], cwd=root, text=True, capture_output=True, check=True
+    ).stdout.strip()
+
+
+class FinalSiteTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name) / "repository"
+        shutil.copytree(
+            ROOT,
+            self.root,
+            ignore=shutil.ignore_patterns(".git", "dist", "__pycache__", "*.pyc"),
+        )
+        shutil.copytree(
+            self.root / "tests/fixtures/build/synthetic", self.root / "catalogue"
+        )
+        git(self.root, "init", "-b", "main")
+        git(self.root, "config", "user.name", "Site fixture")
+        git(self.root, "config", "user.email", "site@example.invalid")
+        git(self.root, "add", ".")
+        git(self.root, "commit", "-m", "base implementation")
+        self.base = git(self.root, "rev-parse", "HEAD")
+        history_path = self.root / "tests/fixtures/build/synthetic/history.txt"
+        history_path.write_text("added\n", encoding="utf-8", newline="\n")
+        git(self.root, "add", "."); git(self.root, "commit", "-m", 'add <script>alert("history")</script> marker')
+        history_path.write_text("changed\n", encoding="utf-8", newline="\n")
+        git(self.root, "add", "."); git(self.root, "commit", "-m", "change history marker")
+        history_path.unlink()
+        git(self.root, "add", "."); git(self.root, "commit", "-m", "revoke history marker")
+        condition = self.root / "catalogue/policies/conditions/test-condition/2.yaml"
+        condition.parent.mkdir(parents=True, exist_ok=True)
+        condition.write_text(
+            "id: test-condition\nversion: 2\ntitle: Second condition\n"
+            "description: Synthetic second immutable version.\nowner: Test policy owner\n",
+            encoding="utf-8", newline="\n",
+        )
+        git(self.root, "add", ".")
+        git(self.root, "commit", "-m", "add synthetic condition")
+        self.source = git(self.root, "rev-parse", "HEAD")
+        self.tree = git(self.root, "rev-parse", "HEAD^{tree}")
+        self.epoch = int(git(self.root, "show", "-s", "--format=%at", self.source))
+        layout = _layout(self.root)
+        projection = with_snapshot(
+            self.root,
+            self.source,
+            lambda snapshot: _projection_from_snapshot(
+                snapshot,
+                "synthetic",
+                self.source,
+                self.tree,
+                date(2026, 8, 30),
+                layout,
+            ),
+        )
+        catalogue = canonical_bytes(projection)
+        delta = canonical_bytes([])
+        data = self.root / "dist" / "candidate" / "site" / "data"
+        data.mkdir(parents=True)
+        (data / "catalogue.json").write_bytes(catalogue)
+        (data / "change-delta.json").write_bytes(delta)
+        candidate_files = {
+            "data/catalogue.json": catalogue,
+            "data/change-delta.json": delta,
+        }
+        manifest = {
+            "contract_version": "0.1.0",
+            "kind": "candidate",
+            "base_commit": self.base,
+            "source_commit": self.source,
+            "source_tree": self.tree,
+            "as_of": "2026-08-30",
+            "source_date_epoch": self.epoch,
+            "profile": "synthetic",
+            "base_url": None,
+            "base_path": "/Modelo/",
+            "promotion_durability": "fsync-durable",
+            "catalogue_path": "data/catalogue.json",
+            "change_delta_path": "data/change-delta.json",
+            "manifest_path": "data/manifest.json",
+            "digest_algorithm": "sha256",
+            "publication_digest": publication_digest(candidate_files),
+            "files": manifest_entries(candidate_files),
+        }
+        (data / "manifest.json").write_bytes(canonical_bytes(manifest))
+        path = "catalogue/policies/conditions/test-condition/2.yaml"
+        delta_record = [{"operation": "add", "path": path, "after": sha256_bytes((self.root / path).read_bytes())}]
+        self.expected_delta = canonical_bytes(delta_record)
+        payload = json.loads((ROOT / "tests/fixtures/mac/add.json").read_text(encoding="utf-8"))
+        payload["subjects"] = [{"kind": "condition", "identity": "test-condition"}]
+        payload["dedupe_key"] = "sha256-" + "0" * 64
+        payload["idempotency_key"] = "sha256-" + "0" * 64
+        payload["dedupe_key"], payload["idempotency_key"] = compute_keys(payload)
+        metadata = {
+            "contract_version": "0.1.0",
+            "repository": {"provider": "github", "host": "github.com", "namespace": "j3brns996", "name": "Modelo"},
+            "issue": {"reference": "27", "url": "https://github.com/j3brns996/Modelo/issues/27", "state": "open"},
+            "base_sha": self.base, "head_sha": self.source, "head_tree_sha": self.tree,
+            "payload": payload, "payload_digest": sha256_bytes(canonical_bytes(payload)),
+            "expected_change_delta": delta_record,
+        }
+        metadata_file = tempfile.NamedTemporaryFile(prefix="modelo-site-metadata-", suffix=".json", delete=False)
+        self.metadata_path = Path(metadata_file.name)
+        metadata_file.write(canonical_bytes(metadata)); metadata_file.close()
+        git(self.root, "commit", "--allow-empty", "-m", "merge MAC 27")
+        self.merge = git(self.root, "rev-parse", "HEAD")
+
+    def tearDown(self) -> None:
+        self.metadata_path.unlink(missing_ok=True)
+        self.temporary.cleanup()
+
+    def request(self, *, base_path: str = "/Modelo/", base_url: str | None = None) -> FinalBuildRequest:
+        return FinalBuildRequest(
+            root=self.root,
+            base_commit=self.base,
+            source_commit=self.source,
+            source_tree=self.tree,
+            merge_commit=self.merge,
+            merge_tree=self.tree,
+            as_of=date(2026, 8, 30),
+            source_date_epoch=self.epoch,
+            profile="synthetic",
+            base_url=base_url or f"https://example.invalid{base_path}",
+            base_path=base_path,
+            output="dist/final",
+            mac_metadata=self.metadata_path,
+            publication_capability="public-pages",
+        )
+
+    def test_exact_inventory_manifest_and_candidate_bytes(self) -> None:
+        result = build_final_site(self.request())
+        site = result.output / "site"
+        manifest = json.loads((site / "data/manifest.json").read_text())
+        actual = {
+            path.relative_to(site).as_posix()
+            for path in site.rglob("*") if path.is_file()
+        }
+        self.assertEqual(actual, set(manifest["files"]) | {"data/manifest.json"})
+        self.assertEqual(
+            (site / "data/catalogue.json").read_bytes(),
+            (self.root / "dist/candidate/site/data/catalogue.json").read_bytes(),
+        )
+        self.assertEqual(
+            (site / "data/change-delta.json").read_bytes(),
+            self.expected_delta,
+        )
+        self.assertEqual(manifest["merge_commit"], self.merge)
+        self.assertEqual(manifest["merge_tree"], self.tree)
+        self.assertNotIn("data/manifest.json", manifest["files"])
+
+    def test_rebuild_is_byte_identical(self) -> None:
+        first = build_final_site(self.request())
+        first_bytes = {
+            item.relative_to(first.output).as_posix(): item.read_bytes()
+            for item in first.output.rglob("*") if item.is_file()
+        }
+        second = build_final_site(self.request())
+        second_bytes = {
+            item.relative_to(second.output).as_posix(): item.read_bytes()
+            for item in second.output.rglob("*") if item.is_file()
+        }
+        self.assertEqual(first_bytes, second_bytes)
+
+    def test_final_output_uses_the_configured_build_layout(self) -> None:
+        current = _layout(self.root)
+        publication = PurePosixPath("publish")
+        alternate = replace(
+            current,
+            candidate_root=PurePosixPath("dist/alternate-candidate"),
+            final_root=PurePosixPath("dist/alternate-final"),
+            target_parent=PurePosixPath("dist"),
+            publication_subdir=publication,
+            candidate_inventory=tuple(
+                publication / path.relative_to(current.publication_subdir)
+                for path in current.candidate_inventory
+            ),
+            writer_lock=PurePosixPath("dist/.alternate-build.lock"),
+        )
+        request = replace(self.request(), output=alternate.final_root.as_posix())
+        with (
+            patch("modelo.site._layout", return_value=alternate),
+            patch("modelo.build._layout", return_value=alternate),
+        ):
+            result = build_final_site(request)
+        self.assertEqual(result.output, self.root / "dist/alternate-final")
+        self.assertTrue((result.output / "publish/index.html").is_file())
+        self.assertTrue((result.output / "publish/data/manifest.json").is_file())
+        self.assertFalse((result.output / "site").exists())
+
+        real_persist = build_module._persist_journal
+        failed = False
+
+        def fail_after_validated_stage(parent, lock, journal, *, initial=False):
+            nonlocal failed
+            real_persist(parent, lock, journal, initial=initial)
+            if journal["phase"] == "validate_stage" and not failed:
+                failed = True
+                raise OSError("injected alternate-layout crash")
+
+        with (
+            patch("modelo.site._layout", return_value=alternate),
+            patch("modelo.build._layout", return_value=alternate),
+            patch.object(build_module, "_persist_journal", side_effect=fail_after_validated_stage),
+            self.assertRaisesRegex(OSError, "alternate-layout crash"),
+        ):
+            build_final_site(request)
+        self.assertFalse((self.root / "dist/.alternate-build.lock").exists())
+        self.assertTrue((result.output / "publish/data/manifest.json").is_file())
+
+    def test_project_subpath_links_and_no_javascript_navigation(self) -> None:
+        result = build_final_site(self.request())
+        site = result.output / "site"
+        for html in site.rglob("*.html"):
+            text = html.read_text(encoding="utf-8")
+            self.assertIn('href="/Modelo/', text)
+            self.assertIn('<main id="main"', text)
+            self.assertIn('class="skip-link"', text)
+            self.assertNotIn("javascript:", text.lower())
+            self.assertNotIn(" onclick=", text.lower())
+
+    def test_root_deployment(self) -> None:
+        result = build_final_site(self.request(base_path="/", base_url="https://example.invalid/"))
+        home = (result.output / "site/index.html").read_text()
+        self.assertIn('href="/catalogue/"', home)
+        self.assertNotIn('href="//', home)
+
+    def test_missing_mutable_candidate_does_not_affect_trusted_rebuild(self) -> None:
+        (self.root / "dist/candidate/site/data/change-delta.json").unlink()
+        build_final_site(self.request())
+
+    def test_mutable_candidate_drift_does_not_affect_trusted_rebuild(self) -> None:
+        path = self.root / "dist/candidate/site/data/catalogue.json"
+        path.write_bytes(path.read_bytes() + b" ")
+        build_final_site(self.request())
+
+    def test_merge_tree_must_equal_accepted_source_tree(self) -> None:
+        request = self.request()
+        bad = replace(request, merge_tree="0" * 40)
+        with self.assertRaisesRegex(Exception, "merge tree"):
+            build_final_site(bad)
+
+    def test_shallow_history_fails_closed(self) -> None:
+        original = subprocess.run
+        def shallow(arguments, *args, **kwargs):
+            if arguments[:3] == ["git", "rev-parse", "--is-shallow-repository"]:
+                return subprocess.CompletedProcess(arguments, 0, "true\n", "")
+            return original(arguments, *args, **kwargs)
+        from unittest.mock import patch
+        with patch("modelo.site.subprocess.run", side_effect=shallow):
+            with self.assertRaisesRegex(Exception, "non-shallow"):
+                build_final_site(self.request())
+
+    def test_assets_have_no_unsafe_dom_or_remote_dependency(self) -> None:
+        javascript = (ROOT / "site/assets/catalogue.js").read_text().lower()
+        for forbidden in ("innerhtml", "outerhtml", "document.write", "fetch(", "xmlhttprequest"):
+            self.assertNotIn(forbidden, javascript)
+        base = (ROOT / "site/templates/base.html").read_text()
+        self.assertIn("default-src 'none'", base)
+        self.assertIn('name="referrer" content="no-referrer"', base)
+
+    def test_search_facets_docs_evidence_footer_and_history_contract(self) -> None:
+        site = build_final_site(self.request()).output / "site"
+        catalogue = (site / "catalogue/index.html").read_text(encoding="utf-8")
+        for facet in ("vendor", "service", "source-region", "route-type", "capability", "modality", "licence", "lifecycle", "condition"):
+            self.assertIn(f'data-filter="{facet}"', catalogue)
+        self.assertIn("data-catalogue-row", catalogue)
+        model = (site / "models/test-model/index.html").read_text(encoding="utf-8")
+        self.assertIn("Intrinsic evidence", model)
+        self.assertIn("sha256-", model)
+        docs = (site / "docs/index.html").read_text(encoding="utf-8")
+        self.assertIn("/Modelo/docs/SPEC.md", docs)
+        self.assertIn("/Modelo/docs/contract.yaml", docs)
+        home = (site / "index.html").read_text(encoding="utf-8")
+        self.assertIn(f'href="https://github.com/j3brns996/Modelo/commit/{self.source}"', home)
+        self.assertIn(f'href="https://github.com/j3brns996/Modelo/commit/{self.merge}"', home)
+        changes = (site / "changes/index.html").read_text(encoding="utf-8")
+        for operation in ("add: ", "change: ", "revoke: "):
+            self.assertIn(operation + "tests/fixtures/build/synthetic/history.txt", changes)
+
+    def test_generated_site_crawl_canonical_fragments_external_rel_and_captions(self) -> None:
+        site = build_final_site(self.request()).output / "site"
+        emitted = {path.relative_to(site).as_posix() for path in site.rglob("*") if path.is_file()}
+        for page in site.rglob("*.html"):
+            parser = LinkParser(); parser.feed(page.read_text(encoding="utf-8"))
+            self.assertTrue(all(parser.tables), page)
+            for href, rel in parser.links:
+                if href.startswith("https://"):
+                    self.assertEqual(set(rel.split()), {"noopener", "noreferrer"}, (page, href))
+                    continue
+                local, _, fragment = href.removeprefix("/Modelo/").partition("#")
+                if href.startswith("#"):
+                    local, fragment = page.relative_to(site).as_posix(), href[1:]
+                target = local + "index.html" if local.endswith("/") else local
+                if not target: target = "index.html"
+                self.assertIn(target, emitted, (page, href))
+                if fragment:
+                    target_parser = LinkParser(); target_parser.feed((site / target).read_text(encoding="utf-8"))
+                    self.assertIn(fragment, target_parser.ids)
+
+    def test_private_profile_requires_explicit_restricted_capability(self) -> None:
+        with self.assertRaisesRegex(BuildError, "restricted capability"):
+            build_final_site(replace(self.request(), profile="private"))
+
+    def test_malicious_values_are_inert(self) -> None:
+        rendered = _history_html([{"url": "https://example.invalid/x", "sha": "a" * 40, "date": "2026-08-30", "subject": '<script>alert("x")</script>', "changes": ['add: <img src=x onerror=alert(1)>']}])
+        self.assertNotIn("<script>", rendered)
+        self.assertNotIn("<img", rendered)
+        self.assertIn("&lt;script&gt;", rendered)
+        site = build_final_site(self.request()).output / "site"
+        generated = b"\n".join(path.read_bytes() for path in site.rglob("*") if path.is_file())
+        self.assertNotIn(b'<script>alert("history")</script>', generated)
+        self.assertIn(b'&lt;script&gt;alert(&quot;history&quot;)&lt;/script&gt;', generated)
+
+    def test_synthetic_generated_bytes_fail_on_private_canary_in_history(self) -> None:
+        import modelo.site as site_module
+        canary = "MODELO_PRIVATE_CANARY"
+        with patch.object(site_module, "_history", return_value=[{
+            "sha": "a" * 40, "date": "2026-08-30", "subject": canary,
+            "changes": ["add: harmless"], "url": "https://example.invalid/commit",
+        }]):
+            with self.assertRaisesRegex(BuildError, "private leakage"):
+                build_final_site(self.request())
+
+    def test_missing_and_extra_generated_inventory_fail_exactly(self) -> None:
+        import modelo.site as site_module
+        real = site_module._site_files
+        for mode in ("missing", "extra"):
+            with self.subTest(mode=mode):
+                def changed(*args, selected=mode, **kwargs):
+                    files = real(*args, **kwargs)
+                    if selected == "missing": files.pop("index.html")
+                    else: files["undeclared.txt"] = b"extra\n"
+                    return files
+                with patch.object(site_module, "_site_files", side_effect=changed):
+                    with self.assertRaisesRegex(BuildError, "inventory mismatch"):
+                        build_final_site(self.request())
+
+    def test_disjoint_final_tree_rebuild_is_byte_identical(self) -> None:
+        first = build_final_site(self.request())
+        snapshot = {
+            path.relative_to(first.output).as_posix(): path.read_bytes()
+            for path in first.output.rglob("*") if path.is_file()
+        }
+        with tempfile.TemporaryDirectory(prefix="modelo-disjoint-final-") as temporary:
+            displaced = Path(temporary) / "first-final-tree"
+            first.output.rename(displaced)
+            second = build_final_site(self.request())
+            rebuilt = {
+                path.relative_to(second.output).as_posix(): path.read_bytes()
+                for path in second.output.rglob("*") if path.is_file()
+            }
+            self.assertEqual(rebuilt, snapshot)
+
+    def test_github_gitlab_root_subpath_and_route_collision(self) -> None:
+        routes = {
+            "home": "/", "catalogue": "/catalogue/", "model": "/models/{model_id}/",
+            "offering": "/offerings/{inference_service_id}/{offering_id}/", "changes": "/changes/",
+            "process": "/process/", "propose": "/propose/", "docs": "/docs/", "not_found": "/404.html",
+            "asset_css": "/assets/site.css", "asset_js": "/assets/catalogue.js",
+            "catalogue_data": "/data/catalogue.json", "change_delta_data": "/data/change-delta.json",
+            "manifest_data": "/data/manifest.json", "schemas_data": "/data/schemas/",
+            "human_specification": "/docs/SPEC.md", "machine_contract": "/docs/contract.yaml",
+        }
+        for base_url, base_path in (("https://example.invalid/", "/"), ("https://example.invalid/group/project/", "/group/project/")):
+            resolver = _Resolver(base_url, base_path, routes, {"web_base": "https://gitlab.com/group/project", "web_routes": {"commit": "/-/commit/{commit_sha}"}})
+            self.assertEqual(resolver.site("catalogue"), base_path + "catalogue/")
+            self.assertEqual(resolver.repository_url("commit", commit_sha="a" * 40), "https://gitlab.com/group/project/-/commit/" + "a" * 40)
+        broken = dict(routes); broken["process"] = broken["catalogue"]
+        with self.assertRaisesRegex(BuildError, "collide"):
+            _Resolver("https://example.invalid/", "/", broken, {"web_base": "https://github.com/o/r", "web_routes": {"commit": "/commit/{commit_sha}"}})
+
+    def test_final_recovery_crash_injection_across_every_shared_phase(self) -> None:
+        baseline = build_final_site(self.request())
+        baseline_bytes = {
+            path.relative_to(baseline.output).as_posix(): path.read_bytes()
+            for path in baseline.output.rglob("*") if path.is_file()
+        }
+        real_persist = build_module._persist_journal
+        for selected in build_module.PHASES:
+            with self.subTest(phase=selected):
+                raised = False
+                def crash(parent, lock, journal, *, initial=False):
+                    nonlocal raised
+                    real_persist(parent, lock, journal, initial=initial)
+                    if journal["phase"] == selected and not raised:
+                        raised = True
+                        raise KeyboardInterrupt("simulated process death")
+                with patch.object(build_module, "_persist_journal", side_effect=crash):
+                    with self.assertRaises(KeyboardInterrupt):
+                        build_final_site(self.request())
+                if selected == "lock":
+                    with self.assertRaisesRegex(BuildError, "initial-lock recovery"):
+                        recover_candidate(self.root)
+                    current = {
+                        path.relative_to(baseline.output).as_posix(): path.read_bytes()
+                        for path in baseline.output.rglob("*") if path.is_file()
+                    }
+                    self.assertEqual(current, baseline_bytes, selected)
+                    (self.root / "dist/.modelo-build.lock").unlink()
+                    continue
+                self.assertIn(recover_candidate(self.root), {
+                    build_module.RecoveryOutcome.ROLLED_BACK,
+                    build_module.RecoveryOutcome.COMMITTED,
+                })
+                self.assertFalse((self.root / "dist/.modelo-build.lock").exists())
+                current = {
+                    path.relative_to(baseline.output).as_posix(): path.read_bytes()
+                    for path in baseline.output.rglob("*") if path.is_file()
+                }
+                self.assertEqual(current, baseline_bytes, selected)
+
+
+class RegionViewTests(unittest.TestCase):
+    def test_direct_route_has_no_destination_region(self) -> None:
+        offering = {"routes": [{"id": "direct", "source_region": "eu-west-2", "reference": "test.model-v1", "model_binding": {"kind": "foundation-model", "model_evidence": {"id": "e"}}}]}
+        html = _route_rows(offering, {})
+        self.assertIn("eu-west-2", html)
+        self.assertIn("None", html)
+
+    def test_profile_destinations_come_from_bound_evidence(self) -> None:
+        offering = {"routes": [{"id": "profile", "source_region": "eu-west-2", "reference": "eu.test.model-v1", "model_binding": {"kind": "system-inference-profile", "profile_evidence": {"id": "profile"}, "destinations": [{"destination_pointer": "/models/0/modelArn", "model_evidence": {"id": "east"}}, {"destination_pointer": "/models/1/modelArn", "model_evidence": {"id": "west"}}]}}]}
+        evidence = {"east": {"source": {"region": "eu-central-1"}}, "west": {"source": {"region": "eu-west-1"}}}
+        html = _route_rows(offering, evidence)
+        self.assertIn("eu-west-2", html)
+        self.assertIn("eu-central-1, eu-west-1", html)
+
+    def test_same_profile_two_source_regions_keep_distinct_routes_prices_and_destinations(self) -> None:
+        offering = {
+            "routes": [
+                {"id": "profile-uk", "source_region": "eu-west-2", "reference": "global.test.profile-v1", "model_binding": {"kind": "system-inference-profile", "profile_evidence": {"id": "p-uk"}, "destinations": [{"destination_pointer": "/models/0/modelArn", "model_evidence": {"id": "uk-destination"}}]}},
+                {"id": "profile-us", "source_region": "us-east-1", "reference": "global.test.profile-v1", "model_binding": {"kind": "system-inference-profile", "profile_evidence": {"id": "p-us"}, "destinations": [{"destination_pointer": "/models/0/modelArn", "model_evidence": {"id": "us-destination"}}]}},
+            ],
+            "pricing": [
+                {"dimension": "input", "amount": "1.00", "currency": "USD", "quantity": 1000000, "unit": "token", "route_ids": ["profile-uk"]},
+                {"dimension": "input", "amount": "2.00", "currency": "USD", "quantity": 1000000, "unit": "token", "route_ids": ["profile-us"]},
+            ],
+        }
+        evidence = {
+            "uk-destination": {"source": {"region": "eu-west-1"}},
+            "us-destination": {"source": {"region": "us-west-2"}},
+        }
+        routes = _route_rows(offering, evidence)
+        prices = _pricing_rows(offering)
+        self.assertEqual(routes.count("global.test.profile-v1"), 2)
+        for value in ("eu-west-2", "eu-west-1", "us-east-1", "us-west-2"):
+            self.assertIn(value, routes)
+        self.assertIn("1.00", prices); self.assertIn("profile-uk", prices)
+        self.assertIn("2.00", prices); self.assertIn("profile-us", prices)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -33,7 +33,7 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("usage:", result.stdout)
 
-    def test_final_build_remains_unavailable(self) -> None:
+    def test_final_build_requires_merge_coordinates_metadata_and_publication_capability(self) -> None:
         result = self.run_cli(
             "build", "--kind", "final", "--base-commit", "a" * 40,
             "--source-commit", "b" * 40, "--source-tree", "c" * 40,
@@ -41,11 +41,28 @@ class CliTests(unittest.TestCase):
             "--mac-metadata", "metadata.json", "--profile", "synthetic",
             "--base-url", "https://example.invalid/Modelo/", "--base-path", "/Modelo/",
             "--output", "dist/final",
+            "--publication-capability", "public-pages",
         )
         self.assertEqual(result.returncode, 2)
         self.assertEqual(result.stdout, "")
-        self.assertIn("final builds remain unavailable until T6", result.stderr)
+        self.assertIn("final build requires --merge-commit and --merge-tree", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
+        result = self.run_cli(
+            "build", "--kind", "final", "--base-commit", "a" * 40,
+            "--source-commit", "b" * 40, "--source-tree", "c" * 40,
+            "--merge-commit", "d" * 40, "--merge-tree", "c" * 40,
+            "--as-of", "2026-08-30", "--source-date-epoch", "0",
+            "--mac-metadata", "metadata.json", "--profile", "synthetic",
+            "--base-url", "https://example.invalid/Modelo/", "--base-path", "/Modelo/",
+            "--output", "dist/final",
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("publication-capability", result.stderr)
+
+    def test_recover_command_is_exposed(self) -> None:
+        result = self.run_cli("recover", "--help")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("usage:", result.stdout)
 
     def test_check_succeeds_for_exact_local_commits(self) -> None:
         repository = Repository()

@@ -331,10 +331,33 @@
             "data/catalogue.json": { "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "size": 123, "media_type": "application/json; charset=utf-8" },
             "data/change-delta.json": { "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "size": 456, "media_type": "application/json; charset=utf-8" }
           }
+        },
+        {
+          "contract_version": "0.1.0",
+          "kind": "final",
+          "base_commit": "0000000000000000000000000000000000000000",
+          "source_commit": "1111111111111111111111111111111111111111",
+          "source_tree": "2222222222222222222222222222222222222222",
+          "merge_commit": "3333333333333333333333333333333333333333",
+          "merge_tree": "2222222222222222222222222222222222222222",
+          "as_of": "2026-08-30",
+          "source_date_epoch": 1788091200,
+          "profile": "synthetic",
+          "base_url": "https://example.invalid/Modelo/",
+          "base_path": "/Modelo/",
+          "promotion_durability": "fsync-durable",
+          "catalogue_path": "data/catalogue.json",
+          "change_delta_path": "data/change-delta.json",
+          "manifest_path": "data/manifest.json",
+          "digest_algorithm": "sha256",
+          "publication_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "files": {
+            "data/catalogue.json": { "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "size": 123, "media_type": "application/json; charset=utf-8" },
+            "data/change-delta.json": { "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "size": 456, "media_type": "application/json; charset=utf-8" }
+          }
         }
       ],
       "valid_mutations": [
-        { "op": "set", "path": ["kind"], "value": "final" },
         { "op": "set", "path": ["profile"], "value": "private" },
         { "op": "set", "path": ["base_path"], "value": "/" },
         { "op": "set", "path": ["base_url"], "value": null }

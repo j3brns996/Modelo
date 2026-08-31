@@ -172,9 +172,10 @@ class MacTemplateTests(unittest.TestCase):
             self.assertIn(required, github)
         self.assertIn("assertions, not evidence", github)
 
-    def test_t7_does_not_add_workflows_site_skills_or_catalogue(self) -> None:
-        for relative in (".github/workflows", "site", ".agents/skills", "catalogue"):
+    def test_t7_and_t6_do_not_add_workflows_skills_or_catalogue(self) -> None:
+        for relative in (".github/workflows", ".agents/skills", "catalogue"):
             self.assertFalse((ROOT / relative).exists(), relative)
+        self.assertTrue((ROOT / "site").is_dir())
 
     def test_schema_and_module_text_parity_corpus(self) -> None:
         schema = json.loads((ROOT / "schemas/mac.schema.json").read_text(encoding="utf-8"))

@@ -34,6 +34,8 @@
     "base_commit": { "$ref": "common.schema.json#/$defs/gitSha" },
     "source_commit": { "$ref": "common.schema.json#/$defs/gitSha" },
     "source_tree": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "merge_commit": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "merge_tree": { "$ref": "common.schema.json#/$defs/gitSha" },
     "as_of": { "type": "string", "format": "date" },
     "source_date_epoch": { "type": "integer", "minimum": 0 },
     "profile": { "enum": ["synthetic", "private"] },
@@ -77,10 +79,17 @@
     {
       "if": { "properties": { "kind": { "const": "final" } }, "required": ["kind"] },
       "then": {
+        "required": ["merge_commit", "merge_tree"],
         "properties": {
           "base_url": { "$ref": "#/$defs/canonicalBaseUrl" },
           "promotion_durability": { "const": "fsync-durable" }
         }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "candidate" } }, "required": ["kind"] },
+      "then": {
+        "not": { "anyOf": [{ "required": ["merge_commit"] }, { "required": ["merge_tree"] }] }
       }
     }
   ],

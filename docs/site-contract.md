@@ -23,7 +23,10 @@ enhancement. Node, npm and `npx` are not required.
 T5 supplies one validated canonical catalogue projection and canonical change
 delta. Its candidate is exactly `data/catalogue.json`,
 `data/change-delta.json` and the non-recursive manifest that hashes those two.
-T6 consumes those exact bytes and must not perform a second raw/private catalogue serialisation.
+T6 does not trust the mutable candidate directory. It repeats the T5 acceptance
+boundary against the accepted source commit and validated MAC metadata, rebuilds
+those exact bytes deterministically, and must not perform a second raw/private
+catalogue serialisation.
 It adds the final site bytes and complete `data/manifest.json` defined by
 `schemas/build-manifest.schema.json`. The manifest lists every publication file
 except itself. T8 supplies trusted provider metadata and creates the detached
@@ -47,7 +50,7 @@ tests; JSON Schema validates the wire shape but does not derive this inventory.
 | `home` | `/` | Purpose, revision, explicit `as_of`, counts, search, recent changes |
 | `catalogue` | `/catalogue/` | Searchable/filterable Models and Offerings views |
 | `model` | `/models/{model_id}/` | Intrinsic facts, evidence and approved offerings |
-| `offering` | `/offerings/{inference_service_id}/{offering_id}/` | Routes, price, conditions, evidence and approval receipt |
+| `offering` | `/offerings/{inference_service_id}/{offering_id}/` | Routes, price, conditions, evidence, approval coordinates and protected release/receipt discovery link; no embedded receipt claim |
 | `changes` | `/changes/` | Add/change/revoke history from local Git first-parent deltas |
 | `process` | `/process/` | MAC, CI, approval and evidence rules |
 | `propose` | `/propose/` | Links to configured provider add/change/revoke/move/batch intake |

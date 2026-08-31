@@ -3,10 +3,10 @@
 contract:
   name: modelo
   version: "0.1.0"
-  status: target_not_as_built
-  implemented_slices: [T1, T2, T3, T4, T7]
-  accepted_t4_head: "76b6fe8f3e74a34299851b6bae9411c719154e9d"
-  unimplemented_slices: [T5, T6, T8, T9, T10]
+  status: implemented_through_t6_local_remote_launch_controls_absent
+  implemented_slices: [T1, T2, T3, T4, T5, T6, T7]
+  accepted_pre_t6_head: "970e245a1c98f65ec21ff4937eb35d26262815d7"
+  unimplemented_slices: [T8, T9, T10]
   executable_config: modelo.yaml
   implementation_plan_config_key: paths.implementation_plan
   drift_is_error: true
@@ -290,6 +290,7 @@ toolchain:
     - uv build --offline --no-cache
     - uv run --locked modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
     - uv run --locked modelo build --kind candidate --base-commit BASE_SHA --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON_PATH --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
+    - uv run --locked modelo build --kind final --base-commit BASE_SHA --source-commit ACCEPTED_HEAD_SHA --source-tree ACCEPTED_TREE_SHA --merge-commit MERGE_SHA --merge-tree ACCEPTED_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch ACCEPTED_HEAD_AUTHOR_UNIX_SECONDS --profile synthetic --base-url CANONICAL_PAGES_URL --base-path /Modelo/ --output dist/final
   solution_tooling_and_publication_are_services: false
   agent_skills_are_build_inputs: false
   network:
@@ -307,11 +308,12 @@ build:
   actors_registry_schema: schemas/actors-registry.schema.json
   t5_outputs: [candidate_catalogue_file, candidate_change_delta_file, candidate_manifest_file, receipt_primitives_library_values]
   t5_implemented_kinds: [candidate]
-  t5_final_kind: unavailable_fail_closed_until_t6
+  t6_implemented_kind: final
   t5_explicit_inputs: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url_choice, base_path, output]
-  cli_required_flags: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, mac_metadata, profile, base_path, output]
+  candidate_cli_required_flags: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, mac_metadata, profile, base_path, output]
+  final_cli_required_flags: [kind, base_commit, source_commit, source_tree, merge_commit, merge_tree, as_of, source_date_epoch, mac_metadata, profile, publication_capability, base_url, base_path, output]
   cli_base_url_choice: exactly_one_of_base_url_or_candidate_only_no_base_url
-  t6_deferred_final_additional_flags: [merge_commit, merge_tree]
+  t6_final_additional_flags: [merge_commit, merge_tree, publication_capability]
   ambient_inference: forbidden
   local_candidate_base_url_may_be_null: true
   trusted_ci_and_final_base_url: explicit_absolute_https
@@ -323,7 +325,8 @@ build:
   final_source_commit: accepted_head
   merge_timestamp: optional_t8_release_receipt_fact_never_build_epoch
   t5_provider_or_git_host_reads: false
-  t6_consumes_single_t5_projection: true
+  t6_rebuilds_single_t5_projection_from_validated_mac_metadata: true
+  t6_trusts_mutable_candidate_directory: false
   t6_second_raw_or_private_serialisation: forbidden
   t8_assembles_check_receipt_from_trusted_provider_metadata: true
   postmerge_assembles_release_receipt_after_exact_tree_verification: true
@@ -334,7 +337,7 @@ build:
     detached_receipts: dist/receipts
   output_argument_equality:
     candidate: exact_configured_candidate_root
-    final_when_t6_lands: exact_configured_final_root
+    final: exact_configured_final_root
   output_path_validation: repo_relative_safe_resolution_no_symlink_no_traversal_not_inside_any_input
   t8_output_argument: exact_configured_root_for_kind
   publication_subdir: site
@@ -373,6 +376,8 @@ build:
     - data/catalogue.json
     - data/change-delta.json
     - docs/index.html
+    - docs/SPEC.md
+    - docs/contract.yaml
     - index.html
     - process/index.html
     - propose/index.html
@@ -405,6 +410,9 @@ canonical_site_url:
 site:
   contract_config_key: paths.site_contract
   routes_config_key: site.routes
+  data_routes: [catalogue, change_delta, manifest, schemas]
+  asset_routes: [asset_css, asset_js]
+  document_routes: [human_specification, machine_contract]
   templates_config_key: paths.site_templates
   generated_output_config_key: build.final_root
   generator_uses_network: false
@@ -413,6 +421,7 @@ site:
   profile_sources: {synthetic: tests/fixtures/build/synthetic, private: catalogue}
   production_public_field_redaction: deferred
   private_to_public_fallback: forbidden
+  private_required_publication_capabilities: [restricted-artifact, access-controlled-pages]
   change_history_source: local_git_first_parent_deltas
   release_receipt_is_site_build_input: false
   final_postmerge_artifact_is_validated_then_deployed_without_rebuild: true

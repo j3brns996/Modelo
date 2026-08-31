@@ -1,8 +1,9 @@
 # Modelo v0.1 implementation and verification plan
 
-Status: T1, T2, T3, T4 and T7 are implemented and independently gated. The
-accepted T4 head is `76b6fe8f3e74a34299851b6bae9411c719154e9d`. T5 is next;
-no catalogue record may merge before T10.
+Status: T1–T7 are implemented. T5 and the AWS route correction are present at
+the accepted base `970e245a1c98f65ec21ff4937eb35d26262815d7`; T6 is the
+current MAC and still requires independent exact-head review. T8–T10 remain
+absent, so no production catalogue record may merge.
 
 ## Outcome
 
@@ -17,6 +18,7 @@ uv sync --locked
 uv build --offline --no-cache
 uv run --locked modelo check --base <protected-base-sha> --head <head-sha> --as-of <YYYY-MM-DD>
 uv run --locked modelo build --kind candidate --base-commit <BASE> --source-commit <HEAD> --source-tree <TREE> --as-of <DATE> --source-date-epoch <EPOCH> --mac-metadata <MAC_JSON_PATH> --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
+uv run --locked modelo build --kind final --base-commit <BASE> --source-commit <ACCEPTED_HEAD> --source-tree <ACCEPTED_TREE> --merge-commit <MERGE> --merge-tree <ACCEPTED_TREE> --as-of <DATE> --source-date-epoch <ACCEPTED_HEAD_AUTHOR_EPOCH> --profile synthetic --base-url https://pages.example/Modelo/ --base-path /Modelo/ --output dist/final
 ```
 
 `uv.lock` controls runtime sync and `uv run --locked`. Tool-package creation is
@@ -46,7 +48,7 @@ The build is split logically, not into services:
 | T3 | Core/AWS/entity/receipt schemas and schema-only fixtures under `schemas/` and `tests/fixtures/schema/` | T1 | Every structural invariant has passing and failing fixtures |
 | T4 | `tooling/modelo/src/modelo/{schemas,evidence,freshness,change,validators}.py`, `tests/fixtures/semantic/` and matching `tests/unit/test_{schemas,evidence,freshness,change,validators}.py` | T2, T3, T7 | Base/head, model binding, equality, immutability, move and revoke tests pass |
 | T5 | `tooling/modelo/src/modelo/{build,receipt}.py`, `tests/fixtures/build/synthetic`, build/receipt fixtures and tests | T4 | Candidate-only exact three-file output; validated MAC envelope/base-head-tree correlations; deterministic catalogue/delta bytes and receipt primitives; no provider reads |
-| T6 | `tooling/modelo/src/modelo/site.py`, `site/`, `tests/fixtures/publication/` and `tests/site/` | T5 | Exact manifest keys equal fixed routes/assets/data/schema inventory plus every projection-derived model/offering page; AWS Source/Destination Region view is derived from validated route/evidence bindings without browser ARN parsing; missing/extra, base-path, XSS, leakage, accessibility, history and reproducibility gates pass |
+| T6 | `tooling/modelo/src/modelo/site.py`, `site/`, `tests/fixtures/publication/` and `tests/site/` | T5, T7 | Exact manifest keys equal fixed routes/assets/data/schema inventory plus every projection-derived model/offering page; AWS Source/Destination Region view is derived from validated route/evidence bindings without browser ARN parsing; missing/extra, base-path, XSS, leakage, accessibility, history and reproducibility gates pass |
 | T7 | `tooling/modelo/src/modelo/mac.py`, MAC schema/examples, GitHub/GitLab issue and change-request template directories, MAC tests | T1, T0 | Adapter fixtures round-trip to identical canonical MAC objects |
 | T8 | `tooling/modelo/src/modelo/platform.py`, `.github/workflows/`, `paths.gitlab_ci`, and `tests/contract/platform/` | T4, T6, T7 | Correlate every trusted provider input with the receipt, including current base/head/tree, provider/workflow/run/check/result and internal head/provider equalities; skipped/failed/stale or drifted checks fail closed |
 | T9 | `.agents/skills/{modelo-change,modelo-review,modelo-discover}/` and static skill lint | T7, T8 | Skill commands and paths resolve; no skill is a build/runtime input |
@@ -97,7 +99,9 @@ another build. A pull request cannot possess a post-merge receipt.
 T5 accepts exact base/head/tree, `as_of`, source epoch and an explicit path to validated MAC metadata
 as arguments and writes exactly candidate `site/data/{catalogue,change-delta,manifest}.json`;
 the manifest hashes exactly catalogue and change delta. Receipt primitives are
-library values and T8 writes the detached check receipt. T6 consumes that single projection and writes the complete static
+library values and T8 writes the detached check receipt. T6 rebuilds that single
+projection from the accepted commit and validated MAC metadata, without trusting
+mutable candidate output, and writes the complete static
 publication and non-recursive manifest. Its executable completeness check
 requires the fixed routes/assets, `data/catalogue.json`,
 `data/change-delta.json`, every schema beneath the configured schema root at
@@ -110,8 +114,10 @@ provider read.
 The T5 CLI has no ambient defaults: common required flags are `--kind`,
 `--base-commit`, `--source-commit`, `--source-tree`, `--as-of`, `--source-date-epoch`,
 `--mac-metadata`, `--profile`, `--base-path` and `--output`, plus exactly one of
-`--base-url` or `--no-base-url`. T5 implements candidate only; final and its
-future `--merge-commit`/`--merge-tree` inputs remain unavailable until T6. T8 supplies every value from trusted inputs and rejects any
+`--base-url` or `--no-base-url`. T5 implements candidate only. T6 implements
+final with required `--merge-commit`, `--merge-tree`, `--base-url`,
+`--mac-metadata` and `--publication-capability`; it reconstructs the exact
+candidate bytes. T8 supplies every value from trusted inputs and rejects any
 receipt correlation mismatch.
 
 `--output` is not a caller-selected alternative directory. For candidate it
@@ -178,7 +184,7 @@ cannot substitute for host controls.
 |---|---|
 | Six independent read-only architecture reviews | Complete |
 | T0 contract reconciliation | Complete; four independent exact-head gates returned READY |
-| Implementation swarm | T1/T2/T3/T4/T7 accepted; T5 next from exact T4 head `76b6fe8f...` |
+| Implementation swarm | T1–T5 and T7 accepted at the `970e245…` base; T6 implemented in the current MAC and awaiting independent gate |
 | Executable validator and CI | Validator implemented; trusted CI adapter missing |
-| Static site and platform templates | Missing |
+| Static site and platform templates | Static site implemented in T6; platform workflow remains missing |
 | Production catalogue launch | Blocked through T10 |

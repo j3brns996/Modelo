@@ -23,6 +23,7 @@ from modelo.platform import (
 )
 from modelo.receipt import canonical_bytes, manifest_entries, publication_digest, sha256_bytes
 from modelo.site import (
+    DemoBuildRequest,
     FinalBuildRequest,
     ValidationBuildRequest,
     _Resolver,
@@ -30,6 +31,7 @@ from modelo.site import (
     _history_html,
     _pricing_rows,
     _route_rows,
+    build_demo_site,
     build_final_site,
     build_validation_site,
 )
@@ -182,6 +184,51 @@ class FinalSiteTests(unittest.TestCase):
             mac_metadata=self.metadata_path,
             publication_capability="public-pages",
         )
+
+    def demo_request(self) -> DemoBuildRequest:
+        return DemoBuildRequest(
+            root=self.root, source_commit=self.source, source_tree=self.tree,
+            as_of=date(2026, 8, 30), source_date_epoch=self.epoch,
+            base_url="https://example.invalid/Modelo/", base_path="/Modelo/",
+            output="dist/pages",
+        )
+
+    def test_demo_is_deterministic_synthetic_and_never_claims_approval(self) -> None:
+        git(self.root, "checkout", "--detach", self.source)
+        first = build_demo_site(self.demo_request())
+        first_bytes = {
+            item.relative_to(first.output).as_posix(): item.read_bytes()
+            for item in first.output.rglob("*") if item.is_file()
+        }
+        second = build_demo_site(self.demo_request())
+        second_bytes = {
+            item.relative_to(second.output).as_posix(): item.read_bytes()
+            for item in second.output.rglob("*") if item.is_file()
+        }
+        self.assertEqual(first_bytes, second_bytes)
+        site = first.output / "site"
+        manifest = json.loads((site / "data/manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["kind"], "demo")
+        self.assertEqual(manifest["profile"], "synthetic")
+        self.assertEqual((site / "data/change-delta.json").read_bytes(), canonical_bytes([]))
+        self.assertNotIn("merge_commit", manifest)
+        self.assertNotIn("validation_commit", manifest)
+        for page in site.rglob("*.html"):
+            rendered = page.read_text(encoding="utf-8")
+            self.assertIn("Synthetic demo.", rendered)
+            self.assertIn("not an approved enterprise catalogue", rendered)
+            self.assertNotIn("Approval merge", rendered)
+        offering = (site / "offerings/aws-bedrock/test-offering/index.html").read_text(encoding="utf-8")
+        self.assertIn("Demo provenance", offering)
+        self.assertIn("not approved for enterprise use", offering)
+
+    def test_demo_rejects_wrong_output_and_dirty_tree(self) -> None:
+        git(self.root, "checkout", "--detach", self.source)
+        with self.assertRaisesRegex(BuildError, "output must equal configured pages_root"):
+            build_demo_site(replace(self.demo_request(), output="dist/final"))
+        (self.root / "untracked.txt").write_text("dirty\n", encoding="utf-8")
+        with self.assertRaisesRegex(BuildError, "working tree is dirty"):
+            build_demo_site(self.demo_request())
 
     def test_exact_inventory_manifest_and_candidate_bytes(self) -> None:
         result = build_final_site(self.request())
@@ -462,6 +509,7 @@ class FinalSiteTests(unittest.TestCase):
             current,
             candidate_root=PurePosixPath("dist/alternate-candidate"),
             final_root=PurePosixPath("dist/alternate-final"),
+            pages_root=PurePosixPath("dist/alternate-pages"),
             target_parent=PurePosixPath("dist"),
             publication_subdir=publication,
             candidate_inventory=tuple(

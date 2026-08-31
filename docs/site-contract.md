@@ -13,6 +13,7 @@ site/
   assets/{site.css,catalogue.js}
   content/{process,propose,docs}.md
 dist/candidate/site/             pre-merge generated and disposable
+dist/pages/site/                 public synthetic demo; never approval evidence
 dist/final/site/                 post-merge generated and disposable
 dist/receipts/                   detached; never publication members
 ```
@@ -31,6 +32,13 @@ It adds the final site bytes and complete `data/manifest.json` defined by
 `schemas/build-manifest.schema.json`. The manifest lists every publication file
 except itself. T8 supplies trusted provider metadata and creates the detached
 check receipt; only post-merge publication may create the final receipt.
+
+The separate `demo` build projects only the configured synthetic fixture. It
+does not ingest MAC metadata, has no merge coordinate, emits an empty change
+delta, and places a visible synthetic/not-approved banner on every HTML page.
+It exists so the static UX, clone instructions and templates can be exercised
+on public GitHub Pages before a production catalogue is authorised. It is not
+the T6 final artefact and cannot satisfy a release or approval gate.
 
 Completeness ownership is split: T5 enforces the exact candidate set above;
 T6 owns the executable final exact-set rule. Final manifest `files` keys must
@@ -134,14 +142,22 @@ CI checks out complete first-parent history for release builds. A shallow clone
 must fetch the missing history or the `/changes/` build fails rather than
 silently publishing an incomplete ledger.
 
-Pre-merge CI builds and validates a candidate artefact. Post-merge CI first
+The GitHub demo workflow runs the complete locked test suite and offline Python
+package build, reads the effective URL only through validated `modelo.yaml`,
+builds `dist/pages/site` once, uploads that exact directory and deploys without
+rebuilding. Its actions are pinned to full commit SHAs. It contains no Node,
+npm or `npx` command; GitHub's pinned Pages actions are provider adapters, not
+Modelo runtime dependencies.
+
+Pre-merge CI builds and validates a candidate artefact. Production post-merge CI first
 proves the merge tree equals the accepted head tree, then builds the final
 merge-aware artefact once, validates it, creates a detached release receipt that
 hashes it, and deploys that exact final artefact without rebuilding. The receipt
 is not stored inside the artefact whose digest it records.
 
 Each build exclusively acquires the fail-fast writer lock, journals its phase,
-creates `dist/candidate.<id>.staging` or `dist/final.<id>.staging` beside its
+creates `dist/candidate.<id>.staging`, `dist/pages.<id>.staging` or
+`dist/final.<id>.staging` beside its
 target using 128 OS-CSPRNG bits, with the matching `<target>.<id>.backup`, fsyncs
 and validates the staged tree, renames the old target to a backup, renames the
 stage to target, fsyncs and verifies it, then removes the backup and lock.

@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://modelo.invalid/schemas/build-manifest.schema.json",
   "title": "Modelo non-recursive publication manifest",
-  "x-modelo-executable-completeness-owner": "candidate:T5;validation:T8;final:T6",
-  "x-modelo-executable-completeness": "candidate_files_exact_catalogue_plus_change_delta;validation_and_final_files_equal_contract_fixed_union_all_source_commit_schemas_union_projection_derived_excluding_manifest",
+  "x-modelo-executable-completeness-owner": "candidate:T5;validation:T8;final:T6;demo:Pages",
+  "x-modelo-executable-completeness": "candidate_files_exact_catalogue_plus_change_delta;validation_final_and_demo_files_equal_contract_fixed_union_all_source_commit_schemas_union_projection_derived_excluding_manifest",
   "$defs": {
     "canonicalBaseUrl": {
       "type": "string",
@@ -30,7 +30,7 @@
   "required": ["contract_version", "kind", "base_commit", "source_commit", "source_tree", "as_of", "source_date_epoch", "profile", "base_url", "base_path", "promotion_durability", "catalogue_path", "change_delta_path", "manifest_path", "digest_algorithm", "publication_digest", "files"],
   "properties": {
     "contract_version": { "const": "0.1.0" },
-    "kind": { "enum": ["candidate", "validation", "final"] },
+    "kind": { "enum": ["candidate", "demo", "validation", "final"] },
     "base_commit": { "$ref": "common.schema.json#/$defs/gitSha" },
     "source_commit": { "$ref": "common.schema.json#/$defs/gitSha" },
     "source_tree": { "$ref": "common.schema.json#/$defs/gitSha" },
@@ -76,6 +76,20 @@
             "propertyNames": { "enum": ["data/catalogue.json", "data/change-delta.json"] }
           }
         }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "demo" } }, "required": ["kind"] },
+      "then": {
+        "properties": {
+          "profile": { "const": "synthetic" },
+          "base_url": { "$ref": "#/$defs/canonicalBaseUrl" },
+          "promotion_durability": { "const": "fsync-durable" }
+        },
+        "not": { "anyOf": [
+          { "required": ["merge_commit"] }, { "required": ["merge_tree"] },
+          { "required": ["validation_commit"] }, { "required": ["validation_tree"] }
+        ] }
       }
     },
     {

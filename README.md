@@ -5,11 +5,12 @@ enterprise AI model catalogue. Git provider issues initiate move/add/change
 (MAC) work; pull or merge requests and trusted CI arbitrate acceptance. Modelo
 does not expose an application API.
 
-> **Implementation status:** T8 pre-merge CI and T9 are implemented on the
-> release-candidate branch. The static generator, detached trusted-check
-> receipt, GitHub adapter and three portable Agent Skills exist. Post-merge
-> Pages/release automation and T10 remote sentinel/restore evidence remain
-> explicit launch blockers. Agent approval is disabled.
+> **Implementation status:** T8 pre-merge CI, T9 and the public synthetic Pages
+> workflow are implemented. The static generator, detached trusted-check
+> receipt, GitHub adapter and three portable Agent Skills exist. The Pages
+> workflow is a labelled demo, not a production-catalogue approval path.
+> Post-merge production release/receipt automation and T10 remote
+> sentinel/restore evidence remain explicit launch blockers. Agent approval is disabled.
 > Do not add real catalogue data before T10 passes.
 
 ## Repository planes
@@ -41,11 +42,17 @@ uv run --locked modelo build --kind candidate \
   --no-base-url --base-path /Modelo/ --output dist/candidate
 ```
 
-Exactly one of `--base-url` or `--no-base-url` is required. Candidate and final
-builds are implemented; the trusted `modelo platform check` builds the distinct
+Exactly one of `--base-url` or `--no-base-url` is required. Candidate, demo and
+final builds are implemented; the trusted `modelo platform check` builds the distinct
 validation site for the Git provider's exact test-merge commit.
 Tool packages and solution publications are different outputs; neither creates
 a service.
+
+The Pages workflow runs the locked tests and offline package build, reads the
+single global URL owner with `modelo config site`, builds `--kind demo` once to
+`dist/pages/site`, uploads those exact bytes and deploys without rebuilding.
+Demo builds accept only the synthetic profile, use an empty MAC delta and make
+no approval, merge or release-receipt claim.
 
 The candidate output is exactly `site/data/catalogue.json`,
 `site/data/change-delta.json` and `site/data/manifest.json` below the selected
@@ -81,10 +88,11 @@ uv run --locked modelo build --help
 ```
 
 `modelo check`, `modelo build` and `modelo platform check` are implemented. The
-templates and local assets are under `site/`; generated validation/final sites
-are under `dist/validation` and `dist/final`. The canonical synthetic Pages URL
-is `https://j3brns996.github.io/Modelo/`, but deployment remains blocked until
-the T10 remote launch rehearsal passes.
+templates and local assets are under `site/`; generated demo, validation and
+final sites are under `dist/pages`, `dist/validation` and `dist/final`. The
+canonical synthetic Pages URL is `https://j3brns996.github.io/Modelo/`. A first
+successful post-merge workflow run proves the demo deployment; it does not
+complete the T10 production launch rehearsal.
 
 Read [SPEC.md](SPEC.md), [the machine contract](docs/contract.yaml),
 [the implementation plan](docs/implementation-plan.md),

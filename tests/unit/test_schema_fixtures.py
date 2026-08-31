@@ -722,10 +722,10 @@ class SchemaFixtureTests(unittest.TestCase):
     def test_t6_manifest_completeness_has_exact_fixed_and_derived_inventory(self) -> None:
         contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
         manifest_schema = self.schemas["build-manifest.schema.json"]
-        self.assertEqual(manifest_schema["x-modelo-executable-completeness-owner"], "candidate:T5;validation:T8;final:T6")
+        self.assertEqual(manifest_schema["x-modelo-executable-completeness-owner"], "candidate:T5;validation:T8;final:T6;demo:Pages")
         self.assertEqual(
             manifest_schema["x-modelo-executable-completeness"],
-            "candidate_files_exact_catalogue_plus_change_delta;validation_and_final_files_equal_contract_fixed_union_all_source_commit_schemas_union_projection_derived_excluding_manifest",
+            "candidate_files_exact_catalogue_plus_change_delta;validation_final_and_demo_files_equal_contract_fixed_union_all_source_commit_schemas_union_projection_derived_excluding_manifest",
         )
         configured = set(contract["build"]["manifest_required_fixed_files"])
         self.assertEqual(configured, REQUIRED_FIXED_PUBLICATION_FILES)
@@ -770,7 +770,7 @@ class SchemaFixtureTests(unittest.TestCase):
     def test_t5_candidate_manifest_inventory_is_exact(self) -> None:
         config = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
         build = config["build"]
-        self.assertEqual(build["implemented_kinds"], ["candidate", "final"])
+        self.assertEqual(build["implemented_kinds"], ["candidate", "demo", "final"])
         self.assertEqual(build["final_cli_arguments"], ["merge_commit", "merge_tree", "publication_capability"])
         self.assertEqual(
             set(build["candidate_output_inventory"]),

@@ -342,6 +342,12 @@ MAC metadata, obtains byte-identical catalogue and change-delta bytes, and exten
 the projection into `dist/final/site/`; it may not create a second raw or private
 serialisation.
 
+The `demo` build is a separate, non-approval publication at
+`dist/pages/site/`. It accepts only the configured synthetic fixture profile,
+does not ingest MAC metadata, has no merge coordinate, emits an empty change
+delta and labels every HTML page as synthetic and not approved. It exists to
+exercise the public Pages UX without fabricating a catalogue governance event.
+
 Each invocation exclusively creates `dist/.modelo-build.lock` or fails fast;
 it never waits. The lock contains a bounded, fsynced phase journal. Staging is
 a same-filesystem sibling under target parent `dist`: candidate uses
@@ -732,6 +738,12 @@ Pages, or stops at a restricted CI/release artefact for the private catalogue.
 It must not acquire an
 authentication proxy merely to compensate for a hosting-plan limitation.
 
+The GitHub Pages workflow reads its URL and base path from validated
+`modelo.yaml`, runs the locked Python test/package gates, builds the synthetic
+demo exactly once, uploads that exact directory and deploys without rebuilding.
+This demo is not the production final artefact and carries no MAC, merge,
+release or approval claim.
+
 The site route resolver receives the configured repository web base, neutral
 commit/issue/change-request/tag/release route templates, MAC intake routes, and
 effective `base_url`/`base_path`. CI may override local repository coordinates
@@ -936,9 +948,11 @@ No production catalogue launches until the executable validator, schemas,
 fixtures, templates, GitHub/GitLab adapters, synthetic Pages build, protected
 host controls, release receipt and mirror-restore rehearsal all pass.
 
-Implementation status at this revision: T8 pre-merge CI and T9 are implemented. The accepted T6
+Implementation status at this revision: T8 pre-merge CI, T9 and the public
+synthetic Pages demo workflow are implemented. The accepted T6
 head is `8694053c3366e162e0da6991ad08729aa8c95ad5`; the release-candidate adds the
 trusted GitHub check adapter, exact validation-site receipt and portable Agent
-Skills. T8 post-merge Pages/release automation and T10 remote sentinel,
-release/restore rehearsal and host enforcement remain required. No static site is deployed, production
+Skills. Production post-merge release/receipt automation and T10 remote
+sentinel, release/restore rehearsal, first live demo deploy and host enforcement
+remain required evidence. Production
 catalogue launch remains blocked and agent approval is disabled.

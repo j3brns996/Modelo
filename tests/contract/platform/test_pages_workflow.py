@@ -1,0 +1,39 @@
+from pathlib import Path
+import re
+
+import yaml
+
+
+ROOT = Path(__file__).resolve().parents[3]
+
+
+def test_pages_workflow_is_pinned_python_only_and_builds_once() -> None:
+    path = ROOT / ".github/workflows/pages.yml"
+    raw = path.read_text(encoding="utf-8")
+    workflow = yaml.safe_load(raw)
+    assert set(workflow["permissions"]) == {"contents", "pages", "id-token"}
+    assert workflow["permissions"] == {
+        "contents": "read", "pages": "write", "id-token": "write",
+    }
+    assert "npx" not in raw and "npm " not in raw and "actions/checkout" not in raw
+    uses = re.findall(r"uses:\s*([^\s#]+)", raw)
+    assert uses
+    assert all(re.fullmatch(r"[^@]+@[0-9a-f]{40}", value) for value in uses)
+    assert raw.count("--kind demo") == 1
+    assert raw.count("upload-pages-artifact") == 1
+    assert "path: source/dist/pages/site" in raw
+    assert "needs: build" in raw
+    assert "Deploy without rebuilding" in raw
+
+
+def test_pages_workflow_can_only_publish_the_synthetic_demo() -> None:
+    raw = (ROOT / ".github/workflows/pages.yml").read_text(encoding="utf-8")
+    assert "--profile synthetic" in raw
+    assert "modelo --root source config site" in raw
+    assert "jq" not in raw
+    assert "https://j3brns996.github.io/Modelo/" not in raw
+    assert "--mac-metadata" not in raw
+    assert "--merge-commit" not in raw
+    assert "--publication-capability" not in raw
+    assert "refs/heads/${DEFAULT_BRANCH}" in raw
+    assert "test \"$(git -C source rev-parse" in raw

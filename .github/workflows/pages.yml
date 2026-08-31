@@ -1,0 +1,101 @@
+name: Modelo Pages demo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: modelo-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and verify demo
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Install pinned uv and Python
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          version: 0.11.33
+          python-version: 3.12.13
+          enable-cache: false
+
+      - name: Fetch exact default-branch source and full history
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          SOURCE_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          test "${SOURCE_REF}" = "refs/heads/${DEFAULT_BRANCH}"
+          git init source
+          git -C source remote add origin "https://github.com/${REPOSITORY}.git"
+          auth="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 -w0)"
+          git -C source -c http.extraheader="AUTHORIZATION: basic ${auth}" \
+            fetch --no-tags origin "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}"
+          unset auth GH_TOKEN
+          test "$(git -C source rev-parse "refs/remotes/origin/${DEFAULT_BRANCH}")" = "${SOURCE_SHA}"
+          git -C source checkout --detach "${SOURCE_SHA}"
+
+      - name: Run locked arbiter tests and offline package build
+        run: |
+          set -euo pipefail
+          uv sync --project source --locked
+          uv run --project source --locked pytest -q source/tests
+          (cd source && uv build --offline --no-cache)
+
+      - name: Build deterministic synthetic Pages artefact once
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          source_tree="$(git -C source rev-parse 'HEAD^{tree}')"
+          source_epoch="$(git -C source show -s --format=%at HEAD)"
+          as_of="$(date -u +%F)"
+          mapfile -t site_config < <(
+            uv run --project source --locked modelo --root source config site --format lines
+          )
+          test "${#site_config[@]}" = 2
+          base_url="${site_config[0]}"
+          base_path="${site_config[1]}"
+          uv run --project source --locked modelo --root source build \
+            --kind demo \
+            --base-commit "${SOURCE_SHA}" \
+            --source-commit "${SOURCE_SHA}" \
+            --source-tree "${source_tree}" \
+            --as-of "${as_of}" \
+            --source-date-epoch "${source_epoch}" \
+            --profile synthetic \
+            --base-url "${base_url}" \
+            --base-path "${base_path}" \
+            --output dist/pages
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+
+      - name: Upload exact built site
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: source/dist/pages/site
+
+  deploy:
+    name: Deploy exact demo artefact
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy without rebuilding
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

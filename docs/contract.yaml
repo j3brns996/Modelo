@@ -3,10 +3,10 @@
 contract:
   name: modelo
   version: "0.1.0"
-  status: t8_premerge_and_t9_implemented_postmerge_launch_slice_pending
-  implemented_slices: [T1, T2, T3, T4, T5, T6, T7, T8-premerge, T9]
+  status: t8_premerge_t9_and_synthetic_pages_demo_implemented_production_launch_slice_pending
+  implemented_slices: [T1, T2, T3, T4, T5, T6, T7, T8-premerge, T9, synthetic-pages-demo]
   accepted_pre_t8_head: "8694053c3366e162e0da6991ad08729aa8c95ad5"
-  unimplemented_slices: [T8-postmerge-release-and-pages, T10]
+  unimplemented_slices: [T8-postmerge-production-release-and-receipt, T10-remote-evidence]
   executable_config: modelo.yaml
   implementation_plan_config_key: paths.implementation_plan
   drift_is_error: true
@@ -290,7 +290,8 @@ toolchain:
     - uv build --offline --no-cache
     - uv run --locked modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
     - uv run --locked modelo build --kind candidate --base-commit BASE_SHA --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON_PATH --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
-    - uv run --locked modelo build --kind final --base-commit BASE_SHA --source-commit ACCEPTED_HEAD_SHA --source-tree ACCEPTED_TREE_SHA --merge-commit MERGE_SHA --merge-tree ACCEPTED_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch ACCEPTED_HEAD_AUTHOR_UNIX_SECONDS --profile synthetic --base-url CANONICAL_PAGES_URL --base-path /Modelo/ --output dist/final
+    - uv run --locked modelo build --kind demo --base-commit SOURCE_SHA --source-commit SOURCE_SHA --source-tree SOURCE_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch SOURCE_AUTHOR_UNIX_SECONDS --profile synthetic --base-url CANONICAL_PAGES_URL --base-path /Modelo/ --output dist/pages
+    - uv run --locked modelo build --kind final --base-commit BASE_SHA --source-commit ACCEPTED_HEAD_SHA --source-tree ACCEPTED_TREE_SHA --merge-commit MERGE_SHA --merge-tree ACCEPTED_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch ACCEPTED_HEAD_AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON_PATH --profile synthetic --base-url CANONICAL_PAGES_URL --base-path /Modelo/ --output dist/final
   solution_tooling_and_publication_are_services: false
   agent_skills_are_build_inputs: false
   network:
@@ -308,11 +309,13 @@ build:
   actors_registry_schema: schemas/actors-registry.schema.json
   t5_outputs: [candidate_catalogue_file, candidate_change_delta_file, candidate_manifest_file, receipt_primitives_library_values]
   t5_implemented_kinds: [candidate]
+  pages_implemented_kind: demo
   t6_implemented_kind: final
   t5_explicit_inputs: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url_choice, base_path, output]
   candidate_cli_required_flags: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, mac_metadata, profile, base_path, output]
+  demo_cli_required_flags: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, profile, base_url, base_path, output]
   final_cli_required_flags: [kind, base_commit, source_commit, source_tree, merge_commit, merge_tree, as_of, source_date_epoch, mac_metadata, profile, publication_capability, base_url, base_path, output]
-  cli_base_url_choice: exactly_one_of_base_url_or_candidate_only_no_base_url
+  cli_base_url_choice: exactly_one_of_base_url_or_candidate_only_no_base_url_demo_and_final_require_base_url
   t6_final_additional_flags: [merge_commit, merge_tree, publication_capability]
   ambient_inference: forbidden
   local_candidate_base_url_may_be_null: true
@@ -332,11 +335,13 @@ build:
   postmerge_assembles_release_receipt_after_exact_tree_verification: true
   output_roots:
     candidate: dist/candidate
+    demo: dist/pages
     final: dist/final
     target_parent: dist
     detached_receipts: dist/receipts
   output_argument_equality:
     candidate: exact_configured_candidate_root
+    demo: exact_configured_pages_root
     final: exact_configured_final_root
   output_path_validation: repo_relative_safe_resolution_no_symlink_no_traversal_not_inside_any_input
   t8_output_argument: exact_configured_root_for_kind
@@ -389,8 +394,8 @@ build:
   final_manifest_completeness_executable_owner: t6
   semantic_evidence_projection_arrays_preserve_source_order: true
   writer_lock: exclusive_create_or_fail_fast
-  staging: dist/{candidate_or_final}.{128_bit_csprng_hex}.staging
-  backup: dist/{candidate_or_final}.{128_bit_csprng_hex}.backup
+  staging: dist/{candidate_demo_or_final}.{128_bit_csprng_hex}.staging
+  backup: dist/{candidate_demo_or_final}.{128_bit_csprng_hex}.backup
   promotion: [lock, stage, fsync_stage, validate_stage, backup_old, promote_new, fsync_parent, verify_target, remove_backup, unlock]
   atomicity_scope: each_same_filesystem_rename_not_whole_multi_rename_transaction
   observable_target: complete_old_complete_new_or_temporarily_absent_never_partial
@@ -414,7 +419,7 @@ site:
   asset_routes: [asset_css, asset_js]
   document_routes: [human_specification, machine_contract]
   templates_config_key: paths.site_templates
-  generated_output_config_key: build.final_root
+  generated_output_config_keys: [build.pages_root, build.final_root]
   generator_uses_network: false
   urls_come_from_global_config_only: true
   profiles: [synthetic, private]
@@ -424,6 +429,15 @@ site:
   private_required_publication_capabilities: [restricted-artifact, access-controlled-pages]
   change_history_source: local_git_first_parent_deltas
   release_receipt_is_site_build_input: false
+  demo:
+    profile: synthetic
+    mac_metadata: forbidden
+    merge_coordinates: forbidden
+    change_delta: empty_canonical_array
+    visible_status: synthetic_not_approved_on_every_html_page
+    approval_or_release_evidence: false
+    github_workflow: .github/workflows/pages.yml
+    build_once_upload_exact_then_deploy: true
   final_postmerge_artifact_is_validated_then_deployed_without_rebuild: true
   test_ownership:
     t6: [no_javascript_navigation, link_integrity, inert_xss, publication_non_leakage, accessibility_structure]

@@ -662,7 +662,7 @@ class BuildTests(unittest.TestCase):
         document = yaml.safe_load((self.repository.root / "modelo.yaml").read_text(encoding="utf-8"))
         document["build"].update({
             "candidate_root": "tests/candidate", "validation_root": "tests/validation",
-            "final_root": "tests/final",
+            "final_root": "tests/final", "pages_root": "tests/pages",
             "target_parent": "tests",
             "writer_lock": "tests/.modelo-build.lock",
         })

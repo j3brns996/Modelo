@@ -158,6 +158,12 @@ never parse ARNs. T10 owns pinned Python-controlled browser execution outside
 the core build runtime and records human keyboard and screen-reader evidence.
 Node, npm and `npx` are not required.
 
+Every CI checkout that runs the test suite or generates change history fetches
+complete reachable history. Synthetic repository fixtures never copy the
+caller's `.git` directory; they initialise an isolated repository. Shallow
+checkout inheritance would invalidate immutable-condition and `/changes/`
+validation and therefore fails closed.
+
 ## Launch gates
 
 ### Implementation swarm

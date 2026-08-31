@@ -222,7 +222,7 @@
     },
     "site": {
       "type": "object",
-      "required": ["base_url", "base_path", "routes", "data_routes", "asset_routes", "document_routes", "urls_resolved_from_config_only", "effective_base_url_and_path_are_receipt_inputs", "ci_requires_explicit_base_url"],
+      "required": ["base_url", "base_path", "routes", "data_routes", "asset_routes", "progressive_enhancement", "document_routes", "urls_resolved_from_config_only", "effective_base_url_and_path_are_receipt_inputs", "ci_requires_explicit_base_url"],
       "properties": {
         "base_url": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/canonicalBaseUrl" }] },
         "base_path": { "type": "string", "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~-]+/)*(?![\\s\\S])" },
@@ -255,10 +255,27 @@
         },
         "asset_routes": {
           "type": "object",
-          "required": ["asset_css", "asset_js"],
+          "required": ["asset_css", "asset_js", "asset_alpine", "asset_third_party_notices"],
           "properties": {
             "asset_css": { "$ref": "#/$defs/noParameterRoute" },
-            "asset_js": { "$ref": "#/$defs/noParameterRoute" }
+            "asset_js": { "$ref": "#/$defs/noParameterRoute" },
+            "asset_alpine": { "$ref": "#/$defs/noParameterRoute" },
+            "asset_third_party_notices": { "$ref": "#/$defs/noParameterRoute" }
+          },
+          "additionalProperties": false
+        },
+        "progressive_enhancement": {
+          "type": "object",
+          "required": ["framework", "version", "runtime_source", "runtime_sha256", "licence_source", "search_max_length", "comparison_max_models", "view_storage_key"],
+          "properties": {
+            "framework": { "const": "alpine-csp" },
+            "version": { "const": "3.16.3" },
+            "runtime_source": { "const": "vendor/alpine-csp-3.16.3.min.js" },
+            "runtime_sha256": { "const": "sha256:0de89ad5a626c023982c2ed7051ef5fd3cbfa22d012de81fa19005c811bfad4d" },
+            "licence_source": { "const": "vendor/THIRD-PARTY-NOTICES.md" },
+            "search_max_length": { "const": 200 },
+            "comparison_max_models": { "const": 4 },
+            "view_storage_key": { "const": "modelo.catalogue.view.v1" }
           },
           "additionalProperties": false
         },
@@ -288,9 +305,10 @@
           "properties": {
             "synthetic": {
               "type": "object",
-              "required": ["source", "delivery", "visibility", "production_catalogue"],
+              "required": ["source", "as_of", "delivery", "visibility", "production_catalogue"],
               "properties": {
                 "source": { "$ref": "#/$defs/path" },
+                "as_of": { "type": "string", "format": "date" },
                 "delivery": { "const": "pages" },
                 "visibility": { "const": "public" },
                 "production_catalogue": { "const": false }
@@ -358,7 +376,7 @@
           "items": { "enum": ["data/catalogue.json", "data/change-delta.json"] }
         },
         "final_fixed_files": {
-          "type": "array", "minItems": 13, "maxItems": 13, "uniqueItems": true,
+          "type": "array", "minItems": 15, "maxItems": 15, "uniqueItems": true,
           "items": { "$ref": "#/$defs/path" }
         },
         "mac_metadata_ingestion": {
@@ -590,7 +608,7 @@
     },
     "verification": {
       "type": "object",
-      "required": ["t6_static", "t8_browser", "t10_human", "node_npm_npx_required"],
+      "required": ["t6_static", "supplementary_controller_command", "supplementary_controller_required_for_locked_build", "t8_browser", "t10_human", "node_npm_npx_required"],
       "properties": {
         "t6_static": {
           "type": "array",
@@ -599,6 +617,8 @@
           "uniqueItems": true,
           "items": { "enum": ["no_javascript_navigation", "link_integrity", "inert_xss_fixtures", "publication_non_leakage", "accessibility_structure"] }
         },
+        "supplementary_controller_command": { "const": "node tests/site/catalogue-explorer.behavior.js" },
+        "supplementary_controller_required_for_locked_build": { "const": false },
         "t8_browser": { "const": "pinned_python_controlled_browser_outside_core_build_runtime" },
         "t10_human": { "const": "keyboard_and_screen_reader_launch_evidence" },
         "node_npm_npx_required": { "const": false }

@@ -18,7 +18,7 @@ class Repository:
             ROOT,
             self.root,
             dirs_exist_ok=True,
-            ignore=shutil.ignore_patterns(".venv", "dist", "__pycache__"),
+            ignore=shutil.ignore_patterns(".git", ".venv", "dist", "__pycache__"),
         )
         shutil.copytree(VALID / "catalogue", self.root / "catalogue", dirs_exist_ok=True)
         self.git("init", "-q")

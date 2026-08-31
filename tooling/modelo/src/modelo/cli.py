@@ -134,12 +134,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             load_config(root)
             document = load_yaml_mapping(root, PurePosixPath("modelo.yaml"))
             site = document["site"]
+            synthetic_as_of = document["publication"]["profiles"]["synthetic"]["as_of"]
             if arguments.format == "lines":
                 print(site["base_url"])
                 print(site["base_path"])
+                print(synthetic_as_of)
             else:
                 print(json.dumps(
-                    {"base_path": site["base_path"], "base_url": site["base_url"]},
+                    {"base_path": site["base_path"], "base_url": site["base_url"], "synthetic_as_of": synthetic_as_of},
                     ensure_ascii=False, sort_keys=True, separators=(",", ":"),
                 ))
             return 0

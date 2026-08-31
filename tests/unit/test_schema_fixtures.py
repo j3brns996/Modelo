@@ -7,6 +7,7 @@ import os
 import stat
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -29,6 +30,8 @@ REQUIRED_FIXED_PUBLICATION_FILES = {
     "404.html",
     "assets/catalogue.js",
     "assets/site.css",
+    "assets/vendor/alpine-csp-3.16.3.min.js",
+    "assets/vendor/THIRD-PARTY-NOTICES.md",
     "catalogue/index.html",
     "changes/index.html",
     "data/catalogue.json",
@@ -795,6 +798,10 @@ class SchemaFixtureTests(unittest.TestCase):
             config["publication"]["profiles"]["synthetic"]["source"],
             "tests/fixtures/build/synthetic",
         )
+        self.assertEqual(
+            config["publication"]["profiles"]["synthetic"]["as_of"],
+            "2026-08-30",
+        )
 
     def test_t5_required_inputs_and_commands_align_cross_document(self) -> None:
         config = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
@@ -1096,10 +1103,16 @@ class SchemaFixtureTests(unittest.TestCase):
             original_mtime = regular.stat().st_mtime_ns
 
             def same_size_rewrite_with_restored_mtime() -> None:
+                original_ctime = regular.stat().st_ctime_ns
                 changed = bytearray(original_bytes)
                 changed[-2] = ord(" ") if changed[-2] != ord(" ") else ord("\t")
                 regular.write_bytes(bytes(changed))
                 os.utime(regular, ns=(original_mtime, original_mtime))
+                deadline = time.monotonic() + 2.0
+                while regular.stat().st_ctime_ns == original_ctime and time.monotonic() < deadline:
+                    time.sleep(0.001)
+                    os.utime(regular, ns=(original_mtime, original_mtime))
+                self.assertNotEqual(regular.stat().st_ctime_ns, original_ctime)
 
             with self.assertRaises(ValueError):
                 _read_mac_metadata_contract(regular, same_size_rewrite_with_restored_mtime)

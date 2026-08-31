@@ -19,7 +19,7 @@ uv sync --locked
 uv build --offline --no-cache
 uv run --locked modelo check --base <protected-base-sha> --head <head-sha> --as-of <YYYY-MM-DD>
 uv run --locked modelo build --kind candidate --base-commit <BASE> --source-commit <HEAD> --source-tree <TREE> --as-of <DATE> --source-date-epoch <EPOCH> --mac-metadata <MAC_JSON_PATH> --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
-uv run --locked modelo build --kind demo --base-commit <SOURCE> --source-commit <SOURCE> --source-tree <TREE> --as-of <DATE> --source-date-epoch <SOURCE_AUTHOR_EPOCH> --profile synthetic --base-url https://pages.example/Modelo/ --base-path /Modelo/ --output dist/pages
+uv run --locked modelo build --kind demo --base-commit <SOURCE> --source-commit <SOURCE> --source-tree <TREE> --as-of <CONFIGURED_SYNTHETIC_AS_OF> --source-date-epoch <SOURCE_AUTHOR_EPOCH> --profile synthetic --base-url https://pages.example/Modelo/ --base-path /Modelo/ --output dist/pages
 uv run --locked modelo build --kind final --base-commit <BASE> --source-commit <ACCEPTED_HEAD> --source-tree <ACCEPTED_TREE> --merge-commit <MERGE> --merge-tree <ACCEPTED_TREE> --as-of <DATE> --source-date-epoch <ACCEPTED_HEAD_AUTHOR_EPOCH> --mac-metadata <MAC_JSON_PATH> --profile synthetic --base-url https://pages.example/Modelo/ --base-path /Modelo/ --output dist/final
 ```
 
@@ -50,7 +50,8 @@ The build is split logically, not into services:
 | T3 | Core/AWS/entity/receipt schemas and schema-only fixtures under `schemas/` and `tests/fixtures/schema/` | T1 | Every structural invariant has passing and failing fixtures |
 | T4 | `tooling/modelo/src/modelo/{schemas,evidence,freshness,change,validators}.py`, `tests/fixtures/semantic/` and matching `tests/unit/test_{schemas,evidence,freshness,change,validators}.py` | T2, T3, T7 | Base/head, model binding, equality, immutability, move and revoke tests pass |
 | T5 | `tooling/modelo/src/modelo/{build,receipt}.py`, `tests/fixtures/build/synthetic`, build/receipt fixtures and tests | T4 | Candidate-only exact three-file output; validated MAC envelope/base-head-tree correlations; deterministic catalogue/delta bytes and receipt primitives; no provider reads |
-| T6 | `tooling/modelo/src/modelo/site.py`, `site/`, `tests/fixtures/publication/` and `tests/site/` | T5, T7 | Exact manifest keys equal fixed routes/assets/data/schema inventory plus every projection-derived model/offering page; AWS Source/Destination Region view is derived from validated route/evidence bindings without browser ARN parsing; missing/extra, base-path, XSS, leakage, accessibility, history and reproducibility gates pass |
+| T6 | `tooling/modelo/src/modelo/site.py`, `site/` and `tests/site/` | T5, T7 | Exact manifest keys equal fixed routes/assets/data/schema inventory plus every projection-derived model/offering page; AWS Source/Destination Region view is derived from validated route/evidence bindings without browser ARN parsing; missing/extra, base-path, XSS, leakage, accessibility, history and reproducibility gates pass |
+| T6-UX | Local Alpine CSP runtime, catalogue explorer and a second synthetic model under `site/`, `tooling/modelo/src/modelo/site.py` and `tests/fixtures/build/synthetic/` | T6, synthetic Pages demo | Locked tests prove runtime/licence integrity, emitted bounds and no-JavaScript completeness; the repeatable zero-package Node harness executes controller logic; controlled-browser and human evidence remain T10 |
 | T7 | `tooling/modelo/src/modelo/mac.py`, MAC schema/examples, GitHub/GitLab issue and change-request template directories, MAC tests | T1, T0 | Adapter fixtures round-trip to identical canonical MAC objects |
 | T8 | `tooling/modelo/src/modelo/platform.py`, `.github/workflows/`, fail-closed `paths.gitlab_ci` capability probe, and `tests/contract/platform/` | T4, T6, T7 | Correlate every trusted provider input with the receipt, including current base/head/tree, provider/workflow/run/check/result and internal head/provider equalities; skipped/failed/stale or drifted checks fail closed |
 | T9 | `.agents/skills/{modelo-change,modelo-review,modelo-discover}/` and static skill lint | T7, T8 | Skill commands and paths resolve; no skill is a build/runtime input |
@@ -159,6 +160,16 @@ never parse ARNs. T10 owns pinned Python-controlled browser execution outside
 the core build runtime and records human keyboard and screen-reader evidence.
 Node, npm and `npx` are not required.
 
+T6-UX uses the exact locally published `@alpinejs/csp==3.16.3` bytes, not the
+standard Alpine build, because the site forbids `unsafe-eval`. Alpine's and the
+bundled Vue reactivity dependency's MIT notices are published beside the runtime.
+Explorer state is bounded and allowlisted before
+it reaches search, filters, URL state or canonical-model comparison.
+The locked suite proves structure and bounds. The supplementary command
+`node tests/site/catalogue-explorer.behavior.js` executes controller logic when
+Node already exists, but remains outside the locked build and cannot replace
+T10 browser, keyboard or screen-reader evidence.
+
 Every CI checkout that runs the test suite or generates change history fetches
 complete reachable history. A shallow checkout is an explicit failure because
 the tests create repository fixtures from that checkout and immutable-condition
@@ -194,5 +205,5 @@ cannot substitute for host controls.
 | T0 contract reconciliation | Complete; four independent exact-head gates returned READY |
 | Implementation swarm | T1–T7 accepted; T8 trusted pre-merge checks and T9 portable skills implemented in the bootstrap candidate |
 | Executable validator and CI | Validator and GitHub trusted pre-merge adapter implemented; remote host-control rehearsal remains T10 |
-| Static site and platform templates | Static site, issue templates, PR/MR templates and synthetic demo Pages workflow implemented; live deploy and production final publication remain T10 evidence |
+| Static site and platform templates | Static site, issue templates, PR/MR templates, synthetic demo Pages workflow and functional explorer implemented in the issue #34 candidate; live deploy and production final publication remain T10 evidence |
 | Production catalogue launch | Blocked through T10 |

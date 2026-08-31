@@ -125,6 +125,17 @@ site:
   asset_routes:
     asset_css: /assets/site.css
     asset_js: /assets/catalogue.js
+    asset_alpine: /assets/vendor/alpine-csp-3.16.3.min.js
+    asset_third_party_notices: /assets/vendor/THIRD-PARTY-NOTICES.md
+  progressive_enhancement:
+    framework: alpine-csp
+    version: "3.16.3"
+    runtime_source: vendor/alpine-csp-3.16.3.min.js
+    runtime_sha256: sha256:0de89ad5a626c023982c2ed7051ef5fd3cbfa22d012de81fa19005c811bfad4d
+    licence_source: vendor/THIRD-PARTY-NOTICES.md
+    search_max_length: 200
+    comparison_max_models: 4
+    view_storage_key: modelo.catalogue.view.v1
   document_routes:
     human_specification: /docs/SPEC.md
     machine_contract: /docs/contract.yaml
@@ -137,6 +148,7 @@ publication:
   profiles:
     synthetic:
       source: tests/fixtures/build/synthetic
+      as_of: "2026-08-30"
       delivery: pages
       visibility: public
       production_catalogue: false
@@ -181,6 +193,8 @@ build:
     - docs/index.html
     - assets/site.css
     - assets/catalogue.js
+    - assets/vendor/alpine-csp-3.16.3.min.js
+    - assets/vendor/THIRD-PARTY-NOTICES.md
     - data/catalogue.json
     - data/change-delta.json
     - docs/SPEC.md
@@ -308,6 +322,8 @@ determinism:
 
 verification:
   t6_static: [no_javascript_navigation, link_integrity, inert_xss_fixtures, publication_non_leakage, accessibility_structure]
+  supplementary_controller_command: node tests/site/catalogue-explorer.behavior.js
+  supplementary_controller_required_for_locked_build: false
   t8_browser: pinned_python_controlled_browser_outside_core_build_runtime
   t10_human: keyboard_and_screen_reader_launch_evidence
   node_npm_npx_required: false

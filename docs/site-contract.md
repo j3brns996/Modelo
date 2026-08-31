@@ -10,7 +10,7 @@ accounts, telemetry and service architecture are explicitly not copied.
 ```text
 site/
   templates/{base,home,catalogue,model,offering,changes,process,propose,docs,404}.html
-  assets/{site.css,catalogue.js}
+  assets/{site.css,catalogue.js,vendor/alpine-csp-3.16.3.min.js,vendor/THIRD-PARTY-NOTICES.md}
   content/{process,propose,docs}.md
 dist/candidate/site/             pre-merge generated and disposable
 dist/pages/site/                 public synthetic demo; never approval evidence
@@ -19,7 +19,13 @@ dist/receipts/                   detached; never publication members
 ```
 
 The generator lives in `tooling/modelo/`. Site JavaScript is local progressive
-enhancement. Node, npm and `npx` are not required.
+enhancement. The exact Alpine CSP build `@alpinejs/csp==3.16.3` is vendored from
+its signed npm package; its runtime SHA-256 is
+`0de89ad5a626c023982c2ed7051ef5fd3cbfa22d012de81fa19005c811bfad4d`.
+The standard expression-evaluating Alpine build is forbidden by the site CSP.
+The Alpine and bundled Vue reactivity MIT notices are one publication member
+linked from every footer. No CDN,
+Node, npm or `npx` command is required.
 
 T5 supplies one validated canonical catalogue projection and canonical change
 delta. Its candidate is exactly `data/catalogue.json`,
@@ -33,7 +39,9 @@ It adds the final site bytes and complete `data/manifest.json` defined by
 except itself. T8 supplies trusted provider metadata and creates the detached
 check receipt; only post-merge publication may create the final receipt.
 
-The separate `demo` build projects only the configured synthetic fixture. It
+The separate `demo` build projects only the configured synthetic fixture. Its
+explicit `as_of` must equal that profile's configured fixture snapshot date; it
+never substitutes the workflow wall-clock date. It
 does not ingest MAC metadata, has no merge coordinate, emits an empty change
 delta, and places a visible synthetic/not-approved banner on every HTML page.
 It exists so the static UX, clone instructions and templates can be exercised
@@ -42,7 +50,7 @@ the T6 final artefact and cannot satisfy a release or approval gate.
 
 Completeness ownership is split: T5 enforces the exact candidate set above;
 T6 owns the executable final exact-set rule. Final manifest `files` keys must
-equal the fixed list in `docs/contract.yaml`—base route HTML, two local assets,
+equal the fixed list in `docs/contract.yaml`—base route HTML, four local assets,
 `data/catalogue.json` and `data/change-delta.json`—union every schema file
 beneath the configured schema root at the exact source commit, union
 `models/{model_id}/index.html` for every projected model and
@@ -74,11 +82,26 @@ paths. CI tests both `/` and a non-root base such as `/Modelo/` and rejects
 placeholder mismatch, collision, traversal, scheme-relative output, invalid
 percent encoding and non-canonical trailing slashes.
 
-The browser supports text search, a Models/Offerings pivot, deterministic sort,
-and filters for vendor, inference service, AWS source Region and route type,
-capability, modality, licence, lifecycle and condition. It does not invent a
-cross-cloud geography facet. Every entity/detail link remains usable without
-JavaScript; filters are progressive enhancement.
+The browser supports text search, multi-select facets, deterministic name/kind
+sorting, a live result count, table/grid views, clearable active-filter chips,
+and filters for type, vendor, inference service, AWS source Region and route
+type, capability, modality, licence, lifecycle and condition. Empty facets are
+not rendered. Query, filters, sort, view and comparison selection use bounded,
+allowlisted URL parameters so a view is shareable; unknown values are ignored.
+Facet values are ORed within a facet and ANDed across facets.
+Only table/grid view preference is stored locally under the configured key.
+An explicit valid URL `view` value takes precedence, and unavailable or invalid
+storage falls back to table view without breaking the explorer. Catalogue
+scripts are emitted only on the catalogue page; all other pages contain no
+browser runtime.
+
+Comparison accepts two to four canonical models only. It never compares an
+offering as if it were a model and never infers facts: identifier, vendor,
+capabilities, modalities, licence and lifecycle come from the already validated
+projection. The dialog is built with safe DOM creation and `textContent`, never
+HTML-string injection. It contains links back to complete model records and is
+not an approval claim. Every entity/detail link and the complete table remain
+usable without JavaScript; all explorer controls are progressive enhancement.
 
 T6's Python generator produces the AWS Region view from validated T5 data. It
 labels `route.source_region` as **Source Region**. For a direct route it emits
@@ -112,6 +135,8 @@ downgrade private output to public.
 - Escape text by default; do not render catalogue Markdown or raw HTML.
 - Do not use `innerHTML`, `outerHTML`, `document.write`, inline handlers or
   remote scripts. Use safe DOM APIs such as `textContent`.
+- Treat URL state as untrusted input: accept only known facet values, cap search
+  text at 200 characters and comparison at four known canonical model keys.
 - Admit only schema-valid `https:` evidence links and add
   `rel="noopener noreferrer"` for external links.
 - Publish only a profile allowlist; private-marker canaries must be absent from
@@ -143,7 +168,8 @@ must fetch the missing history or the `/changes/` build fails rather than
 silently publishing an incomplete ledger.
 
 The GitHub demo workflow runs the complete locked test suite and offline Python
-package build, reads the effective URL only through validated `modelo.yaml`,
+package build, reads the effective URL and synthetic fixture snapshot date only
+through validated `modelo.yaml`,
 builds `dist/pages/site` once, uploads that exact directory and deploys without
 rebuilding. Its actions are pinned to full commit SHAs. It contains no Node,
 npm or `npx` command; GitHub's pinned Pages actions are provider adapters, not
@@ -182,6 +208,15 @@ period as its protected release; expiry must be explicit and cannot remove the
 only durable consumer copy.
 
 Test ownership is deliberately split. T6 owns static no-JavaScript navigation,
-links, inert malicious fixtures, non-leakage and automated accessibility
-structure. T10 owns pinned Python-controlled browser execution outside the core
-build runtime and records human keyboard and screen-reader smoke evidence.
+links, inert malicious fixtures, vendored-runtime integrity, bounded explorer
+state, non-leakage and automated accessibility structure. T10 owns pinned
+Python-controlled browser execution outside the core build runtime and records
+search/filter/sort/view/comparison behavior plus human keyboard and screen-reader
+smoke evidence.
+
+`node tests/site/catalogue-explorer.behavior.js` is supplementary PR evidence
+when a host Node executable already exists. It invokes the actual controller and
+checks search/facet composition, sort/visibility, URL round-trip, URL-over-local
+view precedence, storage failure and comparison bounds without npm, `npx` or a
+DOM package. It is not part of `uv` acceptance and does not claim browser layout,
+focus or assistive-technology behavior; those remain controlled-browser/T10 work.

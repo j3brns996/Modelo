@@ -347,6 +347,23 @@ The `demo` build is a separate, non-approval publication at
 does not ingest MAC metadata, has no merge coordinate, emits an empty change
 delta and labels every HTML page as synthetic and not approved. It exists to
 exercise the public Pages UX without fabricating a catalogue governance event.
+Its explicit `as_of` must equal the synthetic fixture snapshot date in
+`modelo.yaml`; it does not age synthetic evidence against the wall clock or
+pretend that fixtures are current provider observations.
+
+The site progressively enhances its complete server-rendered catalogue with the
+exact locally vendored `@alpinejs/csp==3.16.3` runtime. The standard Alpine build
+is forbidden because its expression evaluation conflicts with Modelo's CSP;
+CDN, npm and `npx` runtime acquisition are also forbidden. The published Alpine
+and bundled Vue reactivity MIT notices and runtime digest are part of the
+deterministic fixed inventory.
+Enhancement supplies bounded search, multi-select facets, deterministic sorting,
+result counts, table/grid views, allowlisted shareable URL state and comparison
+of two to four canonical models. Comparison never treats an offering as a model,
+never invents facts and uses only safe DOM construction and `textContent`.
+Only table/grid preference is eligible for local storage; an explicit URL value
+wins and unavailable storage falls back to table view. Explorer scripts load
+only on the catalogue route.
 
 Each invocation exclusively creates `dist/.modelo-build.lock` or fails fast;
 it never waits. The lock contains a bounded, fsynced phase journal. Staging is
@@ -744,6 +761,11 @@ demo exactly once, uploads that exact directory and deploys without rebuilding.
 This demo is not the production final artefact and carries no MAC, merge,
 release or approval claim.
 
+All catalogue records and detail links remain present without JavaScript.
+Browser state accepts only known generated facet values, at most 200 search
+characters and at most four known canonical model keys. Unknown URL values are
+ignored. Facets are ORed within one dimension and ANDed across dimensions.
+
 The site route resolver receives the configured repository web base, neutral
 commit/issue/change-request/tag/release route templates, MAC intake routes, and
 effective `base_url`/`base_path`. CI may override local repository coordinates
@@ -880,10 +902,16 @@ is not inside the artefact whose digest it records. Pre-merge and post-merge
 artefacts are not claimed to be byte-identical.
 
 T6 owns static no-JavaScript navigation, link integrity, inert-XSS fixtures,
+vendored browser-runtime integrity, bounded explorer structure,
 publication non-leakage and accessibility-structure tests. T10 owns pinned
 Python-controlled browser execution outside the deterministic core build and
-records human keyboard and screen-reader launch evidence. None
-requires Node, npm or `npx`.
+records functional search/filter/sort/view/comparison, human keyboard and
+screen-reader launch evidence. None requires Node, npm or `npx`.
+
+A supplementary zero-package Node harness may execute the real controller logic
+when Node is already available. It is retained as repeatable PR evidence but is
+not part of the locked Python build/runtime, is never fetched by CI and cannot
+substitute for the pinned controlled-browser or human T10 evidence.
 
 Lint, dependency lock, secret scanning and document-drift checks are internal
 stages of those outcomes, not eleven independently promised products. A control
@@ -948,8 +976,9 @@ No production catalogue launches until the executable validator, schemas,
 fixtures, templates, GitHub/GitLab adapters, synthetic Pages build, protected
 host controls, release receipt and mirror-restore rehearsal all pass.
 
-Implementation status at this revision: T8 pre-merge CI, T9 and the public
-synthetic Pages demo workflow are implemented. The accepted T6
+Implementation status at this revision: T8 pre-merge CI, T9, the public
+synthetic Pages demo workflow and the issue #34 functional explorer candidate
+are implemented. The accepted T6
 head is `8694053c3366e162e0da6991ad08729aa8c95ad5`; the release-candidate adds the
 trusted GitHub check adapter, exact validation-site receipt and portable Agent
 Skills. Production post-merge release/receipt automation and T10 remote

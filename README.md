@@ -49,10 +49,29 @@ Tool packages and solution publications are different outputs; neither creates
 a service.
 
 The Pages workflow runs the locked tests and offline package build, reads the
-single global URL owner with `modelo config site`, builds `--kind demo` once to
+single global URL and synthetic snapshot-date owner with `modelo config site`,
+builds `--kind demo` once to
 `dist/pages/site`, uploads those exact bytes and deploys without rebuilding.
 Demo builds accept only the synthetic profile, use an empty MAC delta and make
 no approval, merge or release-receipt claim.
+
+The catalogue is progressively enhanced with the locally vendored Alpine CSP
+build `@alpinejs/csp==3.16.3`; standard Alpine's expression evaluator, CDNs,
+npm and `npx` are not used. Search, multi-select facets, deterministic sorting,
+result counts, table/grid views, shareable URL state and comparison of two to
+four canonical models remain browser-only views over server-rendered records.
+Only the table/grid preference is stored locally, explicit URL state wins, and
+storage failure safely falls back to table view. Scripts load only on the
+catalogue page.
+
+The locked Python suite proves emitted structure, bounds, integrity and the
+no-JavaScript baseline. When a host Node executable is available,
+`node tests/site/catalogue-explorer.behavior.js` additionally executes the real
+controller's search, facet, sort, result, URL/local-view and comparison logic
+without npm or `npx`. This supplementary harness is not a build dependency and
+does not replace the pinned Python-controlled browser evidence reserved for the
+remote launch slice.
+Every record link and the complete catalogue remain usable without JavaScript.
 
 The candidate output is exactly `site/data/catalogue.json`,
 `site/data/change-delta.json` and `site/data/manifest.json` below the selected

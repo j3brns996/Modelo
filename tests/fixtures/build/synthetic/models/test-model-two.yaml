@@ -1,0 +1,7 @@
+id: test-model-two
+vendor_id: test-vendor
+name: Test Model Two
+evidence_refs:
+  /name:
+    id: sha256-baa04a612f9d55282862b8a27362351c5f6c5ccd2b7b09afe88a56f0a4539813
+    projection_pointer: /modelName

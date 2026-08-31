@@ -3,8 +3,8 @@
 contract:
   name: modelo
   version: "0.1.0"
-  status: t8_premerge_t9_and_synthetic_pages_demo_implemented_production_launch_slice_pending
-  implemented_slices: [T1, T2, T3, T4, T5, T6, T7, T8-premerge, T9, synthetic-pages-demo]
+  status: t8_premerge_t9_synthetic_pages_demo_and_functional_explorer_implemented_production_launch_slice_pending
+  implemented_slices: [T1, T2, T3, T4, T5, T6, T6-UX, T7, T8-premerge, T9, synthetic-pages-demo]
   accepted_pre_t8_head: "8694053c3366e162e0da6991ad08729aa8c95ad5"
   unimplemented_slices: [T8-postmerge-production-release-and-receipt, T10-remote-evidence]
   executable_config: modelo.yaml
@@ -290,7 +290,7 @@ toolchain:
     - uv build --offline --no-cache
     - uv run --locked modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
     - uv run --locked modelo build --kind candidate --base-commit BASE_SHA --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON_PATH --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
-    - uv run --locked modelo build --kind demo --base-commit SOURCE_SHA --source-commit SOURCE_SHA --source-tree SOURCE_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch SOURCE_AUTHOR_UNIX_SECONDS --profile synthetic --base-url CANONICAL_PAGES_URL --base-path /Modelo/ --output dist/pages
+    - uv run --locked modelo build --kind demo --base-commit SOURCE_SHA --source-commit SOURCE_SHA --source-tree SOURCE_TREE_SHA --as-of CONFIGURED_SYNTHETIC_AS_OF --source-date-epoch SOURCE_AUTHOR_UNIX_SECONDS --profile synthetic --base-url CANONICAL_PAGES_URL --base-path /Modelo/ --output dist/pages
     - uv run --locked modelo build --kind final --base-commit BASE_SHA --source-commit ACCEPTED_HEAD_SHA --source-tree ACCEPTED_TREE_SHA --merge-commit MERGE_SHA --merge-tree ACCEPTED_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch ACCEPTED_HEAD_AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON_PATH --profile synthetic --base-url CANONICAL_PAGES_URL --base-path /Modelo/ --output dist/final
   solution_tooling_and_publication_are_services: false
   agent_skills_are_build_inputs: false
@@ -314,6 +314,7 @@ build:
   t5_explicit_inputs: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url_choice, base_path, output]
   candidate_cli_required_flags: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, mac_metadata, profile, base_path, output]
   demo_cli_required_flags: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, profile, base_url, base_path, output]
+  demo_as_of_equality: explicit_as_of_equals_publication_profiles_synthetic_as_of
   final_cli_required_flags: [kind, base_commit, source_commit, source_tree, merge_commit, merge_tree, as_of, source_date_epoch, mac_metadata, profile, publication_capability, base_url, base_path, output]
   cli_base_url_choice: exactly_one_of_base_url_or_candidate_only_no_base_url_demo_and_final_require_base_url
   t6_final_additional_flags: [merge_commit, merge_tree, publication_capability]
@@ -376,6 +377,8 @@ build:
     - 404.html
     - assets/catalogue.js
     - assets/site.css
+    - assets/vendor/alpine-csp-3.16.3.min.js
+    - assets/vendor/THIRD-PARTY-NOTICES.md
     - catalogue/index.html
     - changes/index.html
     - data/catalogue.json
@@ -416,7 +419,24 @@ site:
   contract_config_key: paths.site_contract
   routes_config_key: site.routes
   data_routes: [catalogue, change_delta, manifest, schemas]
-  asset_routes: [asset_css, asset_js]
+  asset_routes: [asset_css, asset_js, asset_alpine, asset_third_party_notices]
+  progressive_enhancement:
+    framework: alpine_csp
+    version: 3.16.3
+    distribution: locally_vendored_exact_bytes
+    runtime_sha256: "sha256:0de89ad5a626c023982c2ed7051ef5fd3cbfa22d012de81fa19005c811bfad4d"
+    search_max_length: 200
+    comparison_max_models: 4
+    view_storage_key: modelo.catalogue.view.v1
+    local_persistence: table_or_grid_view_only_url_value_takes_precedence_storage_failure_falls_back_to_table
+    licence: MIT
+    bundled_dependency: "@vue/reactivity==3.5.41"
+    third_party_notice: assets/vendor/THIRD-PARTY-NOTICES.md
+    standard_alpine_eval_build: forbidden
+    cdn_npm_npx_runtime: forbidden
+    no_javascript_navigation: required
+    explorer_state: [search, multi_select_facets, deterministic_sort, result_count, table_grid_view, url_state, local_view_preference, compare_two_to_four_canonical_models]
+    script_scope: catalogue_page_only
   document_routes: [human_specification, machine_contract]
   templates_config_key: paths.site_templates
   generated_output_config_keys: [build.pages_root, build.final_root]
@@ -424,6 +444,7 @@ site:
   urls_come_from_global_config_only: true
   profiles: [synthetic, private]
   profile_sources: {synthetic: tests/fixtures/build/synthetic, private: catalogue}
+  synthetic_snapshot_as_of_config: publication.profiles.synthetic.as_of
   production_public_field_redaction: deferred
   private_to_public_fallback: forbidden
   private_required_publication_capabilities: [restricted-artifact, access-controlled-pages]
@@ -431,6 +452,7 @@ site:
   release_receipt_is_site_build_input: false
   demo:
     profile: synthetic
+    as_of: configured_synthetic_fixture_snapshot_date
     mac_metadata: forbidden
     merge_coordinates: forbidden
     change_delta: empty_canonical_array
@@ -440,8 +462,11 @@ site:
     build_once_upload_exact_then_deploy: true
   final_postmerge_artifact_is_validated_then_deployed_without_rebuild: true
   test_ownership:
-    t6: [no_javascript_navigation, link_integrity, inert_xss, publication_non_leakage, accessibility_structure]
-    t10: [pinned_python_controlled_browser_outside_core_build, human_keyboard_and_screen_reader_evidence]
+    t6_locked: [no_javascript_navigation, link_integrity, inert_xss, vendored_runtime_integrity, bounded_explorer_structure, publication_non_leakage, accessibility_structure]
+    supplementary_controller_command: node tests/site/catalogue-explorer.behavior.js
+    supplementary_controller_scope: [search_and_facets, sort_and_visibility, result_count, url_round_trip, url_over_local_view_precedence, storage_failure, comparison_bound]
+    supplementary_controller_is_locked_build_input: false
+    t10: [pinned_python_controlled_browser_outside_core_build, functional_explorer_behavior, human_keyboard_and_screen_reader_evidence]
 
 validation:
   command: modelo check --base BASE --head HEAD --as-of YYYY-MM-DD

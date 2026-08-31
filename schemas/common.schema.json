@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/common.schema.json",
+  "title": "Modelo common definitions",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?![\\s\\S])",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "evidenceId": {
+      "type": "string",
+      "pattern": "^sha256-[0-9a-f]{64}(?![\\s\\S])"
+    },
+    "gitSha": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})(?![\\s\\S])"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
+    },
+    "jsonPointer": {
+      "type": "string",
+      "pattern": "^(?:/(?:[^~/\\u0000-\\u001f\\u007f]|~0|~1)*)*(?![\\s\\S])"
+    },
+    "nonRootJsonPointer": {
+      "type": "string",
+      "pattern": "^/(?:[^~/\\u0000-\\u001f\\u007f]|~0|~1)(?:(?:[^~/\\u0000-\\u001f\\u007f]|~0|~1)|/(?:[^~/\\u0000-\\u001f\\u007f]|~0|~1)*)*(?![\\s\\S])"
+    },
+    "evidenceRef": {
+      "type": "object",
+      "required": ["id", "projection_pointer"],
+      "properties": {
+        "id": { "$ref": "#/$defs/evidenceId" },
+        "projection_pointer": { "$ref": "#/$defs/jsonPointer" }
+      },
+      "additionalProperties": false
+    },
+    "evidenceRefs": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/nonRootJsonPointer" },
+      "additionalProperties": { "$ref": "#/$defs/evidenceRef" }
+    },
+    "decimal": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?![\\s\\S])"
+    },
+    "httpsUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^\\s\\u0000-\\u001f\\u007f]*)?(?![\\s\\S])"
+    },
+    "safeRelativePath": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|(?![\\s\\S])))(?!.*\\\\)(?!.*//)[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*(?![\\s\\S])"
+    }
+  }
+}

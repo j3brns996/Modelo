@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/build-manifest.schema.json",
+  "title": "Modelo non-recursive publication manifest",
+  "x-modelo-executable-completeness-owner": "candidate:T5;validation:T8;final:T6",
+  "x-modelo-executable-completeness": "candidate_files_exact_catalogue_plus_change_delta;validation_and_final_files_equal_contract_fixed_union_all_source_commit_schemas_union_projection_derived_excluding_manifest",
+  "$defs": {
+    "canonicalBaseUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://(?!.*(?:/\\.{1,2})(?:/|(?![\\s\\S])))[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*(?:/[A-Za-z0-9._~-]+)*/(?![\\s\\S])",
+      "maxLength": 2048
+    },
+    "file": {
+      "type": "object",
+      "required": ["sha256", "size", "media_type"],
+      "properties": {
+        "sha256": { "$ref": "common.schema.json#/$defs/sha256" },
+        "size": { "type": "integer", "minimum": 0 },
+        "media_type": {
+          "type": "string",
+          "pattern": "^[a-z0-9!#$&^_.+-]+/[a-z0-9!#$&^_.+-]+(?:; charset=utf-8)?(?![\\s\\S])",
+          "maxLength": 128
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["contract_version", "kind", "base_commit", "source_commit", "source_tree", "as_of", "source_date_epoch", "profile", "base_url", "base_path", "promotion_durability", "catalogue_path", "change_delta_path", "manifest_path", "digest_algorithm", "publication_digest", "files"],
+  "properties": {
+    "contract_version": { "const": "0.1.0" },
+    "kind": { "enum": ["candidate", "validation", "final"] },
+    "base_commit": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "source_commit": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "source_tree": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "merge_commit": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "merge_tree": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "validation_commit": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "validation_tree": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "as_of": { "type": "string", "format": "date" },
+    "source_date_epoch": { "type": "integer", "minimum": 0 },
+    "profile": { "enum": ["synthetic", "private"] },
+    "base_url": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/canonicalBaseUrl" }] },
+    "base_path": {
+      "type": "string",
+      "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~-]+/)*(?![\\s\\S])"
+    },
+    "promotion_durability": { "enum": ["fsync-durable", "process-atomic-only"] },
+    "catalogue_path": { "const": "data/catalogue.json" },
+    "change_delta_path": { "const": "data/change-delta.json" },
+    "manifest_path": { "const": "data/manifest.json" },
+    "digest_algorithm": { "const": "sha256" },
+    "publication_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "files": {
+      "type": "object",
+      "minProperties": 1,
+      "required": ["data/catalogue.json", "data/change-delta.json"],
+      "propertyNames": {
+        "allOf": [
+          { "$ref": "common.schema.json#/$defs/safeRelativePath" },
+          { "not": { "const": "data/manifest.json" } }
+        ]
+      },
+      "additionalProperties": { "$ref": "#/$defs/file" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "candidate" } }, "required": ["kind"] },
+      "then": {
+        "properties": {
+          "files": {
+            "minProperties": 2,
+            "maxProperties": 2,
+            "propertyNames": { "enum": ["data/catalogue.json", "data/change-delta.json"] }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "validation" } }, "required": ["kind"] },
+      "then": {
+        "required": ["validation_commit", "validation_tree"],
+        "properties": {
+          "base_url": { "$ref": "#/$defs/canonicalBaseUrl" },
+          "promotion_durability": { "const": "fsync-durable" }
+        },
+        "not": { "anyOf": [{ "required": ["merge_commit"] }, { "required": ["merge_tree"] }] }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "final" } }, "required": ["kind"] },
+      "then": {
+        "required": ["merge_commit", "merge_tree"],
+        "properties": {
+          "base_url": { "$ref": "#/$defs/canonicalBaseUrl" },
+          "promotion_durability": { "const": "fsync-durable" }
+        },
+        "not": { "anyOf": [{ "required": ["validation_commit"] }, { "required": ["validation_tree"] }] }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "candidate" } }, "required": ["kind"] },
+      "then": {
+        "not": { "anyOf": [
+          { "required": ["merge_commit"] }, { "required": ["merge_tree"] },
+          { "required": ["validation_commit"] }, { "required": ["validation_tree"] }
+        ] }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

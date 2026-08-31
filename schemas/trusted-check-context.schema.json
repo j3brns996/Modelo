@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/trusted-check-context.schema.json",
+  "title": "Modelo provider-adapter trusted check context",
+  "type": "object",
+  "required": ["contract_version", "repository", "change_request", "base_sha", "head_sha", "head_tree_sha", "validation_sha", "validation_tree_sha", "as_of", "source_date_epoch", "profile", "base_url", "base_path", "publication_capability", "workflow_identity", "workflow_sha", "run_id", "check_name", "gates"],
+  "properties": {
+    "contract_version": { "const": "0.1.0" },
+    "repository": { "$ref": "check-receipt.schema.json#/$defs/repository" },
+    "change_request": { "type": "string", "pattern": "^[1-9][0-9]{0,19}(?![\\s\\S])" },
+    "base_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "head_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "head_tree_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "validation_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "validation_tree_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "as_of": { "type": "string", "format": "date" },
+    "source_date_epoch": { "type": "integer", "minimum": 0 },
+    "profile": { "enum": ["synthetic", "private"] },
+    "base_url": { "$ref": "check-receipt.schema.json#/$defs/canonicalBaseUrl" },
+    "base_path": { "$ref": "check-receipt.schema.json#/properties/base_path" },
+    "publication_capability": { "enum": ["public-pages", "restricted-artifact", "access-controlled-pages"] },
+    "workflow_identity": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "workflow_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "run_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "check_name": { "const": "modelo/check" },
+    "gates": {
+      "type": "object",
+      "required": ["lock", "schema", "tests", "package"],
+      "properties": {
+        "lock": { "const": "success" }, "schema": { "const": "success" },
+        "tests": { "const": "success" }, "package": { "const": "success" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

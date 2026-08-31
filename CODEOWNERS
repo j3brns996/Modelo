@@ -1,0 +1,3 @@
+# Bootstrap policy: all paths require the human control-plane owner.
+# Data-only agent approval remains disabled until T8/T10 verify remote controls.
+* @j3brns

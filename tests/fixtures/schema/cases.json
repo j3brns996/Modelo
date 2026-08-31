@@ -1,0 +1,767 @@
+{
+  "cases": [
+    {
+      "schema": "model.schema.json",
+      "valid": [
+        {
+          "id": "test-model-1",
+          "vendor_id": "test-vendor",
+          "name": "Test Model 1",
+          "capabilities": ["chat"],
+          "modalities": ["text"],
+          "context_window": 4096,
+          "licensing": "proprietary",
+          "lifecycle": "active",
+          "evidence_refs": {
+            "/name": {
+              "id": "sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "projection_pointer": "/modelName"
+            }
+          }
+        }
+      ],
+      "invalid": [
+        { "name": "missing name", "op": "remove", "path": ["name"], "expect": ["required", []] },
+        { "name": "bad identity", "op": "set", "path": ["id"], "value": "Test Model", "expect": ["pattern", ["id"]] },
+        { "name": "unknown field", "op": "set", "path": ["approved"], "value": true, "expect": ["additionalProperties", []] },
+        { "name": "binary float context", "op": "set", "path": ["context_window"], "value": 1.5, "expect": ["type", ["context_window"]] },
+        { "name": "identity line feed", "op": "set", "path": ["id"], "value": "test-model\n", "expect": ["pattern", ["id"]] },
+        { "name": "identity carriage return", "op": "set", "path": ["id"], "value": "test-model\r", "expect": ["pattern", ["id"]] },
+        { "name": "identity control", "op": "set", "path": ["id"], "value": "test\u0000model", "expect": ["pattern", ["id"]] },
+        { "name": "identity too long", "op": "repeat", "path": ["id"], "value": "a", "count": 129, "expect": ["maxLength", ["id"]] }
+      ]
+    },
+    {
+      "schema": "evidence.schema.json",
+      "valid": [
+        {
+          "id": "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source": {
+            "type": "first-party-read-api",
+            "provider": "aws",
+            "service": "bedrock",
+            "operation": "GetFoundationModel",
+            "partition": "aws",
+            "region": "eu-west-2",
+            "sanitised_parameters": { "modelIdentifier": "test.model-v1" },
+            "documentation_uri": "https://docs.aws.amazon.com/bedrock/latest/APIReference/API_GetFoundationModel.html"
+          },
+          "retrieved_by": "cli",
+          "observed_at": "2026-08-30T12:00:00Z",
+          "scope": { "scope_ref": "test-scope", "region": "eu-west-2" },
+          "projection": { "modelId": "test.model-v1", "streamingSupported": true, "count": 1 },
+          "visibility": "internal"
+        },
+        {
+          "id": "sha256-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "source": {
+            "type": "official-vendor-documentation",
+            "uri": "https://example.invalid/vendor/model-card"
+          },
+          "retrieved_by": "manual",
+          "observed_at": "2026-08-30T12:00:00Z",
+          "scope": {},
+          "projection": { "name": "Test Model 1" },
+          "visibility": "public"
+        }
+      ],
+      "invalid": [
+        { "name": "bad digest", "op": "set", "path": ["id"], "value": "sha256-ABC", "expect": ["pattern", ["id"]] },
+        { "name": "digest line feed", "op": "set", "path": ["id"], "value": "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n", "expect": ["pattern", ["id"]] },
+        { "name": "digest carriage return", "op": "set", "path": ["id"], "value": "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\r", "expect": ["pattern", ["id"]] },
+        { "name": "digest control", "op": "set", "path": ["id"], "value": "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\u0000", "expect": ["pattern", ["id"]] },
+        { "name": "API operation absent", "op": "remove", "path": ["source", "operation"], "expect": ["required", ["source"]] },
+        { "name": "binary float projection", "op": "set", "path": ["projection", "price"], "value": 1.25, "expect": ["oneOf", ["projection", "price"]] },
+        { "name": "sensitive extra source field", "op": "set", "path": ["source", "offerToken"], "value": "secret", "expect": ["additionalProperties", ["source"]] },
+        { "name": "timestamp lacks timezone", "op": "set", "path": ["observed_at"], "value": "2026-08-30T12:00:00", "expect": ["pattern", ["observed_at"]] },
+        { "name": "region line feed", "op": "set", "path": ["source", "region"], "value": "eu-west-2\n", "expect": ["pattern", ["source", "region"]] },
+        { "name": "region carriage return", "op": "set", "path": ["source", "region"], "value": "eu-west-2\r", "expect": ["pattern", ["source", "region"]] },
+        { "name": "region control", "op": "set", "path": ["source", "region"], "value": "eu-west-\u00002", "expect": ["pattern", ["source", "region"]] },
+        { "name": "documentation URI not HTTPS", "op": "set", "path": ["source", "documentation_uri"], "value": "http://example.invalid/api", "expect": ["pattern", ["source", "documentation_uri"]] },
+        { "name": "documentation URI malformed", "op": "set", "path": ["source", "documentation_uri"], "value": "https://[", "expect": ["pattern", ["source", "documentation_uri"]] },
+        { "name": "documentation URI line feed", "op": "set", "path": ["source", "documentation_uri"], "value": "https://example.invalid/api\n", "expect": ["pattern", ["source", "documentation_uri"]] },
+        { "name": "documentation URI carriage return", "op": "set", "path": ["source", "documentation_uri"], "value": "https://example.invalid/api\r", "expect": ["pattern", ["source", "documentation_uri"]] },
+        { "name": "documentation URI control", "op": "set", "path": ["source", "documentation_uri"], "value": "https://example.invalid/\u0000api", "expect": ["pattern", ["source", "documentation_uri"]] }
+      ]
+    },
+    {
+      "schema": "condition.schema.json",
+      "valid": [
+        { "id": "test-condition", "version": 1, "title": "Test condition", "description": "Synthetic policy text.", "owner": "Test policy owner" }
+      ],
+      "invalid": [
+        { "name": "zero version", "op": "set", "path": ["version"], "value": 0, "expect": ["minimum", ["version"]] },
+        { "name": "workflow status forbidden", "op": "set", "path": ["status"], "value": "approved", "expect": ["additionalProperties", []] },
+        { "name": "condition owner absent", "op": "remove", "path": ["owner"], "expect": ["required", []] },
+        { "name": "condition title empty", "op": "set", "path": ["title"], "value": "", "expect": ["minLength", ["title"]] }
+      ]
+    },
+    {
+      "schema": "vendors-registry.schema.json",
+      "valid": [
+        {
+          "vendors": {
+            "test-vendor": {
+              "id": "test-vendor",
+              "name": "Test Vendor",
+              "evidence_refs": {
+                "/name": {
+                  "id": "sha256-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                  "projection_pointer": "/providerName"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "invalid": [
+        { "name": "empty registry", "op": "set", "path": ["vendors"], "value": {}, "expect": ["minProperties", ["vendors"]] },
+        { "name": "bad registry key", "op": "rename", "path": ["vendors", "test-vendor"], "value": "Test Vendor", "expect": ["pattern", ["vendors"]] },
+        { "name": "vendor nested unknown", "op": "set", "path": ["vendors", "test-vendor", "domicile"], "value": "us", "expect": ["additionalProperties", ["vendors", "test-vendor"]] },
+        { "name": "vendor evidence digest control", "op": "set", "path": ["vendors", "test-vendor", "evidence_refs", "/name", "id"], "value": "sha256-ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\u0000", "expect": ["pattern", ["vendors", "test-vendor", "evidence_refs", "/name", "id"]] }
+      ]
+    },
+    {
+      "schema": "inference-services-registry.schema.json",
+      "valid": [
+        { "inference_services": { "aws-bedrock": { "id": "aws-bedrock", "adapter": "aws-bedrock" } } }
+      ],
+      "invalid": [
+        { "name": "GCP deferred", "op": "set", "path": ["inference_services", "aws-bedrock", "adapter"], "value": "gcp-vertex-ai", "expect": ["const", ["inference_services", "aws-bedrock", "adapter"]] },
+        { "name": "extra service assertion", "op": "set", "path": ["inference_services", "aws-bedrock", "availability"], "value": true, "expect": ["additionalProperties", ["inference_services", "aws-bedrock"]] },
+        { "name": "service ID absent", "op": "remove", "path": ["inference_services", "aws-bedrock", "id"], "expect": ["required", ["inference_services", "aws-bedrock"]] }
+      ]
+    },
+    {
+      "schema": "freshness-policy.schema.json",
+      "valid": [
+        { "classes_days": { "availability": 30, "pricing": 90, "intrinsic_model_fact": 365 } }
+      ],
+      "invalid": [
+        { "name": "pricing threshold drift", "op": "set", "path": ["classes_days", "pricing"], "value": 91, "expect": ["const", ["classes_days", "pricing"]] },
+        { "name": "unknown freshness class", "op": "set", "path": ["classes_days", "marketing"], "value": 7, "expect": ["additionalProperties", ["classes_days"]] },
+        { "name": "availability threshold absent", "op": "remove", "path": ["classes_days", "availability"], "expect": ["required", ["classes_days"]] }
+      ]
+    },
+    {
+      "schema": "providers/aws-bedrock-route.schema.json",
+      "valid": [
+        {
+          "id": "london-direct",
+          "source_region": "eu-west-2",
+          "reference": "test.model-v1",
+          "model_binding": {
+            "kind": "foundation-model",
+            "model_evidence": {
+              "id": "sha256-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "id_pointer": "/modelId",
+              "arn_pointer": "/modelArn",
+              "name_pointer": "/modelName",
+              "provider_pointer": "/providerName"
+            }
+          }
+        },
+        {
+          "id": "eu-system-profile",
+          "source_region": "eu-west-2",
+          "reference": "eu.test.profile-v1",
+          "model_binding": {
+            "kind": "system-inference-profile",
+            "profile_evidence": {
+              "id": "sha256-ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "projection_pointer": "/profileId",
+              "type_pointer": "/type",
+              "status_pointer": "/status",
+              "destinations_pointer": "/models"
+            },
+            "destinations": [
+              {
+                "destination_pointer": "/models/0/modelArn",
+                "model_evidence": {
+                  "id": "sha256-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "arn_pointer": "/modelArn",
+                  "name_pointer": "/modelName",
+                  "provider_pointer": "/providerName"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "valid_mutations": [
+        { "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2::foundation-model/test.model-v1" },
+        { "valid_index": 1, "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2::inference-profile/eu.test.profile-v1" }
+      ],
+      "invalid": [
+        { "name": "route adapter forbidden", "op": "set", "path": ["adapter"], "value": "aws-bedrock", "expect": ["additionalProperties", []] },
+        { "name": "source Region absent", "op": "remove", "path": ["source_region"], "expect": ["required", []] },
+        { "name": "source Region invalid", "op": "set", "path": ["source_region"], "value": "uk", "expect": ["pattern", ["source_region"]] },
+        { "name": "direct binding lacks explicit ID pointer", "op": "remove", "path": ["model_binding", "model_evidence", "id_pointer"], "expect": ["required", ["model_binding", "model_evidence"]] },
+        { "name": "profile has no destinations", "valid_index": 1, "op": "set", "path": ["model_binding", "destinations"], "value": [], "expect": ["minItems", ["model_binding", "destinations"]] },
+        { "name": "account scope forbidden extra", "op": "set", "path": ["account_id"], "value": "123456789012", "expect": ["additionalProperties", []] },
+        { "name": "route reference absent", "op": "remove", "path": ["reference"], "expect": ["required", []] },
+        { "name": "arbitrary direct reference", "op": "set", "path": ["reference"], "value": "arbitrary", "expect": ["oneOf", ["reference"]] },
+        { "name": "profile reference used for foundation binding", "op": "set", "path": ["reference"], "value": "eu.test.profile-v1", "expect": ["oneOf", ["reference"]] },
+        { "name": "provisioned reference deferred", "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2:123456789012:provisioned-model/test", "expect": ["oneOf", ["reference"]] },
+        { "name": "custom model reference deferred", "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2:123456789012:custom-model/test", "expect": ["oneOf", ["reference"]] },
+        { "name": "imported model reference deferred", "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2:123456789012:imported-model/test", "expect": ["oneOf", ["reference"]] },
+        { "name": "application profile kind deferred", "valid_index": 1, "op": "set", "path": ["model_binding", "kind"], "value": "application-inference-profile", "expect": ["oneOf", ["model_binding"]] },
+        { "name": "application profile ARN deferred", "valid_index": 1, "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2:123456789012:application-inference-profile/test", "expect": ["oneOf", ["reference"]] },
+        { "name": "account-owned profile ARN forbidden", "valid_index": 1, "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2:123456789012:inference-profile/eu.test.profile-v1", "expect": ["oneOf", ["reference"]] },
+        { "name": "malformed profile ARN", "valid_index": 1, "op": "set", "path": ["reference"], "value": "arn:aws:bedrock:eu-west-2::inference-profile/not-an-arn", "expect": ["oneOf", ["reference"]] },
+        { "name": "direct reference line feed", "op": "set", "path": ["reference"], "value": "test.model-v1\n", "expect": ["oneOf", ["reference"]] },
+        { "name": "direct reference carriage return", "op": "set", "path": ["reference"], "value": "test.model-v1\r", "expect": ["oneOf", ["reference"]] },
+        { "name": "direct reference control", "op": "set", "path": ["reference"], "value": "test.model-\u0000v1", "expect": ["oneOf", ["reference"]] },
+        { "name": "direct reference too long", "op": "repeat", "path": ["reference"], "value": "a", "count": 2049, "expect": ["maxLength", ["reference"]] },
+        { "name": "unknown binding field", "op": "set", "path": ["model_binding", "scope"], "value": "test", "expect": ["additionalProperties", ["model_binding"]] }
+      ]
+    },
+    {
+      "schema": "offering.schema.json",
+      "valid": [
+        {
+          "id": "test-offering",
+          "inference_service_id": "aws-bedrock",
+          "model_id": "test-model-1",
+          "routes": [
+            {
+              "id": "london-direct",
+              "source_region": "eu-west-2",
+              "reference": "test.model-v1",
+              "model_binding": {
+                "kind": "foundation-model",
+                "model_evidence": {
+                  "id": "sha256-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "id_pointer": "/modelId",
+                  "arn_pointer": "/modelArn",
+                  "name_pointer": "/modelName",
+                  "provider_pointer": "/providerName"
+                }
+              }
+            }
+          ],
+          "pricing": [
+            { "dimension": "input", "unit": "token", "quantity": 1000000, "amount": "3.00", "currency": "USD", "route_ids": ["london-direct"] }
+          ],
+          "condition_refs": [{ "id": "test-condition", "version": 1 }],
+          "evidence_refs": {
+            "/routes/0/reference": {
+              "id": "sha256-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "projection_pointer": "/modelId"
+            },
+            "/pricing/0": {
+              "id": "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "projection_pointer": "/price"
+            }
+          }
+        }
+      ],
+      "invalid": [
+        { "name": "no consumable route", "op": "set", "path": ["routes"], "value": [], "expect": ["minItems", ["routes"]] },
+        { "name": "numeric amount", "op": "set", "path": ["pricing", 0, "amount"], "value": 3.0, "expect": ["type", ["pricing", 0, "amount"]] },
+        { "name": "zero quantity", "op": "set", "path": ["pricing", 0, "quantity"], "value": 0, "expect": ["minimum", ["pricing", 0, "quantity"]] },
+        { "name": "condition version absent", "op": "remove", "path": ["condition_refs", 0, "version"], "expect": ["required", ["condition_refs", 0]] },
+        { "name": "approval flag forbidden", "op": "set", "path": ["approved"], "value": true, "expect": ["additionalProperties", []] },
+        { "name": "offering model ID line feed", "op": "set", "path": ["model_id"], "value": "test-model-1\n", "expect": ["pattern", ["model_id"]] },
+        { "name": "decimal line feed", "op": "set", "path": ["pricing", 0, "amount"], "value": "3.00\n", "expect": ["pattern", ["pricing", 0, "amount"]] },
+        { "name": "decimal carriage return", "op": "set", "path": ["pricing", 0, "amount"], "value": "3.00\r", "expect": ["pattern", ["pricing", 0, "amount"]] },
+        { "name": "decimal control", "op": "set", "path": ["pricing", 0, "amount"], "value": "3.\u000000", "expect": ["pattern", ["pricing", 0, "amount"]] },
+        { "name": "negative decimal", "op": "set", "path": ["pricing", 0, "amount"], "value": "-1.00", "expect": ["pattern", ["pricing", 0, "amount"]] },
+        { "name": "currency lowercase", "op": "set", "path": ["pricing", 0, "currency"], "value": "usd", "expect": ["pattern", ["pricing", 0, "currency"]] },
+        { "name": "currency line feed", "op": "set", "path": ["pricing", 0, "currency"], "value": "USD\n", "expect": ["pattern", ["pricing", 0, "currency"]] },
+        { "name": "currency carriage return", "op": "set", "path": ["pricing", 0, "currency"], "value": "USD\r", "expect": ["pattern", ["pricing", 0, "currency"]] },
+        { "name": "currency control", "op": "set", "path": ["pricing", 0, "currency"], "value": "US\u0000", "expect": ["pattern", ["pricing", 0, "currency"]] },
+        { "name": "price unknown field", "op": "set", "path": ["pricing", 0, "estimate"], "value": true, "expect": ["additionalProperties", ["pricing", 0]] },
+        { "name": "price currency absent", "op": "remove", "path": ["pricing", 0, "currency"], "expect": ["required", ["pricing", 0]] },
+        { "name": "evidence pointer control", "op": "rename", "path": ["evidence_refs", "/pricing/0"], "value": "/pricing/0\u0000", "expect": ["pattern", ["evidence_refs"]] }
+      ]
+    },
+    {
+      "schema": "catalogue-output.schema.json",
+      "valid": [
+        {
+          "contract_version": "0.1.0",
+          "source_commit": "1111111111111111111111111111111111111111",
+          "source_tree": "2222222222222222222222222222222222222222",
+          "as_of": "2026-08-30",
+          "profile": "synthetic",
+          "models": [],
+          "offerings": [],
+          "evidence": [],
+          "conditions": [],
+          "vendors": { "vendors": { "test-vendor": { "id": "test-vendor", "name": "Test Vendor", "evidence_refs": {} } } },
+          "inference_services": { "inference_services": { "aws-bedrock": { "id": "aws-bedrock", "adapter": "aws-bedrock" } } },
+          "freshness": { "classes_days": { "availability": 30, "pricing": 90, "intrinsic_model_fact": 365 } }
+        }
+      ],
+      "invalid": [
+        { "name": "catalogue contract version changed", "op": "set", "path": ["contract_version"], "value": "0.2.0", "expect": ["const", ["contract_version"]] },
+        { "name": "catalogue source commit absent", "op": "remove", "path": ["source_commit"], "expect": ["required", []] },
+        { "name": "catalogue source tree malformed", "op": "set", "path": ["source_tree"], "value": "tree", "expect": ["pattern", ["source_tree"]] },
+        { "name": "catalogue as-of invalid", "op": "set", "path": ["as_of"], "value": "2026-02-30", "expect": ["format", ["as_of"]] },
+        { "name": "catalogue profile unsupported", "op": "set", "path": ["profile"], "value": "public", "expect": ["enum", ["profile"]] },
+        { "name": "catalogue models not array", "op": "set", "path": ["models"], "value": {}, "expect": ["type", ["models"]] },
+        { "name": "catalogue offering invalid", "op": "set", "path": ["offerings"], "value": [{}], "expect": ["required", ["offerings", 0]] },
+        { "name": "catalogue evidence invalid", "op": "set", "path": ["evidence"], "value": [{}], "expect": ["required", ["evidence", 0]] },
+        { "name": "catalogue condition invalid", "op": "set", "path": ["conditions"], "value": [{}], "expect": ["required", ["conditions", 0]] },
+        { "name": "catalogue actor leakage forbidden", "op": "set", "path": ["actors"], "value": {}, "expect": ["additionalProperties", []] }
+      ]
+    },
+    {
+      "schema": "build-manifest.schema.json",
+      "valid": [
+        {
+          "contract_version": "0.1.0",
+          "kind": "candidate",
+          "base_commit": "0000000000000000000000000000000000000000",
+          "source_commit": "1111111111111111111111111111111111111111",
+          "source_tree": "2222222222222222222222222222222222222222",
+          "as_of": "2026-08-30",
+          "source_date_epoch": 1788091200,
+          "profile": "synthetic",
+          "base_url": "https://example.invalid/Modelo/",
+          "base_path": "/Modelo/",
+          "promotion_durability": "fsync-durable",
+          "catalogue_path": "data/catalogue.json",
+          "change_delta_path": "data/change-delta.json",
+          "manifest_path": "data/manifest.json",
+          "digest_algorithm": "sha256",
+          "publication_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "files": {
+            "data/catalogue.json": { "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "size": 123, "media_type": "application/json; charset=utf-8" },
+            "data/change-delta.json": { "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "size": 456, "media_type": "application/json; charset=utf-8" }
+          }
+        },
+        {
+          "contract_version": "0.1.0",
+          "kind": "final",
+          "base_commit": "0000000000000000000000000000000000000000",
+          "source_commit": "1111111111111111111111111111111111111111",
+          "source_tree": "2222222222222222222222222222222222222222",
+          "merge_commit": "3333333333333333333333333333333333333333",
+          "merge_tree": "2222222222222222222222222222222222222222",
+          "as_of": "2026-08-30",
+          "source_date_epoch": 1788091200,
+          "profile": "synthetic",
+          "base_url": "https://example.invalid/Modelo/",
+          "base_path": "/Modelo/",
+          "promotion_durability": "fsync-durable",
+          "catalogue_path": "data/catalogue.json",
+          "change_delta_path": "data/change-delta.json",
+          "manifest_path": "data/manifest.json",
+          "digest_algorithm": "sha256",
+          "publication_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "files": {
+            "data/catalogue.json": { "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "size": 123, "media_type": "application/json; charset=utf-8" },
+            "data/change-delta.json": { "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "size": 456, "media_type": "application/json; charset=utf-8" }
+          }
+        }
+      ],
+      "valid_mutations": [
+        { "op": "set", "path": ["profile"], "value": "private" },
+        { "op": "set", "path": ["base_path"], "value": "/" },
+        { "op": "set", "path": ["base_url"], "value": null }
+      ],
+      "invalid": [
+        { "name": "manifest hashes itself", "op": "rename", "path": ["files", "data/change-delta.json"], "value": "data/manifest.json", "expect": ["not", ["files"]] },
+        { "name": "manifest omits catalogue", "op": "rename", "path": ["files", "data/catalogue.json"], "value": "data/other.json", "expect": ["required", ["files"]] },
+        { "name": "candidate manifest omits change delta", "op": "rename", "path": ["files", "data/change-delta.json"], "value": "data/other.json", "expect": ["required", ["files"]] },
+        { "name": "manifest traversal path", "op": "rename", "path": ["files", "data/change-delta.json"], "value": "../index.html", "expect": ["pattern", ["files"]] },
+        { "name": "manifest negative file size", "op": "set", "path": ["files", "data/change-delta.json", "size"], "value": -1, "expect": ["minimum", ["files", "data/change-delta.json", "size"]] },
+        { "name": "manifest malformed media type", "op": "set", "path": ["files", "data/change-delta.json", "media_type"], "value": "text html", "expect": ["pattern", ["files", "data/change-delta.json", "media_type"]] },
+        { "name": "candidate manifest unexpected output file", "op": "set", "path": ["files", "index.html"], "value": { "sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "size": 1, "media_type": "text/html; charset=utf-8" }, "expect": ["maxProperties", ["files"]] },
+        { "name": "manifest unsupported digest", "op": "set", "path": ["digest_algorithm"], "value": "sha512", "expect": ["const", ["digest_algorithm"]] },
+        { "name": "final manifest requires absolute base URL", "op": "set", "path": ["base_url"], "value": null, "valid_index": 1, "expect": ["type", ["base_url"]] },
+        { "name": "final manifest requires fsync durability", "op": "set", "path": ["promotion_durability"], "value": "process-atomic-only", "valid_index": 1, "expect": ["const", ["promotion_durability"]] },
+        { "name": "manifest URL userinfo forbidden", "op": "set", "path": ["base_url"], "value": "https://user@example.invalid/Modelo/", "expect": ["pattern", ["base_url"]] },
+        { "name": "manifest URL query forbidden", "op": "set", "path": ["base_url"], "value": "https://example.invalid/Modelo/?x=1", "expect": ["pattern", ["base_url"]] },
+        { "name": "manifest URL fragment forbidden", "op": "set", "path": ["base_url"], "value": "https://example.invalid/Modelo/#x", "expect": ["pattern", ["base_url"]] },
+        { "name": "manifest URL explicit default port forbidden", "op": "set", "path": ["base_url"], "value": "https://example.invalid:443/Modelo/", "expect": ["pattern", ["base_url"]] },
+        { "name": "manifest URL uppercase host forbidden", "op": "set", "path": ["base_url"], "value": "https://Example.invalid/Modelo/", "expect": ["pattern", ["base_url"]] },
+        { "name": "manifest URL trailing slash required", "op": "set", "path": ["base_url"], "value": "https://example.invalid/Modelo", "expect": ["pattern", ["base_url"]] },
+        { "name": "manifest URL dot segment forbidden", "op": "set", "path": ["base_url"], "value": "https://example.invalid/../Modelo/", "expect": ["pattern", ["base_url"]] },
+        { "name": "manifest unexpected field", "op": "set", "path": ["archive"], "value": "site.zip", "expect": ["additionalProperties", []] }
+      ]
+    },
+    {
+      "schema": "trusted-control-context.schema.json",
+      "valid": [{
+        "contract_version": "0.1.0",
+        "repository": { "provider": "github", "host": "github.com", "namespace": "j3brns996", "name": "Modelo" },
+        "control_issue": "28", "control_issue_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "change_request": "30", "base_sha": "1111111111111111111111111111111111111111",
+        "head_sha": "2222222222222222222222222222222222222222",
+        "head_tree_sha": "3333333333333333333333333333333333333333",
+        "validation_sha": "4444444444444444444444444444444444444444",
+        "validation_tree_sha": "3333333333333333333333333333333333333333",
+        "as_of": "2026-08-31", "source_date_epoch": 1788091200,
+        "workflow_identity": "j3brns996/Modelo/.github/workflows/modelo.yml@main",
+        "workflow_sha": "1111111111111111111111111111111111111111", "run_id": "123",
+        "check_name": "modelo/check",
+        "gates": { "lock": "success", "schema": "success", "trusted_tests": "success", "proposed_tests": "success", "trusted_package": "success", "proposed_package": "success" }
+      }],
+      "invalid": [{ "name": "control context skipped proposed tests", "op": "set", "path": ["gates", "proposed_tests"], "value": "skipped", "expect": ["const", ["gates", "proposed_tests"]] }]
+    },
+    {
+      "schema": "control-check-receipt.schema.json",
+      "valid": [{
+        "contract_version": "0.1.0", "kind": "control-plane",
+        "repository": { "provider": "github", "host": "github.com", "namespace": "j3brns996", "name": "Modelo" },
+        "control_issue": "28", "control_issue_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "change_request": "30", "base_sha": "1111111111111111111111111111111111111111",
+        "head_sha": "2222222222222222222222222222222222222222",
+        "head_tree_sha": "3333333333333333333333333333333333333333",
+        "validation_sha": "4444444444444444444444444444444444444444",
+        "validation_tree_sha": "3333333333333333333333333333333333333333",
+        "as_of": "2026-08-31", "source_date_epoch": 1788091200,
+        "changed_paths": ["tooling/modelo/src/modelo/platform.py"],
+        "trusted_tool_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "proposed_tool_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trusted_lock_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "proposed_lock_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "approval_mode": "human-codeowner-only",
+        "ci": { "provider": "github", "workflow_identity": "j3brns996/Modelo/.github/workflows/modelo.yml@main", "workflow_sha": "1111111111111111111111111111111111111111", "run_id": "123", "check": "modelo/check", "result": "success", "head_sha": "2222222222222222222222222222222222222222", "gates": { "lock": "success", "schema": "success", "trusted_tests": "success", "proposed_tests": "success", "trusted_package": "success", "proposed_package": "success" } }
+      }],
+      "invalid": [
+        { "name": "control receipt permits agent", "op": "set", "path": ["approval_mode"], "value": "agent", "expect": ["const", ["approval_mode"]] },
+        { "name": "control receipt has no paths", "op": "set", "path": ["changed_paths"], "value": [], "expect": ["minItems", ["changed_paths"]] }
+      ]
+    },
+    {
+      "schema": "trusted-check-context.schema.json",
+      "valid": [{
+        "contract_version": "0.1.0",
+        "repository": { "provider": "github", "host": "github.com", "namespace": "j3brns996", "name": "Modelo" },
+        "change_request": "29",
+        "base_sha": "1111111111111111111111111111111111111111",
+        "head_sha": "2222222222222222222222222222222222222222",
+        "head_tree_sha": "3333333333333333333333333333333333333333",
+        "validation_sha": "4444444444444444444444444444444444444444",
+        "validation_tree_sha": "3333333333333333333333333333333333333333",
+        "as_of": "2026-08-31", "source_date_epoch": 1788091200,
+        "profile": "synthetic", "base_url": "https://j3brns996.github.io/Modelo/",
+        "base_path": "/Modelo/", "publication_capability": "public-pages",
+        "workflow_identity": "j3brns996/Modelo/.github/workflows/modelo.yml@main",
+        "workflow_sha": "1111111111111111111111111111111111111111", "run_id": "123",
+        "check_name": "modelo/check",
+        "gates": { "lock": "success", "schema": "success", "tests": "success", "package": "success" }
+      }],
+      "invalid": [
+        { "name": "context skipped gate", "op": "set", "path": ["gates", "tests"], "value": "skipped", "expect": ["const", ["gates", "tests"]] },
+        { "name": "context unexpected secret", "op": "set", "path": ["token"], "value": "x", "expect": ["additionalProperties", []] }
+      ]
+    },
+    {
+      "schema": "check-receipt.schema.json",
+      "valid": [
+        {
+          "contract_version": "0.1.0",
+          "repository": { "provider": "github", "host": "github.com", "namespace": "j3brns", "name": "Modelo" },
+          "change_request": "20",
+          "base_sha": "1111111111111111111111111111111111111111",
+          "head_sha": "2222222222222222222222222222222222222222",
+          "head_tree_sha": "3333333333333333333333333333333333333333",
+          "validation_sha": "4444444444444444444444444444444444444444",
+          "validation_tree_sha": "3333333333333333333333333333333333333333",
+          "as_of": "2026-08-30",
+          "source_date_epoch": 1788091200,
+          "profile": "synthetic",
+          "base_url": "https://example.invalid/Modelo/",
+          "base_path": "/Modelo/",
+          "promotion_durability": "fsync-durable",
+          "artifacts": {
+            "catalogue": { "path": "site/data/catalogue.json", "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+            "publication": { "path": "site", "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+            "manifest": { "path": "site/data/manifest.json", "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
+          },
+          "tool_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "lock_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "actors_registry_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "mac_issue": "19",
+          "mac_payload_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "change_delta": [
+            { "operation": "add", "path": "catalogue/models/test-model.yaml", "after": "sha256:9999999999999999999999999999999999999999999999999999999999999999" }
+          ],
+          "ci": {
+            "provider": "github",
+            "workflow_identity": "j3brns/Modelo/.github/workflows/modelo.yml@main",
+            "workflow_sha": "1111111111111111111111111111111111111111",
+            "run_id": "123",
+            "check": "modelo/check",
+            "result": "success",
+            "head_sha": "2222222222222222222222222222222222222222",
+            "gates": { "lock": "success", "schema": "success", "tests": "success", "package": "success", "validation_site": "success" }
+          }
+        }
+      ],
+      "invalid": [
+        { "name": "check receipt failed result", "op": "set", "path": ["ci", "result"], "value": "failure", "expect": ["const", ["ci", "result"]] },
+        { "name": "check receipt skipped result", "op": "set", "path": ["ci", "result"], "value": "skipped", "expect": ["const", ["ci", "result"]] },
+        { "name": "check receipt lacks run identity", "op": "remove", "path": ["ci", "run_id"], "expect": ["required", ["ci"]] },
+        { "name": "check receipt lacks MAC digest", "op": "remove", "path": ["mac_payload_digest"], "expect": ["required", []] },
+        { "name": "check receipt lacks actor registry digest", "op": "remove", "path": ["actors_registry_digest"], "expect": ["required", []] },
+        { "name": "check receipt lacks publication digest", "op": "remove", "path": ["artifacts", "publication"], "expect": ["required", ["artifacts"]] },
+        { "name": "check receipt catalogue artifact renamed", "op": "set", "path": ["artifacts", "catalogue", "path"], "value": "site/data/models.json", "expect": ["const", ["artifacts", "catalogue", "path"]] },
+        { "name": "check receipt repository absent", "op": "remove", "path": ["repository"], "expect": ["required", []] },
+        { "name": "check receipt noncanonical URL", "op": "set", "path": ["base_url"], "value": "https://Example.invalid/Modelo/", "expect": ["pattern", ["base_url"]] },
+        { "name": "check receipt base path traversal", "op": "set", "path": ["base_path"], "value": "/../", "expect": ["pattern", ["base_path"]] },
+        { "name": "check receipt has merge SHA", "op": "set", "path": ["merge_sha"], "value": "4444444444444444444444444444444444444444", "expect": ["additionalProperties", []] },
+        { "name": "check receipt invalid as-of", "op": "set", "path": ["as_of"], "value": "2026-02-30", "expect": ["format", ["as_of"]] }
+      ]
+    },
+    {
+      "schema": "actors-registry.schema.json",
+      "valid": [
+        { "version": 1, "agents": {} },
+        {
+          "version": 1,
+          "agents": {
+            "test-review-agent": {
+              "enabled": true,
+              "platform_identities": { "github": "modelo-review-bot" },
+              "approval_scope": "data-only",
+              "eligible_paths": ["catalogue/models/**", "catalogue/offerings/**", "catalogue/evidence/**"],
+              "independent_review_required": true,
+              "exact_head_successful_check_required": true
+            }
+          }
+        }
+      ],
+      "invalid": [
+        { "name": "actor version unsupported", "op": "set", "path": ["version"], "value": 2, "expect": ["const", ["version"]] },
+        { "name": "actor disabled entries forbidden", "op": "set", "path": ["agents", "test-review-agent", "enabled"], "value": false, "valid_index": 1, "expect": ["const", ["agents", "test-review-agent", "enabled"]] },
+        { "name": "actor has no platform identity", "op": "set", "path": ["agents", "test-review-agent", "platform_identities"], "value": {}, "valid_index": 1, "expect": ["minProperties", ["agents", "test-review-agent", "platform_identities"]] },
+        { "name": "actor broad approval forbidden", "op": "set", "path": ["agents", "test-review-agent", "approval_scope"], "value": "all", "valid_index": 1, "expect": ["const", ["agents", "test-review-agent", "approval_scope"]] },
+        { "name": "actor control-plane path forbidden", "op": "set", "path": ["agents", "test-review-agent", "eligible_paths", 0], "value": "schemas/**", "valid_index": 1, "expect": ["enum", ["agents", "test-review-agent", "eligible_paths", 0]] },
+        { "name": "actor independence cannot be disabled", "op": "set", "path": ["agents", "test-review-agent", "independent_review_required"], "value": false, "valid_index": 1, "expect": ["const", ["agents", "test-review-agent", "independent_review_required"]] },
+        { "name": "actor exact-head check cannot be disabled", "op": "set", "path": ["agents", "test-review-agent", "exact_head_successful_check_required"], "value": false, "valid_index": 1, "expect": ["const", ["agents", "test-review-agent", "exact_head_successful_check_required"]] },
+        { "name": "actor unknown field", "op": "set", "path": ["agents", "test-review-agent", "token"], "value": "secret", "valid_index": 1, "expect": ["additionalProperties", ["agents", "test-review-agent"]] }
+      ]
+    },
+    {
+      "schema": "release-receipt.schema.json",
+      "valid": [
+        {
+          "contract_version": "0.1.0",
+          "release": "catalogue-20260830.1",
+          "repository": { "provider": "github", "host": "github.com", "namespace": "j3brns", "name": "Modelo" },
+          "base_sha": "1111111111111111111111111111111111111111",
+          "source_sha": "2222222222222222222222222222222222222222",
+          "merge_sha": "3333333333333333333333333333333333333333",
+          "head_tree_sha": "3333333333333333333333333333333333333333",
+          "merge_tree_sha": "3333333333333333333333333333333333333333",
+          "as_of": "2026-08-30",
+          "source_date_epoch": 1788091200,
+          "profile": "synthetic",
+          "base_url": "https://example.invalid/Modelo/",
+          "base_path": "/Modelo/",
+          "promotion_durability": "fsync-durable",
+          "artifacts": {
+            "catalogue": { "path": "site/data/catalogue.json", "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+            "publication": { "path": "site", "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+            "manifest": { "path": "site/data/manifest.json", "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
+          },
+          "tool_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "lock_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "accepted_check_receipt_digest": "sha256:7ae108e2d3993001a8b3c5a3cae351c8e5d52a2d0ef0c82ffb74d4823a41f257",
+          "ci": {
+            "provider": "github",
+            "workflow_identity": "j3brns/Modelo/.github/workflows/modelo.yml@main",
+            "workflow_sha": "1111111111111111111111111111111111111111",
+            "run_id": "123",
+            "check": "modelo/check",
+            "result": "success",
+            "head_sha": "2222222222222222222222222222222222222222",
+            "gates": { "lock": "success", "schema": "success", "tests": "success", "package": "success", "validation_site": "success" }
+          },
+          "mac_issue": "19",
+          "change_request": "2",
+          "change_delta": [
+            { "operation": "add", "path": "catalogue/models/test-model.yaml", "after": "sha256:9999999999999999999999999999999999999999999999999999999999999999" }
+          ],
+          "approval": {
+            "reviewer_platform_identity": "test-reviewer",
+            "reviewer_kind": "human",
+            "approved_head_sha": "2222222222222222222222222222222222222222",
+            "approval_timestamp": "2026-08-30T13:00:00Z",
+            "actors_registry_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "independence_and_eligibility_result": "eligible-independent",
+            "provider_approval_and_check_reference": "review/1#modelo-check/123"
+          }
+        }
+      ],
+      "valid_mutations": [
+        { "op": "set", "path": ["change_delta", 0], "value": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test-offering.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reason": "Enterprise approval withdrawn.", "effective_at": "2026-08-30T14:00:00Z" } },
+        { "op": "set", "path": ["change_delta", 0], "value": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test-offering.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reason": "Replaced by a newly reviewed offering.", "effective_at": "2026-08-30T14:00:00Z", "replacement": "catalogue/offerings/aws-bedrock/test-offering-2.yaml" } },
+        { "op": "set", "path": ["change_delta", 0], "value": { "operation": "change", "path": "catalogue/models/test-model-1.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "after": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } },
+        { "op": "set", "path": ["change_delta", 0], "value": { "operation": "move", "source": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test-offering.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reason": "Offering identity moved.", "effective_at": "2026-08-30T14:00:00Z" }, "destination": { "operation": "add", "path": "catalogue/offerings/aws-bedrock/test-offering-2.yaml", "after": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } } }
+      ],
+      "invalid": [
+        { "name": "release receipt contract version changed", "op": "set", "path": ["contract_version"], "value": "0.2.0", "expect": ["const", ["contract_version"]] },
+        { "name": "failed CI is not accepting", "op": "set", "path": ["ci", "result"], "value": "failure", "expect": ["const", ["ci", "result"]] },
+        { "name": "receipt missing explicit as-of", "op": "remove", "path": ["as_of"], "expect": ["required", []] },
+        { "name": "approval lacks exact head", "op": "remove", "path": ["approval", "approved_head_sha"], "expect": ["required", ["approval"]] },
+        { "name": "approval lacks reviewer kind", "op": "remove", "path": ["approval", "reviewer_kind"], "expect": ["required", ["approval"]] },
+        { "name": "approval timestamp lacks timezone", "op": "set", "path": ["approval", "approval_timestamp"], "value": "2026-08-30T13:00:00", "expect": ["pattern", ["approval", "approval_timestamp"]] },
+        { "name": "approval timestamp space separator", "op": "set", "path": ["approval", "approval_timestamp"], "value": "2026-08-30 13:00:00Z", "expect": ["pattern", ["approval", "approval_timestamp"]] },
+        { "name": "delta path terminates in parent traversal", "op": "set", "path": ["change_delta", 0, "path"], "value": "catalogue/models/..", "expect": ["pattern", ["change_delta", 0, "path"]] },
+        { "name": "add delta has before digest", "op": "set", "path": ["change_delta", 0, "before"], "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000", "expect": ["additionalProperties", ["change_delta", 0]] },
+        { "name": "release line feed", "op": "set", "path": ["release"], "value": "catalogue-20260830.1\n", "expect": ["pattern", ["release"]] },
+        { "name": "release carriage return", "op": "set", "path": ["release"], "value": "catalogue-20260830.1\r", "expect": ["pattern", ["release"]] },
+        { "name": "release control", "op": "set", "path": ["release"], "value": "catalogue-20260830.\u00001", "expect": ["pattern", ["release"]] },
+        { "name": "Git SHA line feed", "op": "set", "path": ["base_sha"], "value": "1111111111111111111111111111111111111111\n", "expect": ["pattern", ["base_sha"]] },
+        { "name": "Git SHA carriage return", "op": "set", "path": ["base_sha"], "value": "1111111111111111111111111111111111111111\r", "expect": ["pattern", ["base_sha"]] },
+        { "name": "Git SHA control", "op": "set", "path": ["base_sha"], "value": "111111111111111111111111111111111111111\u0000", "expect": ["pattern", ["base_sha"]] },
+        { "name": "artifact digest line feed", "op": "set", "path": ["tool_digest"], "value": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\n", "expect": ["pattern", ["tool_digest"]] },
+        { "name": "artifact digest carriage return", "op": "set", "path": ["tool_digest"], "value": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\r", "expect": ["pattern", ["tool_digest"]] },
+        { "name": "artifact digest control", "op": "set", "path": ["tool_digest"], "value": "sha256:ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\u0000", "expect": ["pattern", ["tool_digest"]] },
+        { "name": "delta path line feed", "op": "set", "path": ["change_delta", 0, "path"], "value": "catalogue/models/test.yaml\n", "expect": ["pattern", ["change_delta", 0, "path"]] },
+        { "name": "delta path carriage return", "op": "set", "path": ["change_delta", 0, "path"], "value": "catalogue/models/test.yaml\r", "expect": ["pattern", ["change_delta", 0, "path"]] },
+        { "name": "delta path control", "op": "set", "path": ["change_delta", 0, "path"], "value": "catalogue/models/test\u0000.yaml", "expect": ["pattern", ["change_delta", 0, "path"]] },
+        { "name": "duplicate deltas", "op": "duplicate_first", "path": ["change_delta"], "expect": ["uniqueItems", ["change_delta"]] },
+        { "name": "revoke missing before", "op": "set", "path": ["change_delta", 0], "value": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test.yaml", "reason": "Withdrawn.", "effective_at": "2026-08-30T14:00:00Z" }, "expect": ["required", ["change_delta", 0]] },
+        { "name": "revoke has after", "op": "set", "path": ["change_delta", 0], "value": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reason": "Withdrawn.", "effective_at": "2026-08-30T14:00:00Z", "after": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }, "expect": ["additionalProperties", ["change_delta", 0]] },
+        { "name": "change missing before", "op": "set", "path": ["change_delta", 0], "value": { "operation": "change", "path": "catalogue/models/test.yaml", "after": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }, "expect": ["required", ["change_delta", 0]] },
+        { "name": "move shortcut forbidden", "op": "set", "path": ["change_delta", 0], "value": { "operation": "move", "path": "catalogue/offerings/aws-bedrock/test.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "after": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }, "expect": ["required", ["change_delta", 0]] },
+        { "name": "move missing destination after", "op": "set", "path": ["change_delta", 0], "value": { "operation": "move", "source": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reason": "Moved.", "effective_at": "2026-08-30T14:00:00Z" }, "destination": { "operation": "add", "path": "catalogue/offerings/aws-bedrock/test-2.yaml" } }, "expect": ["required", ["change_delta", 0, "destination"]] },
+        { "name": "move source must revoke", "op": "set", "path": ["change_delta", 0], "value": { "operation": "move", "source": { "operation": "add", "path": "catalogue/offerings/aws-bedrock/test.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reason": "Moved.", "effective_at": "2026-08-30T14:00:00Z" }, "destination": { "operation": "add", "path": "catalogue/offerings/aws-bedrock/test-2.yaml", "after": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } }, "expect": ["const", ["change_delta", 0, "source", "operation"]] },
+        { "name": "move destination must add", "op": "set", "path": ["change_delta", 0], "value": { "operation": "move", "source": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reason": "Moved.", "effective_at": "2026-08-30T14:00:00Z" }, "destination": { "operation": "change", "path": "catalogue/offerings/aws-bedrock/test-2.yaml", "after": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } }, "expect": ["const", ["change_delta", 0, "destination", "operation"]] },
+        { "name": "move cannot contain second source", "op": "set", "path": ["change_delta", 0], "value": { "operation": "move", "source": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reason": "Moved.", "effective_at": "2026-08-30T14:00:00Z" }, "source2": { "operation": "revoke" }, "destination": { "operation": "add", "path": "catalogue/offerings/aws-bedrock/test-2.yaml", "after": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } }, "expect": ["additionalProperties", ["change_delta", 0]] },
+        { "name": "revocation reason absent", "op": "set", "path": ["change_delta", 0], "value": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "effective_at": "2026-08-30T14:00:00Z" }, "expect": ["required", ["change_delta", 0]] },
+        { "name": "revocation reason empty", "op": "set", "path": ["change_delta", 0], "value": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reason": "", "effective_at": "2026-08-30T14:00:00Z" }, "expect": ["minLength", ["change_delta", 0, "reason"]] },
+        { "name": "revocation effective time absent", "op": "set", "path": ["change_delta", 0], "value": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reason": "Withdrawn." }, "expect": ["required", ["change_delta", 0]] },
+        { "name": "revocation effective time lacks timezone", "op": "set", "path": ["change_delta", 0], "value": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reason": "Withdrawn.", "effective_at": "2026-08-30T14:00:00" }, "expect": ["pattern", ["change_delta", 0, "effective_at"]] },
+        { "name": "revocation replacement must be offering", "op": "set", "path": ["change_delta", 0], "value": { "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/test.yaml", "before": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reason": "Withdrawn.", "effective_at": "2026-08-30T14:00:00Z", "replacement": "catalogue/models/test.yaml" }, "expect": ["pattern", ["change_delta", 0, "replacement"]] },
+        { "name": "unknown delta field", "op": "set", "path": ["change_delta", 0, "status"], "value": "approved", "expect": ["additionalProperties", ["change_delta", 0]] },
+        { "name": "artifact digest absent", "op": "remove", "path": ["artifacts", "publication"], "expect": ["required", ["artifacts"]] },
+        { "name": "release manifest artifact renamed", "op": "set", "path": ["artifacts", "manifest", "path"], "value": "site/manifest.json", "expect": ["const", ["artifacts", "manifest", "path"]] },
+        { "name": "release repository absent", "op": "remove", "path": ["repository"], "expect": ["required", []] },
+        { "name": "release URL query forbidden", "op": "set", "path": ["base_url"], "value": "https://example.invalid/Modelo/?x=1", "expect": ["pattern", ["base_url"]] },
+        { "name": "accepted check receipt digest absent", "op": "remove", "path": ["accepted_check_receipt_digest"], "expect": ["required", []] },
+        { "name": "release base path traversal", "op": "set", "path": ["base_path"], "value": "/../", "expect": ["pattern", ["base_path"]] },
+        { "name": "unknown approval field", "op": "set", "path": ["approval", "human"], "value": true, "expect": ["additionalProperties", ["approval"]] },
+        { "name": "invalid as-of date", "op": "set", "path": ["as_of"], "value": "2026-02-30", "expect": ["format", ["as_of"]] },
+        { "name": "negative source epoch", "op": "set", "path": ["source_date_epoch"], "value": -1, "expect": ["minimum", ["source_date_epoch"]] },
+        { "name": "unsupported CI provider", "op": "set", "path": ["ci", "provider"], "value": "jenkins", "expect": ["enum", ["ci", "provider"]] }
+      ]
+    },
+    {
+      "schema": "mac-metadata.schema.json",
+      "valid": [
+        {
+          "contract_version": "0.1.0",
+          "repository": {
+            "provider": "github",
+            "host": "github.com",
+            "namespace": "j3brns",
+            "name": "Modelo"
+          },
+          "issue": {
+            "reference": "22",
+            "url": "https://github.com/j3brns/Modelo/issues/22",
+            "state": "open"
+          },
+          "base_sha": "1111111111111111111111111111111111111111",
+          "head_sha": "2222222222222222222222222222222222222222",
+          "head_tree_sha": "3333333333333333333333333333333333333333",
+          "payload": {
+            "schema_version": "0.1",
+            "request_id": "00000000-0000-4000-8000-000000000001",
+            "operation": "add",
+            "purpose": "approve-model-definition",
+            "subjects": [{ "kind": "model", "identity": "example-model-v1" }],
+            "requested_outcome": "Add the evidenced model definition.",
+            "reason": "The model is required by an approved offering proposal.",
+            "candidate_evidence": [{ "uri": "https://example.invalid/official/model-v1", "observed_at": "2026-08-30T12:00:00Z", "digest": "sha256-1111111111111111111111111111111111111111111111111111111111111111" }],
+            "acceptance": ["The model facts match admissible evidence."],
+            "dedupe_key": "sha256-aa864bc685a1c64485a0bcc579481ea9ece2533e90d93076ef1876e8696995fd",
+            "idempotency_key": "sha256-4f915f916f106699d472ec991b8d7f76dbed90c98c4e9e4145fdecd4f9e4f8c2"
+          },
+          "payload_digest": "sha256:6a2806f4e758288570dfbfee358057bc6fd2a07ce661f351c4e0e8ebae4d1541",
+          "expected_change_delta": [{ "operation": "add", "path": "catalogue/models/example-model-v1.yaml", "after": "sha256:9999999999999999999999999999999999999999999999999999999999999999" }]
+        }
+      ],
+      "invalid": [
+        { "name": "MAC metadata missing base", "op": "remove", "path": ["base_sha"], "expect": ["required", []] },
+        { "name": "MAC metadata missing head", "op": "remove", "path": ["head_sha"], "expect": ["required", []] },
+        { "name": "MAC metadata missing head tree", "op": "remove", "path": ["head_tree_sha"], "expect": ["required", []] },
+        { "name": "MAC metadata closed issue", "op": "set", "path": ["issue", "state"], "value": "closed", "expect": ["const", ["issue", "state"]] },
+        { "name": "MAC metadata noncanonical repository host", "op": "set", "path": ["repository", "host"], "value": "GitHub.com", "expect": ["pattern", ["repository", "host"]] },
+        { "name": "MAC metadata malformed payload digest", "op": "set", "path": ["payload_digest"], "value": "sha256:tampered", "expect": ["pattern", ["payload_digest"]] },
+        { "name": "MAC metadata wrong payload operation", "op": "set", "path": ["payload", "operation"], "value": "unknown", "expect": ["enum", ["payload", "operation"]] },
+        { "name": "MAC metadata wrong subject kind", "op": "set", "path": ["payload", "subjects", 0, "kind"], "value": "service", "expect": ["enum", ["payload", "subjects", 0, "kind"]] },
+        { "name": "MAC metadata delta path traversal", "op": "set", "path": ["expected_change_delta", 0, "path"], "value": "catalogue/models/../x.yaml", "expect": ["pattern", ["expected_change_delta", 0, "path"]] },
+        { "name": "MAC metadata delta exceeds bounded subject count", "op": "repeat", "path": ["expected_change_delta"], "value": [{ "operation": "add", "path": "catalogue/models/example-model-v1.yaml", "after": "sha256:9999999999999999999999999999999999999999999999999999999999999999" }], "count": 26, "expect": ["maxItems", ["expected_change_delta"]] },
+        { "name": "MAC metadata extra field", "op": "set", "path": ["labels"], "value": [], "expect": ["additionalProperties", []] }
+      ]
+    },
+    {
+      "schema": "modelo.schema.json",
+      "valid_source": "modelo.yaml",
+      "invalid": [
+        { "name": "Node runtime forbidden", "op": "set", "path": ["toolchain", "required_runtime_is_node"], "value": true, "expect": ["const", ["toolchain", "required_runtime_is_node"]] },
+        { "name": "required check renamed", "op": "set", "path": ["platform", "required_capabilities", "required_check", "name"], "value": "other/check", "expect": ["const", ["platform", "required_capabilities", "required_check", "name"]] },
+        { "name": "silent publication downgrade", "op": "set", "path": ["publication", "silent_private_to_public_downgrade"], "value": true, "expect": ["const", ["publication", "silent_private_to_public_downgrade"]] },
+        { "name": "unknown root service", "op": "set", "path": ["application_api"], "value": true, "expect": ["additionalProperties", []] },
+        { "name": "unknown configured path", "op": "set", "path": ["paths", "services"], "value": "services", "expect": ["additionalProperties", ["paths"]] },
+        { "name": "required configured path absent", "op": "remove", "path": ["paths", "models"], "expect": ["required", ["paths"]] },
+        { "name": "configured path line feed", "op": "set", "path": ["paths", "models"], "value": "catalogue/models\n", "expect": ["pattern", ["paths", "models"]] },
+        { "name": "configured path carriage return", "op": "set", "path": ["paths", "models"], "value": "catalogue/models\r", "expect": ["pattern", ["paths", "models"]] },
+        { "name": "configured path control", "op": "set", "path": ["paths", "models"], "value": "catalogue/\u0000models", "expect": ["pattern", ["paths", "models"]] },
+        { "name": "configured parent path", "op": "set", "path": ["paths", "models"], "value": "catalogue/../models", "expect": ["pattern", ["paths", "models"]] },
+        { "name": "host malformed", "op": "set", "path": ["repository", "host"], "value": "git_hub.com", "expect": ["pattern", ["repository", "host"]] },
+        { "name": "host line feed", "op": "set", "path": ["repository", "host"], "value": "github.com\n", "expect": ["pattern", ["repository", "host"]] },
+        { "name": "host control", "op": "set", "path": ["repository", "host"], "value": "git\u0000hub.com", "expect": ["pattern", ["repository", "host"]] },
+        { "name": "web base not HTTPS", "op": "set", "path": ["repository", "web_base"], "value": "http://github.com/j3brns/Modelo", "expect": ["pattern", ["repository", "web_base"]] },
+        { "name": "route absolute URL", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "https://github.com/issues/1", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route protocol-relative", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "//evil.invalid/x", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route double slash", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues//1", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route environment interpolation", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues/${TOKEN}", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route raw traversal", "op": "set", "path": ["repository", "web_routes", "mac_intake", "add"], "value": "/../admin", "expect": ["pattern", ["repository", "web_routes", "mac_intake", "add"]] },
+        { "name": "route encoded traversal", "op": "set", "path": ["repository", "web_routes", "mac_intake", "add"], "value": "/%2e%2e/admin", "expect": ["pattern", ["repository", "web_routes", "mac_intake", "add"]] },
+        { "name": "route unmatched opening brace", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues/{issue_number", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route unmatched closing brace", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues/issue_number}", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route undefined placeholder", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues/{undefined}", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "issue route missing expected parameter", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues/1", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "issue route has extra parameter", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues/{issue_number}/{commit_sha}", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route line feed", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues/1\n", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route carriage return", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues/1\r", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route control", "op": "set", "path": ["repository", "web_routes", "issue"], "value": "/issues/\u00001", "expect": ["pattern", ["repository", "web_routes", "issue"]] },
+        { "name": "route too long", "op": "repeat", "path": ["repository", "web_routes", "issue"], "value": "/a", "count": 257, "expect": ["maxLength", ["repository", "web_routes", "issue"]] },
+        { "name": "route missing", "op": "remove", "path": ["repository", "web_routes", "commit"], "expect": ["required", ["repository", "web_routes"]] },
+        { "name": "unknown nested route", "op": "set", "path": ["repository", "web_routes", "wiki"], "value": "/wiki", "expect": ["additionalProperties", ["repository", "web_routes"]] },
+        { "name": "site base path double slash", "op": "set", "path": ["site", "base_path"], "value": "/Modelo//", "expect": ["pattern", ["site", "base_path"]] },
+        { "name": "site base path raw traversal", "op": "set", "path": ["site", "base_path"], "value": "/../", "expect": ["pattern", ["site", "base_path"]] },
+        { "name": "site base path encoded traversal", "op": "set", "path": ["site", "base_path"], "value": "/%2e%2e/", "expect": ["pattern", ["site", "base_path"]] },
+        { "name": "site route environment interpolation", "op": "set", "path": ["site", "routes", "home"], "value": "/${HOME}", "expect": ["pattern", ["site", "routes", "home"]] },
+        { "name": "site route without parameters rejects placeholder", "op": "set", "path": ["site", "routes", "home"], "value": "/{undefined}", "expect": ["pattern", ["site", "routes", "home"]] },
+        { "name": "model route missing expected parameter", "op": "set", "path": ["site", "routes", "model"], "value": "/models/", "expect": ["pattern", ["site", "routes", "model"]] },
+        { "name": "model route has extra parameter", "op": "set", "path": ["site", "routes", "model"], "value": "/models/{model_id}/{undefined}/", "expect": ["pattern", ["site", "routes", "model"]] },
+        { "name": "offering route missing service parameter", "op": "set", "path": ["site", "routes", "offering"], "value": "/offerings/{offering_id}/", "expect": ["pattern", ["site", "routes", "offering"]] },
+        { "name": "offering route missing offering parameter", "op": "set", "path": ["site", "routes", "offering"], "value": "/offerings/{inference_service_id}/", "expect": ["pattern", ["site", "routes", "offering"]] },
+        { "name": "offering route has extra parameter", "op": "set", "path": ["site", "routes", "offering"], "value": "/offerings/{inference_service_id}/{offering_id}/{undefined}/", "expect": ["pattern", ["site", "routes", "offering"]] },
+        { "name": "clean clone build absent", "op": "remove", "path": ["toolchain", "clean_clone", "build"], "expect": ["required", ["toolchain", "clean_clone"]] },
+        { "name": "unknown toolchain field", "op": "set", "path": ["toolchain", "npx"], "value": true, "expect": ["additionalProperties", ["toolchain"]] },
+        { "name": "unsupported publication profile", "op": "set", "path": ["publication", "active_profile"], "value": "public", "expect": ["enum", ["publication", "active_profile"]] },
+        { "name": "legacy publication profiles path forbidden", "op": "set", "path": ["paths", "publication_profiles"], "value": "publication", "expect": ["additionalProperties", ["paths"]] },
+        { "name": "manifest self hashing enabled", "op": "set", "path": ["build", "manifest_hashes_itself"], "value": true, "expect": ["const", ["build", "manifest_hashes_itself"]] },
+        { "name": "non-atomic publication forbidden", "op": "set", "path": ["build", "atomic_publish"], "value": "write_in_place", "expect": ["const", ["build", "atomic_publish"]] },
+        { "name": "ambient Git inference forbidden", "op": "set", "path": ["build", "ambient_git_or_environment_inference"], "value": true, "expect": ["const", ["build", "ambient_git_or_environment_inference"]] },
+        { "name": "candidate output cannot be caller selected", "op": "set", "path": ["build", "output_argument"], "value": "arbitrary_output_allowed", "expect": ["const", ["build", "output_argument"]] },
+        { "name": "output safe resolution cannot be weakened", "op": "set", "path": ["build", "output_resolution"], "value": "lexical_only", "expect": ["const", ["build", "output_resolution"]] },
+        { "name": "metadata mutation identity cannot omit ctime", "op": "set", "path": ["build", "mac_metadata_ingestion", "mutation_check"], "value": "fstat_before_after_device_inode_size_mtime_ns_equal", "expect": ["const", ["build", "mac_metadata_ingestion", "mutation_check"]] },
+        { "name": "local metadata durability cannot accept without guarantees", "op": "set", "path": ["build", "mac_metadata_ingestion", "local_candidate_accepting_durability"], "value": true, "expect": ["const", ["build", "mac_metadata_ingestion", "local_candidate_accepting_durability"]] },
+        { "name": "source epoch environment read forbidden", "op": "set", "path": ["determinism", "source_date_epoch_environment_read"], "value": true, "expect": ["const", ["determinism", "source_date_epoch_environment_read"]] },
+        { "name": "source epoch arbitrary override forbidden", "op": "set", "path": ["determinism", "arbitrary_override"], "value": "allowed", "expect": ["const", ["determinism", "arbitrary_override"]] },
+        { "name": "writer lock must fail fast", "op": "set", "path": ["build", "lock_acquire"], "value": "wait", "expect": ["const", ["build", "lock_acquire"]] },
+        { "name": "promotion state order immutable", "op": "set", "path": ["build", "promotion_state_machine", 4], "value": "promote_new", "expect": ["const", ["build", "promotion_state_machine", 4]] },
+        { "name": "final fsync durability cannot be disabled", "op": "set", "path": ["build", "final_requires_fsync_durability"], "value": false, "expect": ["const", ["build", "final_requires_fsync_durability"]] },
+        { "name": "provider reads in core forbidden", "op": "set", "path": ["determinism", "core_provider_reads"], "value": true, "expect": ["const", ["determinism", "core_provider_reads"]] },
+        { "name": "filesystem timestamp input forbidden", "op": "set", "path": ["determinism", "ignored_timestamps", 1], "value": "author_time", "expect": ["enum", ["determinism", "ignored_timestamps", 1]] },
+        { "name": "agent approval cannot be enabled by repository file", "op": "set", "path": ["platform", "optional_capabilities", "agent_approval", "enabled"], "value": true, "expect": ["const", ["platform", "optional_capabilities", "agent_approval", "enabled"]] },
+        { "name": "agent approval control-plane path forbidden", "op": "set", "path": ["platform", "optional_capabilities", "agent_approval", "enablement_requires", 0], "value": "schemas_allowed", "expect": ["enum", ["platform", "optional_capabilities", "agent_approval", "enablement_requires", 0]] },
+        { "name": "GitLab trusted pipeline weakened", "op": "set", "path": ["platform", "required_capabilities", "trusted_pipeline", "gitlab"], "value": "project-ci", "expect": ["const", ["platform", "required_capabilities", "trusted_pipeline", "gitlab"]] },
+        { "name": "browser requires npx", "op": "set", "path": ["verification", "node_npm_npx_required"], "value": true, "expect": ["const", ["verification", "node_npm_npx_required"]] },
+        { "name": "unknown platform capability", "op": "set", "path": ["platform", "required_capabilities", "sso"], "value": true, "expect": ["additionalProperties", ["platform", "required_capabilities"]] }
+      ]
+    }
+  ]
+}

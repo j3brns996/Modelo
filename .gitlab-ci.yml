@@ -1,0 +1,17 @@
+stages: [validate]
+
+modelo/check:
+  stage: validate
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    UV_NO_CACHE: "1"
+  script:
+    - test "$CI_MERGE_REQUEST_SOURCE_PROJECT_ID" = "$CI_PROJECT_ID"
+    - test "$(uv --version)" = "uv 0.11.33 (x86_64-unknown-linux-gnu)"
+    - uv sync --locked
+    - uv run --locked pytest -q
+    - uv build --offline --no-cache
+    - uv run --locked modelo check --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA" --head "$CI_COMMIT_SHA" --as-of "$(date -u +%F)"
+    - echo "GitLab protected-policy and receipt adapter capability must be activated and rehearsed before this check can arbitrate a merge." >&2
+    - exit 1

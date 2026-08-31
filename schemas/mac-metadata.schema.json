@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/mac-metadata.schema.json",
+  "title": "Modelo validated same-repository MAC metadata envelope",
+  "x-modelo-executable-correlations": [
+    "issue_repository==repository",
+    "flags.base_commit==base_sha",
+    "flags.source_commit==head_sha",
+    "flags.source_tree==head_tree_sha",
+    "payload_digest==sha256(rfc8785(payload)+LF)",
+    "payload_operation_and_subjects==expected_change_delta",
+    "vendor_and_inference_service_subjects==operation_aware_canonical_registry_key_transitions",
+    "registry_add==absent_to_present;registry_change==present_changed_to_present;registry_deletion==forbidden",
+    "move.source.replacement==move.destination.path",
+    "revoke.replacement_absent_or_distinct_existing_head_offering_path",
+    "computed_git_delta==expected_change_delta"
+  ],
+  "x-modelo-ingestion": "explicit_regular_non_symlink_file_max_262144_strict_utf8_json_object_read_once_nofollow_fstat_dev_inode_mode_type_size_mtime_ns_ctime_ns_stable_ci_fail_closed",
+  "$defs": {
+    "repository": {
+      "type": "object",
+      "required": ["provider", "host", "namespace", "name"],
+      "properties": {
+        "provider": { "enum": ["github", "gitlab"] },
+        "host": { "type": "string", "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*(?![\\s\\S])", "minLength": 1, "maxLength": 253 },
+        "namespace": { "type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?(?:/[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)*(?![\\s\\S])", "minLength": 1, "maxLength": 256 },
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?(?![\\s\\S])", "minLength": 1, "maxLength": 256 }
+      },
+      "additionalProperties": false
+    },
+    "issue": {
+      "type": "object",
+      "required": ["reference", "url", "state"],
+      "properties": {
+        "reference": { "type": "string", "pattern": "^[1-9][0-9]{0,19}(?![\\s\\S])", "maxLength": 20 },
+        "url": { "type": "string", "format": "uri", "pattern": "^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?/[A-Za-z0-9._~!$&'()*+,;=:@%/-]+(?![\\s\\S])", "maxLength": 2048 },
+        "state": { "const": "open" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": [
+    "contract_version", "repository", "issue", "base_sha", "head_sha",
+    "head_tree_sha", "payload", "payload_digest", "expected_change_delta"
+  ],
+  "properties": {
+    "contract_version": { "const": "0.1.0" },
+    "repository": { "$ref": "#/$defs/repository" },
+    "issue": { "$ref": "#/$defs/issue" },
+    "base_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "head_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "head_tree_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "payload": { "$ref": "mac.schema.json" },
+    "payload_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "expected_change_delta": {
+      "$ref": "release-receipt.schema.json#/$defs/changeDeltaList",
+      "maxItems": 25
+    }
+  },
+  "additionalProperties": false
+}

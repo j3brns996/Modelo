@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/check-receipt.schema.json",
+  "title": "Modelo detached pre-merge check receipt",
+  "x-modelo-executable-correlations": [
+    "ci.head_sha==head_sha",
+    "ci.provider==repository.provider",
+    "receipt_fields==trusted_t8_inputs"
+  ],
+  "$defs": {
+    "repository": {
+      "type": "object",
+      "required": ["provider", "host", "namespace", "name"],
+      "properties": {
+        "provider": { "enum": ["github", "gitlab"] },
+        "host": { "type": "string", "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?![\\s\\S])", "maxLength": 253 },
+        "namespace": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 }
+      },
+      "additionalProperties": false
+    },
+    "canonicalBaseUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://(?!.*(?:/\\.{1,2})(?:/|(?![\\s\\S])))[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*(?:/[A-Za-z0-9._~-]+)*/(?![\\s\\S])",
+      "maxLength": 2048
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "common.schema.json#/$defs/safeRelativePath" },
+        "sha256": { "$ref": "common.schema.json#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "artifactDigests": {
+      "type": "object",
+      "required": ["catalogue", "publication", "manifest"],
+      "properties": {
+        "catalogue": { "allOf": [{ "$ref": "#/$defs/artifact" }, { "properties": { "path": { "const": "site/data/catalogue.json" } } }] },
+        "publication": { "allOf": [{ "$ref": "#/$defs/artifact" }, { "properties": { "path": { "const": "site" } } }] },
+        "manifest": { "allOf": [{ "$ref": "#/$defs/artifact" }, { "properties": { "path": { "const": "site/data/manifest.json" } } }] }
+      },
+      "additionalProperties": false
+    },
+    "ci": {
+      "type": "object",
+      "required": ["provider", "workflow_identity", "workflow_sha", "run_id", "check", "result", "head_sha", "gates"],
+      "properties": {
+        "provider": { "enum": ["github", "gitlab"] },
+        "workflow_identity": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "workflow_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+        "run_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "check": { "const": "modelo/check" },
+        "result": { "const": "success" },
+        "head_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+        "gates": {
+          "type": "object",
+          "required": ["lock", "schema", "tests", "package", "validation_site"],
+          "properties": {
+            "lock": { "const": "success" }, "schema": { "const": "success" },
+            "tests": { "const": "success" }, "package": { "const": "success" },
+            "validation_site": { "const": "success" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["contract_version", "repository", "change_request", "base_sha", "head_sha", "head_tree_sha", "validation_sha", "validation_tree_sha", "as_of", "source_date_epoch", "profile", "base_url", "base_path", "promotion_durability", "artifacts", "tool_digest", "lock_digest", "actors_registry_digest", "mac_issue", "mac_payload_digest", "change_delta", "ci"],
+  "properties": {
+    "contract_version": { "const": "0.1.0" },
+    "repository": { "$ref": "#/$defs/repository" },
+    "change_request": { "type": "string", "pattern": "^[1-9][0-9]{0,19}(?![\\s\\S])" },
+    "base_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "head_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "head_tree_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "validation_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "validation_tree_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "as_of": { "type": "string", "format": "date" },
+    "source_date_epoch": { "type": "integer", "minimum": 0 },
+    "profile": { "enum": ["synthetic", "private"] },
+    "base_url": { "$ref": "#/$defs/canonicalBaseUrl" },
+    "base_path": { "type": "string", "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~-]+/)*(?![\\s\\S])", "maxLength": 512 },
+    "promotion_durability": { "const": "fsync-durable" },
+    "artifacts": { "$ref": "#/$defs/artifactDigests" },
+    "tool_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "lock_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "actors_registry_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "mac_issue": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "mac_payload_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "change_delta": { "$ref": "release-receipt.schema.json#/$defs/changeDeltaList" },
+    "ci": { "$ref": "#/$defs/ci" }
+  },
+  "additionalProperties": false
+}

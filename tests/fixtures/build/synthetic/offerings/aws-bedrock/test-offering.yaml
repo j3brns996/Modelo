@@ -1,0 +1,22 @@
+id: test-offering
+inference_service_id: aws-bedrock
+model_id: test-model
+routes:
+  - id: london-direct
+    source_region: eu-west-2
+    reference: test.model-v1
+    model_binding:
+      kind: foundation-model
+      model_evidence:
+        id: sha256-3cc6bbaee52dff309202c8aed63c219a8277199cadafdbeeac3b0e2c91c746fb
+        id_pointer: /modelId
+        arn_pointer: /modelArn
+        name_pointer: /modelName
+        provider_pointer: /providerName
+condition_refs:
+  - id: test-condition
+    version: 1
+evidence_refs:
+  /routes/0/reference:
+    id: sha256-3cc6bbaee52dff309202c8aed63c219a8277199cadafdbeeac3b0e2c91c746fb
+    projection_pointer: /modelId

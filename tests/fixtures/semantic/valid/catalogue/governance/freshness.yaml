@@ -1,0 +1,4 @@
+classes_days:
+  availability: 30
+  pricing: 90
+  intrinsic_model_fact: 365

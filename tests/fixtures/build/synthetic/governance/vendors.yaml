@@ -1,0 +1,8 @@
+vendors:
+  test-vendor:
+    id: test-vendor
+    name: Test Vendor
+    evidence_refs:
+      /name:
+        id: sha256-1777adbbf1b254fa4a7a4b048845efefea9ad27b9021ae390a6d70976a72899e
+        projection_pointer: /providerName

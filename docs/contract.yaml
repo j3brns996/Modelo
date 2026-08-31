@@ -1,400 +1,550 @@
-# Model Catalogue v0.1.0 - machine-readable agent contract
-# Human explanation: SPEC.md
+# Modelo v0.1.0 compact target contract. Human rationale: SPEC.md.
 
 contract:
-  name: model-catalogue
+  name: modelo
   version: "0.1.0"
-  status: draft
-  purpose: agent_navigation
-  human_specification: SPEC.md
-  version_file: VERSION
-  maintenance:
-    update_with:
-      - schemas
-      - validator_rules
-      - diagnostic_codes
-      - ci_gates
-    drift_severity: error
+  status: t8_premerge_and_t9_implemented_postmerge_launch_slice_pending
+  implemented_slices: [T1, T2, T3, T4, T5, T6, T7, T8-premerge, T9]
+  accepted_pre_t8_head: "8694053c3366e162e0da6991ad08729aa8c95ad5"
+  unimplemented_slices: [T8-postmerge-release-and-pages, T10]
+  executable_config: modelo.yaml
+  implementation_plan_config_key: paths.implementation_plan
+  drift_is_error: true
+
+purpose:
+  system: git_backed_approval_and_static_publication_ledger
+  application_api: false
+  workflow_api: selected_git_provider_only
+  live_inventory: false
+  consumer_interfaces: [static_pages, release_artifact, git_clone]
+  provider_observation_is_approval: false
 
 authority:
-  structural_validation: schemas/
-  cross_file_validation: scripts/validators.py
-  pipeline: scripts/ci_local.py
-  approval: github_protected_main
-  conflict_policy: executable_validation_wins_and_document_drift_is_a_defect
+  paths_routes_profiles_and_capabilities: modelo.yaml
+  entity_shape_and_provenance_classification: schemas
+  semantic_and_change_rules: modelo_validator
+  technical_acceptance: trusted_modelo_check_at_exact_head
+  governance_acceptance: independent_review_at_exact_head
+  remote_enforcement: platform_adapter_and_host_settings
+  rationale: SPEC.md
 
-repository:
-  provider: github
-  default_branch: main
-  source_root: catalogue/
-  protected_paths:
-    - catalogue/models/**
-    - catalogue/offerings/**
-    - catalogue/governance/**
-    - schemas/**
-    - scripts/**
-  forbidden_top_level_directories:
-    - models/
-    - offerings/
-    - governance/
-    - data/
-    - registries/
-    - operators/
-    - tools/
-    - services/
-
-paths:
-  models: "catalogue/models/{model_id}.yaml"
-  offerings: "catalogue/offerings/{operator_id}/{model_id}.{geo}.yaml"
-  vendors_registry: catalogue/governance/vendors.yaml
-  operators_registry: catalogue/governance/operators.yaml
-  freshness_policy: catalogue/governance/freshness.yaml
-  conditions_guidance: docs/conditions.yaml
-  schemas: schemas/
-  scripts: scripts/
-  tests: tests/
-  fixtures_valid: tests/fixtures/valid/
-  fixtures_invalid: tests/fixtures/invalid/
-  site: public-docs/
-  skills: .kiro/skills/
-  agent_config: .kiro/agents/model-catalogue-maintainer.json
-  github_workflow: .github/workflows/ci.yml
-  codeowners: .github/CODEOWNERS
+entities:
+  model:
+    identity: id
+    path: "{paths.models}/{model_id}.yaml"
+    meaning: canonical_named_model_release
+  inference_service:
+    identity: id
+    registry: "{paths.governance}/inference-services.yaml"
+    first_implemented_value: aws-bedrock
+  offering:
+    identity: id
+    path: "{paths.offerings}/{inference_service_id}/{offering_id}.yaml"
+    meaning: consumable_approval_unit
+    minimum_routes: 1
+  route:
+    identity: id
+    stored_under: offering
+    core_fields: [id, reference]
+    adapter_owner: inference_service_registry
+    adapter_dispatch: static_aws_only_schema_in_v0_1
+    provider_reference_is_opaque_to_core: true
+  evidence:
+    identity: "sha256-{rfc8785_envelope_without_id}"
+    path: "{paths.evidence}/{evidence_id}.yaml"
+    ever_merged_record_is_immutable: true
+  condition:
+    identity: [id, version]
+    path: "{paths.conditions}/{condition_id}/{version}.yaml"
+    ever_merged_or_referenced_version_is_immutable: true
 
 approval:
-  mechanism: merge_to_protected_main
-  approved_entity_paths:
-    - catalogue/models/**
-    - catalogue/offerings/**
-    - catalogue/governance/**
-  receipt:
-    - pull_request
-    - reviews
-    - resulting_commit
-  model_record_alone_is_consumable: false
-  offering_required_for_consumption: true
-  revocation: delete_offering_via_pull_request
-  forbidden_workflow_fields:
-    - approval_status
-    - approval_flag
-    - workflow_state
-  lifecycle_is_approval_state: false
+  consumption_granted_only_by_current_offering: true
+  linked_mac_issue_required: true
+  required_check: modelo/check
+  exact_head_required: true
+  missing_skipped_neutral_cancelled_stale_or_failed_is_accepting: false
+  independent_review_required: true
+  new_commit_invalidates_check_and_review: true
+  agent_approval:
+    enabled: false
+    allowed_for: data_only_mac
+    allowed_paths: [catalogue/models/**, catalogue/offerings/**, catalogue/evidence/**]
+    every_other_path_requires_human_codeowner: true
+    requires_distinct_eligible_platform_identity: true
+    author_committer_or_modifier_may_approve: false
+    successful_trusted_exact_head_ci_evidence_required: true
+    registry_config_key: paths.actors_registry
+    empty_or_missing_registry_means: disabled
+    every_changed_path_must_match_allowlist: true
+    any_control_plane_path_makes_entire_change_human_only: true
+  human_codeowner_required_for: every_path_outside_agent_approval_allowlist
 
-identity:
-  identifier_pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
-  model:
-    key:
-      - model_id
-    field: id
-    path_field_match: filename_stem
-    mutable_family_aliases_allowed: false
-  offering:
-    key:
-      - operator_id
-      - model_id
-      - geo
-    path_matches:
-      operator_id: parent_directory
-      model_id: filename_model_component
-      geo: filename_geo_component
+evidence:
+  schema_annotation:
+    provenance: x-modelo-provenance
+    freshness_class: x-modelo-freshness-class
+    provenance_values: [external, internal, policy]
+  required_for: schema_annotated_external_leaves
+  fact_reference_shape: [id, projection_pointer]
+  verification: canonical_deep_equality_between_fact_and_projection
+  transformed_claims: deferred
+  evidence_chain_terminates_at_envelope: true
+  admissible_sources:
+    - first_party_read_api
+    - official_provider_documentation
+    - official_vendor_documentation
+  required_metadata: [source, observed_at, retrieved_by, scope, projection, visibility]
+  api_source_required_fields: [provider, service, operation, partition, region, sanitised_parameters, documentation_uri]
+  documentation_source_required_fields: [uri]
+  yaml_date_and_timestamp_scalars_remain_strings: true
+  canonical_number_domain: signed_64_bit_integer_or_decimal_string
+  non_finite_or_binary_float_values: forbidden
+  content_address:
+    canonicalisation: RFC_8785_JCS
+    digest: sha256
+    input: complete_envelope_without_root_id
+  required_ci_dereferences_catalogue_urls: false
+  discovery_absence_can_revoke: false
+  refresh: new_record_and_mac_reference_migration
 
-semantics:
-  geo:
-    meaning: catalogue_market
-    proves_data_residency: false
-  available_regions:
-    meaning: operator_deployment_region_identifiers
-    proves_data_residency: false
-  conditions:
-    format: free_form_strings
-    machine_enforced: false
-    guidance: docs/conditions.yaml
-  pricing:
-    scope: token_priced_inference
-    other_units_supported: false
-
-schemas:
-  dialect: https://json-schema.org/draft/2020-12/schema
-  format_checking: enforced
-  unknown_properties: rejected
-  model: schemas/model.schema.json
-  offering: schemas/offering.schema.json
-  vendors: schemas/vendors-registry.schema.json
-  operators: schemas/operators-registry.schema.json
-  freshness: schemas/freshness-policy.schema.json
-  summaries_are_informative: true
-
-model:
-  required:
-    - id
-    - vendor
-    - name
-    - description
-    - capabilities
-    - modalities
-    - context_window
-    - licensing
-  optional:
-    - lifecycle
-    - evidence
-  references:
-    vendor: catalogue/governance/vendors.yaml
-  lifecycle_values:
-    - active
-    - legacy
-    - eol
-
-offering:
-  required:
-    - model_id
-    - operator_id
-    - provider_model_name
-    - geo
-    - pricing
-    - available_regions
-  optional:
-    - conditions
-  references:
-    model_id: catalogue/models/
-    operator_id: catalogue/governance/operators.yaml
-  geo_values:
-    - uk
-    - eu
-    - us
-    - global
+freshness:
+  as_of_is_explicit_cli_input: true
+  as_of_recorded_in_receipt: true
+  classes_days:
+    availability: 30
+    pricing: 90
+    intrinsic_model_fact: 365
+  stale_fact_fails_next_check_or_scheduled_audit: true
+  stale_fact_automatically_revokes_current_offering: false
+  calendar_rule: stale_when_as_of_date_minus_utc_observed_date_is_greater_than_class_days
+  future_observation: error
+  scheduled_main_audit: modelo_check_with_base_equal_head_equal_main_and_explicit_as_of
 
 pricing:
-  required:
-    - input_per_million
-    - output_per_million
-    - currency
-    - source_url
-    - checked_at
-  minimum:
-    input_per_million: 0
-    output_per_million: 0
-  currency_pattern: "^[A-Z]{3}$"
-  source_url_format: uri
-  checked_at_format: date
+  optional: true
+  absent_means_no_price_assertion: true
+  representation: dimensional_components
+  amount: decimal_string
+  provider_adapter_owns_dimensions_and_units: true
 
-yaml_loader:
-  implementation: scripts/loader.py
-  root_type: mapping
-  max_depth: 10
-  encoding: utf-8
-  newline: lf
-  yaml_boolean_mode: yaml_1_2
-  implicit_dates: disabled
-  rejected:
-    duplicate_key: DUPLICATE_KEY
-    alias: ALIAS_FOUND
-    anchor: ANCHOR_FOUND
-    custom_tag: CUSTOM_TAG
-    multiple_documents: MULTI_DOCUMENT
-    non_mapping_root: INVALID_ROOT
-    excessive_nesting: EXCESSIVE_NESTING
-    parse_error: YAML_PARSE_ERROR
-    file_read_error: FILE_READ_ERROR
+provider_boundary:
+  cloud_access: read_only_evidence
+  core_route_reference: opaque
+  account_project_subscription_in_identity_or_path: false
+  aws:
+    adapter: aws-bedrock
+    implemented_route_types: [foundation-model, system-inference-profile]
+    route_required_internal_fields: [source_region]
+    source_region_meaning: aws_request_region_and_direct_route_processing_region
+    source_region_is_profile_destination: false
+    profile_processing_regions: explicit_evidenced_destinations
+    semantic_route_identity: [source_region, model_binding.kind, reference]
+    duplicate_semantic_route: error
+    source_region_evidence:
+      source_type: first-party-read-api
+      provider: aws
+      service: bedrock
+      direct_operations: [GetFoundationModel, ListFoundationModels]
+      profile_operations: [GetInferenceProfile, ListInferenceProfiles]
+      exact_region_match: true
+      partition_region_shape_match: true
+      arn_partition_region_match_when_arn_form: true
+      route_reference_fact_ref_must_equal_explicit_binding_evidence: true
+    operations:
+      - ListFoundationModels
+      - GetFoundationModel
+      - GetFoundationModelAvailability
+      - ListInferenceProfiles
+      - GetInferenceProfile
+      - ListFoundationModelAgreementOffers
+    admissible_catalogue_evidence_operations:
+      - ListFoundationModels
+      - GetFoundationModel
+      - ListInferenceProfiles
+      - GetInferenceProfile
+      - ListFoundationModelAgreementOffers
+    discovery_only_operations: [GetFoundationModelAvailability]
+    observation_scope: [opaque_scope_ref, partition, region, operation, parameters, observed_at]
+    sensitive_fields_never_retained: [credentials, offerToken]
+    deferred_route_types: [application-profile, provisioned, custom, imported]
+    model_binding:
+      foundation_model:
+        route_reference_equals: evidenced_model_id_or_arn
+        reported_identity_equals: [canonical_model_name, governed_vendor_name]
+        explicit_model_evidence_pointers: [id_pointer, arn_pointer, name_pointer, provider_pointer]
+      system_inference_profile:
+        requires: [system_defined, active, explicit_profile_evidence_ref, complete_bijective_destination_bindings, explicit_destination_pointer_and_model_evidence_per_destination]
+        destination_arn_equals_model_evidence_arn: true
+        destination_arn_partition_region_equals_model_evidence_source: true
+        every_reported_identity_equals: [canonical_model_name, governed_vendor_name]
+        validator_global_evidence_search: forbidden
+      transformed_or_ambiguous_mapping: deferred
+  gcp_vertex_ai: deferred_until_first_party_fixtures
+  azure_ai_foundry: deferred_until_first_party_fixtures
 
-validation:
-  path_integrity: enforced
-  reference_integrity: enforced
-  duplicate_identity: error
-  prerequisite_failure:
-    dependent_checks: suppressed
-    original_diagnostic: error
-    overall_result: failure
-  freshness:
-    policy: catalogue/governance/freshness.yaml
-    pricing_field: pricing_days
-    capabilities_field: capabilities_days
-    future_dates: error
-  ci_date: current_utc_date
-  fixed_as_of_allowed_in:
-    - tests
-    - local_diagnostics
+mac:
+  schema_config_key: paths.mac_schema
+  initiation: git_provider_issue
+  operations: [add, change, revoke, move, batch]
+  change_preserves_identity: true
+  move:
+    subject_kind: offering_only
+    action: atomic_add_destination_and_revoke_source
+    subject_roles: exactly_one_source_and_one_destination
+  revoke_subject_kind: offering_only
+  batch_max_subjects: 25
+  batch_requires_homogeneous_item_operation: [add, change, revoke]
+  batch_scope_required_fields: [source, observation_scope, inference_service_id]
+  issue_payload_digest_bound_to_change_and_release_receipt: true
+  hash_canonicalisation: RFC_8785_JCS
+  hash_input_omits: [dedupe_key, idempotency_key]
+  dedupe_key: hash_of_typed_sorted_reservations_effective_operation_and_purpose
+  idempotency_key: hash_of_complete_canonical_intent_also_omitting_request_id
+  candidate_issue_evidence_is_accepted_catalogue_evidence: false
+  validated_metadata:
+    schema: schemas/mac-metadata.schema.json
+    schema_role: validation_contract_not_a_second_cli_input
+    creator: t8_same_repository_bounded_provider_adapter
+    consumer: t5_networkless_validator
+    required: [contract_version, repository, issue, base_sha, head_sha, head_tree_sha, payload, payload_digest, expected_change_delta]
+    expected_change_delta_max_items: 25
+    cli_ingestion:
+      value: explicit_file_path
+      file: regular_non_symlink
+      max_bytes: 262144
+      encoding: strict_utf8
+      syntax: strict_json_object_not_yaml
+      reject: [duplicate_keys, non_finite_numbers, floating_point_numbers, yaml_tags]
+      read: once_from_single_open_descriptor
+      mutation_check: fstat_before_after_device_inode_mode_type_size_mtime_ns_ctime_ns_equal
+      nofollow: required_in_ci
+      incapable_ci: fail_closed
+      local_candidate_accepting_durability: false
+      t8_temporary_path_outside_repository: allowed
+      network_read: forbidden
+    payload_digest: sha256_of_rfc8785_payload_utf8_plus_single_lf
+    executable_equalities: [issue_url_to_repository_and_reference, flag_base_head_tree, payload_schema_and_digest, effective_operation_and_all_subjects_to_delta, registry_subjects_to_operation_aware_canonical_keyed_base_head_transitions, exact_computed_git_paths_and_digests_to_delta]
+    enrichment_or_inference: forbidden
+    revoke_move_annotations_source: expected_change_delta_only
+    offering_subject_identity_binding: delta_path_filename_identity_with_inference_service_path_from_computed_git_delta
+    registry_subject_identity_binding: add_absent_to_present_or_change_present_changed_to_present_keys_exactly_equal_claimed_subjects_and_one_registry_file_delta_may_cover_homogeneous_batch
+    registry_deletion: forbidden_v0_1
+    move_replacement: required_equal_destination_path
+    revoke_replacement: optional_but_if_present_distinct_existing_head_offering_path
+  revoke:
+    deletes_current_record: true
+    separate_status_or_tombstone_source_tree: false
+    durable_history: release_delta_receipt
 
-commands:
-  full_pipeline: python scripts/ci_local.py
-  validate: python scripts/validate.py
-  validate_json: python scripts/validate.py --format json
-  validate_as_of: python scripts/validate.py --as-of YYYY-MM-DD
-  build_dev: python scripts/build.py
-  build_without_validation: python scripts/build.py --skip-validation
-  build_release: SOURCE_DATE_EPOCH={epoch} CATALOGUE_RELEASE_SEQ={seq} python scripts/build.py --release
+versioning:
+  version_file_meaning: contract_and_tool_semver
+  ordinary_data_change_bumps_version_file: false
+  catalogue_revision: full_source_commit
+  release_identity: "catalogue-YYYYMMDD.N"
+  release_tag: protected_annotated_tag_at_exact_merge_sha
+  signatures: optional_adapter_strengthening
+  pre_one_zero_rule_or_shape_break: minor
+  compatible_contract_fix: patch
 
-exit_codes:
-  "0": success
-  "1": validation_or_gate_failure
-  "2": invocation_or_layout_error
+diagnostics:
+  fields: [code, severity, path, json_pointer, message, remediation]
+  code_rename_remove_or_semantic_change_is_breaking: true
+  adding_error_code_requires_contract_change: true
+  exit_codes: {success: 0, validation_failure: 1, usage_or_system_error: 2}
+  baseline_codes:
+    - YAML_PARSE_ERROR
+    - YAML_DUPLICATE_KEY
+    - YAML_ALIAS_OR_ANCHOR
+    - YAML_CUSTOM_TAG
+    - YAML_MULTI_DOCUMENT
+    - YAML_INVALID_ROOT
+    - YAML_LIMIT_EXCEEDED
+    - FILE_OR_PATH_ERROR
+    - SCHEMA_VIOLATION
+    - PATH_IDENTITY_MISMATCH
+    - UNKNOWN_REFERENCE
+    - EVIDENCE_MISSING
+    - EVIDENCE_VALUE_MISMATCH
+    - EVIDENCE_ID_MISMATCH
+    - EVIDENCE_IMMUTABLE
+    - EVIDENCE_STALE
+    - EVIDENCE_FUTURE
+    - CHANGE_INVALID
+    - MAC_INVALID
+    - BUILD_NONDETERMINISTIC
+    - RELEASE_RECEIPT_INVALID
+    - PLATFORM_CONTROL_MISSING
 
-ci:
-  gate_count: 11
-  fail_fast: true
-  gates:
-    - lock-check
-    - lint
-    - validate
-    - test
-    - site-test
-    - skill-test
-    - build
-    - scan
-    - reproducibility-check
-    - generated-output-check
-    - clean-tree-check
-  scan:
-    dependencies:
-      - detect-secrets
-      - .secrets.baseline
-    unavailable: visible_warning
-    blocking_when_unavailable: false
+toolchain:
+  required_runtime: python
+  python_version: "3.12.13"
+  uv_version: "0.11.33"
+  environment_and_lock: uv
+  runtime_lock_scope: uv.lock governs sync and uv run --locked
+  pep517_build_requirement: uv_build==0.11.33 pinned in pyproject.toml
+  package_build: uv build --offline --no-cache
+  required_ci_uses_npx: false
+  clean_clone_commands:
+    - uv sync --locked
+    - uv build --offline --no-cache
+    - uv run --locked modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
+    - uv run --locked modelo build --kind candidate --base-commit BASE_SHA --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON_PATH --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
+    - uv run --locked modelo build --kind final --base-commit BASE_SHA --source-commit ACCEPTED_HEAD_SHA --source-tree ACCEPTED_TREE_SHA --merge-commit MERGE_SHA --merge-tree ACCEPTED_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch ACCEPTED_HEAD_AUTHOR_UNIX_SECONDS --profile synthetic --base-url CANONICAL_PAGES_URL --base-path /Modelo/ --output dist/final
+  solution_tooling_and_publication_are_services: false
+  agent_skills_are_build_inputs: false
+  network:
+    core_validation_and_build: disabled
+    platform_adapter: read_only_same_repository_git_provider_only
+    platform_adapter_output: bounded_canonical_mac_input
 
 build:
-  output_directory: dist/
-  outputs:
-    catalogue: dist/catalogue.json
-    manifest: dist/manifest.json
-    site_catalogue_copy: public-docs/data/catalogue.json
-    site_schema_bundle: public-docs/data/schemas-bundle.json
-  tracked: false
-  serialisation:
-    encoding: utf-8
-    newline: lf
-    sort_keys: true
-    indent: 2
-    ensure_ascii: false
-  reproducibility_inputs:
-    - source_tree
-    - SOURCE_DATE_EPOCH
-    - python_version
-    - locked_dependencies
-  manifest_self_hash: false
-  release_requires:
-    - clean_worktree
-    - known_source_commit
-    - successful_validation
-    - SOURCE_DATE_EPOCH
-    - CATALOGUE_RELEASE_SEQ
-  skip_validation_is_releasable: false
+  catalogue_wire_schema: schemas/catalogue-output.schema.json
+  manifest_wire_schema: schemas/build-manifest.schema.json
+  mac_metadata_wire_schema: schemas/mac-metadata.schema.json
+  mac_metadata_cli_value: explicit_file_path
+  check_receipt_wire_schema: schemas/check-receipt.schema.json
+  release_receipt_wire_schema: schemas/release-receipt.schema.json
+  actors_registry_schema: schemas/actors-registry.schema.json
+  t5_outputs: [candidate_catalogue_file, candidate_change_delta_file, candidate_manifest_file, receipt_primitives_library_values]
+  t5_implemented_kinds: [candidate]
+  t6_implemented_kind: final
+  t5_explicit_inputs: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url_choice, base_path, output]
+  candidate_cli_required_flags: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, mac_metadata, profile, base_path, output]
+  final_cli_required_flags: [kind, base_commit, source_commit, source_tree, merge_commit, merge_tree, as_of, source_date_epoch, mac_metadata, profile, publication_capability, base_url, base_path, output]
+  cli_base_url_choice: exactly_one_of_base_url_or_candidate_only_no_base_url
+  t6_final_additional_flags: [merge_commit, merge_tree, publication_capability]
+  ambient_inference: forbidden
+  local_candidate_base_url_may_be_null: true
+  trusted_ci_and_final_base_url: explicit_absolute_https
+  source_epoch: explicit_value_required_equal_exact_source_commit_author_unix_seconds
+  source_epoch_mismatch: error
+  source_epoch_environment_read: forbidden
+  source_epoch_arbitrary_override: forbidden
+  ignored_timestamps: [committer_time, filesystem_mtime, merge_timestamp]
+  final_source_commit: accepted_head
+  merge_timestamp: optional_t8_release_receipt_fact_never_build_epoch
+  t5_provider_or_git_host_reads: false
+  t6_rebuilds_single_t5_projection_from_validated_mac_metadata: true
+  t6_trusts_mutable_candidate_directory: false
+  t6_second_raw_or_private_serialisation: forbidden
+  t8_assembles_check_receipt_from_trusted_provider_metadata: true
+  postmerge_assembles_release_receipt_after_exact_tree_verification: true
+  output_roots:
+    candidate: dist/candidate
+    final: dist/final
+    target_parent: dist
+    detached_receipts: dist/receipts
+  output_argument_equality:
+    candidate: exact_configured_candidate_root
+    final: exact_configured_final_root
+  output_path_validation: repo_relative_safe_resolution_no_symlink_no_traversal_not_inside_any_input
+  t8_output_argument: exact_configured_root_for_kind
+  publication_subdir: site
+  catalogue_path: data/catalogue.json
+  change_delta_path: data/change-delta.json
+  manifest_path: data/manifest.json
+  t5_candidate_output_inventory: [site/data/catalogue.json, site/data/change-delta.json, site/data/manifest.json]
+  t5_candidate_manifest_files: [data/catalogue.json, data/change-delta.json]
+  change_delta_wire: rfc8785_canonical_array_utf8_plus_single_lf
+  change_delta_digest: sha256_exact_emitted_bytes_including_lf
+  t8_check_receipt_path: dist/receipts/check.json
+  t5_writes_check_receipt: false
+  digest_algorithm: sha256_exact_bytes
+  publication_digest: sha256_of_sorted_path_nul_digest_nul_size_lf_records
+  manifest_files_include_manifest: false
+  canonical_json: rfc8785_utf8_plus_single_lf
+  canonical_sha256_scope: exact_rfc8785_bytes_including_single_lf
+  catalogue_sort_keys:
+    models: [id, canonical_json_bytes]
+    offerings: [inference_service_id, id, canonical_json_bytes]
+    evidence: [id, canonical_json_bytes]
+    conditions: [id, version, canonical_json_bytes]
+    routes: [id, canonical_json_bytes]
+    route_destinations: [destination_pointer, canonical_json_bytes]
+    pricing: [dimension, unit, quantity, amount, currency, sorted_route_ids, canonical_json_bytes]
+    condition_refs: [id, version, canonical_json_bytes]
+    id_arrays: ascii_id
+    total_tie_breaker: canonical_json_bytes
+  change_delta_sort: [operation_rank_add_change_revoke_move, primary_path, destination_path, before, after, canonical_json_bytes]
+  manifest_required_fixed_files:
+    - 404.html
+    - assets/catalogue.js
+    - assets/site.css
+    - catalogue/index.html
+    - changes/index.html
+    - data/catalogue.json
+    - data/change-delta.json
+    - docs/index.html
+    - docs/SPEC.md
+    - docs/contract.yaml
+    - index.html
+    - process/index.html
+    - propose/index.html
+  manifest_required_derived_files: ["models/{model_id}/index.html", "offerings/{inference_service_id}/{offering_id}/index.html"]
+  candidate_manifest_completeness: t5_exact_catalogue_plus_change_delta_excluding_manifest
+  final_manifest_completeness: t6_fixed_union_all_source_commit_schemas_union_projection_derived_excluding_manifest
+  final_schema_inventory: every_schema_file_under_configured_paths_schemas_at_exact_source_commit
+  candidate_manifest_completeness_executable_owner: t5
+  final_manifest_completeness_executable_owner: t6
+  semantic_evidence_projection_arrays_preserve_source_order: true
+  writer_lock: exclusive_create_or_fail_fast
+  staging: dist/{candidate_or_final}.{128_bit_csprng_hex}.staging
+  backup: dist/{candidate_or_final}.{128_bit_csprng_hex}.backup
+  promotion: [lock, stage, fsync_stage, validate_stage, backup_old, promote_new, fsync_parent, verify_target, remove_backup, unlock]
+  atomicity_scope: each_same_filesystem_rename_not_whole_multi_rename_transaction
+  observable_target: complete_old_complete_new_or_temporarily_absent_never_partial
+  final_durability: fsync_files_and_directories_or_incapable
+  recovery: explicit_bounded_journal_restore_or_fail_closed_on_ambiguity
+  failure: restore_backup_remove_new_staging_preserve_previous_complete_output
 
-proposal_workflow:
-  issue_form:
-    provider: github
-    approval: false
-  public_form:
-    permitted_actions:
-      - validate_locally
-      - preview_yaml
-      - download_yaml
-      - open_prefilled_github_issue
-    browser_token_storage: forbidden
-    direct_pull_request_creation: false
-  pull_request:
-    branch_pattern: "proposal/*"
-    required_checks:
-      - catalogue-ci
-    codeowners_review: required
-    merge_to_main: approval
+canonical_site_url:
+  scheme: https
+  host: lowercase_dns
+  port: implicit_443_only
+  forbidden: [userinfo, query, fragment, dot_segments, percent_encoding]
+  trailing_slash: required
+  path_must_equal_normalised_base_path: true
+  examples: ["https://host.invalid/ + /", "https://host.invalid/Modelo/ + /Modelo/"]
 
-agent:
-  policy_nature: guidance
-  enforcement:
-    - runtime_sandbox
-    - github_permissions
-    - branch_protection
-  writable:
-    - proposals/**
-    - artifacts/**
-    - tests/fixtures/**
-  protected:
-    - catalogue/**
-    - schemas/**
-    - scripts/**
-    - .kiro/**
-    - public-docs/**
-  allowed_actions:
-    - inspect_repository
-    - create_proposal_branch
-    - write_proposal_artifacts
-    - add_test_fixtures
-    - run_validation
-    - run_tests
-    - run_build
-    - inspect_git_status_diff_log
-  forbidden_actions:
-    - approve_pull_request
-    - merge_pull_request
-    - push_to_protected_branch
-    - weaken_validation
-    - invent_catalogue_facts
-    - infer_revocation_from_discovery_absence
+site:
+  contract_config_key: paths.site_contract
+  routes_config_key: site.routes
+  data_routes: [catalogue, change_delta, manifest, schemas]
+  asset_routes: [asset_css, asset_js]
+  document_routes: [human_specification, machine_contract]
+  templates_config_key: paths.site_templates
+  generated_output_config_key: build.final_root
+  generator_uses_network: false
+  urls_come_from_global_config_only: true
+  profiles: [synthetic, private]
+  profile_sources: {synthetic: tests/fixtures/build/synthetic, private: catalogue}
+  production_public_field_redaction: deferred
+  private_to_public_fallback: forbidden
+  private_required_publication_capabilities: [restricted-artifact, access-controlled-pages]
+  change_history_source: local_git_first_parent_deltas
+  release_receipt_is_site_build_input: false
+  final_postmerge_artifact_is_validated_then_deployed_without_rebuild: true
+  test_ownership:
+    t6: [no_javascript_navigation, link_integrity, inert_xss, publication_non_leakage, accessibility_structure]
+    t10: [pinned_python_controlled_browser_outside_core_build, human_keyboard_and_screen_reader_evidence]
 
-diagnostic_codes:
-  yaml:
-    - DUPLICATE_KEY
-    - ALIAS_FOUND
-    - ANCHOR_FOUND
-    - CUSTOM_TAG
-    - MULTI_DOCUMENT
-    - INVALID_ROOT
-    - EXCESSIVE_NESTING
-    - YAML_PARSE_ERROR
-    - FILE_READ_ERROR
-  schema:
-    - SCHEMA_VIOLATION
-  path:
-    - MODEL_PATH_MISMATCH
-    - OFFERING_OPERATOR_MISMATCH
-    - OFFERING_PATH_MISMATCH
-    - OFFERING_GEO_MISMATCH
-    - DUPLICATE_IDENTITY
-  reference:
-    - UNKNOWN_VENDOR
-    - UNKNOWN_OPERATOR
-    - UNKNOWN_MODEL
-  evidence:
-    - STALE_PRICING
-    - STALE_EVIDENCE
-    - FUTURE_DATE
-  build:
-    - DIRTY_TREE
-    - UNKNOWN_COMMIT
-  system:
-    - MISSING_SCHEMAS
-  stability:
-    add: additive_for_tolerant_consumers
-    rename: breaking
-    remove: breaking
-    semantic_change: breaking
+validation:
+  command: modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
+  change_modes:
+    mac_data:
+      paths: catalogue/**
+      receipt: dist/receipts/check.json
+      approval: independent_human_or_explicitly_enabled_eligible_agent
+    control_plane:
+      trigger: any_non_catalogue_path
+      linked_open_implementation_issue: required
+      issue_body_digest_bound_to_receipt: true
+      receipt: dist/receipts/control-check.json
+      gates: [trusted_base_tests, proposed_head_tests, trusted_base_package, proposed_head_package]
+      approval: human_codeowner_only
+    mutually_exclusive: true
+  restricted_yaml: true
+  change_aware: true
+  deterministic: true
+  checks:
+    - configuration_and_paths
+    - yaml_schema_and_stable_diagnostics
+    - references_evidence_equality_and_freshness
+    - immutability_move_and_revoke_against_base
+    - tests_and_adapter_parity
+    - deterministic_catalogue_site_and_receipts
+    - clean_tree_and_supply_chain_pins
+  release_receipt_fields:
+    - contract_version
+    - base_source_and_merge_shas
+    - as_of
+    - catalogue_publication_and_manifest_digests
+    - tool_and_lock_digest
+    - exact_ci_run_check_and_result
+    - issue_and_change_request_refs
+    - change_delta
+    - head_and_merge_tree_shas
+    - source_date_epoch
+    - reviewer_platform_identity
+    - approved_head_sha
+    - approval_timestamp
+    - actors_registry_digest
+    - independence_and_eligibility_result
+    - provider_approval_and_check_reference
+  premerge_artifact:
+    records_head_tree_sha: true
+    protected_branch_must_be_up_to_date: true
+    merge_gate_requires_current_base_equal_receipt_base: true
+    purpose: candidate_content_validation_not_release
+  t8_check_receipt_correlations:
+    - repository_identity
+    - base_head_and_head_tree
+    - as_of_source_epoch_profile_base_url_and_base_path
+    - mac_payload_and_canonical_change_delta
+    - named_artifact_paths_and_digests
+    - tool_and_lock_digests
+    - actors_registry_digest_and_actor_eligibility
+    - trusted_ci_provider_workflow_run_check_result_and_exact_head
+  t8_trusted_input_equality: [repository, current_base_sha, current_head_sha, current_head_tree_sha, as_of, source_date_epoch, profile, base_url, base_path, mac_issue, mac_payload_digest, canonical_change_delta, named_artifacts_and_digests, tool_digest, lock_digest, actors_registry_digest, ci_provider, workflow_identity, run_id, check_name, success_result]
+  t8_internal_receipt_equalities: [ci_head_equals_top_level_head, ci_provider_equals_repository_provider]
+  accepted_check_receipt_digest: sha256_of_complete_rfc8785_utf8_plus_single_lf
+  postmerge_publication:
+    merge_tree_must_equal_accepted_head_tree: true
+    builds_final_merge_aware_artifact_once: true
+    validates_and_deploys_that_exact_artifact_without_rebuild: true
+    detached_receipt_hashes_final_artifact: true
+    receipt_is_not_inside_hashed_artifact: true
+    required_equalities: [release_source_equals_check_head, release_ci_head_equals_check_head, approval_head_equals_check_head, base_equals_check_base, head_tree_equals_check_head_tree, merge_tree_equals_head_tree]
+    continuity: [repository, as_of, source_date_epoch, profile, base_url, base_path, mac_delta, catalogue_artifact, tool_digest, lock_digest, workflow_identity]
+    final_only_digest_exceptions: [publication, manifest]
 
-fixtures:
-  valid_dir: tests/fixtures/valid/
-  invalid_dir: tests/fixtures/invalid/
-  layout: miniature_repository_with_catalogue_root
-  expected_file: expected_diagnostics.json
-  prefixes:
-    yaml--: yaml_loader
-    schema--: json_schema
-    path--: path_integrity
-    ref--: reference_integrity
-    evidence--: freshness
-  auto_discovered: true
-  synthetic_only: true
+platform:
+  neutral_terms: [issue, change_request, required_check, protected_default_branch, static_site, release]
+  github_adapter_config_key: paths.github_adapter
+  gitlab_adapter_config_key: paths.gitlab_adapter
+  gitlab_ci_config_key: paths.gitlab_ci
+  host_switch_changes_core_records: false
+  platform_receipt_assembly: modelo platform check
+  remote_capability_check: modelo platform capabilities
+  remote_capability_check_status: t10_unimplemented
+  missing_required_capability: fail_closed
+  private_pages_missing: restricted_artifact_not_public_pages
+  merge_queue_or_train: deferred_until_candidate_tree_contract
+  actors_registry_config_key: paths.actors_registry
+  unconfigured_agent_identity_mode: human_only
+  github_trusted_pipeline: protected_main_pull_request_target_without_secrets
+  gitlab_trusted_pipeline: protected_pipeline_policy_if_available_otherwise_protected_branch_adapter
+  gitlab_adapter_status: fail_closed_capability_probe_pending_t10_host_switch_rehearsal
+  missing_trusted_pipeline_result: incapable
 
-compatibility:
-  pre_one_zero_breaking_version: increment_minor
-  patch_release_changes_accepted_shape: false
-  optional_field:
-    schema_only: additive
-    emitted_before_consumer_upgrade: breaking_for_old_validators
-  enum_value_addition: requires_consumer_coordination
+recovery:
+  git_mirror_alone_is_complete_operational_backup: false
+  bundle_requires: [git_mirror, host_metadata_export, control_manifest, releases_and_receipts, locked_dependency_archive]
+  restore_rehearsal_required: true
+
+agents:
+  canonical_rules_config_key: paths.agent_rules
+  canonical_open_skills_config_key: paths.open_skills
+  skills_purpose: authorship_and_review_guidance
+  ci_executes_skill_prose: false
+  skills_used_before_locked_cli_not_by_build: true
+  build_identical_without_skills: true
+  shared_cli_ownership_slices: [T5, T6, T8]
+  one_writer_per_branch_or_worktree: true
+  review_agents_read_only: true
+
+technical_debt:
+  implicit_allowed: false
+  exception_requires: [linked_issue, owner, rationale, removal_criterion, target_date_or_release, failing_or_skipped_test]
 
 deferred:
-  target_version: "0.2.0"
-  items:
-    - unit_based_pricing
-    - condition_referential_integrity
-    - structured_modalities
-    - structured_context
-    - deletion_aware_validation
+  - modelo_application_api_or_live_store
+  - automatic_revocation_from_discovery
+  - transformed_evidence_claims
+  - production_public_field_redaction
+  - private_or_negotiated_pricing
+  - account_owned_provider_routes
+  - gcp_and_azure_adapters
+  - gitlab_remote_adapter_activation_until_host_switch_rehearsal
+  - live_telemetry_and_runtime_health

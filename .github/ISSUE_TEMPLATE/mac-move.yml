@@ -1,0 +1,35 @@
+name: "MAC: move"
+description: Propose atomic add-destination and revoke-source for one offering identity change.
+title: "MAC move: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Paste a complete `schemas/mac.schema.json` payload. In v0.1 a move has exactly one source and one destination offering; a Git rename is insufficient.
+  - type: textarea
+    id: mac_payload
+    attributes:
+      label: Neutral MAC payload
+      description: The operation must be `move`; subject identities use lowercase ASCII canonical IDs; generate both hashes from the canonical payload.
+      render: json
+      placeholder: |
+        { "schema_version": "0.1", "operation": "move", "replace": "with a complete schema-valid payload" }
+    validations:
+      required: true
+  - type: input
+    id: payload_digest
+    attributes:
+      label: Neutral payload digest
+      description: SHA-256 of the complete canonical payload, including its two validated keys.
+      placeholder: sha256-...
+    validations:
+      required: true
+  - type: checkboxes
+    id: assertions
+    attributes:
+      label: Assertions
+      options:
+        - label: The destination add and source revoke are one atomic proposal.
+          required: true
+        - label: I have not included credentials, tokens or private commercial terms.
+          required: true

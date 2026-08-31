@@ -1,0 +1,245 @@
+name: Modelo trusted check
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: modelo-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  classify:
+    name: Classify change
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      kind: ${{ steps.classify.outputs.kind }}
+    steps:
+      - name: Fetch untrusted change with ephemeral read credential
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          test "${HEAD_REPOSITORY}" = "${REPOSITORY}"
+          test "${BASE_REF}" = "${DEFAULT_BRANCH}"
+          git init change
+          git -C change remote add origin "https://github.com/${REPOSITORY}.git"
+          auth="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 -w0)"
+          git -C change -c http.extraheader="AUTHORIZATION: basic ${auth}" \
+            fetch --no-tags origin "${BASE_SHA}" "${HEAD_SHA}"
+          unset auth GH_TOKEN
+
+      - name: Reject mixed changes and classify
+        id: classify
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          changed="$(git -C change diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
+          test -n "${changed}"
+          catalogue=0
+          control=0
+          while IFS= read -r path; do
+            case "${path}" in
+              catalogue/*) catalogue=1 ;;
+              *) control=1 ;;
+            esac
+          done <<< "${changed}"
+          if test "${catalogue}" = 1 && test "${control}" = 1; then
+            echo "Catalogue and control-plane changes require separate pull requests" >&2
+            exit 1
+          fi
+          if test "${catalogue}" = 1; then
+            echo "kind=mac-data" >> "${GITHUB_OUTPUT}"
+          else
+            echo "kind=control-plane" >> "${GITHUB_OUTPUT}"
+          fi
+
+  proposed-control:
+    name: Proposed control-plane tests
+    needs: classify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Data changes need no proposed-code execution
+        if: needs.classify.outputs.kind == 'mac-data'
+        run: echo "No proposed control-plane code is executed for a catalogue change"
+
+      - name: Install pinned uv and Python
+        if: needs.classify.outputs.kind == 'control-plane'
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          version: 0.11.33
+          python-version: 3.12.13
+          enable-cache: false
+
+      - name: Fetch proposed code with ephemeral read credential
+        if: needs.classify.outputs.kind == 'control-plane'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git init proposed
+          git -C proposed remote add origin "https://github.com/${REPOSITORY}.git"
+          auth="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 -w0)"
+          git -C proposed -c http.extraheader="AUTHORIZATION: basic ${auth}" \
+            fetch --no-tags --depth=1 origin "${HEAD_SHA}"
+          unset auth GH_TOKEN
+          git -C proposed checkout --detach FETCH_HEAD
+
+      - name: Test and package proposed code
+        if: needs.classify.outputs.kind == 'control-plane'
+        run: |
+          set -euo pipefail
+          uv sync --project proposed --locked
+          uv run --project proposed --locked pytest -q proposed/tests
+          (cd proposed && uv build --offline --no-cache)
+
+  trusted-check:
+    name: modelo/check
+    if: ${{ always() }}
+    needs: [classify, proposed-control]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Require successful independent prerequisites
+        env:
+          CLASSIFY_RESULT: ${{ needs.classify.result }}
+          PROPOSED_RESULT: ${{ needs.proposed-control.result }}
+          KIND: ${{ needs.classify.outputs.kind }}
+        run: |
+          set -euo pipefail
+          test "${CLASSIFY_RESULT}" = success
+          test "${PROPOSED_RESULT}" = success
+          case "${KIND}" in mac-data|control-plane) ;; *) exit 1 ;; esac
+
+      - name: Install pinned uv and Python
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          version: 0.11.33
+          python-version: 3.12.13
+          enable-cache: false
+
+      - name: Fetch protected tools and provider validation merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CHANGE_REQUEST: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          git init trusted
+          git -C trusted remote add origin "https://github.com/${REPOSITORY}.git"
+          auth="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 -w0)"
+          git -C trusted -c http.extraheader="AUTHORIZATION: basic ${auth}" \
+            fetch --no-tags --depth=1 origin "${BASE_SHA}"
+          git -C trusted checkout --detach FETCH_HEAD
+          git init validation
+          git -C validation remote add origin "https://github.com/${REPOSITORY}.git"
+          git -C validation -c http.extraheader="AUTHORIZATION: basic ${auth}" \
+            fetch --no-tags origin "${BASE_SHA}" "${HEAD_SHA}" "+refs/pull/${CHANGE_REQUEST}/merge:refs/modelo/validation"
+          unset auth GH_TOKEN
+          git -C validation checkout --detach refs/modelo/validation
+          echo "MODELO_AS_OF=$(date -u +%F)" >> "${GITHUB_ENV}"
+
+      - name: Locked dependency and schema gates
+        if: needs.classify.outputs.kind == 'mac-data'
+        run: |
+          set -euo pipefail
+          uv sync --project trusted --locked
+          uv run --project trusted --locked modelo --root validation check \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --head "${{ github.event.pull_request.head.sha }}" \
+            --as-of "${MODELO_AS_OF}"
+
+      - name: Trusted tests
+        run: uv run --project trusted --locked pytest -q trusted/tests
+
+      - name: Offline trusted package build
+        working-directory: trusted
+        run: uv build --offline --no-cache
+
+      - name: Fetch linked MAC issue through GitHub API
+        if: needs.classify.outputs.kind == 'mac-data'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_PATH: ${{ github.event_path }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          issue="$(uv run --project trusted --locked modelo --root validation platform github-issue --event "${EVENT_PATH}")"
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${REPOSITORY}/issues/${issue}" > "${RUNNER_TEMP}/issue.json"
+
+      - name: Build validation site and detached receipt
+        if: needs.classify.outputs.kind == 'mac-data'
+        env:
+          EVENT_PATH: ${{ github.event_path }}
+        run: |
+          set -euo pipefail
+          validation_sha="$(git -C validation rev-parse HEAD)"
+          validation_tree="$(git -C validation rev-parse 'HEAD^{tree}')"
+          uv run --project trusted --locked modelo --root validation platform github-prepare \
+            --event "${EVENT_PATH}" --issue "${RUNNER_TEMP}/issue.json" \
+            --validation-sha "${validation_sha}" --validation-tree "${validation_tree}" \
+            --as-of "${MODELO_AS_OF}" --metadata-output "${RUNNER_TEMP}/mac.json" \
+            --context-output "${RUNNER_TEMP}/context.json"
+          uv run --project trusted --locked modelo --root validation platform check \
+            --context "${RUNNER_TEMP}/context.json" --mac-metadata "${RUNNER_TEMP}/mac.json" \
+            --output "${GITHUB_WORKSPACE}/validation/dist/receipts/check.json"
+
+      - name: Build exact-head control-plane receipt
+        if: needs.classify.outputs.kind == 'control-plane'
+        env:
+          EVENT_PATH: ${{ github.event_path }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          validation_sha="$(git -C validation rev-parse HEAD)"
+          validation_tree="$(git -C validation rev-parse 'HEAD^{tree}')"
+          issue="$(uv run --project trusted --locked modelo --root validation platform github-control-issue --event "${EVENT_PATH}")"
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${REPOSITORY}/issues/${issue}" > "${RUNNER_TEMP}/control-issue.json"
+          uv run --project trusted --locked modelo --root validation platform github-prepare-control \
+            --event "${EVENT_PATH}" --issue "${RUNNER_TEMP}/control-issue.json" \
+            --validation-sha "${validation_sha}" \
+            --validation-tree "${validation_tree}" --as-of "${MODELO_AS_OF}" \
+            --context-output "${RUNNER_TEMP}/control-context.json"
+          uv run --project trusted --locked modelo --root validation platform control-check \
+            --context "${RUNNER_TEMP}/control-context.json" \
+            --output "${GITHUB_WORKSPACE}/validation/dist/receipts/control-check.json"
+
+      - name: Upload exact validation evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: modelo-check-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            validation/dist/receipts/check.json
+            validation/dist/receipts/control-check.json
+            validation/dist/validation/site
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 9

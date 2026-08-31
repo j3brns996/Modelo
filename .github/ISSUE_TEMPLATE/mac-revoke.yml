@@ -1,0 +1,35 @@
+name: "MAC: revoke"
+description: Propose removal of one current offering through a neutral revoke operation.
+title: "MAC revoke: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Paste a complete `schemas/mac.schema.json` payload. In v0.1 a revoke subject is one offering. Absence from discovery is not a revocation reason by itself.
+  - type: textarea
+    id: mac_payload
+    attributes:
+      label: Neutral MAC payload
+      description: The operation must be `revoke`; subject identities use lowercase ASCII canonical IDs; generate both hashes from the canonical payload.
+      render: json
+      placeholder: |
+        { "schema_version": "0.1", "operation": "revoke", "replace": "with a complete schema-valid payload" }
+    validations:
+      required: true
+  - type: input
+    id: payload_digest
+    attributes:
+      label: Neutral payload digest
+      description: SHA-256 of the complete canonical payload, including its two validated keys.
+      placeholder: sha256-...
+    validations:
+      required: true
+  - type: checkboxes
+    id: assertions
+    attributes:
+      label: Assertions
+      options:
+        - label: The request does not infer revocation from a missing discovery result.
+          required: true
+        - label: I have not included credentials, tokens or private commercial terms.
+          required: true

@@ -1,0 +1,614 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/modelo.schema.json",
+  "title": "Modelo repository configuration",
+  "$defs": {
+    "path": { "$ref": "common.schema.json#/$defs/safeRelativePath" },
+    "routeTemplate": {
+      "type": "string",
+      "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*\\$\\{)(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~!$&'()*+,;=:@/?-]|\\{[a-z][a-z0-9_]*\\})*(?![\\s\\S])",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "noParameterRoute": {
+      "allOf": [
+        { "$ref": "#/$defs/routeTemplate" },
+        { "pattern": "^[^{}]*(?![\\s\\S])" }
+      ]
+    },
+    "issueRoute": {
+      "allOf": [
+        { "$ref": "#/$defs/routeTemplate" },
+        { "pattern": "^[^{}]*\\{issue_number\\}[^{}]*(?![\\s\\S])" }
+      ]
+    },
+    "changeRequestRoute": {
+      "allOf": [
+        { "$ref": "#/$defs/routeTemplate" },
+        { "pattern": "^[^{}]*\\{change_request_number\\}[^{}]*(?![\\s\\S])" }
+      ]
+    },
+    "commitRoute": {
+      "allOf": [
+        { "$ref": "#/$defs/routeTemplate" },
+        { "pattern": "^[^{}]*\\{commit_sha\\}[^{}]*(?![\\s\\S])" }
+      ]
+    },
+    "tagRoute": {
+      "allOf": [
+        { "$ref": "#/$defs/routeTemplate" },
+        { "pattern": "^[^{}]*\\{tag_name\\}[^{}]*(?![\\s\\S])" }
+      ]
+    },
+    "modelRoute": {
+      "allOf": [
+        { "$ref": "#/$defs/routeTemplate" },
+        { "pattern": "^[^{}]*\\{model_id\\}[^{}]*(?![\\s\\S])" }
+      ]
+    },
+    "offeringRoute": {
+      "allOf": [
+        { "$ref": "#/$defs/routeTemplate" },
+        { "pattern": "^[^{}]*\\{inference_service_id\\}[^{}]*\\{offering_id\\}[^{}]*(?![\\s\\S])" }
+      ]
+    },
+    "digestField": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "canonicalBaseUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://(?!.*(?:/\\.{1,2})(?:/|(?![\\s\\S])))[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*(?:/[A-Za-z0-9._~-]+)*/(?![\\s\\S])",
+      "maxLength": 2048
+    }
+  },
+  "type": "object",
+  "required": ["config_version", "project", "repository", "paths", "toolchain", "site", "publication", "build", "platform", "artifact_identity", "determinism", "verification", "recovery"],
+  "properties": {
+    "config_version": { "const": "0.1.0" },
+    "project": {
+      "type": "object",
+      "required": ["id", "title", "version_file", "default_branch"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/id" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "version_file": { "$ref": "#/$defs/path" },
+        "default_branch": { "$ref": "common.schema.json#/$defs/id" }
+      },
+      "additionalProperties": false
+    },
+    "repository": {
+      "type": "object",
+      "required": ["adapter", "host", "namespace", "name", "web_base", "web_routes"],
+      "properties": {
+        "adapter": { "enum": ["github", "gitlab"] },
+        "host": {
+          "type": "string",
+          "format": "hostname",
+          "pattern": "^(?=.{1,253}(?![\\s\\S]))(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)*[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?![\\s\\S])"
+        },
+        "namespace": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "web_base": { "$ref": "common.schema.json#/$defs/httpsUri" },
+        "web_routes": {
+          "type": "object",
+          "required": ["issue", "change_request", "commit", "tag", "release", "releases", "mac_intake"],
+          "properties": {
+            "issue": { "$ref": "#/$defs/issueRoute" },
+            "change_request": { "$ref": "#/$defs/changeRequestRoute" },
+            "commit": { "$ref": "#/$defs/commitRoute" },
+            "tag": { "$ref": "#/$defs/tagRoute" },
+            "release": { "$ref": "#/$defs/tagRoute" },
+            "releases": { "$ref": "#/$defs/noParameterRoute" },
+            "mac_intake": {
+              "type": "object",
+              "required": ["add", "change", "revoke", "move", "batch"],
+              "properties": {
+                "add": { "$ref": "#/$defs/noParameterRoute" },
+                "change": { "$ref": "#/$defs/noParameterRoute" },
+                "revoke": { "$ref": "#/$defs/noParameterRoute" },
+                "move": { "$ref": "#/$defs/noParameterRoute" },
+                "batch": { "$ref": "#/$defs/noParameterRoute" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "paths": {
+      "type": "object",
+      "required": ["readme", "contributing", "codeowners", "gitignore", "gitattributes", "catalogue", "models", "offerings", "evidence", "governance", "actors_registry", "conditions", "schemas", "provider_schemas", "mac_schema", "mac_metadata_schema", "release_receipt_schema", "catalogue_output_schema", "build_manifest_schema", "check_receipt_schema", "trusted_check_context_schema", "trusted_control_context_schema", "control_check_receipt_schema", "actors_registry_schema", "tests", "fixtures", "implementation", "site_source", "site_templates", "site_assets", "site_content", "build", "docs", "human_specification", "machine_contract", "implementation_plan", "site_contract", "mac_contract", "security_contract", "launch_runbook", "agent_rules", "provider_docs", "decisions", "reviews", "open_skills", "codex_adapter", "kiro_adapter", "github_adapter", "gitlab_adapter", "gitlab_ci"],
+      "properties": {
+        "readme": { "$ref": "#/$defs/path" },
+        "contributing": { "$ref": "#/$defs/path" },
+        "codeowners": { "$ref": "#/$defs/path" },
+        "gitignore": { "$ref": "#/$defs/path" },
+        "gitattributes": { "$ref": "#/$defs/path" },
+        "catalogue": { "$ref": "#/$defs/path" },
+        "models": { "$ref": "#/$defs/path" },
+        "offerings": { "$ref": "#/$defs/path" },
+        "evidence": { "$ref": "#/$defs/path" },
+        "governance": { "$ref": "#/$defs/path" },
+        "actors_registry": { "$ref": "#/$defs/path" },
+        "conditions": { "$ref": "#/$defs/path" },
+        "schemas": { "$ref": "#/$defs/path" },
+        "provider_schemas": { "$ref": "#/$defs/path" },
+        "mac_schema": { "$ref": "#/$defs/path" },
+        "mac_metadata_schema": { "$ref": "#/$defs/path" },
+        "release_receipt_schema": { "$ref": "#/$defs/path" },
+        "catalogue_output_schema": { "$ref": "#/$defs/path" },
+        "build_manifest_schema": { "$ref": "#/$defs/path" },
+        "check_receipt_schema": { "$ref": "#/$defs/path" },
+        "trusted_check_context_schema": { "$ref": "#/$defs/path" },
+        "trusted_control_context_schema": { "$ref": "#/$defs/path" },
+        "control_check_receipt_schema": { "$ref": "#/$defs/path" },
+        "actors_registry_schema": { "$ref": "#/$defs/path" },
+        "tests": { "$ref": "#/$defs/path" },
+        "fixtures": { "$ref": "#/$defs/path" },
+        "implementation": { "$ref": "#/$defs/path" },
+        "site_source": { "$ref": "#/$defs/path" },
+        "site_templates": { "$ref": "#/$defs/path" },
+        "site_assets": { "$ref": "#/$defs/path" },
+        "site_content": { "$ref": "#/$defs/path" },
+        "build": { "$ref": "#/$defs/path" },
+        "docs": { "$ref": "#/$defs/path" },
+        "human_specification": { "$ref": "#/$defs/path" },
+        "machine_contract": { "$ref": "#/$defs/path" },
+        "implementation_plan": { "$ref": "#/$defs/path" },
+        "site_contract": { "$ref": "#/$defs/path" },
+        "mac_contract": { "$ref": "#/$defs/path" },
+        "security_contract": { "$ref": "#/$defs/path" },
+        "launch_runbook": { "$ref": "#/$defs/path" },
+        "agent_rules": { "$ref": "#/$defs/path" },
+        "provider_docs": { "$ref": "#/$defs/path" },
+        "decisions": { "$ref": "#/$defs/path" },
+        "reviews": { "$ref": "#/$defs/path" },
+        "open_skills": { "$ref": "#/$defs/path" },
+        "codex_adapter": { "$ref": "#/$defs/path" },
+        "kiro_adapter": { "$ref": "#/$defs/path" },
+        "github_adapter": { "$ref": "#/$defs/path" },
+        "gitlab_adapter": { "$ref": "#/$defs/path" },
+        "gitlab_ci": { "$ref": "#/$defs/path" }
+      },
+      "additionalProperties": false
+    },
+    "toolchain": {
+      "type": "object",
+      "required": ["language", "environment_manager", "lock_file", "package_config", "python_version_file", "python_version", "uv_version", "runtime_lock_scope", "pep517_build_pin", "package_build", "bootstrap_config_limits", "required_runtime_is_node", "npx_allowed_in_required_ci", "skills_are_build_inputs", "core_check_network", "platform_adapter_network", "clean_clone"],
+      "properties": {
+        "language": { "const": "python" },
+        "environment_manager": { "const": "uv" },
+        "lock_file": { "$ref": "#/$defs/path" },
+        "package_config": { "$ref": "#/$defs/path" },
+        "python_version_file": { "$ref": "#/$defs/path" },
+        "python_version": { "const": "3.12.13" },
+        "uv_version": { "const": "0.11.33" },
+        "runtime_lock_scope": { "const": "uv_lock_governs_sync_and_uv_run_locked" },
+        "pep517_build_pin": { "const": "uv_build==0.11.33_in_pyproject" },
+        "package_build": { "const": "uv build --offline --no-cache" },
+        "bootstrap_config_limits": {
+          "type": "object",
+          "required": ["max_bytes", "max_depth", "max_nodes"],
+          "properties": {
+            "max_bytes": { "const": 131072 },
+            "max_depth": { "const": 20 },
+            "max_nodes": { "const": 2000 }
+          },
+          "additionalProperties": false
+        },
+        "required_runtime_is_node": { "const": false },
+        "npx_allowed_in_required_ci": { "const": false },
+        "skills_are_build_inputs": { "const": false },
+        "core_check_network": { "const": "disabled" },
+        "platform_adapter_network": { "const": "same_repository_git_provider_read_only" },
+        "clean_clone": {
+          "type": "object",
+          "required": ["sync", "package", "check", "build"],
+          "properties": {
+            "sync": { "type": "string", "minLength": 1 },
+            "package": { "const": "uv build --offline --no-cache" },
+            "check": { "type": "string", "minLength": 1 },
+            "build": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "site": {
+      "type": "object",
+      "required": ["base_url", "base_path", "routes", "data_routes", "asset_routes", "document_routes", "urls_resolved_from_config_only", "effective_base_url_and_path_are_receipt_inputs", "ci_requires_explicit_base_url"],
+      "properties": {
+        "base_url": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/canonicalBaseUrl" }] },
+        "base_path": { "type": "string", "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~-]+/)*(?![\\s\\S])" },
+        "routes": {
+          "type": "object",
+          "required": ["home", "catalogue", "model", "offering", "changes", "process", "propose", "docs", "not_found"],
+          "properties": {
+            "home": { "$ref": "#/$defs/noParameterRoute" },
+            "catalogue": { "$ref": "#/$defs/noParameterRoute" },
+            "model": { "$ref": "#/$defs/modelRoute" },
+            "offering": { "$ref": "#/$defs/offeringRoute" },
+            "changes": { "$ref": "#/$defs/noParameterRoute" },
+            "process": { "$ref": "#/$defs/noParameterRoute" },
+            "propose": { "$ref": "#/$defs/noParameterRoute" },
+            "docs": { "$ref": "#/$defs/noParameterRoute" },
+            "not_found": { "$ref": "#/$defs/noParameterRoute" }
+          },
+          "additionalProperties": false
+        },
+        "data_routes": {
+          "type": "object",
+          "required": ["catalogue", "change_delta", "manifest", "schemas"],
+          "properties": {
+            "catalogue": { "$ref": "#/$defs/noParameterRoute" },
+            "change_delta": { "$ref": "#/$defs/noParameterRoute" },
+            "manifest": { "$ref": "#/$defs/noParameterRoute" },
+            "schemas": { "$ref": "#/$defs/noParameterRoute" }
+          },
+          "additionalProperties": false
+        },
+        "asset_routes": {
+          "type": "object",
+          "required": ["asset_css", "asset_js"],
+          "properties": {
+            "asset_css": { "$ref": "#/$defs/noParameterRoute" },
+            "asset_js": { "$ref": "#/$defs/noParameterRoute" }
+          },
+          "additionalProperties": false
+        },
+        "document_routes": {
+          "type": "object",
+          "required": ["human_specification", "machine_contract"],
+          "properties": {
+            "human_specification": { "$ref": "#/$defs/noParameterRoute" },
+            "machine_contract": { "$ref": "#/$defs/noParameterRoute" }
+          },
+          "additionalProperties": false
+        },
+        "urls_resolved_from_config_only": { "const": true },
+        "effective_base_url_and_path_are_receipt_inputs": { "const": true },
+        "ci_requires_explicit_base_url": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "publication": {
+      "type": "object",
+      "required": ["active_profile", "profiles", "production_field_level_public_redaction", "silent_private_to_public_downgrade"],
+      "properties": {
+        "active_profile": { "enum": ["synthetic", "private"] },
+        "profiles": {
+          "type": "object",
+          "required": ["synthetic", "private"],
+          "properties": {
+            "synthetic": {
+              "type": "object",
+              "required": ["source", "delivery", "visibility", "production_catalogue"],
+              "properties": {
+                "source": { "$ref": "#/$defs/path" },
+                "delivery": { "const": "pages" },
+                "visibility": { "const": "public" },
+                "production_catalogue": { "const": false }
+              },
+              "additionalProperties": false
+            },
+            "private": {
+              "type": "object",
+              "required": ["source", "delivery", "visibility", "fail_if_requested_pages_access_control_is_missing", "restricted_artifact_retention"],
+              "properties": {
+                "source": { "$ref": "#/$defs/path" },
+                "delivery": { "const": "restricted_artifact_or_capability_checked_pages" },
+                "visibility": { "const": "private" },
+                "fail_if_requested_pages_access_control_is_missing": { "const": true },
+                "restricted_artifact_retention": { "const": "protected_release_lifetime" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "production_field_level_public_redaction": { "const": "deferred" },
+        "silent_private_to_public_downgrade": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "build": {
+      "type": "object",
+      "required": ["command", "implemented_kinds", "required_cli_arguments", "final_cli_arguments", "base_url_choice", "ambient_git_or_environment_inference", "candidate_root", "validation_root", "final_root", "output_argument", "output_resolution", "target_parent", "receipts_root", "publication_subdir", "catalogue_path", "change_delta_path", "manifest_path", "candidate_output_inventory", "candidate_manifest_files", "final_fixed_files", "mac_metadata_ingestion", "change_delta_wire", "change_delta_digest", "receipt_primitives", "check_receipt_writer", "check_receipt_path", "control_check_receipt_path", "release_receipt_path", "digest_algorithm", "canonical_json", "publication_digest", "manifest_hashes_itself", "writer_lock", "lock_acquire", "staging_name", "backup_name", "journal", "promotion_state_machine", "crash_recovery", "atomic_publish", "observable_contract", "final_requires_fsync_durability", "failed_build_cleanup"],
+      "properties": {
+        "command": { "const": "modelo build" },
+        "implemented_kinds": { "type": "array", "prefixItems": [{ "const": "candidate" }, { "const": "final" }], "items": false },
+        "required_cli_arguments": {
+          "type": "array", "minItems": 10, "maxItems": 10, "uniqueItems": true,
+          "items": { "enum": ["kind", "base_commit", "source_commit", "source_tree", "as_of", "source_date_epoch", "mac_metadata", "profile", "base_path", "output"] }
+        },
+        "final_cli_arguments": {
+          "type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true,
+          "items": { "enum": ["merge_commit", "merge_tree", "publication_capability"] }
+        },
+        "base_url_choice": { "const": "candidate_exactly_one_of_base_url_or_no_base_url_final_requires_base_url" },
+        "ambient_git_or_environment_inference": { "const": false },
+        "candidate_root": { "const": "dist/candidate" },
+        "validation_root": { "const": "dist/validation" },
+        "final_root": { "const": "dist/final" },
+        "output_argument": { "const": "candidate_equals_candidate_root_final_equals_final_root" },
+        "output_resolution": { "const": "exact_repo_relative_safe_path_no_symlink_no_traversal_not_inside_any_input" },
+        "target_parent": { "const": "dist" },
+        "receipts_root": { "const": "dist/receipts" },
+        "publication_subdir": { "const": "site" },
+        "catalogue_path": { "const": "data/catalogue.json" },
+        "change_delta_path": { "const": "data/change-delta.json" },
+        "manifest_path": { "const": "data/manifest.json" },
+        "candidate_output_inventory": {
+          "type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true,
+          "items": { "enum": ["site/data/catalogue.json", "site/data/change-delta.json", "site/data/manifest.json"] }
+        },
+        "candidate_manifest_files": {
+          "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true,
+          "items": { "enum": ["data/catalogue.json", "data/change-delta.json"] }
+        },
+        "final_fixed_files": {
+          "type": "array", "minItems": 13, "maxItems": 13, "uniqueItems": true,
+          "items": { "$ref": "#/$defs/path" }
+        },
+        "mac_metadata_ingestion": {
+          "type": "object",
+          "required": ["cli_value", "file_type", "max_bytes", "encoding", "format", "duplicate_keys", "non_finite_numbers", "floating_point_numbers", "open_strategy", "read_strategy", "mutation_check", "incapable_ci", "local_candidate_accepting_durability", "outside_repository_temp_path", "network_read", "validation_order"],
+          "properties": {
+            "cli_value": { "const": "explicit_file_path" },
+            "file_type": { "const": "regular_non_symlink" },
+            "max_bytes": { "const": 262144 },
+            "encoding": { "const": "strict_utf8" },
+            "format": { "const": "strict_json_object_not_yaml" },
+            "duplicate_keys": { "const": "reject" },
+            "non_finite_numbers": { "const": "reject" },
+            "floating_point_numbers": { "const": "reject" },
+            "open_strategy": { "const": "nofollow_required_in_ci" },
+            "read_strategy": { "const": "once_from_single_open_descriptor" },
+            "mutation_check": { "const": "fstat_before_after_device_inode_mode_type_size_mtime_ns_ctime_ns_equal" },
+            "incapable_ci": { "const": "fail_closed" },
+            "local_candidate_accepting_durability": { "const": false },
+            "outside_repository_temp_path": { "const": "allowed" },
+            "network_read": { "const": false },
+            "validation_order": {
+              "type": "array", "minItems": 4, "maxItems": 4,
+              "prefixItems": [{ "const": "file_boundary" }, { "const": "json_parse" }, { "const": "schema" }, { "const": "semantic_correlations" }],
+              "items": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "change_delta_wire": { "const": "canonical_rfc8785_array_utf8_plus_single_lf" },
+        "change_delta_digest": { "const": "sha256_exact_bytes_including_single_lf" },
+        "receipt_primitives": { "const": "library_values_only" },
+        "check_receipt_writer": { "const": "t8_detached" },
+        "check_receipt_path": { "const": "dist/receipts/check.json" },
+        "control_check_receipt_path": { "const": "dist/receipts/control-check.json" },
+        "release_receipt_path": { "const": "dist/receipts/release.json" },
+        "digest_algorithm": { "const": "sha256" },
+        "canonical_json": { "const": "rfc8785_utf8_plus_single_lf" },
+        "publication_digest": { "const": "sha256_of_sorted_path_nul_digest_nul_size_lf_records" },
+        "manifest_hashes_itself": { "const": false },
+        "writer_lock": { "const": "dist/.modelo-build.lock" },
+        "lock_acquire": { "const": "exclusive_create_or_fail_fast" },
+        "staging_name": { "const": "target_name_dot_128_bit_csprng_hex_dot_staging" },
+        "backup_name": { "const": "target_name_dot_same_128_bit_csprng_hex_dot_backup" },
+        "journal": { "const": "bounded_fsync_state_file_in_lock" },
+        "promotion_state_machine": {
+          "type": "array", "minItems": 10, "maxItems": 10, "uniqueItems": true,
+          "prefixItems": [
+            { "const": "lock" }, { "const": "stage" }, { "const": "fsync_stage" },
+            { "const": "validate_stage" }, { "const": "backup_old" },
+            { "const": "promote_new" }, { "const": "fsync_parent" },
+            { "const": "verify_target" }, { "const": "remove_backup" }, { "const": "unlock" }
+          ],
+          "items": false
+        },
+        "crash_recovery": { "const": "explicit_recover_from_journal_or_fail_closed_on_ambiguity" },
+        "atomic_publish": { "const": "per_rename_same_filesystem_only" },
+        "observable_contract": { "const": "target_is_complete_old_complete_new_or_temporarily_absent_never_partial" },
+        "final_requires_fsync_durability": { "const": true },
+        "failed_build_cleanup": { "const": "restore_backup_if_needed_remove_staging_preserve_previous_complete_output" }
+      },
+      "additionalProperties": false
+    },
+    "platform": {
+      "type": "object",
+      "required": ["identities", "required_capabilities", "conditional_capabilities", "optional_capabilities"],
+      "properties": {
+        "identities": {
+          "type": "object",
+          "required": ["control_plane_owner"],
+          "properties": {
+            "control_plane_owner": {
+              "type": "object",
+              "required": ["github", "gitlab"],
+              "properties": {
+                "github": { "type": ["string", "null"] },
+                "gitlab": { "type": ["string", "null"] }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "required_capabilities": {
+          "type": "object",
+          "required": ["protected_default_branch", "direct_push", "change_request_required", "required_check", "independent_approved_review", "stale_review_dismissal", "last_pusher_cannot_supply_required_approval", "branch_must_be_up_to_date", "resolved_conversations", "force_push", "branch_deletion", "protected_release_tags", "trusted_pipeline"],
+          "properties": {
+            "protected_default_branch": { "const": true },
+            "direct_push": { "const": false },
+            "change_request_required": { "const": true },
+            "required_check": {
+              "type": "object",
+              "required": ["name", "trusted_source_required", "exact_head_sha", "skipped_or_neutral_is_failure"],
+              "properties": {
+                "name": { "const": "modelo/check" },
+                "trusted_source_required": { "const": true },
+                "exact_head_sha": { "const": true },
+                "skipped_or_neutral_is_failure": { "const": true }
+              },
+              "additionalProperties": false
+            },
+            "independent_approved_review": { "const": true },
+            "stale_review_dismissal": { "const": true },
+            "last_pusher_cannot_supply_required_approval": { "const": true },
+            "branch_must_be_up_to_date": { "const": true },
+            "resolved_conversations": { "const": true },
+            "force_push": { "const": false },
+            "branch_deletion": { "const": false },
+            "protected_release_tags": { "const": true },
+            "trusted_pipeline": {
+              "type": "object",
+              "required": ["github", "gitlab", "fail_closed_if_unavailable"],
+              "properties": {
+                "github": { "const": "protected_main_pull_request_target_without_secrets" },
+                "gitlab": { "const": "protected_pipeline_policy_if_available_otherwise_protected_branch_adapter" },
+                "fail_closed_if_unavailable": { "const": true }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "conditional_capabilities": {
+          "type": "object",
+          "required": ["code_owner_review", "private_pages"],
+          "properties": {
+            "code_owner_review": {
+              "type": "object",
+              "required": ["required_for_everything_outside_agent_data_allowlist", "agent_approvable_data_paths"],
+              "properties": {
+                "required_for_everything_outside_agent_data_allowlist": { "const": true },
+                "agent_approvable_data_paths": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              },
+              "additionalProperties": false
+            },
+            "private_pages": {
+              "type": "object",
+              "required": ["required_only_for_profile", "fallback"],
+              "properties": {
+                "required_only_for_profile": { "const": "private" },
+                "fallback": { "const": "restricted_ci_or_release_artifact" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "optional_capabilities": {
+          "type": "object",
+          "required": ["agent_approval", "serialised_merge"],
+          "properties": {
+            "agent_approval": {
+              "type": "object",
+              "required": ["enabled", "scope", "registry", "enablement_requires"],
+              "properties": {
+                "enabled": { "const": false },
+                "scope": { "const": "data_only_mac" },
+                "registry": { "const": "catalogue/governance/actors.yaml" },
+                "enablement_requires": {
+                  "type": "array",
+                  "minItems": 6,
+                  "maxItems": 6,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": ["registered_distinct_platform_identity", "enabled_eligible_actor", "independent_of_author_committer_and_last_pusher", "successful_trusted_exact_head_check_receipt", "current_base_and_head", "paths_within_agent_data_allowlist"]
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "serialised_merge": { "const": "manual_one_at_a_time" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifact_identity": {
+      "type": "object",
+      "required": ["premerge_receipt_records", "postmerge_requires_merge_tree_equal_head_tree", "merge_gate_requires_current_base_equal_accepted_base", "postmerge_builds_final_artifact_once", "postmerge_validates_and_deploys_that_exact_artifact", "release_receipt_is_detached_from_hashed_artifact", "deploy_exact_premerge_artifact", "merge_queue_or_train", "final_receipt_approval_evidence"],
+      "properties": {
+        "premerge_receipt_records": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/digestField" } },
+        "postmerge_requires_merge_tree_equal_head_tree": { "const": true },
+        "merge_gate_requires_current_base_equal_accepted_base": { "const": true },
+        "postmerge_builds_final_artifact_once": { "const": true },
+        "postmerge_validates_and_deploys_that_exact_artifact": { "const": true },
+        "release_receipt_is_detached_from_hashed_artifact": { "const": true },
+        "deploy_exact_premerge_artifact": { "const": false },
+        "merge_queue_or_train": { "const": "deferred_until_candidate_tree_contract" },
+        "final_receipt_approval_evidence": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/digestField" } }
+      },
+      "additionalProperties": false
+    },
+    "determinism": {
+      "type": "object",
+      "required": ["source_date_epoch", "source_date_epoch_unit", "ignored_timestamps", "source_date_epoch_environment_read", "arbitrary_override", "final_source_commit", "merge_timestamp_receipt_only", "source_tree", "build_inputs_explicit", "core_provider_reads", "change_history", "site_build_requires_complete_first_parent_history"],
+      "properties": {
+        "source_date_epoch": { "const": "required_equal_exact_source_commit_author_timestamp" },
+        "source_date_epoch_unit": { "const": "non_negative_whole_unix_seconds" },
+        "ignored_timestamps": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "enum": ["committer_time", "filesystem_mtime", "merge_timestamp"] }
+        },
+        "source_date_epoch_environment_read": { "const": false },
+        "arbitrary_override": { "const": "forbidden" },
+        "final_source_commit": { "const": "accepted_head" },
+        "merge_timestamp_receipt_only": { "const": true },
+        "source_tree": { "const": "exact_source_commit_tree" },
+        "build_inputs_explicit": {
+          "type": "array",
+          "minItems": 11,
+          "maxItems": 11,
+          "uniqueItems": true,
+          "items": { "enum": ["kind", "base_commit", "source_commit", "source_tree", "as_of", "source_date_epoch", "validated_mac_metadata", "publication_profile", "base_url_choice", "base_path", "output"] }
+        },
+        "core_provider_reads": { "const": false },
+        "change_history": { "const": "local_git_first_parent_deltas" },
+        "site_build_requires_complete_first_parent_history": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "verification": {
+      "type": "object",
+      "required": ["t6_static", "t8_browser", "t10_human", "node_npm_npx_required"],
+      "properties": {
+        "t6_static": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": { "enum": ["no_javascript_navigation", "link_integrity", "inert_xss_fixtures", "publication_non_leakage", "accessibility_structure"] }
+        },
+        "t8_browser": { "const": "pinned_python_controlled_browser_outside_core_build_runtime" },
+        "t10_human": { "const": "keyboard_and_screen_reader_launch_evidence" },
+        "node_npm_npx_required": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "recovery": {
+      "type": "object",
+      "required": ["bundle_contents", "restore_verification_required"],
+      "properties": {
+        "bundle_contents": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/digestField" } },
+        "restore_verification_required": { "const": true }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,4 @@
+inference_services:
+  aws-bedrock:
+    id: aws-bedrock
+    adapter: aws-bedrock

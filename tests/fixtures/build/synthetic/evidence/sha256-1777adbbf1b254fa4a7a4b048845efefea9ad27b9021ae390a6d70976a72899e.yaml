@@ -1,0 +1,10 @@
+id: sha256-1777adbbf1b254fa4a7a4b048845efefea9ad27b9021ae390a6d70976a72899e
+source:
+  type: official-vendor-documentation
+  uri: https://example.invalid/vendor
+retrieved_by: manual
+observed_at: "2026-08-01T00:00:00Z"
+scope: {}
+projection:
+  providerName: Test Vendor
+visibility: public

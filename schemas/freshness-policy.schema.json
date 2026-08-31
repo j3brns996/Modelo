@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/freshness-policy.schema.json",
+  "title": "Modelo evidence freshness policy",
+  "type": "object",
+  "required": ["classes_days"],
+  "properties": {
+    "classes_days": {
+      "type": "object",
+      "required": ["availability", "pricing", "intrinsic_model_fact"],
+      "properties": {
+        "availability": { "const": 30, "x-modelo-provenance": "policy" },
+        "pricing": { "const": 90, "x-modelo-provenance": "policy" },
+        "intrinsic_model_fact": { "const": 365, "x-modelo-provenance": "policy" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

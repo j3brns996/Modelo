@@ -1,0 +1,79 @@
+# ADR 0001: Git is the approval ledger, not live inventory
+
+- Status: proposed
+- Date: 2026-08-30
+- Decision issue: GitHub issue 1
+
+## Context
+
+Modelo expects roughly 10–20 approved catalogue changes per working day. It
+needs evidence, review, a durable change receipt and static publication, but it
+does not require live transactional queries or automatic runtime enforcement.
+Cloud APIs change independently and may be queried much more frequently.
+
+## Decision
+
+Use the Git protected default branch as the v0.1.0 approval ledger. Use issues
+for MAC intake, change requests for review, CI for validation, Pages for static
+publication and protected releases for portable receipts.
+
+CI is the technical arbiter for the exact change-request head. Governance
+approval is separate. An independent eligible agent may approve a data-only MAC
+after verifying trusted exact-head CI, but control-plane paths require a human
+CODEOWNER. A new commit invalidates both acceptance and approval.
+
+The selected Git provider API is the only workflow and control-plane API.
+Modelo exposes no application API. Consumers use static Pages, release
+artefacts or a clone.
+
+Provider APIs, CLIs and read-only MCP tools form an observation plane. Their
+output may supply evidence and initiate an issue, but cannot directly approve,
+change or revoke catalogue state.
+
+Each accepted fact keeps a durable, redacted canonical evidence projection in
+Git with its digest. Expiring CI artefacts may retain raw responses, but are not
+the sole evidence record.
+
+Evidence IDs are content-addressed from the complete canonical evidence
+envelope and immutable once merged. A new observation or correction creates a
+new ID and migrates references through MAC review.
+
+Keep the kernel platform-neutral. GitHub and GitLab integrations are thin
+adapters. `modelo.yaml` owns global paths, relative routes and the selected
+adapter.
+
+## Consequences
+
+- No database, bespoke API, authentication service, audit service or message
+  bus is introduced in v0.1.0.
+- Git history is described as tamper-evident, not absolutely immutable or WORM.
+- Remote protections must be verified separately by `modelo platform capabilities`.
+- A GitHub plan that cannot provide private Pages may publish only the synthetic
+  fixture profile publicly; the private catalogue remains a restricted
+  CI/release artefact. It does not justify an authentication proxy or silent
+  private-to-public downgrade.
+- Approval throughput is measured so review capacity, not Git mechanics, can be
+  identified as the actual bottleneck.
+
+## Alternatives considered
+
+### Operational database first
+
+Rejected for v0.1.0. It adds identity, API, audit, deployment and backup
+responsibilities before transactional or live-state requirements exist.
+
+### Git as live provider inventory
+
+Rejected. Rapid and account-scoped cloud observations would create noise,
+conflicts and false revocations in the approval ledger.
+
+### Provider availability as approval
+
+Rejected. Availability cannot establish enterprise Legal, security, policy,
+IAM or workload approval.
+
+## Review and exit
+
+Review after 90 days. Reconsider the operational store when any two measured
+exit criteria in `SPEC.md` persist for four weeks. Approved release snapshots
+remain in Git even if live state later moves elsewhere.

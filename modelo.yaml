@@ -1,0 +1,320 @@
+config_version: "0.1.0"
+
+project:
+  id: modelo
+  title: Modelo
+  version_file: VERSION
+  default_branch: main
+
+repository:
+  adapter: github
+  host: github.com
+  namespace: j3brns996
+  name: Modelo
+  web_base: https://github.com/j3brns996/Modelo
+  web_routes:
+    issue: /issues/{issue_number}
+    change_request: /pull/{change_request_number}
+    commit: /commit/{commit_sha}
+    tag: /releases/tag/{tag_name}
+    release: /releases/tag/{tag_name}
+    releases: /releases
+    mac_intake:
+      add: /issues/new?template=mac-add.yml
+      change: /issues/new?template=mac-change.yml
+      revoke: /issues/new?template=mac-revoke.yml
+      move: /issues/new?template=mac-move.yml
+      batch: /issues/new?template=mac-batch.yml
+
+paths:
+  readme: README.md
+  contributing: CONTRIBUTING.md
+  codeowners: CODEOWNERS
+  gitignore: .gitignore
+  gitattributes: .gitattributes
+  catalogue: catalogue
+  models: catalogue/models
+  offerings: catalogue/offerings
+  evidence: catalogue/evidence
+  governance: catalogue/governance
+  actors_registry: catalogue/governance/actors.yaml
+  conditions: catalogue/policies/conditions
+  schemas: schemas
+  provider_schemas: schemas/providers
+  mac_schema: schemas/mac.schema.json
+  mac_metadata_schema: schemas/mac-metadata.schema.json
+  release_receipt_schema: schemas/release-receipt.schema.json
+  catalogue_output_schema: schemas/catalogue-output.schema.json
+  build_manifest_schema: schemas/build-manifest.schema.json
+  check_receipt_schema: schemas/check-receipt.schema.json
+  trusted_check_context_schema: schemas/trusted-check-context.schema.json
+  trusted_control_context_schema: schemas/trusted-control-context.schema.json
+  control_check_receipt_schema: schemas/control-check-receipt.schema.json
+  actors_registry_schema: schemas/actors-registry.schema.json
+  tests: tests
+  fixtures: tests/fixtures
+  implementation: tooling/modelo
+  site_source: site
+  site_templates: site/templates
+  site_assets: site/assets
+  site_content: site/content
+  build: dist
+  docs: docs
+  human_specification: SPEC.md
+  machine_contract: docs/contract.yaml
+  implementation_plan: docs/implementation-plan.md
+  site_contract: docs/site-contract.md
+  mac_contract: docs/mac-contract.md
+  security_contract: docs/security-contract.md
+  launch_runbook: docs/launch-runbook.md
+  agent_rules: AGENTS.md
+  provider_docs: docs/providers
+  decisions: docs/adr
+  reviews: docs/reviews
+  open_skills: .agents/skills
+  codex_adapter: .codex
+  kiro_adapter: .kiro
+  github_adapter: .github
+  gitlab_adapter: .gitlab
+  gitlab_ci: .gitlab-ci.yml
+
+toolchain:
+  language: python
+  environment_manager: uv
+  lock_file: uv.lock
+  package_config: pyproject.toml
+  python_version_file: .python-version
+  python_version: "3.12.13"
+  uv_version: "0.11.33"
+  runtime_lock_scope: uv_lock_governs_sync_and_uv_run_locked
+  pep517_build_pin: uv_build==0.11.33_in_pyproject
+  package_build: uv build --offline --no-cache
+  bootstrap_config_limits:
+    max_bytes: 131072
+    max_depth: 20
+    max_nodes: 2000
+  required_runtime_is_node: false
+  npx_allowed_in_required_ci: false
+  skills_are_build_inputs: false
+  core_check_network: disabled
+  platform_adapter_network: same_repository_git_provider_read_only
+  clean_clone:
+    sync: uv sync --locked
+    package: uv build --offline --no-cache
+    check: uv run --locked modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
+    build: uv run --locked modelo build --kind candidate --base-commit BASE_SHA --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS --mac-metadata VALIDATED_MAC_JSON_PATH --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
+
+site:
+  base_url: https://j3brns996.github.io/Modelo/
+  base_path: /Modelo/
+  routes:
+    home: /
+    catalogue: /catalogue/
+    model: /models/{model_id}/
+    offering: /offerings/{inference_service_id}/{offering_id}/
+    changes: /changes/
+    process: /process/
+    propose: /propose/
+    docs: /docs/
+    not_found: /404.html
+  data_routes:
+    catalogue: /data/catalogue.json
+    change_delta: /data/change-delta.json
+    manifest: /data/manifest.json
+    schemas: /data/schemas/
+  asset_routes:
+    asset_css: /assets/site.css
+    asset_js: /assets/catalogue.js
+  document_routes:
+    human_specification: /docs/SPEC.md
+    machine_contract: /docs/contract.yaml
+  urls_resolved_from_config_only: true
+  effective_base_url_and_path_are_receipt_inputs: true
+  ci_requires_explicit_base_url: true
+
+publication:
+  active_profile: synthetic
+  profiles:
+    synthetic:
+      source: tests/fixtures/build/synthetic
+      delivery: pages
+      visibility: public
+      production_catalogue: false
+    private:
+      source: catalogue
+      delivery: restricted_artifact_or_capability_checked_pages
+      visibility: private
+      fail_if_requested_pages_access_control_is_missing: true
+      restricted_artifact_retention: protected_release_lifetime
+  production_field_level_public_redaction: deferred
+  silent_private_to_public_downgrade: false
+
+build:
+  command: modelo build
+  implemented_kinds: [candidate, final]
+  required_cli_arguments: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, mac_metadata, profile, base_path, output]
+  final_cli_arguments: [merge_commit, merge_tree, publication_capability]
+  base_url_choice: candidate_exactly_one_of_base_url_or_no_base_url_final_requires_base_url
+  ambient_git_or_environment_inference: false
+  candidate_root: dist/candidate
+  validation_root: dist/validation
+  final_root: dist/final
+  output_argument: candidate_equals_candidate_root_final_equals_final_root
+  output_resolution: exact_repo_relative_safe_path_no_symlink_no_traversal_not_inside_any_input
+  target_parent: dist
+  receipts_root: dist/receipts
+  publication_subdir: site
+  catalogue_path: data/catalogue.json
+  change_delta_path: data/change-delta.json
+  manifest_path: data/manifest.json
+  candidate_output_inventory: [site/data/catalogue.json, site/data/change-delta.json, site/data/manifest.json]
+  candidate_manifest_files: [data/catalogue.json, data/change-delta.json]
+  final_fixed_files:
+    - index.html
+    - 404.html
+    - catalogue/index.html
+    - changes/index.html
+    - process/index.html
+    - propose/index.html
+    - docs/index.html
+    - assets/site.css
+    - assets/catalogue.js
+    - data/catalogue.json
+    - data/change-delta.json
+    - docs/SPEC.md
+    - docs/contract.yaml
+  mac_metadata_ingestion:
+    cli_value: explicit_file_path
+    file_type: regular_non_symlink
+    max_bytes: 262144
+    encoding: strict_utf8
+    format: strict_json_object_not_yaml
+    duplicate_keys: reject
+    non_finite_numbers: reject
+    floating_point_numbers: reject
+    open_strategy: nofollow_required_in_ci
+    read_strategy: once_from_single_open_descriptor
+    mutation_check: fstat_before_after_device_inode_mode_type_size_mtime_ns_ctime_ns_equal
+    incapable_ci: fail_closed
+    local_candidate_accepting_durability: false
+    outside_repository_temp_path: allowed
+    network_read: false
+    validation_order: [file_boundary, json_parse, schema, semantic_correlations]
+  change_delta_wire: canonical_rfc8785_array_utf8_plus_single_lf
+  change_delta_digest: sha256_exact_bytes_including_single_lf
+  receipt_primitives: library_values_only
+  check_receipt_writer: t8_detached
+  check_receipt_path: dist/receipts/check.json
+  control_check_receipt_path: dist/receipts/control-check.json
+  release_receipt_path: dist/receipts/release.json
+  digest_algorithm: sha256
+  canonical_json: rfc8785_utf8_plus_single_lf
+  publication_digest: sha256_of_sorted_path_nul_digest_nul_size_lf_records
+  manifest_hashes_itself: false
+  writer_lock: dist/.modelo-build.lock
+  lock_acquire: exclusive_create_or_fail_fast
+  staging_name: target_name_dot_128_bit_csprng_hex_dot_staging
+  backup_name: target_name_dot_same_128_bit_csprng_hex_dot_backup
+  journal: bounded_fsync_state_file_in_lock
+  promotion_state_machine: [lock, stage, fsync_stage, validate_stage, backup_old, promote_new, fsync_parent, verify_target, remove_backup, unlock]
+  crash_recovery: explicit_recover_from_journal_or_fail_closed_on_ambiguity
+  atomic_publish: per_rename_same_filesystem_only
+  observable_contract: target_is_complete_old_complete_new_or_temporarily_absent_never_partial
+  final_requires_fsync_durability: true
+  failed_build_cleanup: restore_backup_if_needed_remove_staging_preserve_previous_complete_output
+
+platform:
+  identities:
+    control_plane_owner:
+      github: j3brns
+      gitlab: null
+  required_capabilities:
+    protected_default_branch: true
+    direct_push: false
+    change_request_required: true
+    required_check:
+      name: modelo/check
+      trusted_source_required: true
+      exact_head_sha: true
+      skipped_or_neutral_is_failure: true
+    independent_approved_review: true
+    stale_review_dismissal: true
+    last_pusher_cannot_supply_required_approval: true
+    branch_must_be_up_to_date: true
+    resolved_conversations: true
+    force_push: false
+    branch_deletion: false
+    protected_release_tags: true
+    trusted_pipeline:
+      github: protected_main_pull_request_target_without_secrets
+      gitlab: protected_pipeline_policy_if_available_otherwise_protected_branch_adapter
+      fail_closed_if_unavailable: true
+  conditional_capabilities:
+    code_owner_review:
+      required_for_everything_outside_agent_data_allowlist: true
+      agent_approvable_data_paths:
+        - catalogue/models/**
+        - catalogue/offerings/**
+        - catalogue/evidence/**
+    private_pages:
+      required_only_for_profile: private
+      fallback: restricted_ci_or_release_artifact
+  optional_capabilities:
+    agent_approval:
+      enabled: false
+      scope: data_only_mac
+      registry: catalogue/governance/actors.yaml
+      enablement_requires:
+        - registered_distinct_platform_identity
+        - enabled_eligible_actor
+        - independent_of_author_committer_and_last_pusher
+        - successful_trusted_exact_head_check_receipt
+        - current_base_and_head
+        - paths_within_agent_data_allowlist
+    serialised_merge: manual_one_at_a_time
+
+artifact_identity:
+  premerge_receipt_records: [head_sha, head_tree_sha, base_sha, source_date_epoch, as_of, candidate_artifact_digests]
+  postmerge_requires_merge_tree_equal_head_tree: true
+  merge_gate_requires_current_base_equal_accepted_base: true
+  postmerge_builds_final_artifact_once: true
+  postmerge_validates_and_deploys_that_exact_artifact: true
+  release_receipt_is_detached_from_hashed_artifact: true
+  deploy_exact_premerge_artifact: false
+  merge_queue_or_train: deferred_until_candidate_tree_contract
+  final_receipt_approval_evidence:
+    - reviewer_platform_identity
+    - approved_head_sha
+    - approval_timestamp
+    - actors_registry_digest
+    - independence_and_eligibility_result
+    - provider_approval_and_check_reference
+
+determinism:
+  source_date_epoch: required_equal_exact_source_commit_author_timestamp
+  source_date_epoch_unit: non_negative_whole_unix_seconds
+  ignored_timestamps: [committer_time, filesystem_mtime, merge_timestamp]
+  source_date_epoch_environment_read: false
+  arbitrary_override: forbidden
+  final_source_commit: accepted_head
+  merge_timestamp_receipt_only: true
+  source_tree: exact_source_commit_tree
+  build_inputs_explicit: [kind, base_commit, source_commit, source_tree, as_of, source_date_epoch, validated_mac_metadata, publication_profile, base_url_choice, base_path, output]
+  core_provider_reads: false
+  change_history: local_git_first_parent_deltas
+  site_build_requires_complete_first_parent_history: true
+
+verification:
+  t6_static: [no_javascript_navigation, link_integrity, inert_xss_fixtures, publication_non_leakage, accessibility_structure]
+  t8_browser: pinned_python_controlled_browser_outside_core_build_runtime
+  t10_human: keyboard_and_screen_reader_launch_evidence
+  node_npm_npx_required: false
+
+recovery:
+  bundle_contents:
+    - git_mirror
+    - issues_change_requests_reviews_and_ci_receipts_export
+    - host_control_manifest
+    - release_assets_and_receipts
+    - locked_dependency_archive
+  restore_verification_required: true

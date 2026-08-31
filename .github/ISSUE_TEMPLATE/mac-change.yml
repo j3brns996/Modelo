@@ -1,0 +1,35 @@
+name: "MAC: change"
+description: Propose one identity-preserving neutral change operation.
+title: "MAC change: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Paste a complete `schemas/mac.schema.json` payload. A change preserves logical identity. Candidate issue evidence is not accepted catalogue evidence.
+  - type: textarea
+    id: mac_payload
+    attributes:
+      label: Neutral MAC payload
+      description: The operation must be `change`; subject identities use lowercase ASCII canonical IDs; generate both hashes from the canonical payload.
+      render: json
+      placeholder: |
+        { "schema_version": "0.1", "operation": "change", "replace": "with a complete schema-valid payload" }
+    validations:
+      required: true
+  - type: input
+    id: payload_digest
+    attributes:
+      label: Neutral payload digest
+      description: SHA-256 of the complete canonical payload, including its two validated keys.
+      placeholder: sha256-...
+    validations:
+      required: true
+  - type: checkboxes
+    id: assertions
+    attributes:
+      label: Assertions
+      options:
+        - label: The logical identity is unchanged.
+          required: true
+        - label: I have not included credentials, tokens or private commercial terms.
+          required: true

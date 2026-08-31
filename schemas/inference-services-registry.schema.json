@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/inference-services-registry.schema.json",
+  "title": "Modelo inference-service registry",
+  "type": "object",
+  "required": ["inference_services"],
+  "properties": {
+    "inference_services": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "common.schema.json#/$defs/id" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["id", "adapter"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
+          "adapter": { "const": "aws-bedrock", "x-modelo-provenance": "internal" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

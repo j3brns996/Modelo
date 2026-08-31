@@ -1,0 +1,19 @@
+[mcp_servers.aws_documentation]
+command = "uvx"
+args = ["awslabs.aws-documentation-mcp-server@1.2.0"]
+enabled = true
+required = false
+startup_timeout_sec = 60
+tool_timeout_sec = 60
+enabled_tools = [
+  "read_documentation",
+  "search_documentation",
+  "read_sections",
+  "search_table",
+  "recommend",
+]
+default_tools_approval_mode = "auto"
+
+[mcp_servers.aws_documentation.env]
+FASTMCP_LOG_LEVEL = "ERROR"
+AWS_DOCUMENTATION_PARTITION = "aws"

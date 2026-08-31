@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/release-receipt.schema.json",
+  "title": "Modelo detached release receipt",
+  "$defs": {
+    "canonicalBaseUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://(?!.*(?:/\\.{1,2})(?:/|(?![\\s\\S])))[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*(?:/[A-Za-z0-9._~-]+)*/(?![\\s\\S])",
+      "maxLength": 2048
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "common.schema.json#/$defs/safeRelativePath" },
+        "sha256": { "$ref": "common.schema.json#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "artifactDigests": {
+      "type": "object",
+      "required": ["catalogue", "publication", "manifest"],
+      "properties": {
+        "catalogue": { "allOf": [{ "$ref": "#/$defs/artifact" }, { "properties": { "path": { "const": "site/data/catalogue.json" } } }] },
+        "publication": { "allOf": [{ "$ref": "#/$defs/artifact" }, { "properties": { "path": { "const": "site" } } }] },
+        "manifest": { "allOf": [{ "$ref": "#/$defs/artifact" }, { "properties": { "path": { "const": "site/data/manifest.json" } } }] }
+      },
+      "additionalProperties": false
+    },
+    "ciResult": {
+      "type": "object",
+      "required": ["provider", "workflow_identity", "workflow_sha", "run_id", "check", "result", "head_sha", "gates"],
+      "properties": {
+        "provider": { "enum": ["github", "gitlab"] },
+        "workflow_identity": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "workflow_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+        "run_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "check": { "const": "modelo/check" },
+        "result": { "const": "success" },
+        "head_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+        "gates": { "$ref": "check-receipt.schema.json#/$defs/ci/properties/gates" }
+      },
+      "additionalProperties": false
+    },
+    "offeringPath": {
+      "type": "string",
+      "pattern": "^catalogue/offerings/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.yaml(?![\\s\\S])"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+(?![\\s\\S])"
+    },
+    "effectiveAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?(?:Z|[+-][0-9]{2}:[0-9]{2})(?![\\s\\S])"
+    },
+    "addDelta": {
+      "type": "object",
+      "required": ["operation", "path", "after"],
+      "properties": {
+        "operation": { "const": "add" },
+        "path": { "$ref": "common.schema.json#/$defs/safeRelativePath" },
+        "after": { "$ref": "common.schema.json#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "changeDelta": {
+      "type": "object",
+      "required": ["operation", "path", "before", "after"],
+      "properties": {
+        "operation": { "const": "change" },
+        "path": { "$ref": "common.schema.json#/$defs/safeRelativePath" },
+        "before": { "$ref": "common.schema.json#/$defs/sha256" },
+        "after": { "$ref": "common.schema.json#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "revokeDelta": {
+      "type": "object",
+      "required": ["operation", "path", "before", "reason", "effective_at"],
+      "properties": {
+        "operation": { "const": "revoke" },
+        "path": { "$ref": "#/$defs/offeringPath" },
+        "before": { "$ref": "common.schema.json#/$defs/sha256" },
+        "reason": { "$ref": "#/$defs/reason" },
+        "effective_at": { "$ref": "#/$defs/effectiveAt" },
+        "replacement": { "$ref": "#/$defs/offeringPath" }
+      },
+      "additionalProperties": false
+    },
+    "moveDestination": {
+      "type": "object",
+      "required": ["operation", "path", "after"],
+      "properties": {
+        "operation": { "const": "add" },
+        "path": { "$ref": "#/$defs/offeringPath" },
+        "after": { "$ref": "common.schema.json#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "moveDelta": {
+      "type": "object",
+      "required": ["operation", "source", "destination"],
+      "properties": {
+        "operation": { "const": "move" },
+        "source": { "$ref": "#/$defs/revokeDelta" },
+        "destination": { "$ref": "#/$defs/moveDestination" }
+      },
+      "additionalProperties": false
+    },
+    "delta": {
+      "oneOf": [
+        { "$ref": "#/$defs/addDelta" },
+        { "$ref": "#/$defs/changeDelta" },
+        { "$ref": "#/$defs/revokeDelta" },
+        { "$ref": "#/$defs/moveDelta" }
+      ]
+    },
+    "changeDeltaList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/delta" }
+    },
+    "approval": {
+      "type": "object",
+      "required": ["reviewer_platform_identity", "reviewer_kind", "approved_head_sha", "approval_timestamp", "actors_registry_digest", "independence_and_eligibility_result", "provider_approval_and_check_reference"],
+      "properties": {
+        "reviewer_platform_identity": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "reviewer_kind": { "enum": ["human", "agent"] },
+        "approved_head_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+        "approval_timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?(?:Z|[+-][0-9]{2}:[0-9]{2})(?![\\s\\S])"
+        },
+        "actors_registry_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+        "independence_and_eligibility_result": { "const": "eligible-independent" },
+        "provider_approval_and_check_reference": { "type": "string", "minLength": 1, "maxLength": 1024 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["contract_version", "release", "repository", "base_sha", "source_sha", "merge_sha", "head_tree_sha", "merge_tree_sha", "as_of", "source_date_epoch", "profile", "base_url", "base_path", "promotion_durability", "artifacts", "tool_digest", "lock_digest", "accepted_check_receipt_digest", "ci", "mac_issue", "change_request", "change_delta", "approval"],
+  "properties": {
+    "contract_version": { "const": "0.1.0" },
+    "release": { "type": "string", "pattern": "^catalogue-[0-9]{8}\\.[1-9][0-9]*(?![\\s\\S])" },
+    "repository": {
+      "type": "object",
+      "required": ["provider", "host", "namespace", "name"],
+      "properties": {
+        "provider": { "enum": ["github", "gitlab"] },
+        "host": { "type": "string", "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?![\\s\\S])", "maxLength": 253 },
+        "namespace": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 }
+      },
+      "additionalProperties": false
+    },
+    "base_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "source_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "merge_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "head_tree_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "merge_tree_sha": { "$ref": "common.schema.json#/$defs/gitSha" },
+    "as_of": { "type": "string", "format": "date" },
+    "source_date_epoch": { "type": "integer", "minimum": 0 },
+    "profile": { "enum": ["synthetic", "private"] },
+    "base_url": { "$ref": "#/$defs/canonicalBaseUrl" },
+    "base_path": { "type": "string", "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~-]+/)*(?![\\s\\S])", "maxLength": 512 },
+    "promotion_durability": { "const": "fsync-durable" },
+    "artifacts": { "$ref": "#/$defs/artifactDigests" },
+    "tool_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "lock_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "accepted_check_receipt_digest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "ci": { "$ref": "#/$defs/ciResult" },
+    "mac_issue": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "change_request": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "change_delta": { "$ref": "#/$defs/changeDeltaList" },
+    "approval": { "$ref": "#/$defs/approval" }
+  },
+  "additionalProperties": false
+}

@@ -98,7 +98,7 @@ jobs:
           git -C proposed remote add origin "https://github.com/${REPOSITORY}.git"
           auth="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 -w0)"
           git -C proposed -c http.extraheader="AUTHORIZATION: basic ${auth}" \
-            fetch --no-tags --depth=1 origin "${HEAD_SHA}"
+            fetch --no-tags origin "${HEAD_SHA}"
           unset auth GH_TOKEN
           git -C proposed checkout --detach FETCH_HEAD
 
@@ -148,7 +148,7 @@ jobs:
           git -C trusted remote add origin "https://github.com/${REPOSITORY}.git"
           auth="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 -w0)"
           git -C trusted -c http.extraheader="AUTHORIZATION: basic ${auth}" \
-            fetch --no-tags --depth=1 origin "${BASE_SHA}"
+            fetch --no-tags origin "${BASE_SHA}"
           git -C trusted checkout --detach FETCH_HEAD
           git init validation
           git -C validation remote add origin "https://github.com/${REPOSITORY}.git"

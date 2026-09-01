@@ -1,0 +1,16 @@
+id: sha256-44fd7b3598e7f4100f27fd1ebdb5f2fd66f047670130fba2498180025cb0e960
+source:
+  type: official-vendor-documentation
+  uri: https://example.invalid/model-two
+retrieved_by: manual
+observed_at: "2026-08-01T00:00:00Z"
+scope: {}
+projection:
+  modelName: Atlas Vision
+  description: Synthetic multimodal model for evidence and comparison demonstrations.
+  capabilities: [chat, vision]
+  modalities: [image, text]
+  contextWindow: 1000000
+  licensing: open-weights
+  lifecycle: active
+visibility: public

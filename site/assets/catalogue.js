@@ -5,13 +5,14 @@ document.addEventListener("alpine:init", () => {
     query: "",
     filters: {},
     sort: "name-asc",
-    view: "table",
+    view: "grid",
     comparison: [],
     rows: [],
     filterButtons: [],
     searchMax: 200,
     compareMax: 4,
     viewStorageKey: "",
+    defaultView: "grid",
 
     init() {
       this.rows = [...this.$root.querySelectorAll("[data-catalogue-row]")].map((element, index) => ({ element, index }));
@@ -19,6 +20,7 @@ document.addEventListener("alpine:init", () => {
       this.searchMax = Number(this.$root.dataset.searchMax);
       this.compareMax = Number(this.$root.dataset.compareMax);
       this.viewStorageKey = this.$root.dataset.viewStorageKey;
+      this.defaultView = this.$root.dataset.defaultView === "table" ? "table" : "grid";
       this.readUrl();
       const form = this.$root.querySelector("[data-catalogue-filters]");
       form.addEventListener("submit", event => event.preventDefault());
@@ -56,7 +58,7 @@ document.addEventListener("alpine:init", () => {
         for (const value of [...this.filters[key]].sort()) url.searchParams.append(key, value);
       }
       if (this.sort !== "name-asc") url.searchParams.set("sort", this.sort);
-      if (this.view !== "table") url.searchParams.set("view", this.view);
+      if (this.view !== this.defaultView) url.searchParams.set("view", this.view);
       for (const key of this.comparison) url.searchParams.append("compare", key);
       window.history.replaceState(null, "", url);
     },
@@ -65,9 +67,10 @@ document.addEventListener("alpine:init", () => {
       const requested = parameters.get("view");
       if (requested === "grid" || requested === "table") return requested;
       try {
-        return window.localStorage.getItem(this.viewStorageKey) === "grid" ? "grid" : "table";
+        const stored = window.localStorage.getItem(this.viewStorageKey);
+        return stored === "grid" || stored === "table" ? stored : this.defaultView;
       } catch (_error) {
-        return "table";
+        return this.defaultView;
       }
     },
 
@@ -252,7 +255,7 @@ document.addEventListener("alpine:init", () => {
 
     comparisonBody(selected) {
       const body = document.createElement("tbody");
-      const fields = [["Identifier", "modelId"], ["Vendor", "vendor"], ["Capabilities", "compareCapabilities"], ["Modalities", "compareModalities"], ["Licence", "compareLicence"], ["Lifecycle", "compareLifecycle"]];
+      const fields = [["Identifier", "modelId"], ["Vendor", "vendor"], ["Context window", "compareContext"], ["Capabilities", "compareCapabilities"], ["Modalities", "compareModalities"], ["Licence", "compareLicence"], ["Lifecycle", "compareLifecycle"]];
       for (const [label, key] of fields) {
         const row = document.createElement("tr");
         const heading = document.createElement("th");

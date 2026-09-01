@@ -354,7 +354,10 @@ pretend that fixtures are current provider observations.
 The site progressively enhances its complete server-rendered catalogue with the
 exact locally vendored `@alpinejs/csp==3.16.3` runtime. The standard Alpine build
 is forbidden because its expression evaluation conflicts with Modelo's CSP;
-CDN, npm and `npx` runtime acquisition are also forbidden. The published Alpine
+CDN, npm and `npx` application-runtime acquisition are also forbidden. The
+presentation may load only the configured Inter and JetBrains Mono styles/fonts
+from the exact CSP-allowlisted Google Fonts origins; font responses are never
+catalogue or build inputs. The published Alpine
 and bundled Vue reactivity MIT notices and runtime digest are part of the
 deterministic fixed inventory.
 Enhancement supplies bounded search, multi-select facets, deterministic sorting,
@@ -362,8 +365,14 @@ result counts, table/grid views, allowlisted shareable URL state and comparison
 of two to four canonical models. Comparison never treats an offering as a model,
 never invents facts and uses only safe DOM construction and `textContent`.
 Only table/grid preference is eligible for local storage; an explicit URL value
-wins and unavailable storage falls back to table view. Explorer scripts load
+wins and unavailable storage falls back to the configured grid view. Explorer scripts load
 only on the catalogue route.
+
+The synthetic presentation is a product-quality demonstration rather than a
+minimal fixture dump: a shared responsive shell, guided landing journey,
+card-first explorer and structured model/offering/reference pages expose the
+governance model without changing any approval semantics. Synthetic model facts
+remain content-addressed evidence, never invented presentation copy.
 
 Each invocation exclusively creates `dist/.modelo-build.lock` or fails fast;
 it never waits. The lock contains a bounded, fsynced phase journal. Staging is

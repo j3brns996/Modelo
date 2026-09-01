@@ -26,6 +26,10 @@ The first demo verification exercises search, multi-select filters, sorting,
 result counts, table/grid persistence with URL precedence, a copied URL and
 two-model comparison with keyboard input. It also checks the published Alpine CSP runtime and third-party
 notices against their contract digests. These are UX checks, not catalogue approval.
+Presentation QA also records desktop and mobile shell/catalogue screenshots,
+confirms Google Fonts are the only remote presentation origins, verifies no
+horizontal overflow and checks that all record links remain available without
+JavaScript.
 
 ## Gate B — repository controls
 

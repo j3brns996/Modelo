@@ -107,6 +107,11 @@ toolchain:
 site:
   base_url: https://j3brns996.github.io/Modelo/
   base_path: /Modelo/
+  fonts:
+    families: [Inter, JetBrains Mono]
+    stylesheet_url: https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap
+    style_origin: https://fonts.googleapis.com
+    file_origin: https://fonts.gstatic.com
   routes:
     home: /
     catalogue: /catalogue/
@@ -136,6 +141,7 @@ site:
     search_max_length: 200
     comparison_max_models: 4
     view_storage_key: modelo.catalogue.view.v1
+    default_view: grid
   document_routes:
     human_specification: /docs/SPEC.md
     machine_contract: /docs/contract.yaml

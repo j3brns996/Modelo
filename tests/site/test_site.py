@@ -619,6 +619,10 @@ class FinalSiteTests(unittest.TestCase):
             self.assertNotIn(forbidden, javascript)
         base = (ROOT / "site/templates/base.html").read_text()
         self.assertIn("default-src 'none'", base)
+        self.assertIn("style-src 'self' $font_style_origin", base)
+        self.assertIn("font-src $font_file_origin", base)
+        self.assertIn("connect-src 'self' $font_style_origin $font_file_origin", base)
+        self.assertIn('href="$font_stylesheet_url"', base)
         self.assertIn('name="referrer" content="no-referrer"', base)
         runtime = (ROOT / "site/assets/vendor/alpine-csp-3.16.3.min.js").read_bytes()
         self.assertEqual(
@@ -629,6 +633,34 @@ class FinalSiteTests(unittest.TestCase):
         self.assertEqual(notices.count("MIT License"), 2)
         self.assertIn("Caleb Porzio and contributors", notices)
         self.assertIn("Yuxi (Evan) You", notices)
+
+    def test_product_shell_and_rich_synthetic_experience_contract(self) -> None:
+        site = build_final_site(self.request()).output / "site"
+        home = (site / "index.html").read_text(encoding="utf-8")
+        catalogue = (site / "catalogue/index.html").read_text(encoding="utf-8")
+        model = (site / "models/test-model/index.html").read_text(encoding="utf-8")
+        css = (site / "assets/site.css").read_text(encoding="utf-8")
+        for marker in (
+            "home-hero", "console-grid", "governance-flow", "history-summary", "start-panel",
+            "Explore the catalogue", "Availability is a fact. Approval is a decision.",
+        ):
+            self.assertIn(marker, home)
+        for page in site.rglob("*.html"):
+            rendered = page.read_text(encoding="utf-8")
+            self.assertIn('class="site-header"', rendered)
+            self.assertIn('class="site-footer"', rendered)
+            self.assertIn("fonts.googleapis.com", rendered)
+            self.assertIn("fonts.gstatic.com", rendered)
+        self.assertIn('data-default-view="grid"', catalogue)
+        self.assertIn('data-default-view="grid" data-view="grid"', catalogue)
+        self.assertIn('data-view="grid" aria-pressed="true"', catalogue)
+        for value in ("chat", "function-calling", "reasoning", "vision", "open-weights", "proprietary"):
+            self.assertIn(f'data-value="{value}"', catalogue)
+        self.assertIn("Atlas Reasoning", model)
+        self.assertIn("128,000", model)
+        self.assertIn("Intrinsic evidence", model)
+        for contract in ("@media (max-width: 880px)", "@media (max-width: 580px)", ".catalogue-row {", ".fact-grid"):
+            self.assertIn(contract, css)
 
     def test_progressive_explorer_contract_is_accessible_shareable_and_bounded(self) -> None:
         site = build_final_site(self.request()).output / "site"
@@ -645,6 +677,7 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn('data-search-max="200"', catalogue)
         self.assertIn('data-compare-max="4"', catalogue)
         self.assertIn('data-view-storage-key="modelo.catalogue.view.v1"', catalogue)
+        self.assertIn('data-default-view="grid"', catalogue)
         self.assertIn("slice(0, this.compareMax)", javascript)
         self.assertIn("this.comparison.length < this.compareMax", javascript)
         self.assertIn("window.history.replaceState", javascript)
@@ -653,7 +686,7 @@ class FinalSiteTests(unittest.TestCase):
         self.assertLess(javascript.index('parameters.get("view")'), javascript.index("window.localStorage.getItem"))
         self.assertIn("url.searchParams.append", javascript)
         self.assertIn("dataset.searchText", javascript)
-        self.assertIn('data-search-text="test-model|Test Model|test-vendor', catalogue)
+        self.assertIn('data-search-text="test-model|Atlas Reasoning|test-vendor', catalogue)
         self.assertIn("document.createElement", javascript)
         self.assertIn("textContent", javascript)
         self.assertLess(catalogue.index("/assets/catalogue.js"), catalogue.index("/assets/vendor/alpine-csp-3.16.3.min.js"))
@@ -665,10 +698,8 @@ class FinalSiteTests(unittest.TestCase):
     def test_search_facets_docs_evidence_footer_and_history_contract(self) -> None:
         site = build_final_site(self.request()).output / "site"
         catalogue = (site / "catalogue/index.html").read_text(encoding="utf-8")
-        for facet in ("kind", "vendor", "service", "source-region", "route-type", "condition"):
+        for facet in ("kind", "vendor", "service", "source-region", "route-type", "capability", "modality", "licence", "lifecycle", "condition"):
             self.assertIn(f'data-filter="{facet}"', catalogue)
-        for absent in ("capability", "modality", "licence", "lifecycle"):
-            self.assertNotIn(f'data-filter="{absent}"', catalogue)
         self.assertIn("data-catalogue-row", catalogue)
         model = (site / "models/test-model/index.html").read_text(encoding="utf-8")
         self.assertIn("Intrinsic evidence", model)

@@ -8,7 +8,7 @@ routes:
     model_binding:
       kind: foundation-model
       model_evidence:
-        id: sha256-3cc6bbaee52dff309202c8aed63c219a8277199cadafdbeeac3b0e2c91c746fb
+        id: sha256-eb62b8db82ebbb1aa293237c55540dcedf41188058d0e2548673346c60ba3750
         id_pointer: /modelId
         arn_pointer: /modelArn
         name_pointer: /modelName
@@ -18,5 +18,5 @@ condition_refs:
     version: 1
 evidence_refs:
   /routes/0/reference:
-    id: sha256-3cc6bbaee52dff309202c8aed63c219a8277199cadafdbeeac3b0e2c91c746fb
+    id: sha256-eb62b8db82ebbb1aa293237c55540dcedf41188058d0e2548673346c60ba3750
     projection_pointer: /modelId

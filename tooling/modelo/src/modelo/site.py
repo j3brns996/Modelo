@@ -140,7 +140,7 @@ def _entry(data: bytes, path: str = "") -> dict[str, Any]:
 
 
 class _Resolver:
-    def __init__(self, base_url: str, base_path: str, site_routes: Mapping[str, str], repository: Mapping[str, Any]) -> None:
+    def __init__(self, base_url: str, base_path: str, site_routes: Mapping[str, str], repository: Mapping[str, Any], fonts: Mapping[str, Any] | None = None) -> None:
         _safe_url(base_url, base_path)
         parsed = urlsplit(base_url)
         if parsed.path != base_path:
@@ -149,6 +149,7 @@ class _Resolver:
         self.base_path = base_path
         self.site_routes = dict(site_routes)
         self.repository = repository
+        self.fonts = dict(fonts or {})
         self._validate_routes()
 
     def _validate_routes(self) -> None:
@@ -348,28 +349,62 @@ def _history_html(history: Iterable[Mapping[str, Any]]) -> str:
     return '<div class="cards">' + "".join(items) + "</div>" if items else '<p class="muted">No catalogue changes are present in first-parent history.</p>'
 
 
-def _navigation(resolver: _Resolver) -> str:
-    labels = (("catalogue", "Catalogue"), ("changes", "Changes"), ("process", "Process"), ("propose", "Propose"), ("docs", "Docs"))
-    return "".join('<a href="' + escape(resolver.site(key), quote=True) + '">' + label + "</a>" for key, label in labels)
+def _history_summary_html(history: Iterable[Mapping[str, Any]]) -> str:
+    items = []
+    for entry in history:
+        items.append(
+            '<article class="history-card"><div><time datetime="' + escape(entry["date"], quote=True) + '">'
+            + escape(entry["date"]) + '</time><span>' + str(len(entry["changes"])) + ' changed paths</span></div><h3>'
+            + escape(entry["subject"]) + '</h3><a rel="noopener noreferrer" href="'
+            + escape(entry["url"], quote=True) + '"><code>' + escape(entry["sha"][:12])
+            + '</code><span aria-hidden="true">→</span></a></article>'
+        )
+    return '<div class="history-summary">' + "".join(items) + "</div>" if items else '<p class="muted">No catalogue changes are present in first-parent history.</p>'
+
+
+def _navigation(resolver: _Resolver, current: str) -> str:
+    labels = (
+        ("catalogue", "Explore"), ("process", "Governance"),
+        ("changes", "Changes"), ("propose", "Contribute"), ("docs", "Reference"),
+    )
+    return "".join(
+        '<a href="' + escape(resolver.site(key), quote=True) + '"'
+        + (' aria-current="page"' if key == current else "") + ">" + label + "</a>"
+        for key, label in labels
+    )
 
 
 def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, request: _SiteBuildRequest, name: str, title: str, content: str, route: str, route_values: Mapping[str, str] | None = None) -> bytes:
     base = _template(root, source, templates_path, "base")
+    try:
+        font_stylesheet = str(resolver.fonts["stylesheet_url"])
+        font_style_origin = str(resolver.fonts["style_origin"])
+        font_file_origin = str(resolver.fonts["file_origin"])
+    except KeyError as exc:
+        raise BuildError("configured site font contract is incomplete") from exc
     values = {
         "canonical_url": escape(resolver.canonical(route, **dict(route_values or {})), quote=True),
         "asset_css_url": escape(resolver.site("asset_css"), quote=True),
         "asset_third_party_notices_url": escape(resolver.site("asset_third_party_notices"), quote=True),
+        "font_stylesheet_url": escape(font_stylesheet, quote=True),
+        "font_style_origin": escape(font_style_origin, quote=True),
+        "font_file_origin": escape(font_file_origin, quote=True),
         "scripts": (
             '<script src="' + escape(resolver.site("asset_js"), quote=True) + '" defer></script>\n  '
             '<script src="' + escape(resolver.site("asset_alpine"), quote=True) + '" defer></script>'
             if name == "catalogue" else ""
         ),
-        "title": escape(title), "navigation": _navigation(resolver), "content": content,
+        "title": escape(title), "navigation": _navigation(resolver, route), "content": content,
+        "page_name": escape(name, quote=True),
         "home_url": escape(resolver.site("home"), quote=True),
+        "catalogue_url": escape(resolver.site("catalogue"), quote=True),
+        "process_url": escape(resolver.site("process"), quote=True),
+        "docs_url": escape(resolver.site("docs"), quote=True),
+        "repository_url": escape(str(resolver.repository["web_base"]), quote=True),
         "source_commit_url": escape(resolver.repository_url("commit", commit_sha=request.source_commit), quote=True),
         "status_banner": (
-            '<aside class="card" role="status"><strong>Synthetic demo.</strong> '
-            "This is test data, not an approved enterprise catalogue.</aside>"
+            '<aside class="status-banner" role="status"><span class="status-banner__dot" aria-hidden="true"></span><strong>Synthetic demo.</strong>'
+            "<span>This is test data, not an approved enterprise catalogue.</span></aside>"
             if request.kind == "demo" else ""
         ),
         "integration_label": (
@@ -388,7 +423,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     all_routes.update({key + "_data": value for key, value in document["site"]["data_routes"].items()})
     all_routes.update(document["site"]["asset_routes"])
     all_routes.update(document["site"]["document_routes"])
-    resolver = _Resolver(request.base_url, request.base_path, all_routes, document["repository"])
+    resolver = _Resolver(request.base_url, request.base_path, all_routes, document["repository"], document["site"]["fonts"])
     templates_path = document["paths"]["site_templates"]
     templates = {name: _template(root, request.source_commit, templates_path, name) for name in ("home", "catalogue", "model", "offering", "changes", "process", "propose", "docs", "404")}
     evidence = {item["id"]: item for item in catalogue["evidence"]}
@@ -396,8 +431,23 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     for item in catalogue["offerings"]:
         offerings_by_model.setdefault(item["model_id"], []).append(item)
     history = _history(root, request.integration_commit, document["publication"]["profiles"][request.profile]["source"], resolver)
-    summary = '<div class="cards"><section class="card"><strong>' + str(len(catalogue["models"])) + '</strong><br>Models</section><section class="card"><strong>' + str(len(catalogue["offerings"])) + "</strong><br>Offerings</section></div>"
-    home_content = _substitute(templates["home"], {"summary": summary, "recent_changes": _history_html(history[:3])}, "home")
+    metrics = (
+        ("Models", len(catalogue["models"])), ("Offerings", len(catalogue["offerings"])),
+        ("Evidence", len(catalogue["evidence"])), ("Conditions", len(catalogue["conditions"])),
+    )
+    summary = '<div class="console-grid">' + "".join(
+        '<div><span>' + label + '</span><strong>' + str(value) + "</strong></div>"
+        for label, value in metrics
+    ) + "</div><div class=\"console-foot\"><span>profile</span><code>" + escape(request.profile) + "</code><span>as_of</span><code>" + request.as_of.isoformat() + "</code></div>"
+    governance_flow = '<ol class="governance-flow"><li><span>01</span><strong>Observe</strong><p>Read provider facts without changing approval.</p></li><li><span>02</span><strong>Evidence</strong><p>Retain a bounded, content-addressed projection.</p></li><li><span>03</span><strong>Review</strong><p>Validate the exact Git head and independent decision.</p></li><li><span>04</span><strong>Publish</strong><p>Serve one deterministic, immutable static view.</p></li></ol>'
+    home_content = _substitute(templates["home"], {
+        "summary": summary, "governance_flow": governance_flow,
+        "recent_changes": _history_summary_html(history[:3]),
+        "catalogue_url": escape(resolver.site("catalogue"), quote=True),
+        "process_url": escape(resolver.site("process"), quote=True),
+        "propose_url": escape(resolver.site("propose"), quote=True),
+        "docs_url": escape(resolver.site("docs"), quote=True),
+    }, "home")
     rows = []
     def attributes(values: Mapping[str, Iterable[Any] | Any]) -> str:
         parts = []
@@ -417,21 +467,23 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
             "model-name": model_name, "model-url": model_url,
             "compare-capabilities": ", ".join(model.get("capabilities", [])),
             "compare-modalities": ", ".join(model.get("modalities", [])),
+            "compare-context": model.get("context_window", ""),
             "compare-licence": model.get("licensing", ""),
             "compare-lifecycle": model.get("lifecycle", ""),
         })
         rows.append(
-            '<tr data-catalogue-row' + attrs + '><td data-label="Kind">Model</td><td data-label="Name"><a href="'
-            + escape(model_url, quote=True) + '">' + escape(model_name) + '</a></td><td data-label="Owner/service">'
-            + escape(model.get("vendor_id", "")) + '</td><td data-label="Capabilities/Source Regions">'
+            '<tr class="catalogue-row catalogue-row--model" data-catalogue-row' + attrs + '><td class="catalogue-kind" data-label="Kind"><span>Model</span></td><td class="catalogue-primary" data-label="Name"><a href="'
+            + escape(model_url, quote=True) + '">' + escape(model_name) + '</a><code>' + escape(model["id"]) + '</code></td><td class="catalogue-owner" data-label="Vendor">'
+            + escape(model.get("vendor_id", "")) + '</td><td class="catalogue-signals" data-label="Capabilities">'
             + _tags(model.get("capabilities", []))
-            + '</td><td data-label="Action"><button class="button" type="button" data-compare-toggle '
+            + ('<span class="context-stat"><small>Context</small><strong>' + f'{model["context_window"]:,}' + "</strong></span>" if model.get("context_window") else "")
+            + '</td><td class="catalogue-action" data-label="Action"><button class="button button--small" type="button" data-compare-toggle '
             + 'x-on:click="toggleComparison" aria-pressed="false" hidden>Compare</button></td></tr>'
         )
     for offering in catalogue["offerings"]:
         model = next(item for item in catalogue["models"] if item["id"] == offering["model_id"])
         attrs = attributes({"key": f'offering:{offering["inference_service_id"]}:{offering["id"]}', "name": offering["id"], "kind": "offering", "search-text": [offering["id"], offering["model_id"], model.get("vendor_id", ""), offering["inference_service_id"], *[route["source_region"] for route in offering["routes"]], *[route["model_binding"]["kind"] for route in offering["routes"]], *model.get("capabilities", []), *model.get("modalities", []), *[item["id"] for item in offering.get("condition_refs", [])]], "vendor": model.get("vendor_id", ""), "service": offering["inference_service_id"], "source-region": [route["source_region"] for route in offering["routes"]], "route-type": [route["model_binding"]["kind"] for route in offering["routes"]], "capability": model.get("capabilities", []), "modality": model.get("modalities", []), "licence": model.get("licensing", ""), "lifecycle": model.get("lifecycle", ""), "condition": [item["id"] for item in offering.get("condition_refs", [])]})
-        rows.append('<tr data-catalogue-row' + attrs + '><td data-label="Kind">Offering</td><td data-label="Name"><a href="' + escape(resolver.site("offering", inference_service_id=offering["inference_service_id"], offering_id=offering["id"]), quote=True) + '">' + escape(offering["id"]) + '</a></td><td data-label="Owner/service">' + escape(offering["inference_service_id"]) + '</td><td data-label="Capabilities/Source Regions">' + _tags(route["source_region"] for route in offering["routes"]) + '</td><td data-label="Action"><span class="muted">—</span></td></tr>')
+        rows.append('<tr class="catalogue-row catalogue-row--offering" data-catalogue-row' + attrs + '><td class="catalogue-kind" data-label="Kind"><span>Offering</span></td><td class="catalogue-primary" data-label="Name"><a href="' + escape(resolver.site("offering", inference_service_id=offering["inference_service_id"], offering_id=offering["id"]), quote=True) + '">' + escape(offering["id"]) + '</a><code>' + escape(offering["model_id"]) + '</code></td><td class="catalogue-owner" data-label="Service">' + escape(offering["inference_service_id"]) + '</td><td class="catalogue-signals" data-label="Source regions">' + _tags(route["source_region"] for route in offering["routes"]) + '</td><td class="catalogue-action" data-label="Action"><span class="muted">View route →</span></td></tr>')
     filter_fields = (
         ("kind", "Type", "basic"), ("vendor", "Vendor", "basic"),
         ("service", "Service", "basic"), ("source-region", "Source Region", "basic"),
@@ -469,15 +521,18 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         "search_max_length": str(enhancement["search_max_length"]),
         "comparison_max_models": str(enhancement["comparison_max_models"]),
         "view_storage_key": escape(enhancement["view_storage_key"], quote=True),
-        "catalogue_rows": '<table data-catalogue-table><caption>' + caption + '</caption><thead><tr><th>Kind</th><th>Name</th><th>Owner/service</th><th>Capabilities/Source Regions</th><th>Action</th></tr></thead><tbody data-catalogue-body>' + "".join(rows) + "</tbody></table>",
+        "default_view": escape(enhancement["default_view"], quote=True),
+        "table_view_pressed": "true" if enhancement["default_view"] == "table" else "false",
+        "grid_view_pressed": "true" if enhancement["default_view"] == "grid" else "false",
+        "catalogue_rows": '<table data-catalogue-table><caption>' + caption + '</caption><thead><tr><th>Kind</th><th>Name</th><th>Owner/service</th><th>Signals</th><th>Action</th></tr></thead><tbody data-catalogue-body>' + "".join(rows) + "</tbody></table>",
     }, "catalogue")
     history_content = _substitute(templates["changes"], {"history": _history_html(history)}, "changes")
     content_path = document["paths"]["site_content"]
     process_content = _substitute(templates["process"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/process.md"))}, "process")
     intake = document["repository"]["web_routes"]["mac_intake"]
-    intake_links = "".join('<li><a rel="noopener noreferrer" href="' + escape(str(document["repository"]["web_base"]).rstrip("/") + intake[key], quote=True) + '">' + escape(key.title()) + " request</a></li>" for key in ("add", "change", "revoke", "move", "batch"))
+    intake_links = "".join('<a class="intake-card" rel="noopener noreferrer" href="' + escape(str(document["repository"]["web_base"]).rstrip("/") + intake[key], quote=True) + '"><span>' + escape(key.title()) + '</span><small>Open governed request</small><b aria-hidden="true">→</b></a>' for key in ("add", "change", "revoke", "move", "batch"))
     propose_content = _substitute(templates["propose"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/propose.md")), "intake_links": intake_links}, "propose")
-    docs_links = '<ul><li><a href="' + escape(resolver.site("human_specification"), quote=True) + '">Human specification</a></li><li><a href="' + escape(resolver.site("machine_contract"), quote=True) + '">Machine contract</a></li><li><a href="' + escape(resolver.site("schemas_data") + "model.schema.json", quote=True) + '">Model schema</a></li><li><a href="' + escape(resolver.site("schemas_data") + "offering.schema.json", quote=True) + '">Offering schema</a></li></ul><pre><code>git clone ' + escape(str(document["repository"]["web_base"]) + ".git") + "</code></pre>"
+    docs_links = '<div class="reference-grid"><a href="' + escape(resolver.site("human_specification"), quote=True) + '"><strong>Human specification</strong><span>Rationale and invariants</span></a><a href="' + escape(resolver.site("machine_contract"), quote=True) + '"><strong>Machine contract</strong><span>Compact executable context</span></a><a href="' + escape(resolver.site("schemas_data") + "model.schema.json", quote=True) + '"><strong>Model schema</strong><span>Canonical model shape</span></a><a href="' + escape(resolver.site("schemas_data") + "offering.schema.json", quote=True) + '"><strong>Offering schema</strong><span>Consumption approval shape</span></a></div><div class="clone-command"><span>Clean clone</span><code>git clone ' + escape(str(document["repository"]["web_base"]) + ".git") + "</code></div>"
     docs_content = _substitute(templates["docs"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/docs.md")), "documentation_links": docs_links}, "docs")
     not_found_content = _substitute(templates["404"], {"home_url": escape(resolver.site("home"), quote=True)}, "404")
     page_specs = {
@@ -492,21 +547,27 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     files = {path: _page(root, request.source_commit, templates_path, resolver, request, name, title, content, route) for path, (name, title, content, route) in page_specs.items()}
     for model in catalogue["models"]:
         model_refs = sorted({reference["id"] for reference in model.get("evidence_refs", {}).values()})
-        facts = '<dl><dt>Identifier</dt><dd><code>' + escape(model["id"]) + "</code></dd><dt>Vendor</dt><dd>" + escape(model.get("vendor_id", "")) + "</dd><dt>Capabilities</dt><dd>" + _tags(model.get("capabilities", [])) + "</dd><dt>Modalities</dt><dd>" + _tags(model.get("modalities", [])) + "</dd><dt>Intrinsic evidence</dt><dd>" + (_tags(model_refs) or "None") + "</dd></dl>"
-        links = "".join('<li><a href="' + escape(resolver.site("offering", inference_service_id=o["inference_service_id"], offering_id=o["id"]), quote=True) + '">' + escape(o["id"]) + "</a></li>" for o in offerings_by_model.get(model["id"], [])) or "<li>None</li>"
-        content = _substitute(templates["model"], {"model_name": escape(model.get("name", model["id"])), "model_description": escape(model.get("description", "No description published.")), "model_facts": facts, "offering_links": "<ul>" + links + "</ul>"}, "model")
+        facts = '<dl class="fact-grid"><div><dt>Identifier</dt><dd><code>' + escape(model["id"]) + "</code></dd></div><div><dt>Vendor</dt><dd>" + escape(model.get("vendor_id", "")) + "</dd></div><div><dt>Context window</dt><dd>" + (f'{model["context_window"]:,}' if model.get("context_window") else "Not stated") + "</dd></div><div><dt>Licence</dt><dd>" + escape(model.get("licensing", "Not stated")) + "</dd></div><div><dt>Capabilities</dt><dd>" + (_tags(model.get("capabilities", [])) or "Not stated") + "</dd></div><div><dt>Modalities</dt><dd>" + (_tags(model.get("modalities", [])) or "Not stated") + "</dd></div></dl>"
+        links = "".join('<a class="related-card" href="' + escape(resolver.site("offering", inference_service_id=o["inference_service_id"], offering_id=o["id"]), quote=True) + '"><span><strong>' + escape(o["id"]) + '</strong><small>' + escape(o["inference_service_id"]) + '</small></span><b aria-hidden="true">→</b></a>' for o in offerings_by_model.get(model["id"], [])) or '<p class="empty-state">No approved offering is published for this model.</p>'
+        content = _substitute(templates["model"], {
+            "model_name": escape(model.get("name", model["id"])),
+            "model_description": escape(model.get("description", "No description published.")),
+            "model_facts": facts, "offering_links": '<div class="related-grid">' + links + "</div>",
+            "model_status": '<span class="status-pill status-pill--' + escape(model.get("lifecycle", "unknown"), quote=True) + '">' + escape(model.get("lifecycle", "Unspecified").title()) + "</span>",
+            "evidence_summary": '<p class="evidence-count"><strong>' + str(len(model_refs)) + '</strong><span>bound fact references</span></p><p>Every externally sourced field links to a content-addressed evidence projection.</p><div class="evidence-ids">' + (_tags(model_refs) or "None") + "</div>",
+        }, "model")
         files[resolver.output_path("model", model_id=model["id"])] = _page(root, request.source_commit, templates_path, resolver, request, "model", model.get("name", model["id"]), content, "model", {"model_id": model["id"]})
     releases_url = str(document["repository"]["web_base"]).rstrip("/") + document["repository"]["web_routes"]["releases"]
     for offering in catalogue["offerings"]:
         if request.kind == "final":
-            approval = '<section class="card"><h2>Approval coordinates</h2><dl><dt>Accepted source</dt><dd><code>' + escape(request.source_commit) + '</code></dd><dt>Accepted tree</dt><dd><code>' + escape(request.source_tree) + '</code></dd><dt>Merge commit</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True) + '"><code>' + escape(request.integration_commit) + '</code></a></dd></dl><p><a rel="noopener noreferrer" href="' + escape(releases_url, quote=True) + '">Discover protected releases and detached receipts</a>. No approval receipt is embedded in this site.</p></section>'
+            approval = '<section class="coordinate-card"><span class="status-pill">Approved</span><h2>Approval coordinates</h2><dl><dt>Accepted source</dt><dd><code>' + escape(request.source_commit[:12]) + '</code></dd><dt>Accepted tree</dt><dd><code>' + escape(request.source_tree[:12]) + '</code></dd><dt>Merge</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True) + '"><code>' + escape(request.integration_commit[:12]) + '</code></a></dd></dl><p><a rel="noopener noreferrer" href="' + escape(releases_url, quote=True) + '">Find release receipts</a></p></section>'
         elif request.kind == "validation":
-            approval = '<section class="card"><h2>Validation coordinates</h2><dl><dt>Proposed source</dt><dd><code>' + escape(request.source_commit) + '</code></dd><dt>Proposed tree</dt><dd><code>' + escape(request.source_tree) + '</code></dd><dt>Validation integration</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True) + '"><code>' + escape(request.integration_commit) + '</code></a></dd></dl><p>This validation publication is not approval and is never deployed as the catalogue.</p></section>'
+            approval = '<section class="coordinate-card"><span class="status-pill status-pill--validation">Validation</span><h2>Validation coordinates</h2><dl><dt>Source</dt><dd><code>' + escape(request.source_commit[:12]) + '</code></dd><dt>Tree</dt><dd><code>' + escape(request.source_tree[:12]) + '</code></dd><dt>Integration</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True) + '"><code>' + escape(request.integration_commit[:12]) + '</code></a></dd></dl><p>Validation is not approval.</p></section>'
         else:
-            approval = '<section class="card"><h2>Demo provenance</h2><dl><dt>Source commit</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.source_commit), quote=True) + '"><code>' + escape(request.source_commit) + '</code></a></dd><dt>Source tree</dt><dd><code>' + escape(request.source_tree) + '</code></dd></dl><p>Synthetic fixture only. This record is not approved for enterprise use.</p></section>'
+            approval = '<section class="coordinate-card"><span class="status-pill status-pill--synthetic">Synthetic</span><h2>Demo provenance</h2><dl><dt>Source</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.source_commit), quote=True) + '"><code>' + escape(request.source_commit[:12]) + '</code></a></dd><dt>Tree</dt><dd><code>' + escape(request.source_tree[:12]) + '</code></dd></dl><p>Synthetic fixture only, not approved for enterprise use.</p></section>'
         refs = sorted({reference["id"] for reference in offering.get("evidence_refs", {}).values()})
         conditions = [f'{item["id"]}@{item["version"]}' for item in offering.get("condition_refs", [])]
-        content = _substitute(templates["offering"], {"offering_name": escape(offering["id"]), "approval": approval, "route_table": _route_rows(offering, evidence), "pricing_table": _pricing_rows(offering), "conditions_evidence": "<p>Conditions: " + (_tags(conditions) or "None") + "</p><p>Evidence: " + (_tags(refs) or "None") + "</p>"}, "offering")
+        content = _substitute(templates["offering"], {"offering_name": escape(offering["id"]), "approval": approval, "route_table": _route_rows(offering, evidence), "pricing_table": _pricing_rows(offering), "conditions_evidence": '<dl class="fact-grid"><div><dt>Conditions</dt><dd>' + (_tags(conditions) or "None") + '</dd></div><div><dt>Evidence</dt><dd>' + (_tags(refs) or "None") + "</dd></div></dl>"}, "offering")
         path = resolver.output_path("offering", inference_service_id=offering["inference_service_id"], offering_id=offering["id"])
         files[path] = _page(root, request.source_commit, templates_path, resolver, request, "offering", offering["id"], content, "offering", {"inference_service_id": offering["inference_service_id"], "offering_id": offering["id"]})
     files[resolver.output_path("asset_css")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/site.css")

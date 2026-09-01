@@ -1,0 +1,16 @@
+id: sha256-9894804c8ec29b03f4405976c79554bd3e7c427c82d632e0f12ccb5f87a13108
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-cohere-embed-v4.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Embed v4"
+  providerName: "Cohere"
+  description: "A unified embedding model for text, images and mixed-content retrieval."
+  capabilities: [embeddings]
+  modalities: [embedding, image, text]
+  contextWindow: 128000
+  lifecycle: active
+visibility: public

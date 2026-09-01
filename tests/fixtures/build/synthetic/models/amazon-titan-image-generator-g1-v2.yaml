@@ -1,0 +1,14 @@
+id: amazon-titan-image-generator-g1-v2
+vendor_id: amazon
+name: "Titan Image Generator G1 v2"
+description: "An image generation and editing model with built-in watermarking."
+capabilities: [image-generation]
+modalities: [image, text]
+lifecycle: legacy
+evidence_refs:
+  /name: {id: sha256-7135df0341f4f4d2114e55e49a5c6009722594a056c030ebfe04b5725bad9e30, projection_pointer: /modelName}
+  /description: {id: sha256-7135df0341f4f4d2114e55e49a5c6009722594a056c030ebfe04b5725bad9e30, projection_pointer: /description}
+  /capabilities/0: {id: sha256-7135df0341f4f4d2114e55e49a5c6009722594a056c030ebfe04b5725bad9e30, projection_pointer: /capabilities/0}
+  /modalities/0: {id: sha256-7135df0341f4f4d2114e55e49a5c6009722594a056c030ebfe04b5725bad9e30, projection_pointer: /modalities/0}
+  /modalities/1: {id: sha256-7135df0341f4f4d2114e55e49a5c6009722594a056c030ebfe04b5725bad9e30, projection_pointer: /modalities/1}
+  /lifecycle: {id: sha256-7135df0341f4f4d2114e55e49a5c6009722594a056c030ebfe04b5725bad9e30, projection_pointer: /lifecycle}

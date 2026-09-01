@@ -111,15 +111,37 @@ function record(index, { key, name, kind, search, facets = {} }) {
   assert.equal(explorer.matches(model), false, "control labels must not enter semantic search");
 }
 
+// Alpine debounce may clear currentTarget before invoking the handler.
+{
+  const explorer = component();
+  explorer.apply = () => {};
+  explorer.searchChanged({ target: { value: "  Nova Micro  " }, currentTarget: null });
+  assert.equal(explorer.query, "nova micro");
+}
+
+// Offerings live in the complete table, so selecting that filter changes view.
+{
+  const explorer = component();
+  explorer.filters = { kind: [] };
+  explorer.view = "grid";
+  explorer.apply = () => {};
+  explorer.writeViewPreference = () => {};
+  explorer.toggleFilter({ currentTarget: { dataset: { filter: "kind", value: "offering" } } });
+  assert.equal(explorer.view, "table");
+  assert.deepEqual(explorer.filters.kind, ["offering"]);
+}
+
 // Deterministic sort and visibility application use the actual controller.
 {
   const explorer = component();
   const alpha = record(1, { key: "model:alpha", name: "Alpha 2", kind: "model", search: "alpha" });
   const beta = record(0, { key: "offering:beta", name: "Beta 10", kind: "offering", search: "beta" });
   const body = new FakeElement();
+  const grid = new FakeElement();
   const result = new FakeElement();
   const empty = new FakeElement();
   explorer.rows = [beta, alpha];
+  explorer.cards = [alpha];
   explorer.filters = {};
   explorer.query = "alpha";
   explorer.sort = "name-asc";
@@ -130,17 +152,16 @@ function record(index, { key, name, kind, search, facets = {} }) {
   explorer.$root = {
     dataset: {},
     querySelector(selector) {
-      return { "[data-catalogue-body]": body, "[data-result-count]": result, "[data-no-results]": empty }[selector];
+      return { "[data-catalogue-body]": body, "[data-catalogue-grid]": grid, "[data-result-count]": result, "[data-no-results]": empty }[selector];
     },
     querySelectorAll() {
       return [];
     },
   };
   explorer.apply(false);
-  assert.deepEqual(body.children, [alpha.element, beta.element]);
+  assert.deepEqual(grid.children, [alpha.element]);
   assert.equal(alpha.element.hidden, false);
-  assert.equal(beta.element.hidden, true);
-  assert.equal(result.textContent, "Showing 1 of 2 records");
+  assert.equal(result.textContent, "Showing 1 of 1 model");
   assert.equal(explorer.$root.dataset.view, "grid");
 }
 

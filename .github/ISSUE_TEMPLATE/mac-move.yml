@@ -1,16 +1,22 @@
-name: "MAC: move"
-description: Propose atomic add-destination and revoke-source for one offering identity change.
-title: "MAC move: "
+name: "Request: replace an offering identity"
+description: "Ask to add a destination offering and withdraw its source atomically."
+title: "Move offering: "
 body:
   - type: markdown
     attributes:
       value: |
-        Paste a complete `schemas/mac.schema.json` payload. In v0.1 a move has exactly one source and one destination offering; a Git rename is insufficient.
+        ## Replace an offering identity
+
+        Use this when an offering's stable identity or governed path must change.
+
+        **Before you start:** A file rename is not enough. Modelo records this as one destination add and one source withdrawal so history remains honest.
+
+        **What happens next:** the submitted JSON is validated against Modelo's change contract. A reviewed pull request and successful exact-head CI are still required before anything can be approved.
   - type: textarea
     id: mac_payload
     attributes:
-      label: Neutral MAC payload
-      description: The operation must be `move`; subject identities use lowercase ASCII canonical IDs; generate both hashes from the canonical payload.
+      label: Change details (JSON)
+      description: The operation must be `move`. Include exactly one source offering and one destination offering, plus the reason and acceptance checks for both sides.
       render: json
       placeholder: |
         { "schema_version": "0.1", "operation": "move", "replace": "with a complete schema-valid payload" }
@@ -19,17 +25,17 @@ body:
   - type: input
     id: payload_digest
     attributes:
-      label: Neutral payload digest
-      description: SHA-256 of the complete canonical payload, including its two validated keys.
+      label: Change fingerprint
+      description: Paste the generated SHA-256 fingerprint for the complete canonical JSON above.
       placeholder: sha256-...
     validations:
       required: true
   - type: checkboxes
     id: assertions
     attributes:
-      label: Assertions
+      label: Final checks
       options:
-        - label: The destination add and source revoke are one atomic proposal.
+        - label: The destination add and source withdrawal form one atomic request.
           required: true
         - label: I have not included credentials, tokens or private commercial terms.
           required: true

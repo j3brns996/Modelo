@@ -8,6 +8,7 @@ document.addEventListener("alpine:init", () => {
     view: "grid",
     comparison: [],
     rows: [],
+    cards: [],
     filterButtons: [],
     searchMax: 200,
     compareMax: 4,
@@ -16,6 +17,7 @@ document.addEventListener("alpine:init", () => {
 
     init() {
       this.rows = [...this.$root.querySelectorAll("[data-catalogue-row]")].map((element, index) => ({ element, index }));
+      this.cards = [...this.$root.querySelectorAll("[data-catalogue-card]")].map((element, index) => ({ element, index }));
       this.filterButtons = [...this.$root.querySelectorAll("[data-filter][data-value]")];
       this.searchMax = Number(this.$root.dataset.searchMax);
       this.compareMax = Number(this.$root.dataset.compareMax);
@@ -45,7 +47,7 @@ document.addEventListener("alpine:init", () => {
       this.sort = allowedSorts.has(requestedSort) ? requestedSort : "name-asc";
       this.$root.querySelector("[data-sort]").value = this.sort;
       this.view = this.readViewPreference(parameters);
-      const modelKeys = new Set(this.rows.filter(row => row.element.dataset.kind === "model").map(row => row.element.dataset.key));
+      const modelKeys = new Set(this.cards.map(card => card.element.dataset.key));
       this.comparison = [...new Set(parameters.getAll("compare"))].filter(key => modelKeys.has(key)).slice(0, this.compareMax);
     },
 
@@ -83,7 +85,7 @@ document.addEventListener("alpine:init", () => {
     },
 
     searchChanged(event) {
-      this.query = event.currentTarget.value.toLocaleLowerCase("en-GB").trim().slice(0, this.searchMax);
+      this.query = event.target.value.toLocaleLowerCase("en-GB").trim().slice(0, this.searchMax);
       this.apply();
     },
 
@@ -94,6 +96,10 @@ document.addEventListener("alpine:init", () => {
       const selected = new Set(this.filters[key] || []);
       selected.has(value) ? selected.delete(value) : selected.add(value);
       this.filters[key] = [...selected];
+      if (key === "kind" && value === "offering" && selected.has(value) && this.view === "grid") {
+        this.view = "table";
+        this.writeViewPreference();
+      }
       this.apply();
     },
 
@@ -148,15 +154,19 @@ document.addEventListener("alpine:init", () => {
 
     apply(write = true) {
       const body = this.$root.querySelector("[data-catalogue-body]");
-      const ordered = [...this.rows].sort((left, right) => this.compareRows(left, right));
+      const grid = this.$root.querySelector("[data-catalogue-grid]");
+      const items = this.view === "grid" ? this.cards : this.rows;
+      const ordered = [...items].sort((left, right) => this.compareRows(left, right));
       let visible = 0;
+      for (const item of this.rows) item.element.hidden = this.view === "table" ? !this.matches(item) : false;
+      for (const item of this.cards) item.element.hidden = this.view === "grid" ? !this.matches(item) : false;
       for (const row of ordered) {
-        row.element.hidden = !this.matches(row);
         if (!row.element.hidden) visible += 1;
-        body.append(row.element);
+        (this.view === "grid" ? grid : body).append(row.element);
       }
-      const total = this.rows.length;
-      this.$root.querySelector("[data-result-count]").textContent = `Showing ${visible} of ${total} ${total === 1 ? "record" : "records"}`;
+      const total = items.length;
+      const noun = this.view === "grid" ? (total === 1 ? "model" : "models") : (total === 1 ? "record" : "records");
+      this.$root.querySelector("[data-result-count]").textContent = `Showing ${visible} of ${total} ${noun}`;
       this.$root.querySelector("[data-no-results]").hidden = visible !== 0;
       this.$root.dataset.view = this.view;
       for (const button of this.$root.querySelectorAll("[data-view]")) button.setAttribute("aria-pressed", String(button.dataset.view === this.view));
@@ -194,7 +204,7 @@ document.addEventListener("alpine:init", () => {
     },
 
     toggleComparison(event) {
-      const key = event.currentTarget.closest("[data-catalogue-row]").dataset.key;
+      const key = event.currentTarget.closest("[data-catalogue-item]").dataset.key;
       if (this.comparison.includes(key)) {
         this.comparison = this.comparison.filter(item => item !== key);
       } else if (this.comparison.length < this.compareMax) {
@@ -209,7 +219,7 @@ document.addEventListener("alpine:init", () => {
 
     updateComparison() {
       for (const button of this.$root.querySelectorAll("[data-compare-toggle]")) {
-        const key = button.closest("[data-catalogue-row]").dataset.key;
+        const key = button.closest("[data-catalogue-item]").dataset.key;
         const selected = this.comparison.includes(key);
         button.setAttribute("aria-pressed", String(selected));
         button.textContent = selected ? "Selected" : "Compare";
@@ -223,7 +233,7 @@ document.addEventListener("alpine:init", () => {
 
     openComparison() {
       if (this.comparison.length < 2) return;
-      const selected = this.comparison.map(key => this.rows.find(row => row.element.dataset.key === key).element);
+      const selected = this.comparison.map(key => this.cards.find(card => card.element.dataset.key === key).element);
       const table = document.createElement("table");
       table.className = "comparison-table";
       table.append(this.comparisonHead(selected), this.comparisonBody(selected));

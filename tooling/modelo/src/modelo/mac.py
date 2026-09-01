@@ -459,10 +459,10 @@ def extract_adapter_issue_payload(body: str, adapter: Adapter) -> dict[str, Any]
     _bounded_body(body)
     if adapter == "github":
         payload_matches = re.findall(
-            r"(?ms)^### Neutral MAC payload\n\n```json\n([\s\S]*?)\n```(?:\n|$)", body
+            r"(?ms)^### (?:Neutral MAC payload|Change details \(JSON\))\n\n```json\n([\s\S]*?)\n```(?:\n|$)", body
         )
         digest_matches = re.findall(
-            r"(?m)^### Neutral payload digest\n\n(sha256-[0-9a-f]{64})$", body
+            r"(?m)^### (?:Neutral payload digest|Change fingerprint)\n\n(sha256-[0-9a-f]{64})$", body
         )
     elif adapter == "gitlab":
         payload_matches = re.findall(r"(?ms)^```json\n([\s\S]*?)\n```(?:\n|$)", body)

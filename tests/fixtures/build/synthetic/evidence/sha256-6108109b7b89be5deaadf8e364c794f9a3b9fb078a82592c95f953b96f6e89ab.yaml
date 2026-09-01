@@ -1,0 +1,16 @@
+id: sha256-6108109b7b89be5deaadf8e364c794f9a3b9fb078a82592c95f953b96f6e89ab
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-premier.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Nova Premier"
+  providerName: "Amazon"
+  description: "A multimodal model for complex reasoning, agent workflows and distillation."
+  capabilities: [chat, reasoning]
+  modalities: [image, text, video]
+  contextWindow: 1000000
+  lifecycle: legacy
+visibility: public

@@ -1,6 +1,7 @@
 id: test-offering
 inference_service_id: aws-bedrock
 model_id: test-model
+approval_rationale: Approved for synthetic integration testing of the governed catalogue and route presentation.
 routes:
   - id: london-direct
     source_region: eu-west-2
@@ -8,7 +9,7 @@ routes:
     model_binding:
       kind: foundation-model
       model_evidence:
-        id: sha256-eb62b8db82ebbb1aa293237c55540dcedf41188058d0e2548673346c60ba3750
+        id: sha256-e5d79edf1a0f8d61c3ea1e0d7b113da9ef7ac1be52dd38881a54621ca98dd837
         id_pointer: /modelId
         arn_pointer: /modelArn
         name_pointer: /modelName
@@ -18,5 +19,5 @@ condition_refs:
     version: 1
 evidence_refs:
   /routes/0/reference:
-    id: sha256-eb62b8db82ebbb1aa293237c55540dcedf41188058d0e2548673346c60ba3750
+    id: sha256-e5d79edf1a0f8d61c3ea1e0d7b113da9ef7ac1be52dd38881a54621ca98dd837
     projection_pointer: /modelId

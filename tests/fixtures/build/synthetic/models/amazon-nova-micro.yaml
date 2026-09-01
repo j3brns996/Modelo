@@ -1,0 +1,16 @@
+id: amazon-nova-micro
+vendor_id: amazon
+name: "Nova Micro"
+description: "A fast text model for summarisation, translation and classification."
+capabilities: [chat, text-generation]
+modalities: [text]
+context_window: 128000
+lifecycle: active
+evidence_refs:
+  /name: {id: sha256-290cae070b5422ec73fbaa06a4f5c031ac5d0f6490f3479212d319da896fbd90, projection_pointer: /modelName}
+  /description: {id: sha256-290cae070b5422ec73fbaa06a4f5c031ac5d0f6490f3479212d319da896fbd90, projection_pointer: /description}
+  /capabilities/0: {id: sha256-290cae070b5422ec73fbaa06a4f5c031ac5d0f6490f3479212d319da896fbd90, projection_pointer: /capabilities/0}
+  /capabilities/1: {id: sha256-290cae070b5422ec73fbaa06a4f5c031ac5d0f6490f3479212d319da896fbd90, projection_pointer: /capabilities/1}
+  /modalities/0: {id: sha256-290cae070b5422ec73fbaa06a4f5c031ac5d0f6490f3479212d319da896fbd90, projection_pointer: /modalities/0}
+  /context_window: {id: sha256-290cae070b5422ec73fbaa06a4f5c031ac5d0f6490f3479212d319da896fbd90, projection_pointer: /contextWindow}
+  /lifecycle: {id: sha256-290cae070b5422ec73fbaa06a4f5c031ac5d0f6490f3479212d319da896fbd90, projection_pointer: /lifecycle}

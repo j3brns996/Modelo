@@ -22,7 +22,10 @@
     "request_id": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f-]{36}(?![\\s\\S])" },
     "operation": { "enum": ["add", "change", "revoke", "move", "batch"] },
     "item_operation": { "enum": ["add", "change", "revoke"] },
-    "purpose": { "$ref": "#/$defs/shortText" },
+    "purpose": {
+      "$ref": "#/$defs/shortText",
+      "description": "A short, stable statement of what business or governance need this request serves."
+    },
     "subjects": {
       "type": "array",
       "minItems": 1,
@@ -30,8 +33,14 @@
       "items": { "$ref": "#/$defs/subject" }
     },
     "batch_scope": { "$ref": "#/$defs/batchScope" },
-    "requested_outcome": { "$ref": "#/$defs/text" },
-    "reason": { "$ref": "#/$defs/text" },
+    "requested_outcome": {
+      "$ref": "#/$defs/text",
+      "description": "The catalogue state that should be true when this request is complete."
+    },
+    "reason": {
+      "$ref": "#/$defs/text",
+      "description": "Why the current catalogue state should change, written for a human reviewer."
+    },
     "candidate_evidence": {
       "type": "array",
       "maxItems": 25,
@@ -41,6 +50,7 @@
       "type": "array",
       "minItems": 1,
       "maxItems": 25,
+      "description": "Observable checks a reviewer can use to decide whether the requested outcome was achieved.",
       "items": { "$ref": "#/$defs/text" }
     },
     "dedupe_key": { "$ref": "#/$defs/digest" },

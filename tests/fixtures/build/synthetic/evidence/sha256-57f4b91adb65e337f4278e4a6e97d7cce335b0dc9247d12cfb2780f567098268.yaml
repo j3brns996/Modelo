@@ -1,0 +1,15 @@
+id: sha256-57f4b91adb65e337f4278e4a6e97d7cce335b0dc9247d12cfb2780f567098268
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-reel.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Nova Reel"
+  providerName: "Amazon"
+  description: "A video generation model with text, image and camera-motion controls."
+  capabilities: [video-generation]
+  modalities: [image, text, video]
+  lifecycle: legacy
+visibility: public

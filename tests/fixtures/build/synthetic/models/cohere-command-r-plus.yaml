@@ -1,0 +1,17 @@
+id: cohere-command-r-plus
+vendor_id: cohere
+name: "Command R+"
+description: "A larger model for complex retrieval workflows and multi-step tool use."
+capabilities: [chat, function-calling, rag]
+modalities: [text]
+context_window: 128000
+lifecycle: legacy
+evidence_refs:
+  /name: {id: sha256-a38ab47d01c6e3660cfc71483fd90f83328c01c327835f2613854874ce6a18c6, projection_pointer: /modelName}
+  /description: {id: sha256-a38ab47d01c6e3660cfc71483fd90f83328c01c327835f2613854874ce6a18c6, projection_pointer: /description}
+  /capabilities/0: {id: sha256-a38ab47d01c6e3660cfc71483fd90f83328c01c327835f2613854874ce6a18c6, projection_pointer: /capabilities/0}
+  /capabilities/1: {id: sha256-a38ab47d01c6e3660cfc71483fd90f83328c01c327835f2613854874ce6a18c6, projection_pointer: /capabilities/1}
+  /capabilities/2: {id: sha256-a38ab47d01c6e3660cfc71483fd90f83328c01c327835f2613854874ce6a18c6, projection_pointer: /capabilities/2}
+  /modalities/0: {id: sha256-a38ab47d01c6e3660cfc71483fd90f83328c01c327835f2613854874ce6a18c6, projection_pointer: /modalities/0}
+  /context_window: {id: sha256-a38ab47d01c6e3660cfc71483fd90f83328c01c327835f2613854874ce6a18c6, projection_pointer: /contextWindow}
+  /lifecycle: {id: sha256-a38ab47d01c6e3660cfc71483fd90f83328c01c327835f2613854874ce6a18c6, projection_pointer: /lifecycle}

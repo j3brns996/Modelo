@@ -1,0 +1,16 @@
+id: sha256-9da2ecfb1800aa18aae128365289a18dfb91921dd63a453487839b23a772b374
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-ai21-labs-jamba-1-5-mini.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Jamba 1.5 Mini"
+  providerName: "AI21 Labs"
+  description: "A lighter long-context model intended for responsive enterprise text tasks."
+  capabilities: [chat, text-generation]
+  modalities: [text]
+  contextWindow: 256000
+  lifecycle: active
+visibility: public

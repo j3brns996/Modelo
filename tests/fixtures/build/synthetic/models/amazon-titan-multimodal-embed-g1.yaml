@@ -1,0 +1,15 @@
+id: amazon-titan-multimodal-embed-g1
+vendor_id: amazon
+name: "Titan Multimodal Embeddings G1"
+description: "A multimodal embedding model for image-and-text search and recommendations."
+capabilities: [embeddings]
+modalities: [embedding, image, text]
+lifecycle: active
+evidence_refs:
+  /name: {id: sha256-3a1d7acc678a227ea4c679440eef0fbba7b5fe93091b0ae9ce747bf60d7fd3cd, projection_pointer: /modelName}
+  /description: {id: sha256-3a1d7acc678a227ea4c679440eef0fbba7b5fe93091b0ae9ce747bf60d7fd3cd, projection_pointer: /description}
+  /capabilities/0: {id: sha256-3a1d7acc678a227ea4c679440eef0fbba7b5fe93091b0ae9ce747bf60d7fd3cd, projection_pointer: /capabilities/0}
+  /modalities/0: {id: sha256-3a1d7acc678a227ea4c679440eef0fbba7b5fe93091b0ae9ce747bf60d7fd3cd, projection_pointer: /modalities/0}
+  /modalities/1: {id: sha256-3a1d7acc678a227ea4c679440eef0fbba7b5fe93091b0ae9ce747bf60d7fd3cd, projection_pointer: /modalities/1}
+  /modalities/2: {id: sha256-3a1d7acc678a227ea4c679440eef0fbba7b5fe93091b0ae9ce747bf60d7fd3cd, projection_pointer: /modalities/2}
+  /lifecycle: {id: sha256-3a1d7acc678a227ea4c679440eef0fbba7b5fe93091b0ae9ce747bf60d7fd3cd, projection_pointer: /lifecycle}

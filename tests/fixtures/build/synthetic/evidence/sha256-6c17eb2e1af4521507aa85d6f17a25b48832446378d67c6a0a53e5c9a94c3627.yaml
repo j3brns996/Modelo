@@ -1,0 +1,16 @@
+id: sha256-6c17eb2e1af4521507aa85d6f17a25b48832446378d67c6a0a53e5c9a94c3627
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-lite.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Nova Lite"
+  providerName: "Amazon"
+  description: "A low-cost multimodal model for document analysis and visual questions."
+  capabilities: [chat, vision]
+  modalities: [image, text, video]
+  contextWindow: 300000
+  lifecycle: active
+visibility: public

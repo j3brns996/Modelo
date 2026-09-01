@@ -1,0 +1,17 @@
+id: ai21-jamba-1-5-large
+vendor_id: ai21-labs
+name: "Jamba 1.5 Large"
+description: "A long-context hybrid model designed for reasoning across substantial documents."
+capabilities: [chat, function-calling, reasoning]
+modalities: [text]
+context_window: 256000
+lifecycle: legacy
+evidence_refs:
+  /name: {id: sha256-9fd557fe241ed5048e95338153a77552d1bf8ac01e8b230840fb367033183cfa, projection_pointer: /modelName}
+  /description: {id: sha256-9fd557fe241ed5048e95338153a77552d1bf8ac01e8b230840fb367033183cfa, projection_pointer: /description}
+  /capabilities/0: {id: sha256-9fd557fe241ed5048e95338153a77552d1bf8ac01e8b230840fb367033183cfa, projection_pointer: /capabilities/0}
+  /capabilities/1: {id: sha256-9fd557fe241ed5048e95338153a77552d1bf8ac01e8b230840fb367033183cfa, projection_pointer: /capabilities/1}
+  /capabilities/2: {id: sha256-9fd557fe241ed5048e95338153a77552d1bf8ac01e8b230840fb367033183cfa, projection_pointer: /capabilities/2}
+  /modalities/0: {id: sha256-9fd557fe241ed5048e95338153a77552d1bf8ac01e8b230840fb367033183cfa, projection_pointer: /modalities/0}
+  /context_window: {id: sha256-9fd557fe241ed5048e95338153a77552d1bf8ac01e8b230840fb367033183cfa, projection_pointer: /contextWindow}
+  /lifecycle: {id: sha256-9fd557fe241ed5048e95338153a77552d1bf8ac01e8b230840fb367033183cfa, projection_pointer: /lifecycle}

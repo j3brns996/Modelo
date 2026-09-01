@@ -1,0 +1,16 @@
+id: cohere-embed-multilingual
+vendor_id: cohere
+name: "Embed Multilingual"
+description: "A multilingual embedding model for cross-language search and classification."
+capabilities: [embeddings]
+modalities: [embedding, text]
+context_window: 512
+lifecycle: active
+evidence_refs:
+  /name: {id: sha256-39e9b64a7908cf26db05c079a3f7f985721279dd8c057a7d984e519d3db35742, projection_pointer: /modelName}
+  /description: {id: sha256-39e9b64a7908cf26db05c079a3f7f985721279dd8c057a7d984e519d3db35742, projection_pointer: /description}
+  /capabilities/0: {id: sha256-39e9b64a7908cf26db05c079a3f7f985721279dd8c057a7d984e519d3db35742, projection_pointer: /capabilities/0}
+  /modalities/0: {id: sha256-39e9b64a7908cf26db05c079a3f7f985721279dd8c057a7d984e519d3db35742, projection_pointer: /modalities/0}
+  /modalities/1: {id: sha256-39e9b64a7908cf26db05c079a3f7f985721279dd8c057a7d984e519d3db35742, projection_pointer: /modalities/1}
+  /context_window: {id: sha256-39e9b64a7908cf26db05c079a3f7f985721279dd8c057a7d984e519d3db35742, projection_pointer: /contextWindow}
+  /lifecycle: {id: sha256-39e9b64a7908cf26db05c079a3f7f985721279dd8c057a7d984e519d3db35742, projection_pointer: /lifecycle}

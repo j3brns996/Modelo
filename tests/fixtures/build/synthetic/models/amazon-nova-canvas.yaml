@@ -1,0 +1,14 @@
+id: amazon-nova-canvas
+vendor_id: amazon
+name: "Nova Canvas"
+description: "An image generation model with editing, watermarking and moderation controls."
+capabilities: [image-generation]
+modalities: [image, text]
+lifecycle: legacy
+evidence_refs:
+  /name: {id: sha256-ced037c61ea7cc2aea2b3bc9c3512130eb92284a3a45c544413672a056a84818, projection_pointer: /modelName}
+  /description: {id: sha256-ced037c61ea7cc2aea2b3bc9c3512130eb92284a3a45c544413672a056a84818, projection_pointer: /description}
+  /capabilities/0: {id: sha256-ced037c61ea7cc2aea2b3bc9c3512130eb92284a3a45c544413672a056a84818, projection_pointer: /capabilities/0}
+  /modalities/0: {id: sha256-ced037c61ea7cc2aea2b3bc9c3512130eb92284a3a45c544413672a056a84818, projection_pointer: /modalities/0}
+  /modalities/1: {id: sha256-ced037c61ea7cc2aea2b3bc9c3512130eb92284a3a45c544413672a056a84818, projection_pointer: /modalities/1}
+  /lifecycle: {id: sha256-ced037c61ea7cc2aea2b3bc9c3512130eb92284a3a45c544413672a056a84818, projection_pointer: /lifecycle}

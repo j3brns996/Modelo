@@ -1,0 +1,15 @@
+id: cohere-rerank-3-5
+vendor_id: cohere
+name: "Rerank 3.5"
+description: "A relevance model that reorders results for search and retrieval workflows."
+capabilities: [reranking]
+modalities: [text]
+context_window: 4000
+lifecycle: active
+evidence_refs:
+  /name: {id: sha256-4c3d62fa7945c62d877611fd0d62c44d26e95a23d0370933c41707250aafa528, projection_pointer: /modelName}
+  /description: {id: sha256-4c3d62fa7945c62d877611fd0d62c44d26e95a23d0370933c41707250aafa528, projection_pointer: /description}
+  /capabilities/0: {id: sha256-4c3d62fa7945c62d877611fd0d62c44d26e95a23d0370933c41707250aafa528, projection_pointer: /capabilities/0}
+  /modalities/0: {id: sha256-4c3d62fa7945c62d877611fd0d62c44d26e95a23d0370933c41707250aafa528, projection_pointer: /modalities/0}
+  /context_window: {id: sha256-4c3d62fa7945c62d877611fd0d62c44d26e95a23d0370933c41707250aafa528, projection_pointer: /contextWindow}
+  /lifecycle: {id: sha256-4c3d62fa7945c62d877611fd0d62c44d26e95a23d0370933c41707250aafa528, projection_pointer: /lifecycle}

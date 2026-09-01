@@ -1,4 +1,25 @@
 vendors:
+  ai21-labs:
+    id: ai21-labs
+    name: AI21 Labs
+    evidence_refs:
+      /name:
+        id: sha256-9fd557fe241ed5048e95338153a77552d1bf8ac01e8b230840fb367033183cfa
+        projection_pointer: /providerName
+  amazon:
+    id: amazon
+    name: Amazon
+    evidence_refs:
+      /name:
+        id: sha256-76fa9a2ecfdf38014534e237049660bf9f6228ddb7cad497b4b2ed83550ea7d8
+        projection_pointer: /providerName
+  cohere:
+    id: cohere
+    name: Cohere
+    evidence_refs:
+      /name:
+        id: sha256-4c3d62fa7945c62d877611fd0d62c44d26e95a23d0370933c41707250aafa528
+        projection_pointer: /providerName
   test-vendor:
     id: test-vendor
     name: Test Vendor

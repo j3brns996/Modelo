@@ -1,0 +1,16 @@
+id: sha256-737ba1f65df71165e43f938a340bf82210ce2bd812f6294a7f7b2303bfa0ca14
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-titan-embeddings-g1---text.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Titan Embeddings G1 - Text"
+  providerName: "Amazon"
+  description: "A text embedding model for search, personalisation and clustering."
+  capabilities: [embeddings]
+  modalities: [embedding, text]
+  contextWindow: 8000
+  lifecycle: active
+visibility: public

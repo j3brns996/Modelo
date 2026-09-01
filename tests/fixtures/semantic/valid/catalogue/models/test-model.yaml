@@ -3,5 +3,5 @@ vendor_id: test-vendor
 name: Test Model
 evidence_refs:
   /name:
-    id: sha256-3cc6bbaee52dff309202c8aed63c219a8277199cadafdbeeac3b0e2c91c746fb
+    id: sha256-9f19d4dfb29b0414ef63fe8ef528f37e5d50deca65a6de0ab752f46b316cbf43
     projection_pointer: /modelName

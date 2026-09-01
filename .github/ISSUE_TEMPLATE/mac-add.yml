@@ -1,16 +1,22 @@
-name: "MAC: add"
-description: Propose one neutral add operation; the payload and CI are authoritative.
-title: "MAC add: "
+name: "Request: add a model or offering"
+description: "Ask to add a new governed record to the catalogue."
+title: "Add to catalogue: "
 body:
   - type: markdown
     attributes:
       value: |
-        Paste a complete `schemas/mac.schema.json` payload. Candidate issue evidence is not accepted catalogue evidence. Do not include secrets or private commercial terms.
+        ## Add something new
+
+        Use this when the model or offering does not already exist in Modelo.
+
+        **Before you start:** Gather the supporting source material first. A provider listing shows that something exists; it does not mean the enterprise has approved it.
+
+        **What happens next:** the submitted JSON is validated against Modelo's change contract. A reviewed pull request and successful exact-head CI are still required before anything can be approved.
   - type: textarea
     id: mac_payload
     attributes:
-      label: Neutral MAC payload
-      description: The operation must be `add`; subject identities use lowercase ASCII canonical IDs; generate both hashes from the canonical payload.
+      label: Change details (JSON)
+      description: The operation must be `add`. Include the new record identity, the outcome you want, why it is needed, supporting observations and clear acceptance checks.
       render: json
       placeholder: |
         { "schema_version": "0.1", "operation": "add", "replace": "with a complete schema-valid payload" }
@@ -19,17 +25,17 @@ body:
   - type: input
     id: payload_digest
     attributes:
-      label: Neutral payload digest
-      description: SHA-256 of the complete canonical payload, including its two validated keys.
+      label: Change fingerprint
+      description: Paste the generated SHA-256 fingerprint for the complete canonical JSON above.
       placeholder: sha256-...
     validations:
       required: true
   - type: checkboxes
     id: assertions
     attributes:
-      label: Assertions
+      label: Final checks
       options:
-        - label: I have not included credentials, tokens or private commercial terms.
+        - label: I checked that the model or offering is not already in the catalogue.
           required: true
-        - label: I understand that labels and checkboxes are assertions, not evidence or approval.
+        - label: I have not included credentials, tokens or private commercial terms.
           required: true

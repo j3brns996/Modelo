@@ -42,6 +42,7 @@ entities:
     path: "{paths.offerings}/{inference_service_id}/{offering_id}.yaml"
     meaning: consumable_approval_unit
     minimum_routes: 1
+    required_policy_explanation: approval_rationale
   route:
     identity: id
     stored_under: offering
@@ -60,6 +61,11 @@ entities:
 
 approval:
   consumption_granted_only_by_current_offering: true
+  offering_rationale:
+    field: approval_rationale
+    provenance: policy
+    meaning: human_readable_reason_this_consumption_path_is_approved
+    external_evidence_required: false
   linked_mac_issue_required: true
   required_check: modelo/check
   exact_head_required: true
@@ -429,7 +435,8 @@ site:
     remote_scripts: forbidden
     home_journey: [purpose, primary_actions, trust_posture, catalogue_metrics, governance_flow, recent_changes, next_actions]
     catalogue_default_view: grid
-    entity_components: [status, facts, evidence_posture, approval_coordinates, related_records]
+    catalogue_grid: dedicated_model_cards_not_table_row_restyling
+    entity_components: [status, facts, evidence_posture, approval_rationale, approval_coordinates, related_records]
     responsive_breakpoints: [880px, 580px]
   progressive_enhancement:
     framework: alpine_csp
@@ -457,7 +464,7 @@ site:
   profiles: [synthetic, private]
   profile_sources: {synthetic: tests/fixtures/build/synthetic, private: catalogue}
   synthetic_snapshot_as_of_config: publication.profiles.synthetic.as_of
-  synthetic_experience_facts: content_addressed_distinct_capability_modality_context_licence_lifecycle_examples
+  synthetic_experience_facts: twenty_two_content_addressed_models_including_twenty_official_documentation_observations_with_only_supported_description_capability_modality_context_and_lifecycle_facts
   production_public_field_redaction: deferred
   private_to_public_fallback: forbidden
   private_required_publication_capabilities: [restricted-artifact, access-controlled-pages]

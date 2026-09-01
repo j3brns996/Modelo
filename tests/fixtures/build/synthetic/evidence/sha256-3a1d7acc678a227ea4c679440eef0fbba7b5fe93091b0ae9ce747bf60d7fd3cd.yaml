@@ -1,0 +1,15 @@
+id: sha256-3a1d7acc678a227ea4c679440eef0fbba7b5fe93091b0ae9ce747bf60d7fd3cd
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-titan-multimodal-embeddings-g1.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Titan Multimodal Embeddings G1"
+  providerName: "Amazon"
+  description: "A multimodal embedding model for image-and-text search and recommendations."
+  capabilities: [embeddings]
+  modalities: [embedding, image, text]
+  lifecycle: active
+visibility: public

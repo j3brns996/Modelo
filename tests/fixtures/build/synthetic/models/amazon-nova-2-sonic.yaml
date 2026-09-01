@@ -1,0 +1,17 @@
+id: amazon-nova-2-sonic
+vendor_id: amazon
+name: "Nova 2 Sonic"
+description: "A real-time speech model for natural, bidirectional voice conversations."
+capabilities: [chat, speech]
+modalities: [speech, text]
+context_window: 1000000
+lifecycle: active
+evidence_refs:
+  /name: {id: sha256-e255195c28cf4c47ce199ad556e230c448093b0c1a4f8aa84ff4d828c626ab26, projection_pointer: /modelName}
+  /description: {id: sha256-e255195c28cf4c47ce199ad556e230c448093b0c1a4f8aa84ff4d828c626ab26, projection_pointer: /description}
+  /capabilities/0: {id: sha256-e255195c28cf4c47ce199ad556e230c448093b0c1a4f8aa84ff4d828c626ab26, projection_pointer: /capabilities/0}
+  /capabilities/1: {id: sha256-e255195c28cf4c47ce199ad556e230c448093b0c1a4f8aa84ff4d828c626ab26, projection_pointer: /capabilities/1}
+  /modalities/0: {id: sha256-e255195c28cf4c47ce199ad556e230c448093b0c1a4f8aa84ff4d828c626ab26, projection_pointer: /modalities/0}
+  /modalities/1: {id: sha256-e255195c28cf4c47ce199ad556e230c448093b0c1a4f8aa84ff4d828c626ab26, projection_pointer: /modalities/1}
+  /context_window: {id: sha256-e255195c28cf4c47ce199ad556e230c448093b0c1a4f8aa84ff4d828c626ab26, projection_pointer: /contextWindow}
+  /lifecycle: {id: sha256-e255195c28cf4c47ce199ad556e230c448093b0c1a4f8aa84ff4d828c626ab26, projection_pointer: /lifecycle}

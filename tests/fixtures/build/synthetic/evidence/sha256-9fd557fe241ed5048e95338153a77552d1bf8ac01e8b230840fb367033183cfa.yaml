@@ -1,0 +1,16 @@
+id: sha256-9fd557fe241ed5048e95338153a77552d1bf8ac01e8b230840fb367033183cfa
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-ai21-labs-jamba-1-5-large.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Jamba 1.5 Large"
+  providerName: "AI21 Labs"
+  description: "A long-context hybrid model designed for reasoning across substantial documents."
+  capabilities: [chat, function-calling, reasoning]
+  modalities: [text]
+  contextWindow: 256000
+  lifecycle: legacy
+visibility: public

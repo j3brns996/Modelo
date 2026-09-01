@@ -1,0 +1,16 @@
+id: sha256-4c3d62fa7945c62d877611fd0d62c44d26e95a23d0370933c41707250aafa528
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-cohere-rerank-3-5.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Rerank 3.5"
+  providerName: "Cohere"
+  description: "A relevance model that reorders results for search and retrieval workflows."
+  capabilities: [reranking]
+  modalities: [text]
+  contextWindow: 4000
+  lifecycle: active
+visibility: public

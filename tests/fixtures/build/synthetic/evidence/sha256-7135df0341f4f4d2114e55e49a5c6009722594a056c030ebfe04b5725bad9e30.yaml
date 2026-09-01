@@ -1,0 +1,15 @@
+id: sha256-7135df0341f4f4d2114e55e49a5c6009722594a056c030ebfe04b5725bad9e30
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-titan-image-generator-g1-v2.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Titan Image Generator G1 v2"
+  providerName: "Amazon"
+  description: "An image generation and editing model with built-in watermarking."
+  capabilities: [image-generation]
+  modalities: [image, text]
+  lifecycle: legacy
+visibility: public

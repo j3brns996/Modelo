@@ -54,11 +54,18 @@
     }
   },
   "type": "object",
-  "required": ["id", "inference_service_id", "model_id", "routes", "condition_refs", "evidence_refs"],
+  "required": ["id", "inference_service_id", "model_id", "approval_rationale", "routes", "condition_refs", "evidence_refs"],
   "properties": {
     "id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
     "inference_service_id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
     "model_id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
+    "approval_rationale": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 2048,
+      "description": "The enterprise policy reason this specific model consumption path is approved.",
+      "x-modelo-provenance": "policy"
+    },
     "routes": {
       "type": "array",
       "minItems": 1,

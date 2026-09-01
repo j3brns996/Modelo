@@ -23,7 +23,7 @@ class ValidatorTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.repository.close()
 
-    def check(self, base: str | None = None, head: str | None = None, as_of: date = date(2026, 8, 30)):
+    def check(self, base: str | None = None, head: str | None = None, as_of: date = date(2026, 9, 1)):
         return check_repository(
             self.repository.root,
             base or self.repository.base,
@@ -51,7 +51,7 @@ class ValidatorTests(unittest.TestCase):
     def install_profile(self, transform=lambda record, offering: None) -> None:
         profile = {
             "source": {"type": "first-party-read-api", "provider": "aws", "service": "bedrock", "operation": "GetInferenceProfile", "partition": "aws", "region": "eu-west-2", "sanitised_parameters": {"inferenceProfileIdentifier": "eu.test.profile-v1"}, "documentation_uri": "https://example.invalid/aws-profile-api"},
-            "retrieved_by": "cli", "observed_at": "2026-08-01T00:00:00Z",
+            "retrieved_by": "cli", "observed_at": "2026-09-01T00:00:00Z",
             "scope": {"scope_ref": "synthetic", "region": "eu-west-2"},
             "projection": {"profileId": "eu.test.profile-v1", "type": "SYSTEM_DEFINED", "status": "ACTIVE", "models": [{"modelArn": "arn:aws:bedrock:eu-west-2::foundation-model/test.model-v1"}]},
             "visibility": "public",
@@ -75,7 +75,7 @@ class ValidatorTests(unittest.TestCase):
                 "destinations": [{
                     "destination_pointer": "/models/0/modelArn",
                     "model_evidence": {
-                        "id": "sha256-3cc6bbaee52dff309202c8aed63c219a8277199cadafdbeeac3b0e2c91c746fb",
+                        "id": "sha256-9f19d4dfb29b0414ef63fe8ef528f37e5d50deca65a6de0ab752f46b316cbf43",
                         "arn_pointer": "/modelArn", "name_pointer": "/modelName",
                         "provider_pointer": "/providerName",
                     },
@@ -170,7 +170,7 @@ class ValidatorTests(unittest.TestCase):
     def test_system_inference_profile_binding_is_explicit_and_equal(self) -> None:
         profile = {
             "source": {"type": "first-party-read-api", "provider": "aws", "service": "bedrock", "operation": "GetInferenceProfile", "partition": "aws", "region": "eu-west-2", "sanitised_parameters": {"inferenceProfileIdentifier": "eu.test.profile-v1"}, "documentation_uri": "https://example.invalid/aws-profile-api"},
-            "retrieved_by": "cli", "observed_at": "2026-08-01T00:00:00Z",
+            "retrieved_by": "cli", "observed_at": "2026-09-01T00:00:00Z",
             "scope": {"scope_ref": "synthetic", "region": "eu-west-2"},
             "projection": {"profileId": "eu.test.profile-v1", "type": "SYSTEM_DEFINED", "status": "ACTIVE", "models": [{"modelArn": "arn:aws:bedrock:eu-west-2::foundation-model/test.model-v1"}]},
             "visibility": "public",
@@ -183,7 +183,7 @@ class ValidatorTests(unittest.TestCase):
         offering = yaml.safe_load(offering_path.read_text(encoding="utf-8"))
         offering["routes"][0] = {
             "id": "eu-profile", "source_region": "eu-west-2", "reference": "eu.test.profile-v1",
-            "model_binding": {"kind": "system-inference-profile", "profile_evidence": {"id": profile_id, "projection_pointer": "/profileId", "type_pointer": "/type", "status_pointer": "/status", "destinations_pointer": "/models"}, "destinations": [{"destination_pointer": "/models/0/modelArn", "model_evidence": {"id": "sha256-3cc6bbaee52dff309202c8aed63c219a8277199cadafdbeeac3b0e2c91c746fb", "arn_pointer": "/modelArn", "name_pointer": "/modelName", "provider_pointer": "/providerName"}}]},
+            "model_binding": {"kind": "system-inference-profile", "profile_evidence": {"id": profile_id, "projection_pointer": "/profileId", "type_pointer": "/type", "status_pointer": "/status", "destinations_pointer": "/models"}, "destinations": [{"destination_pointer": "/models/0/modelArn", "model_evidence": {"id": "sha256-9f19d4dfb29b0414ef63fe8ef528f37e5d50deca65a6de0ab752f46b316cbf43", "arn_pointer": "/modelArn", "name_pointer": "/modelName", "provider_pointer": "/providerName"}}]},
         }
         offering["evidence_refs"]["/routes/0/reference"] = {"id": profile_id, "projection_pointer": "/profileId"}
         offering_path.write_text(yaml.safe_dump(offering, sort_keys=False), encoding="utf-8", newline="\n")

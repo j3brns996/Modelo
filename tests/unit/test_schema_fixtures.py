@@ -617,6 +617,21 @@ class SchemaFixtureTests(unittest.TestCase):
             "protected_pipeline_policy_if_available_otherwise_protected_branch_adapter",
         )
 
+    def test_offering_requires_a_policy_authored_approval_rationale(self) -> None:
+        offering = self.schemas["offering.schema.json"]
+        self.assertIn("approval_rationale", offering["required"])
+        rationale = offering["properties"]["approval_rationale"]
+        self.assertEqual(rationale["type"], "string")
+        self.assertEqual(rationale["x-modelo-provenance"], "policy")
+        self.assertGreaterEqual(rationale["minLength"], 20)
+        self.assertIn("reason", rationale["description"])
+
+    def test_mac_schema_explains_its_human_intent_fields(self) -> None:
+        properties = self.schemas["mac.schema.json"]["properties"]
+        for field in ("purpose", "requested_outcome", "reason", "acceptance"):
+            with self.subTest(field=field):
+                self.assertGreater(len(properties[field]["description"]), 30)
+
     def test_catalogue_output_cannot_publish_actor_registry(self) -> None:
         output = self.schemas["catalogue-output.schema.json"]
         self.assertNotIn("actors", output["properties"])
@@ -800,7 +815,7 @@ class SchemaFixtureTests(unittest.TestCase):
         )
         self.assertEqual(
             config["publication"]["profiles"]["synthetic"]["as_of"],
-            "2026-08-30",
+            "2026-09-01",
         )
 
     def test_t5_required_inputs_and_commands_align_cross_document(self) -> None:

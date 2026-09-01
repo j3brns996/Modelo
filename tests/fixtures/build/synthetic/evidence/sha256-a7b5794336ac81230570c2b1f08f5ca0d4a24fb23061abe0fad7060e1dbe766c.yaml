@@ -1,0 +1,16 @@
+id: sha256-a7b5794336ac81230570c2b1f08f5ca0d4a24fb23061abe0fad7060e1dbe766c
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-cohere-command-r.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Command R"
+  providerName: "Cohere"
+  description: "A long-context model tuned for retrieval and tool-using enterprise applications."
+  capabilities: [chat, function-calling, rag]
+  modalities: [text]
+  contextWindow: 128000
+  lifecycle: legacy
+visibility: public

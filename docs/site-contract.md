@@ -42,7 +42,11 @@ It adds the final site bytes and complete `data/manifest.json` defined by
 except itself. T8 supplies trusted provider metadata and creates the detached
 check receipt; only post-merge publication may create the final receipt.
 
-The separate `demo` build projects only the configured synthetic fixture. Its
+The separate `demo` build projects only the configured synthetic fixture. The
+fixture contains 22 models: two fully synthetic integration records and 20
+official-documentation observations used to exercise realistic catalogue
+density. Documentation presence is not approval, and no route, price, licence
+or regional availability is inferred for those 20 observations. Its
 explicit `as_of` must equal that profile's configured fixture snapshot date; it
 never substitutes the workflow wall-clock date. It
 does not ingest MAC metadata, has no merge coordinate, emits an empty change
@@ -67,9 +71,9 @@ tests; JSON Schema validates the wire shape but does not derive this inventory.
 | Route key | Default route | Content |
 |---|---|---|
 | `home` | `/` | Purpose, revision, explicit `as_of`, counts, search, recent changes |
-| `catalogue` | `/catalogue/` | Searchable/filterable Models and Offerings views |
+| `catalogue` | `/catalogue/` | Model-first card explorer plus complete Models and Offerings table |
 | `model` | `/models/{model_id}/` | Intrinsic facts, evidence and approved offerings |
-| `offering` | `/offerings/{inference_service_id}/{offering_id}/` | Routes, price, conditions, evidence, approval coordinates and protected release/receipt discovery link; no embedded receipt claim |
+| `offering` | `/offerings/{inference_service_id}/{offering_id}/` | Policy-authored approval rationale, routes, price, conditions, evidence, approval coordinates and protected release/receipt discovery link; no embedded receipt claim |
 | `changes` | `/changes/` | Add/change/revoke history from local Git first-parent deltas |
 | `process` | `/process/` | MAC, CI, approval and evidence rules |
 | `propose` | `/propose/` | Links to configured provider add/change/revoke/move/batch intake |
@@ -101,7 +105,9 @@ browser runtime.
 The shared shell supplies sticky grouped navigation, source/publication
 affordances, a synthetic-status rail and structured footer. Home leads users
 through purpose, trust posture, catalogue counts, observation-to-publication
-flow and next actions. Grid is the catalogue default; table remains available.
+flow and next actions. Grid is the catalogue default and uses purpose-built
+model-card markup rather than restyling table rows; the complete model/offering
+table remains available.
 Model and offering pages use the same fact, evidence, coordinate and related
 record components. At narrow widths, navigation scrolls safely, split layouts
 stack and the grid collapses without losing semantic table fallback.
@@ -129,8 +135,9 @@ separate rows, and pricing remains associated by route ID.
 
 v0.1 permits two profiles only:
 
-- `synthetic`: public Pages built solely from synthetic fixtures and
-  `example.invalid` evidence.
+- `synthetic`: public Pages built solely from the configured demo fixture,
+  including explicit synthetic records and bounded official-documentation
+  observations; none is enterprise approval without a current offering.
 - `private`: the complete validated catalogue, published only when the platform
   capability probe proves native access control; otherwise supplied as a
   restricted CI/release artefact.

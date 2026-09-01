@@ -370,9 +370,12 @@ only on the catalogue route.
 
 The synthetic presentation is a product-quality demonstration rather than a
 minimal fixture dump: a shared responsive shell, guided landing journey,
-card-first explorer and structured model/offering/reference pages expose the
-governance model without changing any approval semantics. Synthetic model facts
-remain content-addressed evidence, never invented presentation copy.
+purpose-built model cards and structured model/offering/reference pages expose
+the governance model without changing any approval semantics. Its 22-model
+dataset includes 20 bounded official-documentation observations. Only facts
+supported by each retained source are projected; missing routes, prices,
+licences or availability remain missing. Documentation presence never becomes
+enterprise approval.
 
 Each invocation exclusively creates `dist/.modelo-build.lock` or fails fast;
 it never waits. The lock contains a bounded, fsynced phase journal. Staging is
@@ -477,6 +480,7 @@ The exact shape belongs to `schemas/offering.schema.json`. The minimum shape is:
 id: <stable-offering-id>
 inference_service_id: aws-bedrock
 model_id: <stable-canonical-model-id>
+approval_rationale: <policy-authored reason this route is approved>
 routes:
   - id: <stable-route-id>
     source_region: <aws-request-region>
@@ -499,8 +503,12 @@ evidence_refs:
     projection_pointer: /modelId
 ```
 
-An offering must have at least one valid route to be consumable. Empty pricing
-means that no price assertion is made; it does not imply zero or free usage.
+`approval_rationale` answers the human question that route coordinates cannot:
+why the organisation has approved this particular way of consuming the model.
+It is enterprise-authored policy, not an external provider claim, and therefore
+does not use an evidence reference. An offering must have at least one valid
+route to be consumable. Empty pricing means that no price assertion is made; it
+does not imply zero or free usage.
 
 ### Routes
 

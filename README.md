@@ -68,10 +68,10 @@ storage failure safely falls back to the configured grid view. Scripts load only
 catalogue page.
 
 The public synthetic site uses a shared responsive product shell, guided home
-journey, card-first catalogue and structured entity/reference pages. Synthetic
-models deliberately contain distinct content-addressed capabilities, modalities,
-context windows, licences and lifecycle facts so filters and comparison can be
-evaluated without publishing production catalogue data.
+journey, purpose-built model cards and structured entity/reference pages. Its
+22 evidence-linked models make filtering and comparison credible without
+publishing production catalogue data. Twenty are bounded official-documentation
+observations; they are examples, not enterprise approval.
 
 The locked Python suite proves emitted structure, bounds, integrity and the
 no-JavaScript baseline. When a host Node executable is available,

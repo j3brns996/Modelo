@@ -154,7 +154,7 @@ publication:
   profiles:
     synthetic:
       source: tests/fixtures/build/synthetic
-      as_of: "2026-08-30"
+      as_of: "2026-09-01"
       delivery: pages
       visibility: public
       production_catalogue: false

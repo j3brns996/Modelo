@@ -1,0 +1,19 @@
+id: amazon-nova-2-lite
+vendor_id: amazon
+name: "Nova 2 Lite"
+description: "A cost-conscious multimodal model for automation, documents and customer support."
+capabilities: [chat, function-calling, vision]
+modalities: [image, text, video]
+context_window: 1000000
+lifecycle: active
+evidence_refs:
+  /name: {id: sha256-76fa9a2ecfdf38014534e237049660bf9f6228ddb7cad497b4b2ed83550ea7d8, projection_pointer: /modelName}
+  /description: {id: sha256-76fa9a2ecfdf38014534e237049660bf9f6228ddb7cad497b4b2ed83550ea7d8, projection_pointer: /description}
+  /capabilities/0: {id: sha256-76fa9a2ecfdf38014534e237049660bf9f6228ddb7cad497b4b2ed83550ea7d8, projection_pointer: /capabilities/0}
+  /capabilities/1: {id: sha256-76fa9a2ecfdf38014534e237049660bf9f6228ddb7cad497b4b2ed83550ea7d8, projection_pointer: /capabilities/1}
+  /capabilities/2: {id: sha256-76fa9a2ecfdf38014534e237049660bf9f6228ddb7cad497b4b2ed83550ea7d8, projection_pointer: /capabilities/2}
+  /modalities/0: {id: sha256-76fa9a2ecfdf38014534e237049660bf9f6228ddb7cad497b4b2ed83550ea7d8, projection_pointer: /modalities/0}
+  /modalities/1: {id: sha256-76fa9a2ecfdf38014534e237049660bf9f6228ddb7cad497b4b2ed83550ea7d8, projection_pointer: /modalities/1}
+  /modalities/2: {id: sha256-76fa9a2ecfdf38014534e237049660bf9f6228ddb7cad497b4b2ed83550ea7d8, projection_pointer: /modalities/2}
+  /context_window: {id: sha256-76fa9a2ecfdf38014534e237049660bf9f6228ddb7cad497b4b2ed83550ea7d8, projection_pointer: /contextWindow}
+  /lifecycle: {id: sha256-76fa9a2ecfdf38014534e237049660bf9f6228ddb7cad497b4b2ed83550ea7d8, projection_pointer: /lifecycle}

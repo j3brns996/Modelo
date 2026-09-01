@@ -1,0 +1,15 @@
+id: amazon-nova-sonic
+vendor_id: amazon
+name: "Nova Sonic"
+description: "A multilingual speech model for low-latency, real-time voice interaction."
+capabilities: [chat, speech]
+modalities: [speech, text]
+lifecycle: legacy
+evidence_refs:
+  /name: {id: sha256-c6da61492dcebd70fb72d8f75ca5955202f0de961708455892ce02bcaaf27951, projection_pointer: /modelName}
+  /description: {id: sha256-c6da61492dcebd70fb72d8f75ca5955202f0de961708455892ce02bcaaf27951, projection_pointer: /description}
+  /capabilities/0: {id: sha256-c6da61492dcebd70fb72d8f75ca5955202f0de961708455892ce02bcaaf27951, projection_pointer: /capabilities/0}
+  /capabilities/1: {id: sha256-c6da61492dcebd70fb72d8f75ca5955202f0de961708455892ce02bcaaf27951, projection_pointer: /capabilities/1}
+  /modalities/0: {id: sha256-c6da61492dcebd70fb72d8f75ca5955202f0de961708455892ce02bcaaf27951, projection_pointer: /modalities/0}
+  /modalities/1: {id: sha256-c6da61492dcebd70fb72d8f75ca5955202f0de961708455892ce02bcaaf27951, projection_pointer: /modalities/1}
+  /lifecycle: {id: sha256-c6da61492dcebd70fb72d8f75ca5955202f0de961708455892ce02bcaaf27951, projection_pointer: /lifecycle}

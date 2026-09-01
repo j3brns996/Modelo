@@ -38,12 +38,12 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             result.stdout,
-            '{"base_path":"/Modelo/","base_url":"https://j3brns996.github.io/Modelo/","synthetic_as_of":"2026-08-30"}\n',
+            '{"base_path":"/Modelo/","base_url":"https://j3brns996.github.io/Modelo/","synthetic_as_of":"2026-09-01"}\n',
         )
         lines = self.run_cli("config", "site", "--format", "lines")
         self.assertEqual(
             lines.stdout,
-            "https://j3brns996.github.io/Modelo/\n/Modelo/\n2026-08-30\n",
+            "https://j3brns996.github.io/Modelo/\n/Modelo/\n2026-09-01\n",
         )
 
     def test_final_build_requires_merge_coordinates_metadata_and_publication_capability(self) -> None:
@@ -96,7 +96,7 @@ class CliTests(unittest.TestCase):
         repository = Repository()
         self.addCleanup(repository.close)
         result = subprocess.run(
-            [sys.executable, "-m", "modelo", "--root", str(repository.root), "check", "--base", repository.base, "--head", repository.base, "--as-of", "2026-08-30"],
+            [sys.executable, "-m", "modelo", "--root", str(repository.root), "check", "--base", repository.base, "--head", repository.base, "--as-of", "2026-09-01"],
             cwd=ROOT, text=True, capture_output=True, check=False,
         )
         self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
@@ -107,7 +107,7 @@ class CliTests(unittest.TestCase):
         path = repository.root / "catalogue/models/test-model.yaml"
         path.write_text(path.read_text(encoding="utf-8").replace("vendor_id: test-vendor", "vendor_id: absent"), encoding="utf-8", newline="\n")
         head = repository.commit()
-        command = [sys.executable, "-m", "modelo", "--root", str(repository.root), "check", "--base", repository.base, "--head", head, "--as-of", "2026-08-30", "--format", "json"]
+        command = [sys.executable, "-m", "modelo", "--root", str(repository.root), "check", "--base", repository.base, "--head", head, "--as-of", "2026-09-01", "--format", "json"]
         first = subprocess.run(command, cwd=ROOT, text=True, capture_output=True, check=False)
         second = subprocess.run(command, cwd=ROOT, text=True, capture_output=True, check=False)
         self.assertEqual(first.returncode, 1)

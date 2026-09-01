@@ -1,0 +1,18 @@
+id: amazon-nova-lite
+vendor_id: amazon
+name: "Nova Lite"
+description: "A low-cost multimodal model for document analysis and visual questions."
+capabilities: [chat, vision]
+modalities: [image, text, video]
+context_window: 300000
+lifecycle: active
+evidence_refs:
+  /name: {id: sha256-6c17eb2e1af4521507aa85d6f17a25b48832446378d67c6a0a53e5c9a94c3627, projection_pointer: /modelName}
+  /description: {id: sha256-6c17eb2e1af4521507aa85d6f17a25b48832446378d67c6a0a53e5c9a94c3627, projection_pointer: /description}
+  /capabilities/0: {id: sha256-6c17eb2e1af4521507aa85d6f17a25b48832446378d67c6a0a53e5c9a94c3627, projection_pointer: /capabilities/0}
+  /capabilities/1: {id: sha256-6c17eb2e1af4521507aa85d6f17a25b48832446378d67c6a0a53e5c9a94c3627, projection_pointer: /capabilities/1}
+  /modalities/0: {id: sha256-6c17eb2e1af4521507aa85d6f17a25b48832446378d67c6a0a53e5c9a94c3627, projection_pointer: /modalities/0}
+  /modalities/1: {id: sha256-6c17eb2e1af4521507aa85d6f17a25b48832446378d67c6a0a53e5c9a94c3627, projection_pointer: /modalities/1}
+  /modalities/2: {id: sha256-6c17eb2e1af4521507aa85d6f17a25b48832446378d67c6a0a53e5c9a94c3627, projection_pointer: /modalities/2}
+  /context_window: {id: sha256-6c17eb2e1af4521507aa85d6f17a25b48832446378d67c6a0a53e5c9a94c3627, projection_pointer: /contextWindow}
+  /lifecycle: {id: sha256-6c17eb2e1af4521507aa85d6f17a25b48832446378d67c6a0a53e5c9a94c3627, projection_pointer: /lifecycle}

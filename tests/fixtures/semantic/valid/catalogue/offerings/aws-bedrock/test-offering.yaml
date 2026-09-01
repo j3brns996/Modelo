@@ -1,6 +1,7 @@
 id: test-offering
 inference_service_id: aws-bedrock
 model_id: test-model
+approval_rationale: Approved for validator integration testing of the governed offering workflow.
 routes:
   - id: london-direct
     source_region: eu-west-2
@@ -8,7 +9,7 @@ routes:
     model_binding:
       kind: foundation-model
       model_evidence:
-        id: sha256-3cc6bbaee52dff309202c8aed63c219a8277199cadafdbeeac3b0e2c91c746fb
+        id: sha256-9f19d4dfb29b0414ef63fe8ef528f37e5d50deca65a6de0ab752f46b316cbf43
         id_pointer: /modelId
         arn_pointer: /modelArn
         name_pointer: /modelName
@@ -18,5 +19,5 @@ condition_refs:
     version: 1
 evidence_refs:
   /routes/0/reference:
-    id: sha256-3cc6bbaee52dff309202c8aed63c219a8277199cadafdbeeac3b0e2c91c746fb
+    id: sha256-9f19d4dfb29b0414ef63fe8ef528f37e5d50deca65a6de0ab752f46b316cbf43
     projection_pointer: /modelId

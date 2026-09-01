@@ -1,16 +1,22 @@
-name: "MAC: change"
-description: Propose one identity-preserving neutral change operation.
-title: "MAC change: "
+name: "Request: update a catalogue record"
+description: "Ask to change facts without changing the record's identity."
+title: "Update catalogue record: "
 body:
   - type: markdown
     attributes:
       value: |
-        Paste a complete `schemas/mac.schema.json` payload. A change preserves logical identity. Candidate issue evidence is not accepted catalogue evidence.
+        ## Update an existing record
+
+        Use this when the same model or offering remains in place but its governed facts need to change.
+
+        **Before you start:** If the identity itself changes, use the move form. A change must not quietly replace one logical record with another.
+
+        **What happens next:** the submitted JSON is validated against Modelo's change contract. A reviewed pull request and successful exact-head CI are still required before anything can be approved.
   - type: textarea
     id: mac_payload
     attributes:
-      label: Neutral MAC payload
-      description: The operation must be `change`; subject identities use lowercase ASCII canonical IDs; generate both hashes from the canonical payload.
+      label: Change details (JSON)
+      description: The operation must be `change`. Name the existing record, explain what should change and why, and include checks that make the result unambiguous.
       render: json
       placeholder: |
         { "schema_version": "0.1", "operation": "change", "replace": "with a complete schema-valid payload" }
@@ -19,17 +25,17 @@ body:
   - type: input
     id: payload_digest
     attributes:
-      label: Neutral payload digest
-      description: SHA-256 of the complete canonical payload, including its two validated keys.
+      label: Change fingerprint
+      description: Paste the generated SHA-256 fingerprint for the complete canonical JSON above.
       placeholder: sha256-...
     validations:
       required: true
   - type: checkboxes
     id: assertions
     attributes:
-      label: Assertions
+      label: Final checks
       options:
-        - label: The logical identity is unchanged.
+        - label: The logical identity of the model or offering will stay the same.
           required: true
         - label: I have not included credentials, tokens or private commercial terms.
           required: true

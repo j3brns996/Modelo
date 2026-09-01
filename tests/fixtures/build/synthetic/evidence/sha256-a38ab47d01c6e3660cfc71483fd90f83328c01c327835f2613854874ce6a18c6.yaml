@@ -1,0 +1,16 @@
+id: sha256-a38ab47d01c6e3660cfc71483fd90f83328c01c327835f2613854874ce6a18c6
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-cohere-command-r-plus.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Command R+"
+  providerName: "Cohere"
+  description: "A larger model for complex retrieval workflows and multi-step tool use."
+  capabilities: [chat, function-calling, rag]
+  modalities: [text]
+  contextWindow: 128000
+  lifecycle: legacy
+visibility: public

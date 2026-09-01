@@ -1,0 +1,17 @@
+id: cohere-embed-v4
+vendor_id: cohere
+name: "Embed v4"
+description: "A unified embedding model for text, images and mixed-content retrieval."
+capabilities: [embeddings]
+modalities: [embedding, image, text]
+context_window: 128000
+lifecycle: active
+evidence_refs:
+  /name: {id: sha256-9894804c8ec29b03f4405976c79554bd3e7c427c82d632e0f12ccb5f87a13108, projection_pointer: /modelName}
+  /description: {id: sha256-9894804c8ec29b03f4405976c79554bd3e7c427c82d632e0f12ccb5f87a13108, projection_pointer: /description}
+  /capabilities/0: {id: sha256-9894804c8ec29b03f4405976c79554bd3e7c427c82d632e0f12ccb5f87a13108, projection_pointer: /capabilities/0}
+  /modalities/0: {id: sha256-9894804c8ec29b03f4405976c79554bd3e7c427c82d632e0f12ccb5f87a13108, projection_pointer: /modalities/0}
+  /modalities/1: {id: sha256-9894804c8ec29b03f4405976c79554bd3e7c427c82d632e0f12ccb5f87a13108, projection_pointer: /modalities/1}
+  /modalities/2: {id: sha256-9894804c8ec29b03f4405976c79554bd3e7c427c82d632e0f12ccb5f87a13108, projection_pointer: /modalities/2}
+  /context_window: {id: sha256-9894804c8ec29b03f4405976c79554bd3e7c427c82d632e0f12ccb5f87a13108, projection_pointer: /contextWindow}
+  /lifecycle: {id: sha256-9894804c8ec29b03f4405976c79554bd3e7c427c82d632e0f12ccb5f87a13108, projection_pointer: /lifecycle}

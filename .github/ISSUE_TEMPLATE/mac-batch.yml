@@ -1,16 +1,22 @@
-name: "MAC: batch"
-description: Propose at most 25 homogeneous items from one bounded observation scope.
-title: "MAC batch: "
+name: "Request: submit a catalogue batch"
+description: "Ask for up to 25 related changes from one observation scope."
+title: "Batch catalogue request: "
 body:
   - type: markdown
     attributes:
       value: |
-        Paste a complete `schemas/mac.schema.json` payload. A batch has one item operation, source, observation scope, inference service and purpose.
+        ## Submit several related changes
+
+        Use this for a bounded set of changes that all perform the same kind of operation.
+
+        **Before you start:** Every item must come from the same source, observation scope and inference service. Split mixed work into separate requests.
+
+        **What happens next:** the submitted JSON is validated against Modelo's change contract. A reviewed pull request and successful exact-head CI are still required before anything can be approved.
   - type: textarea
     id: mac_payload
     attributes:
-      label: Neutral MAC payload
-      description: The operation must be `batch`; subject identities use lowercase ASCII canonical IDs; generate both hashes from the canonical payload.
+      label: Change details (JSON)
+      description: The operation must be `batch`. Include no more than 25 subjects and set one item operation for the whole batch.
       render: json
       placeholder: |
         { "schema_version": "0.1", "operation": "batch", "replace": "with a complete schema-valid payload" }
@@ -19,17 +25,17 @@ body:
   - type: input
     id: payload_digest
     attributes:
-      label: Neutral payload digest
-      description: SHA-256 of the complete canonical payload, including its two validated keys.
+      label: Change fingerprint
+      description: Paste the generated SHA-256 fingerprint for the complete canonical JSON above.
       placeholder: sha256-...
     validations:
       required: true
   - type: checkboxes
     id: assertions
     attributes:
-      label: Assertions
+      label: Final checks
       options:
-        - label: The batch is homogeneous and contains no more than 25 subjects.
+        - label: Every item uses the same operation and the batch contains no more than 25 subjects.
           required: true
         - label: I have not included credentials, tokens or private commercial terms.
           required: true

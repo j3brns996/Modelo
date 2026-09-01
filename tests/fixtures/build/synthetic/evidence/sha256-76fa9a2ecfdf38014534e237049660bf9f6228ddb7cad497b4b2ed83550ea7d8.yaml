@@ -1,0 +1,16 @@
+id: sha256-76fa9a2ecfdf38014534e237049660bf9f6228ddb7cad497b4b2ed83550ea7d8
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-2-lite.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Nova 2 Lite"
+  providerName: "Amazon"
+  description: "A cost-conscious multimodal model for automation, documents and customer support."
+  capabilities: [chat, function-calling, vision]
+  modalities: [image, text, video]
+  contextWindow: 1000000
+  lifecycle: active
+visibility: public

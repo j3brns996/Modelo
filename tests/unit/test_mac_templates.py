@@ -107,6 +107,30 @@ class MacTemplateTests(unittest.TestCase):
                 self.assertTrue(inputs[0]["validations"]["required"])
                 self.assertNotIn("labels", form)
 
+    def test_github_issue_forms_explain_the_request_in_plain_language(self) -> None:
+        expected = {
+            "add": "Add something new",
+            "change": "Update an existing record",
+            "revoke": "Withdraw an approved offering",
+            "move": "Replace an offering identity",
+            "batch": "Submit several related changes",
+        }
+        for operation, heading in expected.items():
+            form = yaml.safe_load(
+                (ROOT / f".github/ISSUE_TEMPLATE/mac-{operation}.yml").read_text(encoding="utf-8")
+            )
+            rendered = "\n".join(
+                item.get("attributes", {}).get("value", "")
+                for item in form["body"] if item["type"] == "markdown"
+            )
+            with self.subTest(operation=operation):
+                self.assertIn(heading, rendered)
+                self.assertIn("What happens next", rendered)
+                payload = next(item for item in form["body"] if item.get("id") == "mac_payload")
+                digest = next(item for item in form["body"] if item.get("id") == "payload_digest")
+                self.assertEqual(payload["attributes"]["label"], "Change details (JSON)")
+                self.assertEqual(digest["attributes"]["label"], "Change fingerprint")
+
     def test_actual_filled_github_forms_round_trip(self) -> None:
         for operation, payload in self.fixtures().items():
             body = self.fill_github_form(operation, payload)

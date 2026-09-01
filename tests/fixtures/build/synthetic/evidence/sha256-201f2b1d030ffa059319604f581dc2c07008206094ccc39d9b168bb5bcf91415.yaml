@@ -1,0 +1,16 @@
+id: sha256-201f2b1d030ffa059319604f581dc2c07008206094ccc39d9b168bb5bcf91415
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-pro.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Nova Pro"
+  providerName: "Amazon"
+  description: "A balanced multimodal model spanning text, image and video work."
+  capabilities: [chat, vision]
+  modalities: [image, text, video]
+  contextWindow: 300000
+  lifecycle: active
+visibility: public

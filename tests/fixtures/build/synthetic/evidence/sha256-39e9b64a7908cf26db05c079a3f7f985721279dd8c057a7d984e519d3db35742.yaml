@@ -1,0 +1,16 @@
+id: sha256-39e9b64a7908cf26db05c079a3f7f985721279dd8c057a7d984e519d3db35742
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-cohere-embed-multilingual.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Embed Multilingual"
+  providerName: "Cohere"
+  description: "A multilingual embedding model for cross-language search and classification."
+  capabilities: [embeddings]
+  modalities: [embedding, text]
+  contextWindow: 512
+  lifecycle: active
+visibility: public

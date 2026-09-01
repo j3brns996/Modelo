@@ -1,0 +1,15 @@
+id: sha256-ced037c61ea7cc2aea2b3bc9c3512130eb92284a3a45c544413672a056a84818
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-canvas.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Nova Canvas"
+  providerName: "Amazon"
+  description: "An image generation model with editing, watermarking and moderation controls."
+  capabilities: [image-generation]
+  modalities: [image, text]
+  lifecycle: legacy
+visibility: public

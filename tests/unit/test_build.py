@@ -65,7 +65,7 @@ class BuildTests(unittest.TestCase):
         values = {
             "root": self.repository.root, "kind": "candidate",
             "base_commit": self.repository.base, "source_commit": self.head,
-            "source_tree": self.tree, "as_of": date(2026, 8, 30),
+            "source_tree": self.tree, "as_of": date(2026, 9, 1),
             "source_date_epoch": self.epoch, "mac_metadata": self.metadata_path,
             "profile": "synthetic", "base_url": None, "base_path": "/Modelo/",
             "output": "dist/candidate",
@@ -119,7 +119,7 @@ class BuildTests(unittest.TestCase):
         def make(order):
             repository = Repository()
             self.addCleanup(repository.close)
-            eu_model_id = "sha256-3cc6bbaee52dff309202c8aed63c219a8277199cadafdbeeac3b0e2c91c746fb"
+            eu_model_id = "sha256-9f19d4dfb29b0414ef63fe8ef528f37e5d50deca65a6de0ab752f46b316cbf43"
             eu_model = yaml.safe_load(
                 evidence_path(repository, eu_model_id).read_text(encoding="utf-8")
             )
@@ -153,7 +153,7 @@ class BuildTests(unittest.TestCase):
                         },
                         "documentation_uri": "https://example.invalid/aws-profile-api",
                     },
-                    "retrieved_by": "cli", "observed_at": "2026-08-01T00:00:00Z",
+                    "retrieved_by": "cli", "observed_at": "2026-09-01T00:00:00Z",
                     "scope": {"scope_ref": f"synthetic-{key}", "region": regions[key]},
                     "projection": {
                         "profileId": "global.test.profile-v1", "type": "SYSTEM_DEFINED",
@@ -199,7 +199,9 @@ class BuildTests(unittest.TestCase):
                 }
             offering = {
                 "id": "test-offering", "inference_service_id": "aws-bedrock",
-                "model_id": "test-model", "routes": [routes[key] for key in order],
+                "model_id": "test-model",
+                "approval_rationale": "Approved for deterministic multi-region build testing.",
+                "routes": [routes[key] for key in order],
                 "pricing": [
                     {**prices[key], "route_ids": [f"{key}-route"]}
                     for key in reversed(order)
@@ -230,13 +232,13 @@ class BuildTests(unittest.TestCase):
             head = repository.commit("two regional routes")
             self.assertEqual(
                 check_repository(
-                    repository.root, repository.base, head, date(2026, 8, 30)
+                    repository.root, repository.base, head, date(2026, 9, 1)
                 ),
                 (),
             )
             projection = build_module._projection_from_snapshot(
                 repository.root, "synthetic", "a" * 40, "b" * 40,
-                date(2026, 8, 30), build_module._layout(repository.root),
+                date(2026, 9, 1), build_module._layout(repository.root),
             )
             return canonical_bytes(projection), projection
 
@@ -308,7 +310,7 @@ class BuildTests(unittest.TestCase):
             sys.executable, "-m", "modelo", "--root", str(self.repository.root), "build",
             "--kind", "candidate", "--base-commit", self.repository.base,
             "--source-commit", self.head, "--source-tree", self.tree,
-            "--as-of", "2026-08-30", "--source-date-epoch", str(self.epoch),
+            "--as-of", "2026-09-01", "--source-date-epoch", str(self.epoch),
             "--mac-metadata", str(self.metadata_path), "--profile", "synthetic",
             "--no-base-url", "--base-path", "/Modelo/", "--output", "dist/candidate",
         ]
@@ -652,7 +654,7 @@ class BuildTests(unittest.TestCase):
         metadata.write_bytes(canonical_bytes(envelope))
         result = build_candidate(BuildRequest(
             root=repository.root, kind="candidate", base_commit=base, source_commit=head,
-            source_tree=tree, as_of=date(2026, 8, 30), source_date_epoch=epoch,
+            source_tree=tree, as_of=date(2026, 9, 1), source_date_epoch=epoch,
             mac_metadata=metadata, profile="synthetic", base_url=None,
             base_path="/Modelo/", output="dist/candidate",
         ))

@@ -40,6 +40,12 @@ idempotency_key: sha256-<canonical-complete-intent>
 Candidate issue evidence never becomes accepted catalogue evidence. The branch
 must contain admissible evidence records.
 
+The four explanatory fields are deliberately distinct. `purpose` is the stable
+need, `requested_outcome` describes the desired catalogue state, `reason` tells
+a human reviewer why the current state should change, and `acceptance` lists the
+observable checks for completion. Git-provider forms use plain-language labels,
+but retain the exact JSON field IDs and digest needed by the trusted adapter.
+
 `change` preserves identity. In v0.1, `move` and `revoke` apply only to
 offerings. A move changes offering identity and compiles to atomic
 add-destination plus revoke-source; it has exactly two subjects, one with each

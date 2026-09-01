@@ -1,0 +1,28 @@
+id: sha256-e5d79edf1a0f8d61c3ea1e0d7b113da9ef7ac1be52dd38881a54621ca98dd837
+source:
+  type: first-party-read-api
+  provider: aws
+  service: bedrock
+  operation: GetFoundationModel
+  partition: aws
+  region: eu-west-2
+  sanitised_parameters:
+    modelIdentifier: test.model-v1
+  documentation_uri: https://example.invalid/aws-api
+retrieved_by: cli
+observed_at: "2026-09-01T08:30:00Z"
+scope:
+  scope_ref: synthetic
+  region: eu-west-2
+projection:
+  modelId: test.model-v1
+  modelArn: arn:aws:bedrock:eu-west-2::foundation-model/test.model-v1
+  modelName: Atlas Reasoning
+  providerName: Test Vendor
+  description: Synthetic reasoning model for governed catalogue demonstrations.
+  capabilities: [chat, function-calling, reasoning]
+  modalities: [text]
+  contextWindow: 128000
+  licensing: proprietary
+  lifecycle: active
+visibility: public

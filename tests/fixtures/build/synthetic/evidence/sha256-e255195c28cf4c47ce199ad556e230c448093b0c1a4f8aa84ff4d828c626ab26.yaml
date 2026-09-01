@@ -1,0 +1,16 @@
+id: sha256-e255195c28cf4c47ce199ad556e230c448093b0c1a4f8aa84ff4d828c626ab26
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-2-sonic.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Nova 2 Sonic"
+  providerName: "Amazon"
+  description: "A real-time speech model for natural, bidirectional voice conversations."
+  capabilities: [chat, speech]
+  modalities: [speech, text]
+  contextWindow: 1000000
+  lifecycle: active
+visibility: public

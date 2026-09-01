@@ -1,0 +1,15 @@
+id: amazon-nova-reel
+vendor_id: amazon
+name: "Nova Reel"
+description: "A video generation model with text, image and camera-motion controls."
+capabilities: [video-generation]
+modalities: [image, text, video]
+lifecycle: legacy
+evidence_refs:
+  /name: {id: sha256-57f4b91adb65e337f4278e4a6e97d7cce335b0dc9247d12cfb2780f567098268, projection_pointer: /modelName}
+  /description: {id: sha256-57f4b91adb65e337f4278e4a6e97d7cce335b0dc9247d12cfb2780f567098268, projection_pointer: /description}
+  /capabilities/0: {id: sha256-57f4b91adb65e337f4278e4a6e97d7cce335b0dc9247d12cfb2780f567098268, projection_pointer: /capabilities/0}
+  /modalities/0: {id: sha256-57f4b91adb65e337f4278e4a6e97d7cce335b0dc9247d12cfb2780f567098268, projection_pointer: /modalities/0}
+  /modalities/1: {id: sha256-57f4b91adb65e337f4278e4a6e97d7cce335b0dc9247d12cfb2780f567098268, projection_pointer: /modalities/1}
+  /modalities/2: {id: sha256-57f4b91adb65e337f4278e4a6e97d7cce335b0dc9247d12cfb2780f567098268, projection_pointer: /modalities/2}
+  /lifecycle: {id: sha256-57f4b91adb65e337f4278e4a6e97d7cce335b0dc9247d12cfb2780f567098268, projection_pointer: /lifecycle}

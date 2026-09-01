@@ -1,16 +1,22 @@
-name: "MAC: revoke"
-description: Propose removal of one current offering through a neutral revoke operation.
-title: "MAC revoke: "
+name: "Request: withdraw an offering"
+description: "Ask to remove enterprise approval from one current offering."
+title: "Withdraw offering: "
 body:
   - type: markdown
     attributes:
       value: |
-        Paste a complete `schemas/mac.schema.json` payload. In v0.1 a revoke subject is one offering. Absence from discovery is not a revocation reason by itself.
+        ## Withdraw an approved offering
+
+        Use this when an offering should no longer grant permission to consume a model.
+
+        **Before you start:** A missing provider-discovery result is not enough on its own. State the governance reason and the effective outcome.
+
+        **What happens next:** the submitted JSON is validated against Modelo's change contract. A reviewed pull request and successful exact-head CI are still required before anything can be approved.
   - type: textarea
     id: mac_payload
     attributes:
-      label: Neutral MAC payload
-      description: The operation must be `revoke`; subject identities use lowercase ASCII canonical IDs; generate both hashes from the canonical payload.
+      label: Change details (JSON)
+      description: The operation must be `revoke`. Identify one offering, explain why approval should end and describe the expected catalogue state.
       render: json
       placeholder: |
         { "schema_version": "0.1", "operation": "revoke", "replace": "with a complete schema-valid payload" }
@@ -19,17 +25,17 @@ body:
   - type: input
     id: payload_digest
     attributes:
-      label: Neutral payload digest
-      description: SHA-256 of the complete canonical payload, including its two validated keys.
+      label: Change fingerprint
+      description: Paste the generated SHA-256 fingerprint for the complete canonical JSON above.
       placeholder: sha256-...
     validations:
       required: true
   - type: checkboxes
     id: assertions
     attributes:
-      label: Assertions
+      label: Final checks
       options:
-        - label: The request does not infer revocation from a missing discovery result.
+        - label: This request is based on an explicit governance decision, not only a missing discovery result.
           required: true
         - label: I have not included credentials, tokens or private commercial terms.
           required: true

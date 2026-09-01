@@ -1,0 +1,16 @@
+id: sha256-a15d5c23ed4e80e89e1973af2baa8198bb52c09cd95225af2cb6f218e040c4bf
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-cohere-embed-english.html
+retrieved_by: manual
+observed_at: "2026-09-01T08:30:00Z"
+scope: {catalogue: synthetic-demo}
+projection:
+  modelName: "Embed English"
+  providerName: "Cohere"
+  description: "An English text embedding model for search, classification and clustering."
+  capabilities: [embeddings]
+  modalities: [embedding, text]
+  contextWindow: 512
+  lifecycle: active
+visibility: public

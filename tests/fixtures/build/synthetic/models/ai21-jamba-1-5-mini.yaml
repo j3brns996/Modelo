@@ -1,0 +1,16 @@
+id: ai21-jamba-1-5-mini
+vendor_id: ai21-labs
+name: "Jamba 1.5 Mini"
+description: "A lighter long-context model intended for responsive enterprise text tasks."
+capabilities: [chat, text-generation]
+modalities: [text]
+context_window: 256000
+lifecycle: active
+evidence_refs:
+  /name: {id: sha256-9da2ecfb1800aa18aae128365289a18dfb91921dd63a453487839b23a772b374, projection_pointer: /modelName}
+  /description: {id: sha256-9da2ecfb1800aa18aae128365289a18dfb91921dd63a453487839b23a772b374, projection_pointer: /description}
+  /capabilities/0: {id: sha256-9da2ecfb1800aa18aae128365289a18dfb91921dd63a453487839b23a772b374, projection_pointer: /capabilities/0}
+  /capabilities/1: {id: sha256-9da2ecfb1800aa18aae128365289a18dfb91921dd63a453487839b23a772b374, projection_pointer: /capabilities/1}
+  /modalities/0: {id: sha256-9da2ecfb1800aa18aae128365289a18dfb91921dd63a453487839b23a772b374, projection_pointer: /modalities/0}
+  /context_window: {id: sha256-9da2ecfb1800aa18aae128365289a18dfb91921dd63a453487839b23a772b374, projection_pointer: /contextWindow}
+  /lifecycle: {id: sha256-9da2ecfb1800aa18aae128365289a18dfb91921dd63a453487839b23a772b374, projection_pointer: /lifecycle}

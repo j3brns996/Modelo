@@ -1,0 +1,16 @@
+id: amazon-titan-embed-text-g1
+vendor_id: amazon
+name: "Titan Embeddings G1 - Text"
+description: "A text embedding model for search, personalisation and clustering."
+capabilities: [embeddings]
+modalities: [embedding, text]
+context_window: 8000
+lifecycle: active
+evidence_refs:
+  /name: {id: sha256-737ba1f65df71165e43f938a340bf82210ce2bd812f6294a7f7b2303bfa0ca14, projection_pointer: /modelName}
+  /description: {id: sha256-737ba1f65df71165e43f938a340bf82210ce2bd812f6294a7f7b2303bfa0ca14, projection_pointer: /description}
+  /capabilities/0: {id: sha256-737ba1f65df71165e43f938a340bf82210ce2bd812f6294a7f7b2303bfa0ca14, projection_pointer: /capabilities/0}
+  /modalities/0: {id: sha256-737ba1f65df71165e43f938a340bf82210ce2bd812f6294a7f7b2303bfa0ca14, projection_pointer: /modalities/0}
+  /modalities/1: {id: sha256-737ba1f65df71165e43f938a340bf82210ce2bd812f6294a7f7b2303bfa0ca14, projection_pointer: /modalities/1}
+  /context_window: {id: sha256-737ba1f65df71165e43f938a340bf82210ce2bd812f6294a7f7b2303bfa0ca14, projection_pointer: /contextWindow}
+  /lifecycle: {id: sha256-737ba1f65df71165e43f938a340bf82210ce2bd812f6294a7f7b2303bfa0ca14, projection_pointer: /lifecycle}

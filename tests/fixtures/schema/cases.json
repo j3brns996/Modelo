@@ -223,6 +223,7 @@
           "id": "test-offering",
           "inference_service_id": "aws-bedrock",
           "model_id": "test-model-1",
+          "approval_rationale": "Approved for schema validation of the governed offering workflow.",
           "routes": [
             {
               "id": "london-direct",

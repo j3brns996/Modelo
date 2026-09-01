@@ -1,4 +1,4 @@
-id: sha256-3cc6bbaee52dff309202c8aed63c219a8277199cadafdbeeac3b0e2c91c746fb
+id: sha256-eb62b8db82ebbb1aa293237c55540dcedf41188058d0e2548673346c60ba3750
 source:
   type: first-party-read-api
   provider: aws
@@ -17,6 +17,12 @@ scope:
 projection:
   modelId: test.model-v1
   modelArn: arn:aws:bedrock:eu-west-2::foundation-model/test.model-v1
-  modelName: Test Model
+  modelName: Atlas Reasoning
   providerName: Test Vendor
+  description: Synthetic reasoning model for governed catalogue demonstrations.
+  capabilities: [chat, function-calling, reasoning]
+  modalities: [text]
+  contextWindow: 128000
+  licensing: proprietary
+  lifecycle: active
 visibility: public

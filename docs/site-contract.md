@@ -24,8 +24,11 @@ its signed npm package; its runtime SHA-256 is
 `0de89ad5a626c023982c2ed7051ef5fd3cbfa22d012de81fa19005c811bfad4d`.
 The standard expression-evaluating Alpine build is forbidden by the site CSP.
 The Alpine and bundled Vue reactivity MIT notices are one publication member
-linked from every footer. No CDN,
-Node, npm or `npx` command is required.
+linked from every footer. Remote application scripts remain forbidden. The
+presentation loads Inter and JetBrains Mono only from the configured Google
+Fonts stylesheet/file origins, both explicitly admitted by CSP. Font responses
+are optional presentation resources, never generator inputs. No Node, npm or
+`npx` command is required.
 
 T5 supplies one validated canonical catalogue projection and canonical change
 delta. Its candidate is exactly `data/catalogue.json`,
@@ -91,9 +94,17 @@ allowlisted URL parameters so a view is shareable; unknown values are ignored.
 Facet values are ORed within a facet and ANDed across facets.
 Only table/grid view preference is stored locally under the configured key.
 An explicit valid URL `view` value takes precedence, and unavailable or invalid
-storage falls back to table view without breaking the explorer. Catalogue
+storage falls back to the configured grid view without breaking the explorer. Catalogue
 scripts are emitted only on the catalogue page; all other pages contain no
 browser runtime.
+
+The shared shell supplies sticky grouped navigation, source/publication
+affordances, a synthetic-status rail and structured footer. Home leads users
+through purpose, trust posture, catalogue counts, observation-to-publication
+flow and next actions. Grid is the catalogue default; table remains available.
+Model and offering pages use the same fact, evidence, coordinate and related
+record components. At narrow widths, navigation scrolls safely, split layouts
+stack and the grid collapses without losing semantic table fallback.
 
 Comparison accepts two to four canonical models only. It never compares an
 offering as if it were a model and never infers facts: identifier, vendor,
@@ -102,6 +113,8 @@ projection. The dialog is built with safe DOM creation and `textContent`, never
 HTML-string injection. It contains links back to complete model records and is
 not an approval claim. Every entity/detail link and the complete table remain
 usable without JavaScript; all explorer controls are progressive enhancement.
+The comparison includes context window in addition to identifier, vendor,
+capabilities, modalities, licence and lifecycle.
 
 T6's Python generator produces the AWS Region view from validated T5 data. It
 labels `route.source_region` as **Source Region**. For a direct route it emits

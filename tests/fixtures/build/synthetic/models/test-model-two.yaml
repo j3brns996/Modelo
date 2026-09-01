@@ -1,7 +1,21 @@
 id: test-model-two
 vendor_id: test-vendor
-name: Test Model Two
+name: Atlas Vision
+description: Synthetic multimodal model for evidence and comparison demonstrations.
+capabilities: [chat, vision]
+modalities: [image, text]
+context_window: 1000000
+licensing: open-weights
+lifecycle: active
 evidence_refs:
   /name:
-    id: sha256-baa04a612f9d55282862b8a27362351c5f6c5ccd2b7b09afe88a56f0a4539813
+    id: sha256-44fd7b3598e7f4100f27fd1ebdb5f2fd66f047670130fba2498180025cb0e960
     projection_pointer: /modelName
+  /description: {id: sha256-44fd7b3598e7f4100f27fd1ebdb5f2fd66f047670130fba2498180025cb0e960, projection_pointer: /description}
+  /capabilities/0: {id: sha256-44fd7b3598e7f4100f27fd1ebdb5f2fd66f047670130fba2498180025cb0e960, projection_pointer: /capabilities/0}
+  /capabilities/1: {id: sha256-44fd7b3598e7f4100f27fd1ebdb5f2fd66f047670130fba2498180025cb0e960, projection_pointer: /capabilities/1}
+  /modalities/0: {id: sha256-44fd7b3598e7f4100f27fd1ebdb5f2fd66f047670130fba2498180025cb0e960, projection_pointer: /modalities/0}
+  /modalities/1: {id: sha256-44fd7b3598e7f4100f27fd1ebdb5f2fd66f047670130fba2498180025cb0e960, projection_pointer: /modalities/1}
+  /context_window: {id: sha256-44fd7b3598e7f4100f27fd1ebdb5f2fd66f047670130fba2498180025cb0e960, projection_pointer: /contextWindow}
+  /licensing: {id: sha256-44fd7b3598e7f4100f27fd1ebdb5f2fd66f047670130fba2498180025cb0e960, projection_pointer: /licensing}
+  /lifecycle: {id: sha256-44fd7b3598e7f4100f27fd1ebdb5f2fd66f047670130fba2498180025cb0e960, projection_pointer: /lifecycle}

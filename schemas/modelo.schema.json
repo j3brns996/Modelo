@@ -222,10 +222,21 @@
     },
     "site": {
       "type": "object",
-      "required": ["base_url", "base_path", "routes", "data_routes", "asset_routes", "progressive_enhancement", "document_routes", "urls_resolved_from_config_only", "effective_base_url_and_path_are_receipt_inputs", "ci_requires_explicit_base_url"],
+      "required": ["base_url", "base_path", "fonts", "routes", "data_routes", "asset_routes", "progressive_enhancement", "document_routes", "urls_resolved_from_config_only", "effective_base_url_and_path_are_receipt_inputs", "ci_requires_explicit_base_url"],
       "properties": {
         "base_url": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/canonicalBaseUrl" }] },
         "base_path": { "type": "string", "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~-]+/)*(?![\\s\\S])" },
+        "fonts": {
+          "type": "object",
+          "required": ["families", "stylesheet_url", "style_origin", "file_origin"],
+          "properties": {
+            "families": { "type": "array", "prefixItems": [{ "const": "Inter" }, { "const": "JetBrains Mono" }], "items": false },
+            "stylesheet_url": { "const": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" },
+            "style_origin": { "const": "https://fonts.googleapis.com" },
+            "file_origin": { "const": "https://fonts.gstatic.com" }
+          },
+          "additionalProperties": false
+        },
         "routes": {
           "type": "object",
           "required": ["home", "catalogue", "model", "offering", "changes", "process", "propose", "docs", "not_found"],
@@ -266,7 +277,7 @@
         },
         "progressive_enhancement": {
           "type": "object",
-          "required": ["framework", "version", "runtime_source", "runtime_sha256", "licence_source", "search_max_length", "comparison_max_models", "view_storage_key"],
+          "required": ["framework", "version", "runtime_source", "runtime_sha256", "licence_source", "search_max_length", "comparison_max_models", "view_storage_key", "default_view"],
           "properties": {
             "framework": { "const": "alpine-csp" },
             "version": { "const": "3.16.3" },
@@ -275,7 +286,8 @@
             "licence_source": { "const": "vendor/THIRD-PARTY-NOTICES.md" },
             "search_max_length": { "const": 200 },
             "comparison_max_models": { "const": 4 },
-            "view_storage_key": { "const": "modelo.catalogue.view.v1" }
+            "view_storage_key": { "const": "modelo.catalogue.view.v1" },
+            "default_view": { "const": "grid" }
           },
           "additionalProperties": false
         },

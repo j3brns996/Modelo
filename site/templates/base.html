@@ -3,18 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' $font_style_origin; font-src $font_file_origin; script-src 'self'; img-src 'self' data:; connect-src 'self' $font_style_origin $font_file_origin; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
   <meta name="referrer" content="no-referrer">
   <link rel="canonical" href="$canonical_url">
+  <link rel="preconnect" href="$font_style_origin">
+  <link rel="preconnect" href="$font_file_origin" crossorigin>
+  <link rel="stylesheet" href="$font_stylesheet_url">
   <link rel="stylesheet" href="$asset_css_url">
   <title>$title · Modelo</title>
 </head>
-<body>
+<body class="page-$page_name">
   <a class="skip-link" href="#main">Skip to content</a>
-  <header><a class="brand" href="$home_url">Modelo</a><nav aria-label="Primary">$navigation</nav></header>
-  $status_banner
-  <main id="main" tabindex="-1">$content</main>
-  <footer><p>Source revision <a rel="noopener noreferrer" href="$source_commit_url"><code>$source_commit_short</code></a> · $integration_label <a rel="noopener noreferrer" href="$integration_commit_url"><code>$integration_commit_short</code></a> · As at <time datetime="$as_of">$as_of</time> · <a href="$asset_third_party_notices_url">Third-party notices</a></p></footer>
+  <header class="site-header"><div class="site-header__inner"><a class="brand" href="$home_url"><span class="brand__mark" aria-hidden="true">M</span><span><strong>Modelo</strong><small>Governed AI catalogue</small></span></a><nav class="site-nav" aria-label="Primary">$navigation</nav><a class="source-link" rel="noopener noreferrer" href="$repository_url">Source <span aria-hidden="true">↗</span></a></div></header>
+  <div class="status-wrap">$status_banner</div>
+  <main id="main" class="site-main" tabindex="-1">$content</main>
+  <footer class="site-footer"><div class="site-footer__inner"><div><a class="brand brand--footer" href="$home_url"><span class="brand__mark" aria-hidden="true">M</span><span><strong>Modelo</strong><small>Evidence before approval.</small></span></a></div><div><strong>Explore</strong><a href="$catalogue_url">Catalogue</a><a href="$process_url">Governance process</a><a href="$docs_url">Reference</a></div><div><strong>Publication</strong><span>Source <a rel="noopener noreferrer" href="$source_commit_url"><code>$source_commit_short</code></a></span><span>$integration_label <a rel="noopener noreferrer" href="$integration_commit_url"><code>$integration_commit_short</code></a></span><span>As at <time datetime="$as_of">$as_of</time></span><a href="$asset_third_party_notices_url">Third-party notices</a></div></div></footer>
   $scripts
 </body>
 </html>

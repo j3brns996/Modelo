@@ -420,6 +420,17 @@ site:
   routes_config_key: site.routes
   data_routes: [catalogue, change_delta, manifest, schemas]
   asset_routes: [asset_css, asset_js, asset_alpine, asset_third_party_notices]
+  presentation:
+    shell: responsive_product_catalogue
+    references: [symphonic_information_architecture, local_model_filter_prototype]
+    font_families: [Inter, JetBrains Mono]
+    font_stylesheet_origin: https://fonts.googleapis.com
+    font_file_origin: https://fonts.gstatic.com
+    remote_scripts: forbidden
+    home_journey: [purpose, primary_actions, trust_posture, catalogue_metrics, governance_flow, recent_changes, next_actions]
+    catalogue_default_view: grid
+    entity_components: [status, facts, evidence_posture, approval_coordinates, related_records]
+    responsive_breakpoints: [880px, 580px]
   progressive_enhancement:
     framework: alpine_csp
     version: 3.16.3
@@ -428,7 +439,8 @@ site:
     search_max_length: 200
     comparison_max_models: 4
     view_storage_key: modelo.catalogue.view.v1
-    local_persistence: table_or_grid_view_only_url_value_takes_precedence_storage_failure_falls_back_to_table
+    default_view: grid
+    local_persistence: table_or_grid_view_only_url_value_takes_precedence_storage_failure_falls_back_to_configured_default
     licence: MIT
     bundled_dependency: "@vue/reactivity==3.5.41"
     third_party_notice: assets/vendor/THIRD-PARTY-NOTICES.md
@@ -445,6 +457,7 @@ site:
   profiles: [synthetic, private]
   profile_sources: {synthetic: tests/fixtures/build/synthetic, private: catalogue}
   synthetic_snapshot_as_of_config: publication.profiles.synthetic.as_of
+  synthetic_experience_facts: content_addressed_distinct_capability_modality_context_licence_lifecycle_examples
   production_public_field_redaction: deferred
   private_to_public_fallback: forbidden
   private_required_publication_capabilities: [restricted-artifact, access-controlled-pages]

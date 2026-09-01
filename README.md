@@ -57,13 +57,21 @@ Demo builds accept only the synthetic profile, use an empty MAC delta and make
 no approval, merge or release-receipt claim.
 
 The catalogue is progressively enhanced with the locally vendored Alpine CSP
-build `@alpinejs/csp==3.16.3`; standard Alpine's expression evaluator, CDNs,
-npm and `npx` are not used. Search, multi-select facets, deterministic sorting,
+build `@alpinejs/csp==3.16.3`; standard Alpine's expression evaluator, remote
+application scripts, npm and `npx` are not used. Inter and JetBrains Mono are
+loaded from the two explicitly CSP-allowlisted Google Fonts origins. Search,
+multi-select facets, deterministic sorting,
 result counts, table/grid views, shareable URL state and comparison of two to
 four canonical models remain browser-only views over server-rendered records.
 Only the table/grid preference is stored locally, explicit URL state wins, and
-storage failure safely falls back to table view. Scripts load only on the
+storage failure safely falls back to the configured grid view. Scripts load only on the
 catalogue page.
+
+The public synthetic site uses a shared responsive product shell, guided home
+journey, card-first catalogue and structured entity/reference pages. Synthetic
+models deliberately contain distinct content-addressed capabilities, modalities,
+context windows, licences and lifecycle facts so filters and comparison can be
+evaluated without publishing production catalogue data.
 
 The locked Python suite proves emitted structure, bounds, integrity and the
 no-JavaScript baseline. When a host Node executable is available,

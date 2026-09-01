@@ -78,6 +78,7 @@ function component() {
   value.searchMax = 200;
   value.compareMax = 4;
   value.viewStorageKey = "modelo.catalogue.view.v1";
+  value.defaultView = "grid";
   return value;
 }
 
@@ -157,7 +158,7 @@ function record(index, { key, name, kind, search, facets = {} }) {
   assert.equal(window.location.searchParams.get("unowned"), "kept");
   assert.deepEqual(window.location.searchParams.getAll("vendor"), ["vendor-a", "vendor-b"]);
   assert.deepEqual(window.location.searchParams.getAll("compare"), ["model:alpha", "model:beta"]);
-  assert.equal(window.location.searchParams.get("view"), "grid");
+  assert.equal(window.location.searchParams.get("view"), null);
 }
 
 // A valid URL view wins over local preference; unavailable storage fails safe.
@@ -168,7 +169,7 @@ function record(index, { key, name, kind, search, facets = {} }) {
   assert.equal(explorer.readViewPreference(new URLSearchParams()), "grid");
   const available = window.localStorage;
   window.localStorage = { getItem() { throw new Error("blocked"); }, setItem() { throw new Error("blocked"); } };
-  assert.equal(explorer.readViewPreference(new URLSearchParams()), "table");
+  assert.equal(explorer.readViewPreference(new URLSearchParams()), "grid");
   explorer.view = "table";
   explorer.apply = () => {};
   assert.doesNotThrow(() => explorer.changeView({ currentTarget: { dataset: { view: "grid" } } }));

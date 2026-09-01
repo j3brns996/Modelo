@@ -15,7 +15,7 @@ from typing import Any, Iterable, Mapping
 from urllib.parse import quote, urlsplit
 
 from modelo.build import (
-    BuildError, BuildRequest, _layout, _publish, _safe_url,
+    BuildError, BuildRequest, _layout, _projection_from_snapshot, _publish, _safe_url,
     _walk_regular_tree, rebuild_candidate_inputs, recover_candidate,
 )
 from modelo.change import with_snapshot
@@ -65,6 +65,18 @@ class ValidationBuildRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class DemoBuildRequest:
+    root: Path
+    source_commit: str
+    source_tree: str
+    as_of: date
+    source_date_epoch: int
+    base_url: str
+    base_path: str
+    output: str
+
+
+@dataclass(frozen=True, slots=True)
 class _SiteBuildRequest:
     kind: str
     root: Path
@@ -79,7 +91,7 @@ class _SiteBuildRequest:
     base_url: str
     base_path: str
     output: str
-    mac_metadata: Path
+    mac_metadata: Path | None
     publication_capability: str
 
 
@@ -346,7 +358,15 @@ def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, req
         "title": escape(title), "navigation": _navigation(resolver), "content": content,
         "home_url": escape(resolver.site("home"), quote=True),
         "source_commit_url": escape(resolver.repository_url("commit", commit_sha=request.source_commit), quote=True),
-        "integration_label": "Approval merge" if request.kind == "final" else "Validation integration",
+        "status_banner": (
+            '<aside class="card" role="status"><strong>Synthetic demo.</strong> '
+            "This is test data, not an approved enterprise catalogue.</aside>"
+            if request.kind == "demo" else ""
+        ),
+        "integration_label": (
+            "Approval merge" if request.kind == "final" else
+            ("Validation integration" if request.kind == "validation" else "Demo source")
+        ),
         "integration_commit_url": escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True),
         "source_commit_short": escape(request.source_commit[:12]), "as_of": request.as_of.isoformat(),
         "integration_commit_short": escape(request.integration_commit[:12]),
@@ -393,7 +413,8 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
             for item in match.split("|") if item
         })
         controls.append('<label for="filter-' + key + '">' + label + '</label><select id="filter-' + key + '" data-filter="' + key + '"><option value="">All</option>' + "".join('<option value="' + escape(value, quote=True) + '">' + escape(value) + '</option>' for value in present) + '</select>')
-    catalogue_content = _substitute(templates["catalogue"], {"filter_controls": "".join(controls), "catalogue_rows": '<table><caption>Approved models and offerings</caption><thead><tr><th>Kind</th><th>Name</th><th>Owner/service</th><th>Capabilities/Source Regions</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>"}, "catalogue")
+    caption = "Synthetic example models and offerings" if request.kind == "demo" else "Approved models and offerings"
+    catalogue_content = _substitute(templates["catalogue"], {"filter_controls": "".join(controls), "catalogue_rows": '<table><caption>' + caption + '</caption><thead><tr><th>Kind</th><th>Name</th><th>Owner/service</th><th>Capabilities/Source Regions</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>"}, "catalogue")
     history_content = _substitute(templates["changes"], {"history": _history_html(history)}, "changes")
     content_path = document["paths"]["site_content"]
     process_content = _substitute(templates["process"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/process.md"))}, "process")
@@ -423,8 +444,10 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     for offering in catalogue["offerings"]:
         if request.kind == "final":
             approval = '<section class="card"><h2>Approval coordinates</h2><dl><dt>Accepted source</dt><dd><code>' + escape(request.source_commit) + '</code></dd><dt>Accepted tree</dt><dd><code>' + escape(request.source_tree) + '</code></dd><dt>Merge commit</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True) + '"><code>' + escape(request.integration_commit) + '</code></a></dd></dl><p><a rel="noopener noreferrer" href="' + escape(releases_url, quote=True) + '">Discover protected releases and detached receipts</a>. No approval receipt is embedded in this site.</p></section>'
-        else:
+        elif request.kind == "validation":
             approval = '<section class="card"><h2>Validation coordinates</h2><dl><dt>Proposed source</dt><dd><code>' + escape(request.source_commit) + '</code></dd><dt>Proposed tree</dt><dd><code>' + escape(request.source_tree) + '</code></dd><dt>Validation integration</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True) + '"><code>' + escape(request.integration_commit) + '</code></a></dd></dl><p>This validation publication is not approval and is never deployed as the catalogue.</p></section>'
+        else:
+            approval = '<section class="card"><h2>Demo provenance</h2><dl><dt>Source commit</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.source_commit), quote=True) + '"><code>' + escape(request.source_commit) + '</code></a></dd><dt>Source tree</dt><dd><code>' + escape(request.source_tree) + '</code></dd></dl><p>Synthetic fixture only. This record is not approved for enterprise use.</p></section>'
         refs = sorted({reference["id"] for reference in offering.get("evidence_refs", {}).values()})
         conditions = [f'{item["id"]}@{item["version"]}' for item in offering.get("condition_refs", [])]
         content = _substitute(templates["offering"], {"offering_name": escape(offering["id"]), "approval": approval, "route_table": _route_rows(offering, evidence), "pricing_table": _pricing_rows(offering), "conditions_evidence": "<p>Conditions: " + (_tags(conditions) or "None") + "</p><p>Evidence: " + (_tags(refs) or "None") + "</p>"}, "offering")
@@ -498,10 +521,22 @@ def build_validation_site(request: ValidationBuildRequest) -> FinalBuildResult:
     ))
 
 
+def build_demo_site(request: DemoBuildRequest) -> FinalBuildResult:
+    return _build_site(_SiteBuildRequest(
+        kind="demo", root=request.root, base_commit=request.source_commit,
+        source_commit=request.source_commit, source_tree=request.source_tree,
+        integration_commit=request.source_commit, integration_tree=request.source_tree,
+        as_of=request.as_of, source_date_epoch=request.source_date_epoch,
+        profile="synthetic", base_url=request.base_url, base_path=request.base_path,
+        output=request.output, mac_metadata=None,
+        publication_capability="public-pages",
+    ))
+
+
 def _build_site(request: _SiteBuildRequest) -> FinalBuildResult:
     root = request.root.resolve()
     load_config(root)
-    if request.kind not in {"validation", "final"}:
+    if request.kind not in {"demo", "validation", "final"}:
         raise BuildError("unknown site publication kind")
     if request.profile not in {"synthetic", "private"}:
         raise BuildError("unknown publication profile")
@@ -518,9 +553,14 @@ def _build_site(request: _SiteBuildRequest) -> FinalBuildResult:
     source = _canonical_commit(root, request.source_commit, "source commit")
     integration = _canonical_commit(root, request.integration_commit, f"{request.kind} integration commit")
     layout = with_snapshot(root, source, lambda snapshot: _layout(snapshot))
-    configured_output = layout.validation_root if request.kind == "validation" else layout.final_root
+    configured_output = {
+        "demo": layout.pages_root,
+        "validation": layout.validation_root,
+        "final": layout.final_root,
+    }[request.kind]
     if request.output != configured_output.as_posix():
-        raise BuildError(f"{request.kind} output must equal configured {request.kind}_root")
+        output_key = "pages_root" if request.kind == "demo" else f"{request.kind}_root"
+        raise BuildError(f"{request.kind} output must equal configured {output_key}")
     if str(_git(root, "rev-parse", f"{source}^{{tree}}")).strip() != request.source_tree:
         raise BuildError("source tree does not match source commit")
     actual_integration_tree = str(_git(root, "rev-parse", f"{integration}^{{tree}}")).strip()
@@ -540,13 +580,26 @@ def _build_site(request: _SiteBuildRequest) -> FinalBuildResult:
     author_epoch = int(str(_git(root, "show", "-s", "--format=%at", source)).strip())
     if request.source_date_epoch != author_epoch:
         raise BuildError("source date epoch differs from accepted source commit author time")
-    catalogue_raw, delta_raw, catalogue = rebuild_candidate_inputs(BuildRequest(
-        root=root, kind="candidate", base_commit=base, source_commit=source,
-        source_tree=request.source_tree, as_of=request.as_of,
-        source_date_epoch=request.source_date_epoch, mac_metadata=request.mac_metadata,
-        profile=request.profile, base_url=None, base_path=request.base_path,
-        output=layout.candidate_root.as_posix(),
-    ))
+    if request.kind == "demo":
+        catalogue = with_snapshot(
+            root, source,
+            lambda snapshot: _projection_from_snapshot(
+                snapshot, request.profile, source, request.source_tree,
+                request.as_of, layout,
+            ),
+        )
+        catalogue_raw = canonical_bytes(catalogue)
+        delta_raw = canonical_bytes([])
+    else:
+        if request.mac_metadata is None:
+            raise BuildError(f"{request.kind} build requires validated MAC metadata")
+        catalogue_raw, delta_raw, catalogue = rebuild_candidate_inputs(BuildRequest(
+            root=root, kind="candidate", base_commit=base, source_commit=source,
+            source_tree=request.source_tree, as_of=request.as_of,
+            source_date_epoch=request.source_date_epoch, mac_metadata=request.mac_metadata,
+            profile=request.profile, base_url=None, base_path=request.base_path,
+            output=layout.candidate_root.as_posix(),
+        ))
     document = _committed_yaml_config(root, source, "modelo.yaml")
     files = _site_files(root, request, catalogue_raw, delta_raw, catalogue, document)
     schemas_root = document["paths"]["schemas"]
@@ -574,7 +627,7 @@ def _build_site(request: _SiteBuildRequest) -> FinalBuildResult:
             "validation_commit": integration,
             "validation_tree": request.integration_tree,
         })
-    else:
+    elif request.kind == "final":
         manifest.update({"merge_commit": integration, "merge_tree": request.integration_tree})
     findings = with_snapshot(
         root, source,

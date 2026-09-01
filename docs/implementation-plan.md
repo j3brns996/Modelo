@@ -1,8 +1,8 @@
 # Modelo v0.1 implementation and verification plan
 
-Status: T8 pre-merge CI and T9 are implemented on the release-candidate branch.
-The accepted T6 head is `8694053c3366e162e0da6991ad08729aa8c95ad5`.
-T8 post-merge Pages/release automation and the T10 remote sentinel,
+Status: T8 pre-merge CI, T9 and a public synthetic Pages demo workflow are
+implemented. The accepted T6 head is `8694053c3366e162e0da6991ad08729aa8c95ad5`.
+Production post-merge release/receipt automation and the T10 remote sentinel,
 release/receipt and mirror-restore rehearsal remain launch gates, so no
 production catalogue record may merge.
 
@@ -19,7 +19,8 @@ uv sync --locked
 uv build --offline --no-cache
 uv run --locked modelo check --base <protected-base-sha> --head <head-sha> --as-of <YYYY-MM-DD>
 uv run --locked modelo build --kind candidate --base-commit <BASE> --source-commit <HEAD> --source-tree <TREE> --as-of <DATE> --source-date-epoch <EPOCH> --mac-metadata <MAC_JSON_PATH> --profile synthetic --no-base-url --base-path /Modelo/ --output dist/candidate
-uv run --locked modelo build --kind final --base-commit <BASE> --source-commit <ACCEPTED_HEAD> --source-tree <ACCEPTED_TREE> --merge-commit <MERGE> --merge-tree <ACCEPTED_TREE> --as-of <DATE> --source-date-epoch <ACCEPTED_HEAD_AUTHOR_EPOCH> --profile synthetic --base-url https://pages.example/Modelo/ --base-path /Modelo/ --output dist/final
+uv run --locked modelo build --kind demo --base-commit <SOURCE> --source-commit <SOURCE> --source-tree <TREE> --as-of <DATE> --source-date-epoch <SOURCE_AUTHOR_EPOCH> --profile synthetic --base-url https://pages.example/Modelo/ --base-path /Modelo/ --output dist/pages
+uv run --locked modelo build --kind final --base-commit <BASE> --source-commit <ACCEPTED_HEAD> --source-tree <ACCEPTED_TREE> --merge-commit <MERGE> --merge-tree <ACCEPTED_TREE> --as-of <DATE> --source-date-epoch <ACCEPTED_HEAD_AUTHOR_EPOCH> --mac-metadata <MAC_JSON_PATH> --profile synthetic --base-url https://pages.example/Modelo/ --base-path /Modelo/ --output dist/final
 ```
 
 `uv.lock` controls runtime sync and `uv run --locked`. Tool-package creation is
@@ -194,5 +195,5 @@ cannot substitute for host controls.
 | T0 contract reconciliation | Complete; four independent exact-head gates returned READY |
 | Implementation swarm | T1–T7 accepted; T8 trusted pre-merge checks and T9 portable skills implemented in the bootstrap candidate |
 | Executable validator and CI | Validator and GitHub trusted pre-merge adapter implemented; remote host-control rehearsal remains T10 |
-| Static site and platform templates | Static site, issue templates and PR/MR templates implemented; Pages publication remains T10 |
+| Static site and platform templates | Static site, issue templates, PR/MR templates and synthetic demo Pages workflow implemented; live deploy and production final publication remain T10 evidence |
 | Production catalogue launch | Blocked through T10 |

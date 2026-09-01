@@ -27,11 +27,24 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result.stderr, "")
 
     def test_help_and_future_command_help_succeed(self) -> None:
-        for arguments in ((), ("check", "--help"), ("build", "--help")):
+        for arguments in ((), ("check", "--help"), ("build", "--help"), ("config", "site", "--help")):
             with self.subTest(arguments=arguments):
                 result = self.run_cli(*arguments)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("usage:", result.stdout)
+
+    def test_site_configuration_has_one_machine_readable_owner(self) -> None:
+        result = self.run_cli("config", "site")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stdout,
+            '{"base_path":"/Modelo/","base_url":"https://j3brns996.github.io/Modelo/"}\n',
+        )
+        lines = self.run_cli("config", "site", "--format", "lines")
+        self.assertEqual(
+            lines.stdout,
+            "https://j3brns996.github.io/Modelo/\n/Modelo/\n",
+        )
 
     def test_final_build_requires_merge_coordinates_metadata_and_publication_capability(self) -> None:
         result = self.run_cli(
@@ -58,6 +71,21 @@ class CliTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn("publication-capability", result.stderr)
+
+    def test_demo_build_rejects_mac_and_private_profile_before_git_access(self) -> None:
+        common = (
+            "build", "--kind", "demo", "--base-commit", "a" * 40,
+            "--source-commit", "a" * 40, "--source-tree", "b" * 40,
+            "--as-of", "2026-08-30", "--source-date-epoch", "0",
+            "--base-url", "https://example.invalid/Modelo/", "--base-path", "/Modelo/",
+            "--output", "dist/pages",
+        )
+        private = self.run_cli(*common, "--profile", "private")
+        self.assertEqual(private.returncode, 2)
+        self.assertIn("fixes publication profile to synthetic", private.stderr)
+        metadata = self.run_cli(*common, "--profile", "synthetic", "--mac-metadata", "metadata.json")
+        self.assertEqual(metadata.returncode, 2)
+        self.assertIn("does not accept --mac-metadata", metadata.stderr)
 
     def test_recover_command_is_exposed(self) -> None:
         result = self.run_cli("recover", "--help")

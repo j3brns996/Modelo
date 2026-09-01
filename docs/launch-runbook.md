@@ -19,6 +19,10 @@ The PR must contain no production model or offering records. Before merge:
 After merge, verify the main tree equals the reviewed head tree. Do not yet add
 `modelo/check` as a required check unless a positive sentinel can run.
 
+The checked-in Pages workflow may publish the labelled synthetic demo after
+merge. A successful demo deploy proves only the static hosting path. It is not
+a MAC approval, final release receipt, production catalogue or T10 completion.
+
 ## Gate B — repository controls
 
 Apply and read back: PR required; one independent approval; stale approvals
@@ -48,7 +52,8 @@ direct/force push, branch deletion and skipped/cancelled check.
 ## Gate D — remaining executable launch slice
 
 Production launch remains blocked until a further human-approved PR implements
-and tests all of the following:
+and tests all of the following. The public synthetic demo workflow does not
+satisfy these production items:
 
 - consume the accepted exact-head check receipt after merge;
 - prove merge tree equals accepted head tree;

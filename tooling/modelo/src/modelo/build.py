@@ -90,6 +90,7 @@ class BuildLayout:
     candidate_root: PurePosixPath
     validation_root: PurePosixPath
     final_root: PurePosixPath
+    pages_root: PurePosixPath
     target_parent: PurePosixPath
     publication_subdir: PurePosixPath
     catalogue_path: PurePosixPath
@@ -128,6 +129,7 @@ def _layout(root: Path) -> BuildLayout:
         candidate_root = _safe_config_path(build["candidate_root"], "build.candidate_root")
         validation_root = _safe_config_path(build["validation_root"], "build.validation_root")
         final_root = _safe_config_path(build["final_root"], "build.final_root")
+        pages_root = _safe_config_path(build["pages_root"], "build.pages_root")
         target_parent = _safe_config_path(build["target_parent"], "build.target_parent")
         publication_subdir = _safe_config_path(build["publication_subdir"], "build.publication_subdir")
         catalogue_path = _safe_config_path(build["catalogue_path"], "build.catalogue_path")
@@ -166,15 +168,16 @@ def _layout(root: Path) -> BuildLayout:
     if any(value.parent != schemas_root for value in schema_paths.values()):
         raise BuildError("configured build schemas must be direct children of paths.schemas")
     if (
-        len({candidate_root, validation_root, final_root}) != 3
-        or writer_lock in {candidate_root, validation_root, final_root}
+        len({candidate_root, validation_root, final_root, pages_root}) != 4
+        or writer_lock in {candidate_root, validation_root, final_root, pages_root}
         or candidate_root.parent != target_parent
         or validation_root.parent != target_parent
         or final_root.parent != target_parent
+        or pages_root.parent != target_parent
         or writer_lock.parent != target_parent
     ):
         raise BuildError(
-            "configured candidate, validation and final roots and writer lock must be distinct under target_parent"
+            "configured candidate, validation, final and Pages roots and writer lock must be distinct under target_parent"
         )
     input_keys = (
         "catalogue", "schemas", "fixtures", "site_source", "site_templates", "site_assets",
@@ -183,7 +186,7 @@ def _layout(root: Path) -> BuildLayout:
     inputs = tuple(dict.fromkeys([
         PurePosixPath("modelo.yaml"), *(path(key) for key in input_keys), *profiles.values()
     ]))
-    for output in (candidate_root, validation_root, final_root):
+    for output in (candidate_root, validation_root, final_root, pages_root):
         for source in inputs:
             if output == source or output in source.parents or source in output.parents:
                 raise BuildError("configured build output overlaps a configured input")
@@ -194,6 +197,7 @@ def _layout(root: Path) -> BuildLayout:
         catalogue_output_schema=schema_paths["catalogue_output_schema"].name,
         build_manifest_schema=schema_paths["build_manifest_schema"].name,
         candidate_root=candidate_root, validation_root=validation_root, final_root=final_root,
+        pages_root=pages_root,
         target_parent=target_parent, publication_subdir=publication_subdir,
         catalogue_path=catalogue_path, change_delta_path=delta_path, manifest_path=manifest_path,
         candidate_inventory=inventory, candidate_manifest_files=manifest_files,
@@ -667,7 +671,8 @@ def _validate_record(value: Mapping[str, Any], layout: BuildLayout) -> dict[str,
     token = value.get("token")
     if (
         value.get("target") not in {
-            layout.candidate_root.name, layout.validation_root.name, layout.final_root.name
+            layout.candidate_root.name, layout.validation_root.name,
+            layout.final_root.name, layout.pages_root.name,
         }
         or not isinstance(token, str)
         or len(token) != 32 or any(character not in "0123456789abcdef" for character in token)
@@ -830,18 +835,20 @@ def _publication_inventory(root: Path, target: Path, layout: BuildLayout) -> dic
     candidate_name = layout.candidate_root.name
     validation_name = layout.validation_root.name
     final_name = layout.final_root.name
+    pages_name = layout.pages_root.name
     if target.name == candidate_name or target.name.startswith(candidate_name + "."):
         return _candidate_inventory(root, target, layout)
     validation = target.name == validation_name or target.name.startswith(validation_name + ".")
     final = target.name == final_name or target.name.startswith(final_name + ".")
-    if not validation and not final:
+    pages = target.name == pages_name or target.name.startswith(pages_name + ".")
+    if not validation and not final and not pages:
         raise BuildError("publication target is not configured")
     raw = _walk_regular_tree(target)
     manifest_path = (layout.publication_subdir / layout.manifest_path).as_posix()
     if manifest_path not in raw:
         raise BuildError("final publication lacks its manifest")
     manifest = _strict_json_bytes(raw[manifest_path], "final manifest")
-    expected_kind = "validation" if validation else "final"
+    expected_kind = "validation" if validation else ("final" if final else "demo")
     if canonical_bytes(manifest) != raw[manifest_path] or manifest.get("kind") != expected_kind:
         raise BuildError(f"{expected_kind} manifest is not canonical {expected_kind} metadata")
     files = {
@@ -963,6 +970,7 @@ def _recover_candidate(root: Path) -> RecoveryOutcome | None:
         layout.candidate_root.name: layout.candidate_root,
         layout.validation_root.name: layout.validation_root,
         layout.final_root.name: layout.final_root,
+        layout.pages_root.name: layout.pages_root,
     }[journal["target"]]
     target = repository.joinpath(*selected.parts)
     staging = parent / f"{target.name}.{token}.staging"

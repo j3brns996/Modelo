@@ -60,13 +60,13 @@ jobs:
           set -euo pipefail
           source_tree="$(git -C source rev-parse 'HEAD^{tree}')"
           source_epoch="$(git -C source show -s --format=%at HEAD)"
-          as_of="$(date -u +%F)"
           mapfile -t site_config < <(
             uv run --project source --locked modelo --root source config site --format lines
           )
-          test "${#site_config[@]}" = 2
+          test "${#site_config[@]}" = 3
           base_url="${site_config[0]}"
           base_path="${site_config[1]}"
+          as_of="${site_config[2]}"
           uv run --project source --locked modelo --root source build \
             --kind demo \
             --base-commit "${SOURCE_SHA}" \

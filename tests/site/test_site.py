@@ -230,6 +230,27 @@ class FinalSiteTests(unittest.TestCase):
         with self.assertRaisesRegex(BuildError, "working tree is dirty"):
             build_demo_site(self.demo_request())
 
+    def test_demo_requires_configured_synthetic_snapshot_date(self) -> None:
+        git(self.root, "checkout", "--detach", self.source)
+        with self.assertRaisesRegex(BuildError, "configured synthetic fixture snapshot date"):
+            build_demo_site(replace(self.demo_request(), as_of=date(2026, 9, 1)))
+
+    def test_demo_rejects_tampered_vendored_runtime(self) -> None:
+        git(self.root, "checkout", "--detach", self.source)
+        runtime = self.root / "site/assets/vendor/alpine-csp-3.16.3.min.js"
+        runtime.write_bytes(runtime.read_bytes() + b"\n")
+        git(self.root, "add", runtime.relative_to(self.root).as_posix())
+        git(self.root, "commit", "-m", "tamper with browser runtime")
+        source = git(self.root, "rev-parse", "HEAD")
+        request = replace(
+            self.demo_request(),
+            source_commit=source,
+            source_tree=git(self.root, "rev-parse", "HEAD^{tree}"),
+            source_date_epoch=int(git(self.root, "show", "-s", "--format=%at", source)),
+        )
+        with self.assertRaisesRegex(BuildError, "runtime digest differs"):
+            build_demo_site(request)
+
     def test_exact_inventory_manifest_and_candidate_bytes(self) -> None:
         result = build_final_site(self.request())
         site = result.output / "site"
@@ -599,12 +620,55 @@ class FinalSiteTests(unittest.TestCase):
         base = (ROOT / "site/templates/base.html").read_text()
         self.assertIn("default-src 'none'", base)
         self.assertIn('name="referrer" content="no-referrer"', base)
+        runtime = (ROOT / "site/assets/vendor/alpine-csp-3.16.3.min.js").read_bytes()
+        self.assertEqual(
+            sha256_bytes(runtime),
+            "sha256:0de89ad5a626c023982c2ed7051ef5fd3cbfa22d012de81fa19005c811bfad4d",
+        )
+        notices = (ROOT / "site/assets/vendor/THIRD-PARTY-NOTICES.md").read_text(encoding="utf-8")
+        self.assertEqual(notices.count("MIT License"), 2)
+        self.assertIn("Caleb Porzio and contributors", notices)
+        self.assertIn("Yuxi (Evan) You", notices)
+
+    def test_progressive_explorer_contract_is_accessible_shareable_and_bounded(self) -> None:
+        site = build_final_site(self.request()).output / "site"
+        catalogue = (site / "catalogue/index.html").read_text(encoding="utf-8")
+        javascript = (site / "assets/catalogue.js").read_text(encoding="utf-8")
+        for marker in (
+            'x-data="catalogueExplorer"', 'aria-live="polite"', "data-active-filters",
+            "data-advanced-filters", "data-sort", 'data-view="grid"',
+            "data-comparison-dialog", "data-comparison-content",
+            'data-comparison-tray role="status" aria-live="polite"',
+        ):
+            self.assertIn(marker, catalogue)
+        self.assertEqual(catalogue.count("data-compare-toggle"), 2)
+        self.assertIn('data-search-max="200"', catalogue)
+        self.assertIn('data-compare-max="4"', catalogue)
+        self.assertIn('data-view-storage-key="modelo.catalogue.view.v1"', catalogue)
+        self.assertIn("slice(0, this.compareMax)", javascript)
+        self.assertIn("this.comparison.length < this.compareMax", javascript)
+        self.assertIn("window.history.replaceState", javascript)
+        self.assertIn("window.localStorage.getItem", javascript)
+        self.assertIn("window.localStorage.setItem", javascript)
+        self.assertLess(javascript.index('parameters.get("view")'), javascript.index("window.localStorage.getItem"))
+        self.assertIn("url.searchParams.append", javascript)
+        self.assertIn("dataset.searchText", javascript)
+        self.assertIn('data-search-text="test-model|Test Model|test-vendor', catalogue)
+        self.assertIn("document.createElement", javascript)
+        self.assertIn("textContent", javascript)
+        self.assertLess(catalogue.index("/assets/catalogue.js"), catalogue.index("/assets/vendor/alpine-csp-3.16.3.min.js"))
+        self.assertNotIn("<script src=\"http", catalogue)
+        home = (site / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn("catalogue.js", home)
+        self.assertNotIn("alpine-csp", home)
 
     def test_search_facets_docs_evidence_footer_and_history_contract(self) -> None:
         site = build_final_site(self.request()).output / "site"
         catalogue = (site / "catalogue/index.html").read_text(encoding="utf-8")
-        for facet in ("vendor", "service", "source-region", "route-type", "capability", "modality", "licence", "lifecycle", "condition"):
+        for facet in ("kind", "vendor", "service", "source-region", "route-type", "condition"):
             self.assertIn(f'data-filter="{facet}"', catalogue)
+        for absent in ("capability", "modality", "licence", "lifecycle"):
+            self.assertNotIn(f'data-filter="{absent}"', catalogue)
         self.assertIn("data-catalogue-row", catalogue)
         model = (site / "models/test-model/index.html").read_text(encoding="utf-8")
         self.assertIn("Intrinsic evidence", model)
@@ -699,6 +763,8 @@ class FinalSiteTests(unittest.TestCase):
             "offering": "/offerings/{inference_service_id}/{offering_id}/", "changes": "/changes/",
             "process": "/process/", "propose": "/propose/", "docs": "/docs/", "not_found": "/404.html",
             "asset_css": "/assets/site.css", "asset_js": "/assets/catalogue.js",
+            "asset_alpine": "/assets/vendor/alpine-csp-3.16.3.min.js",
+            "asset_third_party_notices": "/assets/vendor/THIRD-PARTY-NOTICES.md",
             "catalogue_data": "/data/catalogue.json", "change_delta_data": "/data/change-delta.json",
             "manifest_data": "/data/manifest.json", "schemas_data": "/data/schemas/",
             "human_specification": "/docs/SPEC.md", "machine_contract": "/docs/contract.yaml",

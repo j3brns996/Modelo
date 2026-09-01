@@ -22,6 +22,10 @@ After merge, verify the main tree equals the reviewed head tree. Do not yet add
 The checked-in Pages workflow may publish the labelled synthetic demo after
 merge. A successful demo deploy proves only the static hosting path. It is not
 a MAC approval, final release receipt, production catalogue or T10 completion.
+The first demo verification exercises search, multi-select filters, sorting,
+result counts, table/grid persistence with URL precedence, a copied URL and
+two-model comparison with keyboard input. It also checks the published Alpine CSP runtime and third-party
+notices against their contract digests. These are UX checks, not catalogue approval.
 
 ## Gate B — repository controls
 

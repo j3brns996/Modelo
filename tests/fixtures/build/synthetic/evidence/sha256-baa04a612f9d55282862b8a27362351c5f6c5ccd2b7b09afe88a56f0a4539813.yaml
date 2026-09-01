@@ -1,0 +1,10 @@
+id: sha256-baa04a612f9d55282862b8a27362351c5f6c5ccd2b7b09afe88a56f0a4539813
+source:
+  type: official-vendor-documentation
+  uri: https://example.invalid/model-two
+retrieved_by: manual
+observed_at: "2026-08-01T00:00:00Z"
+scope: {}
+projection:
+  modelName: Test Model Two
+visibility: public

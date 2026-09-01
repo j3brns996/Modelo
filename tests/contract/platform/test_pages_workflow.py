@@ -30,6 +30,9 @@ def test_pages_workflow_can_only_publish_the_synthetic_demo() -> None:
     raw = (ROOT / ".github/workflows/pages.yml").read_text(encoding="utf-8")
     assert "--profile synthetic" in raw
     assert "modelo --root source config site" in raw
+    assert 'test "${#site_config[@]}" = 3' in raw
+    assert 'as_of="${site_config[2]}"' in raw
+    assert "date -u +%F" not in raw
     assert "jq" not in raw
     assert "https://j3brns996.github.io/Modelo/" not in raw
     assert "--mac-metadata" not in raw

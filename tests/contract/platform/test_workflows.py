@@ -51,6 +51,8 @@ def test_github_trusted_workflow_is_pinned_read_only_and_node_free() -> None:
     assert raw.count("fetch --no-tags origin") >= 3
     fixture = (ROOT / "tests/fixtures/semantic/repository.py").read_text(encoding="utf-8")
     assert 'ignore=shutil.ignore_patterns(".git",' in fixture
+    assert "--depth=1" not in raw
+    assert raw.count("fetch --no-tags origin") >= 3
 
 
 def test_skills_are_not_workflow_or_package_inputs() -> None:

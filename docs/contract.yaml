@@ -460,6 +460,9 @@ site:
     approval_or_release_evidence: false
     github_workflow: .github/workflows/pages.yml
     build_once_upload_exact_then_deploy: true
+    artifact_archive: gnu_tar_dereference_hard_dereference_excluding_dot_git_and_dot_github
+    artifact_upload: direct_full_sha_pinned_actions_upload_artifact_named_github_pages
+    composite_upload_pages_artifact: forbidden_due_to_transitive_floating_action_reference
   final_postmerge_artifact_is_validated_then_deployed_without_rebuild: true
   test_ownership:
     t6_locked: [no_javascript_navigation, link_integrity, inert_xss, vendored_runtime_integrity, bounded_explorer_structure, publication_non_leakage, accessibility_structure]

@@ -757,7 +757,10 @@ authentication proxy merely to compensate for a hosting-plan limitation.
 
 The GitHub Pages workflow reads its URL and base path from validated
 `modelo.yaml`, runs the locked Python test/package gates, builds the synthetic
-demo exactly once, uploads that exact directory and deploys without rebuilding.
+demo exactly once, archives that exact directory and uploads it with a directly
+pinned GitHub-owned artifact action before deploying without rebuilding. The
+workflow does not use the Pages composite uploader because its transitive
+floating action reference conflicts with the repository SHA-pinning policy.
 This demo is not the production final artefact and carries no MAC, merge,
 release or approval claim.
 

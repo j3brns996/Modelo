@@ -51,7 +51,8 @@ a service.
 The Pages workflow runs the locked tests and offline package build, reads the
 single global URL and synthetic snapshot-date owner with `modelo config site`,
 builds `--kind demo` once to
-`dist/pages/site`, uploads those exact bytes and deploys without rebuilding.
+`dist/pages/site`, archives those exact bytes and uploads them with the directly
+pinned GitHub artifact action before deploying without rebuilding.
 Demo builds accept only the synthetic profile, use an empty MAC delta and make
 no approval, merge or release-receipt claim.
 

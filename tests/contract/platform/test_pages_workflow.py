@@ -20,8 +20,13 @@ def test_pages_workflow_is_pinned_python_only_and_builds_once() -> None:
     assert uses
     assert all(re.fullmatch(r"[^@]+@[0-9a-f]{40}", value) for value in uses)
     assert raw.count("--kind demo") == 1
-    assert raw.count("upload-pages-artifact") == 1
-    assert "path: source/dist/pages/site" in raw
+    assert "upload-pages-artifact" not in raw
+    assert raw.count("actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02") == 1
+    assert "tar --dereference --hard-dereference" in raw
+    assert 'INPUT_PATH: source/dist/pages/site' in raw
+    assert 'name: github-pages' in raw
+    assert 'path: ${{ runner.temp }}/artifact.tar' in raw
+    assert "compression-level: 0" in raw
     assert "needs: build" in raw
     assert "Deploy without rebuilding" in raw
 
@@ -40,3 +45,4 @@ def test_pages_workflow_can_only_publish_the_synthetic_demo() -> None:
     assert "--publication-capability" not in raw
     assert "refs/heads/${DEFAULT_BRANCH}" in raw
     assert "test \"$(git -C source rev-parse" in raw
+    assert "actions/upload-artifact@v4" not in raw

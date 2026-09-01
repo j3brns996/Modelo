@@ -170,8 +170,12 @@ silently publishing an incomplete ledger.
 The GitHub demo workflow runs the complete locked test suite and offline Python
 package build, reads the effective URL and synthetic fixture snapshot date only
 through validated `modelo.yaml`,
-builds `dist/pages/site` once, uploads that exact directory and deploys without
-rebuilding. Its actions are pinned to full commit SHAs. It contains no Node,
+builds `dist/pages/site` once, archives that exact directory with GNU tar,
+uploads the single `artifact.tar` using a directly SHA-pinned GitHub-owned
+artifact action and deploys without rebuilding. The Pages composite uploader is
+not used because its transitive floating action reference is incompatible with
+the repository SHA-pinning policy. All invoked actions are pinned to full commit
+SHAs. The workflow contains no Node,
 npm or `npx` command; GitHub's pinned Pages actions are provider adapters, not
 Modelo runtime dependencies.
 

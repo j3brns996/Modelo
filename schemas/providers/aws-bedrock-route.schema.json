@@ -3,10 +3,6 @@
   "$id": "https://modelo.invalid/schemas/providers/aws-bedrock-route.schema.json",
   "title": "Modelo AWS Bedrock route",
   "$defs": {
-    "awsRegion": {
-      "type": "string",
-      "pattern": "^[a-z]{2}(?:-gov)?-[a-z]+-[0-9]+(?![\\s\\S])"
-    },
     "foundationModelReference": {
       "oneOf": [
         {
@@ -102,7 +98,7 @@
   "properties": {
     "id": { "$ref": "../common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
     "source_region": {
-      "$ref": "#/$defs/awsRegion",
+      "$ref": "../common.schema.json#/$defs/awsRegion",
       "x-modelo-provenance": "internal"
     },
     "reference": {

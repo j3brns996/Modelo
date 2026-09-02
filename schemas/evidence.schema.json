@@ -22,7 +22,7 @@
         "service": { "$ref": "common.schema.json#/$defs/id" },
         "operation": { "type": "string", "minLength": 1, "maxLength": 128 },
         "partition": { "type": "string", "enum": ["aws", "aws-cn", "aws-us-gov"] },
-        "region": { "type": "string", "pattern": "^[a-z]{2}(?:-gov)?-[a-z]+-[0-9]+(?![\\s\\S])" },
+        "region": { "$ref": "common.schema.json#/$defs/awsRegion" },
         "sanitised_parameters": { "$ref": "#/$defs/canonicalValue" },
         "documentation_uri": { "$ref": "common.schema.json#/$defs/httpsUri" }
       },

@@ -1,143 +1,108 @@
 # Modelo
 
 Modelo is a Git-backed approval ledger and static publication system for an
-enterprise AI model catalogue. Git provider issues initiate move/add/change
-(MAC) work; pull or merge requests and trusted CI arbitrate acceptance. Modelo
-does not expose an application API.
+enterprise AI model catalogue. Model records describe facts. Offering records
+carry consumption approval. Git issues start work, pull requests or merge
+requests decide the change, and trusted CI decides acceptance. There is no
+application API. Host-specific concerns stay in the Git adapter layer, not in
+core records or schemas.
 
-> **Implementation status:** T8 pre-merge CI, T9 and the public synthetic Pages
-> workflow are implemented. The static generator, detached trusted-check
-> receipt, GitHub adapter and three portable Agent Skills exist. The Pages
-> workflow is a labelled demo, not a production-catalogue approval path.
-> Post-merge production release/receipt automation and T10 remote
-> sentinel/restore evidence remain explicit launch blockers. Agent approval is disabled.
-> Do not add real catalogue data before T10 passes.
+## Start Here
 
-## Repository planes
+- Live synthetic demo: [j3brns996.github.io/Modelo/](https://j3brns996.github.io/Modelo/)
+- Guided issue chooser: [Open a Modelo MAC request](https://github.com/j3brns996/Modelo/issues/new/choose)
+  for add, change, revoke, move or batch requests.
+- Repository rules and exact contracts: [SPEC.md](SPEC.md) and [docs/contract.yaml](docs/contract.yaml)
+
+The demo uses labelled synthetic records, so sample content is not enterprise
+approval. To change the governed catalogue, start with the issue chooser rather
+than editing a record. It captures the intent and subjects that the later
+change request must preserve.
+
+## Why Facts And Approval Are Separate
+
+A model record says what a named model release is. It does not say that the
+enterprise may consume it. An offering record is the approval unit: it ties a
+model to one or more provider routes, enterprise policy text and evidenced
+conditions. That split matters because provider availability, documentation
+examples and public demos are only observations. They are not approval.
+The approved route is what the enterprise may use; the observed model is only
+what the provider says exists.
+
+## Current Status
+
+T8 pre-merge CI, T9 and the public synthetic Pages demo are implemented. The
+synthetic demo is for the labelled demo slice only. Production post-merge
+release and receipt automation, plus the T10 remote evidence gate, are still
+blocked. No real production catalogue data is published, and agent approval is
+disabled. The site guides readers and validates the static publication flow;
+it does not claim launch completion.
+
+Do not add real production catalogue data before T10 passes remotely.
+
+## Choose Your Path
+
+| If you want to... | Start here |
+|---|---|
+| Browse the live site | [Synthetic demo](https://j3brns996.github.io/Modelo/) |
+| Start a proposed change | [Guided issue chooser](https://github.com/j3brns996/Modelo/issues/new/choose) |
+| Learn how to contribute safely | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Read the compact docs index | [docs/README.md](docs/README.md) |
+| Understand the product rules | [SPEC.md](SPEC.md) |
+| Inspect the machine contract | [docs/contract.yaml](docs/contract.yaml) |
+
+## How A Change Is Decided
+
+A proposal begins with a linked issue and continues on a topic branch with one
+writer. The change request binds its operation to the exact base, head and tree
+under review. Trusted CI validates that head; a missing, stale, skipped or
+failed result cannot accept the change. Catalogue facts need admissible
+evidence, while policy text explains why an offering is approved. Human
+CODEOWNER approval remains required for control and documentation paths. A new
+commit invalidates earlier check and review evidence.
+
+## Five-Minute Setup
+
+```bash
+uv sync --locked
+uv run --locked modelo --version
+uv run --locked modelo-local-ci run --base <base-sha> --head <head-sha> --as-of YYYY-MM-DD --jobs 3
+```
+
+`modelo-local-ci` is advisory preflight only. It helps you compare a topic
+branch with its base, but it does not accept a change. `modelo/check` remains
+the acceptance gate. Use the exact base and head SHAs from your change request
+so the result matches the reviewed head.
+
+Run the command from a clean worktree after reading the repository rules and
+the schema that owns the changed files. Start with narrow tests, then use local
+CI for the broader preflight. Never commit generated output from `dist/`.
+
+## Four Planes
 
 | Plane | Location | Purpose |
 |---|---|---|
 | Governed solution | `catalogue/`, `schemas/`, `modelo.yaml` | Reviewed source of truth |
 | Build tooling | `tooling/modelo/`, `pyproject.toml`, `uv.lock` | Deterministic validation and generation |
 | Static presentation | `site/` | Templates, content and local assets |
-| Publication | `dist/` | Generated, tested and never committed |
+| Publication | `dist/` | Generated output, never committed |
 
-Agent Skills under `.agents/skills/` will guide authorship and review. They are
-not executable build inputs: an agent uses a skill before invoking the ordinary
-locked CLI. Required CI contains no Node, npm or `npx` step and produces the
-same bytes when no skills are installed.
+## Documentation Map
 
-`uv build --offline --no-cache` packages the Python tooling. `uv.lock` governs
-runtime dependency sync and `uv run --locked`; it is not a `uv build` flag.
-PEP 517 build requirements are exactly pinned in `pyproject.toml`, which also
-requires the bootstrapped `uv 0.11.33`. `modelo build`
-compiles the catalogue/static publication and deliberately has no ambient
-defaults:
+- [CONTRIBUTING.md](CONTRIBUTING.md) covers linked issues, topic branches,
+  one-writer ownership and the local preflight flow.
+- [docs/README.md](docs/README.md) is the repository docs index.
+- [SPEC.md](SPEC.md) explains the product rationale, scope and invariants.
+- [docs/contract.yaml](docs/contract.yaml) is the compact machine contract.
+  Read it when you need the authoritative field, path and acceptance rules.
 
-```bash
-uv run --locked modelo build --kind candidate \
-  --base-commit BASE_SHA --source-commit HEAD_SHA --source-tree HEAD_TREE_SHA \
-  --as-of YYYY-MM-DD --source-date-epoch AUTHOR_UNIX_SECONDS \
-  --mac-metadata /path/to/validated-mac.json --profile synthetic \
-  --no-base-url --base-path /Modelo/ --output dist/candidate
-```
+## Security And Reuse
 
-Exactly one of `--base-url` or `--no-base-url` is required. Candidate, demo and
-final builds are implemented; the trusted `modelo platform check` builds the distinct
-validation site for the Git provider's exact test-merge commit.
-Tool packages and solution publications are different outputs; neither creates
-a service.
-
-The Pages workflow runs the locked tests and offline package build, reads the
-single global URL and synthetic snapshot-date owner with `modelo config site`,
-builds `--kind demo` once to
-`dist/pages/site`, archives those exact bytes and uploads them with the directly
-pinned GitHub artifact action before deploying without rebuilding.
-Demo builds accept only the synthetic profile, use an empty MAC delta and make
-no approval, merge or release-receipt claim.
-
-The catalogue is progressively enhanced with the locally vendored Alpine CSP
-build `@alpinejs/csp==3.16.3`; standard Alpine's expression evaluator, remote
-application scripts, npm and `npx` are not used. Inter and JetBrains Mono are
-loaded from the two explicitly CSP-allowlisted Google Fonts origins. Search,
-multi-select facets, deterministic sorting,
-result counts, table/grid views, shareable URL state and comparison of two to
-four canonical models remain browser-only views over server-rendered records.
-Only the table/grid preference is stored locally, explicit URL state wins, and
-storage failure safely falls back to the configured grid view. Scripts load only on the
-catalogue page.
-
-The public synthetic site uses a shared responsive product shell, guided home
-journey, purpose-built model cards and structured entity/reference pages. Its
-22 evidence-linked models make filtering and comparison credible without
-publishing production catalogue data. Twenty are bounded official-documentation
-observations; they are examples, not enterprise approval.
-
-The locked Python suite proves emitted structure, bounds, integrity and the
-no-JavaScript baseline. When a host Node executable is available,
-`node tests/site/catalogue-explorer.behavior.js` additionally executes the real
-controller's search, facet, sort, result, URL/local-view and comparison logic
-without npm or `npx`. This supplementary harness is not a build dependency and
-does not replace the pinned Python-controlled browser evidence reserved for the
-remote launch slice.
-Every record link and the complete catalogue remain usable without JavaScript.
-
-The candidate output is exactly `site/data/catalogue.json`,
-`site/data/change-delta.json` and `site/data/manifest.json` below the selected
-output. The manifest hashes exactly the first two files and never itself. T8,
-not T5, writes detached `dist/receipts/check.json`.
-
-`--mac-metadata` is an explicit path to one closed `schemas/mac-metadata.schema.json`
-JSON envelope, not the JSON value and not a second schema argument. The file is
-read once as a regular non-symlink, is limited to 262144 bytes, and rejects
-invalid UTF-8, YAML, duplicate keys, floating-point or non-finite numbers. CI
-fails closed if stable no-follow and before/after device, inode, mode/type,
-size, nanosecond mtime and nanosecond ctime checks cannot be enforced; such a
-local candidate cannot produce accepting durability. The envelope is created only by T8 from the same repository. It binds the open issue, exact
-base/head/tree, complete neutral MAC payload and digest, and expected Git delta;
-T5 performs no provider read or enrichment.
-
-GitHub catalogue requests use guided Issue Forms. Requesters provide the
-subject, purpose, desired outcome, reason, supporting observations and
-acceptance checks; a least-privilege Action runs trusted default-branch tooling
-to validate those answers and generate the canonical MAC payload and hashes.
-The action updates only the generated issue block and one status comment. It
-does not edit catalogue files, create branches, approve or merge changes.
-
-The explicit `--source-date-epoch` must equal the exact source commit's author
-Unix timestamp. The build rejects mismatch and never reads an environment
-override. Final continues to use the accepted head author time; merge time is
-receipt metadata only.
-
-## Clean-clone smoke test
-
-Prerequisites are Git, Python `3.12.13` and `uv 0.11.33`.
-
-```bash
-uv sync --locked
-uv build --offline --no-cache
-uv run --locked modelo --version
-uv run --locked modelo --help
-uv run --locked modelo check --help
-uv run --locked modelo build --help
-uv run --locked modelo-local-ci --help
-```
-
-`modelo-local-ci` is the shared, non-accepting preflight for contributors and
-the protected GitHub runner. Local mode can use up to three deterministic test
-processes; GitHub runs protected-base and proposed-head verification as parallel
-jobs, then requires both before the final `modelo/check` receipt step.
-
-`modelo check`, `modelo build` and `modelo platform check` are implemented. The
-templates and local assets are under `site/`; generated demo, validation and
-final sites are under `dist/pages`, `dist/validation` and `dist/final`. The
-canonical synthetic Pages URL is `https://j3brns996.github.io/Modelo/`. A first
-successful post-merge workflow run proves the demo deployment; it does not
-complete the T10 production launch rehearsal.
-
-Read [SPEC.md](SPEC.md), [the machine contract](docs/contract.yaml),
-[the implementation plan](docs/implementation-plan.md),
-[the MAC contract](docs/mac-contract.md), [the site contract](docs/site-contract.md),
-[the security contract](docs/security-contract.md) and
-[the launch runbook](docs/launch-runbook.md) and
-[CONTRIBUTING.md](CONTRIBUTING.md) before making changes.
+- [SECURITY.md](SECURITY.md) is the security and recovery guidance.
+- There is no root repository licence file yet.
+- Reuse terms are undecided.
+- Public visibility does not grant reuse rights.
+- Do not post secrets, tokens or private evidence in issues, pull requests or
+  public comments.
+  If something belongs in the ledger, capture it through the governed
+  workflow instead of copying it into chat or an ad hoc note.

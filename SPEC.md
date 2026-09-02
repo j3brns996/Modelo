@@ -156,7 +156,12 @@ reviewed change request, required checks and merge to the protected default
 branch. Only a current offering grants consumption; accepted evidence,
 conditions, models and governance records grant no consumption by themselves.
 
-The issue is intake. The merged files and commit are the approved state.
+The issue is intake. On GitHub, a requester fills in operation-specific human
+fields; trusted default-branch tooling validates them and generates the neutral
+payload and fingerprints. The generated payload is bound to the human portion
+of the issue so edits cannot silently leave stale machine data. The action may
+update only that generated block and one marked status comment. The merged
+files and commit—not the issue or bot comment—are the approved state.
 
 ### 2. Stable paths use internal identities
 
@@ -757,13 +762,21 @@ evidence is never accepted catalogue evidence. See `docs/mac-contract.md`.
 
 | Capability | GitHub adapter | GitLab adapter |
 |---|---|---|
-| Structured intake | Issue Forms | Issue/description templates |
+| Structured intake | Guided Issue Forms plus trusted payload compiler | Issue/description templates |
 | Change review | Pull request | Merge request |
 | Validation | Actions | GitLab CI |
 | Concurrency | Merge queue | Merge train |
 | Ownership | CODEOWNERS and ruleset | CODEOWNERS and approval rules |
 | Publication | Pages Actions artefact | Pages CI artefact |
 | Release | Protected tag and release | Protected tag and release |
+
+`modelo-local-ci` provides fast, non-accepting feedback with the same fixed test
+inventory and offline package gate used by GitHub. It classifies only the
+catalogue/control boundary; agent-approval eligibility remains a separate,
+narrower decision. In the trusted GitHub workflow, the runner itself always
+comes from the protected base. Protected-base and proposed-head verification
+run in parallel, and the final `modelo/check` job requires both before it writes
+a receipt. A local result never substitutes for that remote authority.
 
 Pages serves static HTML and JSON only. It has no write API and no custom auth.
 The current personal GitHub repository cannot satisfy the private Pages

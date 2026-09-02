@@ -23,6 +23,18 @@ uv run --locked modelo --version
 uv run --locked modelo --help
 ```
 
+For normal local preflight, compare the topic branch with its base using the
+shared advisory runner:
+
+```bash
+uv run --locked modelo-local-ci run \
+  --base <base-sha> --head <head-sha> --as-of YYYY-MM-DD --jobs 3
+```
+
+Control changes run the complete Python test inventory and offline package
+build. Catalogue-only changes run validation and execute no proposed tooling in
+trusted CI. Local success is feedback only; `modelo/check` remains authoritative.
+
 Do not commit `dist/` or weaken a test to make a change pass. Technical debt is
 permitted only with a linked issue that names an owner, rationale, removal
 criterion, target release or date, and test reference.

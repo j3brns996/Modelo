@@ -44,7 +44,15 @@ The four explanatory fields are deliberately distinct. `purpose` is the stable
 need, `requested_outcome` describes the desired catalogue state, `reason` tells
 a human reviewer why the current state should change, and `acceptance` lists the
 observable checks for completion. Git-provider forms use plain-language labels,
-but retain the exact JSON field IDs and digest needed by the trusted adapter.
+and GitHub requesters do not construct JSON or calculate hashes. The trusted
+default-branch `modelo platform github-intake` compiler creates a stable UUID
+from the issue coordinate, validates subjects and evidence references, computes
+both intent keys and the payload digest, and appends the canonical payload as a
+generated issue block. The block carries a digest of the human-authored
+portion, so an edit cannot leave a stale payload looking valid. Invalid edits
+remove the stale generated block and update one marked bot comment with a
+bounded diagnostic. The compiler never edits catalogue files, branches,
+approvals or cloud state.
 
 `change` preserves identity. In v0.1, `move` and `revoke` apply only to
 offerings. A move changes offering identity and compiles to atomic
@@ -123,12 +131,14 @@ time.
 The canonical examples/schema render to:
 
 - GitHub `.github/ISSUE_TEMPLATE/{mac-add,mac-change,mac-revoke,mac-move,mac-batch}.yml`
-  and `.github/PULL_REQUEST_TEMPLATE/mac.md`;
+  and `.github/PULL_REQUEST_TEMPLATE/mac.md`, with trusted compilation through
+  `.github/workflows/issue-intake.yml`;
 - GitLab `.gitlab/issue_templates/{MAC-Add,MAC-Change,MAC-Revoke,MAC-Move,MAC-Batch}.md`
   and `.gitlab/merge_request_templates/MAC.md`.
 
-Adapter conformance tests must recover identical neutral objects. Checkboxes and
-labels are assertions, not evidence.
+Adapter conformance tests must recover identical neutral objects. GitHub's
+generated block remains compatible with the earlier direct canonical-payload
+transport. Checkboxes and labels are assertions, not evidence.
 
 ## Acceptance and approval
 

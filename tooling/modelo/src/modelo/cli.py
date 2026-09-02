@@ -21,6 +21,7 @@ from modelo.platform import (
     run_trusted_control_check,
 )
 from modelo.github_adapter import (
+    write_github_intake_outputs,
     github_control_issue_reference, github_issue_reference, prepare_github,
     prepare_github_control,
 )
@@ -97,6 +98,12 @@ def _parser() -> argparse.ArgumentParser:
     github_control.add_argument("--validation-tree", required=True)
     github_control.add_argument("--as-of", required=True)
     github_control.add_argument("--context-output", type=Path, required=True)
+    github_intake = platform_subparsers.add_parser(
+        "github-intake", help="compile a guided GitHub issue proposal"
+    )
+    github_intake.add_argument("--event", type=Path, required=True)
+    github_intake.add_argument("--issue-body-output", type=Path, required=True)
+    github_intake.add_argument("--comment-output", type=Path, required=True)
     return parser
 
 
@@ -193,6 +200,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 root=arguments.root, event_path=arguments.event, issue_path=arguments.issue,
                 validation_sha=arguments.validation_sha, validation_tree=arguments.validation_tree,
                 as_of=parse_as_of(arguments.as_of), context_output=arguments.context_output,
+            )
+            return 0
+        except (ValueError, BuildError) as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "github-intake":
+        try:
+            write_github_intake_outputs(
+                event_path=arguments.event,
+                issue_body_output=arguments.issue_body_output,
+                comment_output=arguments.comment_output,
             )
             return 0
         except (ValueError, BuildError) as exc:

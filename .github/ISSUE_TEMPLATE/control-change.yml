@@ -1,0 +1,61 @@
+name: "Improve Modelo itself"
+description: "Propose a product, documentation, workflow, security or maintenance change."
+title: "Improve: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Improve the product or control plane
+
+        Describe the result people need before suggesting implementation details. Catalogue data changes use the dedicated Add, Update, Withdraw, Move or Batch forms instead.
+  - type: textarea
+    id: problem
+    attributes:
+      label: "What is not working well?"
+      description: "Describe the current experience or control weakness and who it affects."
+      placeholder: "Example: contributors must understand an internal file format before they can propose a change."
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: "What should be better?"
+      description: "State the observable outcome in plain language."
+      placeholder: "Example: a contributor can complete a guided form and receive a validated proposal."
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: "Scope and boundaries"
+      description: "List what is included and what must not change."
+      placeholder: "Included: GitHub forms and adapter tests. Excluded: catalogue records and cloud writes."
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: "Risk and rollback"
+      description: "What could go wrong, and how can the change be safely reversed or recovered?"
+      placeholder: "Example: preserve the previous transport so existing issues remain valid."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Acceptance checks"
+      description: "One observable or testable completion check per line."
+      placeholder: |
+        The new path works from a clean clone.
+        Existing requests remain valid.
+    validations:
+      required: true
+  - type: checkboxes
+    id: final_checks
+    attributes:
+      label: "Before submitting"
+      options:
+        - label: "This is not a production catalogue data request."
+          required: true
+        - label: "I have not included credentials, tokens or private commercial information."
+          required: true

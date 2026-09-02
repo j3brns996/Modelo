@@ -1,0 +1,88 @@
+name: Modelo guided proposal
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: modelo-intake-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    name: Validate and compile proposal
+    if: ${{ github.event.issue.pull_request == null && (contains(github.event.issue.body, '### Request type') || contains(github.event.issue.body, '<!-- modelo:intake-generated-start -->')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Install pinned uv and Python
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          version: 0.11.33
+          python-version: 3.12.13
+          enable-cache: false
+
+      - name: Fetch trusted default-branch tooling
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DEFAULT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git init trusted
+          git -C trusted remote add origin "https://github.com/${REPOSITORY}.git"
+          auth="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 -w0)"
+          git -C trusted -c http.extraheader="AUTHORIZATION: basic ${auth}" \
+            fetch --no-tags origin "refs/heads/${DEFAULT_BRANCH}"
+          test "$(git -C trusted rev-parse FETCH_HEAD)" = "${DEFAULT_SHA}"
+          git -C trusted checkout --detach FETCH_HEAD
+          unset auth GH_TOKEN
+
+      - name: Compile bounded human fields
+        env:
+          EVENT_PATH: ${{ github.event_path }}
+          ISSUE_BODY_OUTPUT: ${{ runner.temp }}/modelo-issue-body.md
+          COMMENT_OUTPUT: ${{ runner.temp }}/modelo-intake-comment.md
+        run: |
+          set -euo pipefail
+          uv sync --project trusted --locked
+          uv run --project trusted --locked modelo --root trusted platform github-intake \
+            --event "${EVENT_PATH}" \
+            --issue-body-output "${ISSUE_BODY_OUTPUT}" \
+            --comment-output "${COMMENT_OUTPUT}"
+
+      - name: Update the generated block and one result comment
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          ISSUE_BODY_OUTPUT: ${{ runner.temp }}/modelo-issue-body.md
+          COMMENT_OUTPUT: ${{ runner.temp }}/modelo-intake-comment.md
+        with:
+          script: |
+            const fs = require("fs");
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = context.issue.number;
+            const issueBody = fs.readFileSync(process.env.ISSUE_BODY_OUTPUT, "utf8");
+            const commentBody = fs.readFileSync(process.env.COMMENT_OUTPUT, "utf8");
+            if (context.payload.issue.body !== issueBody) {
+              await github.rest.issues.update({ owner, repo, issue_number, body: issueBody });
+            }
+            const response = await github.rest.issues.listComments({
+              owner, repo, issue_number, per_page: 100,
+            });
+            const marker = "<!-- modelo:intake-result -->";
+            const existing = response.data.find(comment =>
+              comment.user?.login === "github-actions[bot]" && comment.body?.includes(marker)
+            );
+            if (existing) {
+              if (existing.body !== commentBody) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: commentBody });
+              }
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: commentBody });
+            }

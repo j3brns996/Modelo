@@ -29,6 +29,13 @@
   locked. Required CI has no floating images, unpinned executable downloads,
   `pip install --upgrade` or `npx`. `uv sync --locked` may fetch hash-locked
   dependencies from the configured registry; recovery uses the archived copy.
+- Guided GitHub issue intake executes only tooling fetched from the exact
+  default-branch SHA. Untrusted issue answers are read from the event JSON, not
+  interpolated into a shell command. Its token has `contents: read` and
+  `issues: write` only; it may update the generated issue block and one marked
+  bot comment, but cannot write contents, branches, pull requests or approvals.
+  The generated payload is bound to the human issue body digest, and invalid
+  edits remove stale generated data.
 - Agent approval is disabled by default. Enabling it requires an enabled actor
   in the schema-valid actors registry, a distinct registered platform identity,
   independence from author/committer/last pusher, a current successful trusted
@@ -60,6 +67,13 @@
   or security issue, runs both protected-base and proposed-head test/package
   gates, emits `control-check.json`, and requires a human CODEOWNER. A control
   change can never inherit agent approval eligibility.
+- `modelo-local-ci` is a non-accepting preflight. Its change-mode classifier
+  distinguishes catalogue, control and mixed changes but never decides agent
+  eligibility. GitHub executes the verifier from the protected base even when
+  the target is proposed code, so a contributor cannot replace the runner with
+  a no-op. Protected-base and proposed-head gates run as independent parallel
+  jobs; the final trusted job fails unless both succeed and remains the only
+  receipt writer.
 - GitHub requires a trusted required workflow sourced from the protected
   default branch. GitLab requires a Pipeline Execution Policy or equivalent
   control outside contributor modification; absence is an incapable platform,

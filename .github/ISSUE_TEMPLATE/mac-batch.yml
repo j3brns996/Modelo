@@ -1,41 +1,162 @@
-name: "Request: submit a catalogue batch"
-description: "Ask for up to 25 related changes from one observation scope."
-title: "Batch catalogue request: "
+name: "Submit a related batch"
+description: "Propose up to 25 changes from one source and observation scope."
+title: "Batch: "
 body:
   - type: markdown
     attributes:
       value: |
         ## Submit several related changes
 
-        Use this for a bounded set of changes that all perform the same kind of operation.
+        Use this only when every subject has the same operation, evidence source, observation scope and inference service.
 
-        **Before you start:** Every item must come from the same source, observation scope and inference service. Split mixed work into separate requests.
+        **What happens next:** Modelo validates these answers and adds the canonical JSON and fingerprints to the issue. You do not need to calculate them.
 
-        **What happens next:** the submitted JSON is validated against Modelo's change contract. A reviewed pull request and successful exact-head CI are still required before anything can be approved.
-  - type: textarea
-    id: mac_payload
+  - type: dropdown
+    id: request_type
     attributes:
-      label: Change details (JSON)
-      description: The operation must be `batch`. Include no more than 25 subjects and set one item operation for the whole batch.
-      render: json
+      label: "Request type"
+      description: "Fixed by this form."
+      options:
+        - "batch"
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: item_operation
+    attributes:
+      label: "Batch change type"
+      description: "Every subject in this batch will use this operation."
+      options:
+        - "add"
+        - "change"
+        - "revoke"
+    validations:
+      required: true
+  - type: dropdown
+    id: subject_kind
+    attributes:
+      label: "Subject type"
+      description: "Every subject in this batch must have this type."
+      options:
+        - "model"
+        - "offering"
+        - "evidence"
+        - "vendor"
+        - "inference-service"
+        - "condition"
+    validations:
+      required: true
+  - type: textarea
+    id: subject_identities
+    attributes:
+      label: "Subject identities"
+      description: "One stable lowercase Modelo identity per line; maximum 25."
       placeholder: |
-        { "schema_version": "0.1", "operation": "batch", "replace": "with a complete schema-valid payload" }
+        bedrock-model-a
+        bedrock-model-b
     validations:
       required: true
   - type: input
-    id: payload_digest
+    id: purpose
     attributes:
-      label: Change fingerprint
-      description: Paste the generated SHA-256 fingerprint for the complete canonical JSON above.
-      placeholder: sha256-...
+      label: "Purpose"
+      description: "In one short sentence, what business or governance need does this request serve?"
+      placeholder: "Example: Enable a reviewed summarisation workload"
+    validations:
+      required: true
+  - type: textarea
+    id: requested_outcome
+    attributes:
+      label: "Requested outcome"
+      description: "Describe the catalogue state that should be true when this work is complete."
+      placeholder: "Example: Add one evidenced model record. Do not approve a route."
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: "Why is this needed?"
+      description: "Give the reviewer the decision context. Explain why the current catalogue state is insufficient."
+      placeholder: "Example: The workload team needs a governed model record before it can request an offering."
+    validations:
+      required: true
+  - type: dropdown
+    id: source_type
+    attributes:
+      label: "Evidence source type"
+      description: "How was the bounded observation obtained?"
+      options:
+        - "first-party-read-api"
+        - "official-documentation"
+    validations:
+      required: true
+  - type: input
+    id: source_url
+    attributes:
+      label: "Evidence source URL"
+      description: "Official HTTPS source for the batch observation."
+      placeholder: "https://bedrock.us-east-1.amazonaws.com/foundation-models"
+    validations:
+      required: true
+  - type: input
+    id: scope_ref
+    attributes:
+      label: "Opaque scope reference"
+      description: "A non-secret internal scope label. Never enter an account ID."
+      placeholder: "production-scope"
+    validations:
+      required: true
+  - type: dropdown
+    id: partition
+    attributes:
+      label: "Provider partition"
+      description: "Provider partition for the observation scope."
+      options:
+        - "aws"
+        - "aws-cn"
+        - "aws-us-gov"
+    validations:
+      required: true
+  - type: input
+    id: region
+    attributes:
+      label: "Source region"
+      description: "Region in which the read observation was made."
+      placeholder: "us-east-1"
+    validations:
+      required: true
+  - type: input
+    id: inference_service
+    attributes:
+      label: "Inference service"
+      description: "Stable governed service identity."
+      placeholder: "aws-bedrock"
+    validations:
+      required: true
+  - type: textarea
+    id: candidate_evidence
+    attributes:
+      label: "Supporting observations"
+      description: "One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. These are candidate sources, not approval."
+      placeholder: "https://docs.example.com/model | 2026-09-02T08:00:00Z | sha256-0123…"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Acceptance checks"
+      description: "One observable completion check per line. State what a reviewer or CI can verify."
+      placeholder: |
+        The model name matches retained evidence.
+        The proposed record passes Modelo validation.
     validations:
       required: true
   - type: checkboxes
-    id: assertions
+    id: final_checks
     attributes:
-      label: Final checks
+      label: Before submitting
       options:
-        - label: Every item uses the same operation and the batch contains no more than 25 subjects.
+        - label: "I checked the catalogue and open requests for an existing record."
           required: true
-        - label: I have not included credentials, tokens or private commercial terms.
+        - label: "I have not included credentials, account identifiers, tokens, private terms or provider offer tokens."
           required: true

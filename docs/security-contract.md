@@ -29,6 +29,13 @@
   locked. Required CI has no floating images, unpinned executable downloads,
   `pip install --upgrade` or `npx`. `uv sync --locked` may fetch hash-locked
   dependencies from the configured registry; recovery uses the archived copy.
+- Guided GitHub issue intake executes only tooling fetched from the exact
+  default-branch SHA. Untrusted issue answers are read from the event JSON, not
+  interpolated into a shell command. Its token has `contents: read` and
+  `issues: write` only; it may update the generated issue block and one marked
+  bot comment, but cannot write contents, branches, pull requests or approvals.
+  The generated payload is bound to the human issue body digest, and invalid
+  edits remove stale generated data.
 - Agent approval is disabled by default. Enabling it requires an enabled actor
   in the schema-valid actors registry, a distinct registered platform identity,
   independence from author/committer/last pusher, a current successful trusted

@@ -4,7 +4,7 @@ contract:
   name: modelo
   version: "0.1.0"
   status: t8_premerge_t9_synthetic_pages_demo_and_functional_explorer_implemented_production_launch_slice_pending
-  implemented_slices: [T1, T2, T3, T4, T5, T6, T6-UX, T7, T8-premerge, T9, synthetic-pages-demo]
+  implemented_slices: [T1, T2, T3, T4, T5, T6, T6-UX, T7, T7-UX, T8-premerge, T9, synthetic-pages-demo]
   accepted_pre_t8_head: "8694053c3366e162e0da6991ad08729aa8c95ad5"
   unimplemented_slices: [T8-postmerge-production-release-and-receipt, T10-remote-evidence]
   executable_config: modelo.yaml
@@ -192,6 +192,18 @@ provider_boundary:
 mac:
   schema_config_key: paths.mac_schema
   initiation: git_provider_issue
+  github_guided_intake:
+    forms: [add, change, revoke, move, batch]
+    human_fields: [request_type, subjects, purpose, requested_outcome, reason, candidate_evidence, acceptance]
+    compiler: trusted_default_branch_modelo_platform_github_intake
+    generated_values: [stable_request_uuid, dedupe_key, idempotency_key, payload_digest, pull_request_handoff]
+    source_binding: sha256_of_human_issue_body_without_generated_block
+    workflow: .github/workflows/issue-intake.yml
+    trigger: [issues_opened, issues_edited, issues_reopened]
+    permissions: {contents: read, issues: write}
+    only_write: generated_issue_block_and_single_marked_bot_comment
+    catalogue_branch_cloud_approval_merge_writes: forbidden
+    legacy_canonical_payload_body: accepted_for_backward_compatibility
   operations: [add, change, revoke, move, batch]
   change_preserves_identity: true
   move:

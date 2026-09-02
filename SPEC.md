@@ -156,7 +156,12 @@ reviewed change request, required checks and merge to the protected default
 branch. Only a current offering grants consumption; accepted evidence,
 conditions, models and governance records grant no consumption by themselves.
 
-The issue is intake. The merged files and commit are the approved state.
+The issue is intake. On GitHub, a requester fills in operation-specific human
+fields; trusted default-branch tooling validates them and generates the neutral
+payload and fingerprints. The generated payload is bound to the human portion
+of the issue so edits cannot silently leave stale machine data. The action may
+update only that generated block and one marked status comment. The merged
+files and commit—not the issue or bot comment—are the approved state.
 
 ### 2. Stable paths use internal identities
 
@@ -757,7 +762,7 @@ evidence is never accepted catalogue evidence. See `docs/mac-contract.md`.
 
 | Capability | GitHub adapter | GitLab adapter |
 |---|---|---|
-| Structured intake | Issue Forms | Issue/description templates |
+| Structured intake | Guided Issue Forms plus trusted payload compiler | Issue/description templates |
 | Change review | Pull request | Merge request |
 | Validation | Actions | GitLab CI |
 | Concurrency | Merge queue | Merge train |

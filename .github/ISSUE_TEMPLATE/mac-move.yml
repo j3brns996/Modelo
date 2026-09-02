@@ -1,41 +1,90 @@
-name: "Request: replace an offering identity"
-description: "Ask to add a destination offering and withdraw its source atomically."
-title: "Move offering: "
+name: "Move an offering"
+description: "Replace one offering identity with another as one governed change."
+title: "Move: "
 body:
   - type: markdown
     attributes:
       value: |
         ## Replace an offering identity
 
-        Use this when an offering's stable identity or governed path must change.
+        Use this when an offering identity or governed path changes meaning. Modelo treats this as destination-add plus source-withdrawal, never a cosmetic rename.
 
-        **Before you start:** A file rename is not enough. Modelo records this as one destination add and one source withdrawal so history remains honest.
+        **What happens next:** Modelo validates these answers and adds the canonical JSON and fingerprints to the issue. You do not need to calculate them.
 
-        **What happens next:** the submitted JSON is validated against Modelo's change contract. A reviewed pull request and successful exact-head CI are still required before anything can be approved.
-  - type: textarea
-    id: mac_payload
+  - type: dropdown
+    id: request_type
     attributes:
-      label: Change details (JSON)
-      description: The operation must be `move`. Include exactly one source offering and one destination offering, plus the reason and acceptance checks for both sides.
-      render: json
-      placeholder: |
-        { "schema_version": "0.1", "operation": "move", "replace": "with a complete schema-valid payload" }
+      label: "Request type"
+      description: "Fixed by this form."
+      options:
+        - "move"
+      default: 0
     validations:
       required: true
   - type: input
-    id: payload_digest
+    id: source_identity
     attributes:
-      label: Change fingerprint
-      description: Paste the generated SHA-256 fingerprint for the complete canonical JSON above.
-      placeholder: sha256-...
+      label: "Current offering identity"
+      description: "The offering that will be withdrawn."
+      placeholder: "bedrock-example-old"
+    validations:
+      required: true
+  - type: input
+    id: destination_identity
+    attributes:
+      label: "Replacement offering identity"
+      description: "The new offering that will be added."
+      placeholder: "bedrock-example-new"
+    validations:
+      required: true
+  - type: input
+    id: purpose
+    attributes:
+      label: "Purpose"
+      description: "In one short sentence, what business or governance need does this request serve?"
+      placeholder: "Example: Enable a reviewed summarisation workload"
+    validations:
+      required: true
+  - type: textarea
+    id: requested_outcome
+    attributes:
+      label: "Requested outcome"
+      description: "Describe the catalogue state that should be true when this work is complete."
+      placeholder: "Example: Add one evidenced model record. Do not approve a route."
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: "Why is this needed?"
+      description: "Give the reviewer the decision context. Explain why the current catalogue state is insufficient."
+      placeholder: "Example: The workload team needs a governed model record before it can request an offering."
+    validations:
+      required: true
+  - type: textarea
+    id: candidate_evidence
+    attributes:
+      label: "Supporting observations"
+      description: "One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. These are candidate sources, not approval."
+      placeholder: "https://docs.example.com/model | 2026-09-02T08:00:00Z | sha256-0123…"
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Acceptance checks"
+      description: "One observable completion check per line. State what a reviewer or CI can verify."
+      placeholder: |
+        The model name matches retained evidence.
+        The proposed record passes Modelo validation.
     validations:
       required: true
   - type: checkboxes
-    id: assertions
+    id: final_checks
     attributes:
-      label: Final checks
+      label: Before submitting
       options:
-        - label: The destination add and source withdrawal form one atomic request.
+        - label: "I checked the catalogue and open requests for an existing record."
           required: true
-        - label: I have not included credentials, tokens or private commercial terms.
+        - label: "I have not included credentials, account identifiers, tokens, private terms or provider offer tokens."
           required: true

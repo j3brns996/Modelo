@@ -97,6 +97,13 @@ local candidate cannot produce accepting durability. The envelope is created onl
 base/head/tree, complete neutral MAC payload and digest, and expected Git delta;
 T5 performs no provider read or enrichment.
 
+GitHub catalogue requests use guided Issue Forms. Requesters provide the
+subject, purpose, desired outcome, reason, supporting observations and
+acceptance checks; a least-privilege Action runs trusted default-branch tooling
+to validate those answers and generate the canonical MAC payload and hashes.
+The action updates only the generated issue block and one status comment. It
+does not edit catalogue files, create branches, approve or merge changes.
+
 The explicit `--source-date-epoch` must equal the exact source commit's author
 Unix timestamp. The build rejects mismatch and never reads an environment
 override. Final continues to use the accepted head author time; merge time is

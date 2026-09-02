@@ -1,41 +1,96 @@
-name: "Request: add a model or offering"
-description: "Ask to add a new governed record to the catalogue."
-title: "Add to catalogue: "
+name: "Add a model or offering"
+description: "Propose one new governed catalogue record."
+title: "Add: "
 body:
   - type: markdown
     attributes:
       value: |
         ## Add something new
 
-        Use this when the model or offering does not already exist in Modelo.
+        Use this when the model, offering, evidence, vendor, service or condition does not already exist.
 
-        **Before you start:** Gather the supporting source material first. A provider listing shows that something exists; it does not mean the enterprise has approved it.
+        **What happens next:** Modelo validates these answers and adds the canonical JSON and fingerprints to the issue. You do not need to calculate them.
 
-        **What happens next:** the submitted JSON is validated against Modelo's change contract. A reviewed pull request and successful exact-head CI are still required before anything can be approved.
-  - type: textarea
-    id: mac_payload
+  - type: dropdown
+    id: request_type
     attributes:
-      label: Change details (JSON)
-      description: The operation must be `add`. Include the new record identity, the outcome you want, why it is needed, supporting observations and clear acceptance checks.
-      render: json
-      placeholder: |
-        { "schema_version": "0.1", "operation": "add", "replace": "with a complete schema-valid payload" }
+      label: "Request type"
+      description: "Fixed by this form."
+      options:
+        - "add"
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: subject_kind
+    attributes:
+      label: "Subject type"
+      description: "What governed record is changing?"
+      options:
+        - "model"
+        - "offering"
+        - "evidence"
+        - "vendor"
+        - "inference-service"
+        - "condition"
     validations:
       required: true
   - type: input
-    id: payload_digest
+    id: subject_identity
     attributes:
-      label: Change fingerprint
-      description: Paste the generated SHA-256 fingerprint for the complete canonical JSON above.
-      placeholder: sha256-...
+      label: "Subject identity"
+      description: "Use the stable lowercase Modelo identity, not a display name or mutable provider alias."
+      placeholder: "example-model-v1"
+    validations:
+      required: true
+  - type: input
+    id: purpose
+    attributes:
+      label: "Purpose"
+      description: "In one short sentence, what business or governance need does this request serve?"
+      placeholder: "Example: Enable a reviewed summarisation workload"
+    validations:
+      required: true
+  - type: textarea
+    id: requested_outcome
+    attributes:
+      label: "Requested outcome"
+      description: "Describe the catalogue state that should be true when this work is complete."
+      placeholder: "Example: Add one evidenced model record. Do not approve a route."
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: "Why is this needed?"
+      description: "Give the reviewer the decision context. Explain why the current catalogue state is insufficient."
+      placeholder: "Example: The workload team needs a governed model record before it can request an offering."
+    validations:
+      required: true
+  - type: textarea
+    id: candidate_evidence
+    attributes:
+      label: "Supporting observations"
+      description: "One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. These are candidate sources, not approval."
+      placeholder: "https://docs.example.com/model | 2026-09-02T08:00:00Z | sha256-0123…"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Acceptance checks"
+      description: "One observable completion check per line. State what a reviewer or CI can verify."
+      placeholder: |
+        The model name matches retained evidence.
+        The proposed record passes Modelo validation.
     validations:
       required: true
   - type: checkboxes
-    id: assertions
+    id: final_checks
     attributes:
-      label: Final checks
+      label: Before submitting
       options:
-        - label: I checked that the model or offering is not already in the catalogue.
+        - label: "I checked the catalogue and open requests for an existing record."
           required: true
-        - label: I have not included credentials, tokens or private commercial terms.
+        - label: "I have not included credentials, account identifiers, tokens, private terms or provider offer tokens."
           required: true

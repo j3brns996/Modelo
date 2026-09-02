@@ -82,6 +82,24 @@ def test_skills_are_not_workflow_or_package_inputs() -> None:
     assert ".agents/skills" not in pyproject
 
 
+def test_github_issue_intake_uses_trusted_code_and_one_bounded_comment_writer() -> None:
+    path = ROOT / ".github/workflows/issue-intake.yml"
+    raw = path.read_text(encoding="utf-8")
+    workflow = yaml.safe_load(raw)
+    assert workflow[True]["issues"]["types"] == ["opened", "edited", "reopened"]
+    assert workflow["permissions"] == {"contents": "read", "issues": "write"}
+    assert "pull-requests" not in workflow["permissions"]
+    assert "concurrency" in workflow
+    assert "github-intake" in raw
+    assert "modelo:intake-result" in raw
+    assert "modelo:intake-generated-start" in raw
+    assert "${{ github.event.issue.body }}" not in raw
+    assert "npx" not in raw and "npm " not in raw and "actions/checkout" not in raw
+    uses = re.findall(r"^\s*uses:\s*([^\s#]+)", raw, re.MULTILINE)
+    assert uses and all(re.fullmatch(r"[^@]+@[0-9a-f]{40}", value) for value in uses)
+    assert "actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd" in raw
+
+
 def test_gitlab_adapter_is_explicitly_fail_closed_until_rehearsed() -> None:
     raw = (ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8")
     document = yaml.safe_load(raw)

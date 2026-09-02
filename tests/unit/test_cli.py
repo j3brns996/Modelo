@@ -27,7 +27,10 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result.stderr, "")
 
     def test_help_and_future_command_help_succeed(self) -> None:
-        for arguments in ((), ("check", "--help"), ("build", "--help"), ("config", "site", "--help")):
+        for arguments in (
+            (), ("check", "--help"), ("build", "--help"), ("config", "site", "--help"),
+            ("platform", "github-intake", "--help"),
+        ):
             with self.subTest(arguments=arguments):
                 result = self.run_cli(*arguments)
                 self.assertEqual(result.returncode, 0, result.stderr)

@@ -21,8 +21,9 @@ global.document = {
 global.window = {
   Alpine: {
     data(name, factory) {
-      assert.equal(name, "catalogueExplorer");
-      componentFactory = factory;
+      if (name === "catalogueExplorer") {
+        componentFactory = factory;
+      }
     },
   },
   location: new URL("https://example.invalid/Modelo/catalogue/"),

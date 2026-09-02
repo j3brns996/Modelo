@@ -180,3 +180,47 @@ def validate_content_addresses(
                 f"Set id and filename to {expected}.",
             ))
     return tuple(diagnostics)
+
+
+def create_evidence_record(
+    source_type: str,
+    uri: str,
+    observed_at: str,
+    projection: Any,
+    operation: str | None = None,
+    partition: str | None = None,
+    region: str | None = None,
+    retrieved_by: str = "cli",
+    scope: dict[str, Any] | None = None,
+    visibility: str = "internal",
+) -> dict[str, Any]:
+    """Construct an evidence record dictionary, compute its canonical SHA-256 ID, and set id."""
+
+    if source_type == "first-party-read-api":
+        source: dict[str, Any] = {
+            "type": source_type,
+            "provider": "aws",
+            "service": "bedrock",
+            "operation": operation or "",
+            "partition": partition or "aws",
+            "region": region or "",
+            "sanitised_parameters": {},
+            "documentation_uri": uri,
+        }
+    else:
+        source = {
+            "type": source_type,
+            "uri": uri,
+        }
+
+    envelope: dict[str, Any] = {
+        "source": source,
+        "retrieved_by": retrieved_by,
+        "observed_at": observed_at,
+        "scope": scope if scope is not None else {},
+        "projection": projection,
+        "visibility": visibility,
+    }
+    calculated_id = evidence_id(envelope)
+    return {"id": calculated_id, **envelope}
+

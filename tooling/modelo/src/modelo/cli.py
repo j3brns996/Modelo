@@ -25,10 +25,20 @@ from modelo.github_adapter import (
     github_control_issue_reference, github_issue_reference, prepare_github,
     prepare_github_control,
 )
+from modelo.evidence import create_evidence_record
+from modelo.mac import MacError, init_mac_payload
 from modelo.validators import CheckSystemError, check_repository
 
 
 UNAVAILABLE = "modelo: {command} is not implemented in the current repository slice"
+
+
+def _parse_json_arg(value: str) -> Any:
+    candidate = Path(value)
+    if candidate.is_file():
+        return json.loads(candidate.read_text(encoding="utf-8"))
+    return json.loads(value)
+
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -104,7 +114,41 @@ def _parser() -> argparse.ArgumentParser:
     github_intake.add_argument("--event", type=Path, required=True)
     github_intake.add_argument("--issue-body-output", type=Path, required=True)
     github_intake.add_argument("--comment-output", type=Path, required=True)
+
+    dev = subparsers.add_parser("dev", help="developer and authoring suite utilities")
+    dev_subparsers = dev.add_subparsers(dest="dev_command", required=True)
+
+    evidence_create = dev_subparsers.add_parser(
+        "evidence-create", help="create an evidence record"
+    )
+    evidence_create.add_argument("--source-type", required=True)
+    evidence_create.add_argument("--uri", required=True)
+    evidence_create.add_argument("--observed-at", required=True)
+    evidence_create.add_argument("--projection", required=True)
+    evidence_create.add_argument("--operation")
+    evidence_create.add_argument("--partition")
+    evidence_create.add_argument("--region")
+    evidence_create.add_argument("--retrieved-by", default="cli")
+    evidence_create.add_argument("--scope")
+    evidence_create.add_argument("--visibility", default="internal")
+    evidence_create.add_argument("--output", type=Path)
+
+    mac_init = dev_subparsers.add_parser(
+        "mac-init", help="initialize a MAC payload"
+    )
+    mac_init.add_argument("--operation", required=True)
+    mac_init.add_argument("--purpose", required=True)
+    mac_init.add_argument("--subjects", required=True)
+    mac_init.add_argument("--requested-outcome", required=True)
+    mac_init.add_argument("--reason", required=True)
+    mac_init.add_argument("--candidate-evidence", required=True)
+    mac_init.add_argument("--acceptance", required=True)
+    mac_init.add_argument("--item-operation")
+    mac_init.add_argument("--batch-scope")
+    mac_init.add_argument("--output", type=Path)
+
     return parser
+
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -287,8 +331,59 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         except (ValueError, ConfigError, BuildError) as exc:
             parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "dev":
+        if arguments.dev_command == "evidence-create":
+            try:
+                projection = _parse_json_arg(arguments.projection)
+                scope = _parse_json_arg(arguments.scope) if arguments.scope else None
+                record = create_evidence_record(
+                    source_type=arguments.source_type,
+                    uri=arguments.uri,
+                    observed_at=arguments.observed_at,
+                    projection=projection,
+                    operation=arguments.operation,
+                    partition=arguments.partition,
+                    region=arguments.region,
+                    retrieved_by=arguments.retrieved_by,
+                    scope=scope,
+                    visibility=arguments.visibility,
+                )
+                formatted = json.dumps(record, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+                if arguments.output is not None:
+                    arguments.output.write_text(formatted, encoding="utf-8")
+                else:
+                    print(formatted, end="")
+                return 0
+            except (ValueError, json.JSONDecodeError, OSError) as exc:
+                parser.exit(2, f"modelo: {exc}\n")
+        if arguments.dev_command == "mac-init":
+            try:
+                subjects = _parse_json_arg(arguments.subjects)
+                candidate_evidence = _parse_json_arg(arguments.candidate_evidence)
+                acceptance = _parse_json_arg(arguments.acceptance)
+                batch_scope = _parse_json_arg(arguments.batch_scope) if arguments.batch_scope else None
+                payload = init_mac_payload(
+                    operation=arguments.operation,
+                    purpose=arguments.purpose,
+                    subjects=subjects,
+                    requested_outcome=arguments.requested_outcome,
+                    reason=arguments.reason,
+                    candidate_evidence=candidate_evidence,
+                    acceptance=acceptance,
+                    item_operation=arguments.item_operation,
+                    batch_scope=batch_scope,
+                )
+                formatted = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+                if arguments.output is not None:
+                    arguments.output.write_text(formatted, encoding="utf-8")
+                else:
+                    print(formatted, end="")
+                return 0
+            except (ValueError, MacError, json.JSONDecodeError, OSError) as exc:
+                parser.exit(2, f"modelo: {exc}\n")
     parser.exit(2, f"{UNAVAILABLE.format(command=arguments.command)}\n")
     return 2
+
 
 
 def _render_text(diagnostic: Diagnostic) -> str:

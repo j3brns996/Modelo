@@ -5,6 +5,8 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 
+from uuid import UUID
+
 from modelo.mac import (
     MAX_ADAPTER_OVERHEAD_BYTES,
     MAX_BODY_BYTES,
@@ -13,6 +15,7 @@ from modelo.mac import (
     compute_keys,
     extract_adapter_issue_payload,
     extract_issue_payload,
+    init_mac_payload,
     payload_digest,
     render_adapter_issue_body,
     render_issue_body,
@@ -199,6 +202,38 @@ class MacTests(unittest.TestCase):
         with self.assertRaisesRegex(MacError, "rendered canonical payload exceeds"):
             with_computed_keys(payload)
 
+    def test_init_mac_payload_valid_add(self) -> None:
+        payload = init_mac_payload(
+            operation="add",
+            purpose="Add test model for validation",
+            subjects=[{"kind": "model", "identity": "test-model"}],
+            requested_outcome="Add model record to catalogue",
+            reason="New model model-v1 available",
+            candidate_evidence=[{
+                "uri": "https://example.invalid/doc",
+                "observed_at": "2026-09-01T00:00:00Z",
+                "digest": "sha256-" + "a" * 64,
+            }],
+            acceptance=["Model schema passes validation"],
+        )
+        self.assertEqual(payload["operation"], "add")
+        self.assertEqual(str(UUID(payload["request_id"])), payload["request_id"])
+        self.assertEqual(validate_payload(payload), payload)
+        self.assertEqual(compute_keys(payload), (payload["dedupe_key"], payload["idempotency_key"]))
+
+    def test_init_mac_payload_invalid_raises_mac_error(self) -> None:
+        with self.assertRaises(MacError):
+            init_mac_payload(
+                operation="invalid_op",
+                purpose="Test invalid operation",
+                subjects=[{"kind": "model", "identity": "test-model"}],
+                requested_outcome="Outcome",
+                reason="Reason",
+                candidate_evidence=[],
+                acceptance=["Acceptance"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -22,7 +22,7 @@ def test_github_trusted_workflow_is_pinned_read_only_and_node_free() -> None:
     assert uses
     assert all(re.fullmatch(r"[^@]+@[0-9a-f]{40}", value) for value in uses)
     assert "enable-cache: false" in raw
-    assert "kind=control-plane" in raw and "kind=mac-data" in raw
+    assert "modelo-local-ci classify" in raw
     assert "modelo/check" in raw
     adapter = (ROOT / "tooling/modelo/src/modelo/github_adapter.py").read_text(encoding="utf-8")
     assert "same-repository pull requests" in adapter
@@ -31,20 +31,31 @@ def test_github_trusted_workflow_is_pinned_read_only_and_node_free() -> None:
     assert "pull_request_target" in raw and "workflow_dispatch" not in raw
     assert "github.event.pull_request.base.sha" in raw
     assert "github.event.pull_request.head.sha" in raw
-    assert "proposed-control:" in raw and "trusted-check:" in raw
-    assert "needs: [classify, proposed-control]" in raw
+    assert "proposed-control:" in raw and "trusted-base:" in raw and "trusted-check:" in raw
+    assert "needs: [classify, proposed-control, trusted-base]" in raw
     assert "if: ${{ always() }}" in raw
     assert 'test "${PROPOSED_RESULT}" = success' in raw
-    assert "Catalogue and control-plane changes require separate pull requests" in raw
+    assert 'test "${TRUSTED_BASE_RESULT}" = success' in raw
     locked_gate = raw.split("- name: Locked dependency and schema gates", 1)[1].split(
-        "- name: Trusted tests", 1
+        "- name: Fetch linked MAC issue", 1
     )[0]
     assert "if: needs.classify.outputs.kind == 'mac-data'" in locked_gate
-    proposed = raw.split("  proposed-control:", 1)[1].split("  trusted-check:", 1)[0]
+    proposed = raw.split("  proposed-control:", 1)[1].split("  trusted-base:", 1)[0]
     assert "upload-artifact" not in proposed and "download-artifact" not in proposed
-    proposed_execution = proposed.split("- name: Test and package proposed code", 1)[1]
+    proposed_execution = proposed.split("- name: Verify proposed code with protected runner", 1)[1]
     assert "GH_TOKEN" not in proposed_execution and "github.token" not in proposed_execution
     assert "unset auth GH_TOKEN" in proposed
+    assert proposed.count("if: needs.classify.outputs.kind == 'control-plane'") >= 3
+    trusted_base = raw.split("  trusted-base:", 1)[1].split("  trusted-check:", 1)[0]
+    assert "needs: classify" in trusted_base
+    assert "modelo-local-ci verify --root trusted --jobs 1" in trusted_base
+    assert "HEAD_SHA" not in trusted_base and "proposed" not in trusted_base
+    assert "modelo-local-ci verify --root proposed --jobs 1" in proposed
+    assert "--project runner" in proposed
+    assert "pytest -q" not in raw and "uv build --offline" not in raw
+    final = raw.split("  trusted-check:", 1)[1]
+    assert "modelo-local-ci verify" not in final
+    assert "- name: Trusted tests" not in final
     assert "github-prepare-control" in raw and "platform control-check" in raw
     assert "curl --fail --silent --show-error --location" not in raw
     assert "--depth=1" not in raw
@@ -53,6 +64,15 @@ def test_github_trusted_workflow_is_pinned_read_only_and_node_free() -> None:
     assert 'ignore=shutil.ignore_patterns(".git",' in fixture
     assert "--depth=1" not in raw
     assert raw.count("fetch --no-tags origin") >= 3
+
+
+def test_local_ci_entrypoint_is_advisory_and_has_no_receipt_surface() -> None:
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    source = (ROOT / "tooling/modelo/src/modelo/local_ci.py").read_text(encoding="utf-8")
+    assert 'modelo-local-ci = "modelo.local_ci:main"' in pyproject
+    assert "classify" in source and "verify" in source and "run" in source
+    for forbidden in ("check.json", "control-check.json", "release.json", "approval", "merge"):
+        assert forbidden not in source
 
 
 def test_skills_are_not_workflow_or_package_inputs() -> None:

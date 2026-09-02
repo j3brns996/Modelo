@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import date
+import errno
 import json
 import os
 from pathlib import Path
@@ -72,6 +73,21 @@ class BuildTests(unittest.TestCase):
         }
         values.update(changes)
         return BuildRequest(**values)
+
+    def test_repository_cleanup_retries_transient_directory_not_empty(self) -> None:
+        repository = Repository()
+        transient = OSError(errno.ENOTEMPTY, "directory not empty")
+        try:
+            with (
+                patch.object(repository.temporary, "cleanup", side_effect=transient),
+                patch("repository.shutil.rmtree", side_effect=[transient, None]) as remove,
+                patch("repository.time.sleep") as pause,
+            ):
+                repository.close()
+            self.assertEqual(remove.call_count, 2)
+            pause.assert_called_once_with(0.05)
+        finally:
+            repository.temporary.cleanup()
 
     def changed_publication(self, result):
         catalogue = json.loads(result.catalogue_bytes)

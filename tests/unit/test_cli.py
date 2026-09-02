@@ -23,7 +23,7 @@ class CliTests(unittest.TestCase):
     def test_version_is_deterministic(self) -> None:
         result = self.run_cli("--version")
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(result.stdout, "modelo 0.1.0\n")
+        self.assertEqual(result.stdout, "modelo 0.1.1\n")
         self.assertEqual(result.stderr, "")
 
     def test_help_and_future_command_help_succeed(self) -> None:

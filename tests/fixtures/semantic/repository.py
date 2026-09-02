@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import errno
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -24,6 +26,8 @@ class Repository:
         self.git("init", "-q")
         self.git("config", "user.name", "Modelo Tests")
         self.git("config", "user.email", "modelo@example.invalid")
+        self.git("config", "gc.auto", "0")
+        self.git("config", "maintenance.auto", "false")
         self.git("add", ".")
         self.git("commit", "-qm", "base")
         self.base = self.git("rev-parse", "HEAD").strip()
@@ -39,4 +43,19 @@ class Repository:
         return self.git("rev-parse", "HEAD").strip()
 
     def close(self) -> None:
-        self.temporary.cleanup()
+        try:
+            self.temporary.cleanup()
+            return
+        except OSError as exc:
+            if exc.errno != errno.ENOTEMPTY:
+                raise
+        for attempt in range(5):
+            try:
+                shutil.rmtree(self.root)
+                return
+            except FileNotFoundError:
+                return
+            except OSError as exc:
+                if exc.errno != errno.ENOTEMPTY or attempt == 4:
+                    raise
+                time.sleep(0.05 * (2**attempt))

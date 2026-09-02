@@ -29,6 +29,8 @@ MAX_DEPTH = 12
 MAX_NODES = 500
 PAYLOAD_START = "<!-- modelo:mac-payload:start -->"
 PAYLOAD_END = "<!-- modelo:mac-payload:end -->"
+INTAKE_START = "<!-- modelo:intake-generated-start -->"
+INTAKE_END = "<!-- modelo:intake-generated-end -->"
 _HASH_PATTERN = re.compile(r"^sha256-[0-9a-f]{64}$")
 _IDENTITY_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9._:/@+-]*[a-z0-9])?$")
 _HOST_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
@@ -458,6 +460,21 @@ def extract_adapter_issue_payload(body: str, adapter: Adapter) -> dict[str, Any]
 
     _bounded_body(body)
     if adapter == "github":
+        starts = [match.start() for match in re.finditer(re.escape(INTAKE_START), body)]
+        ends = [match.start() for match in re.finditer(re.escape(INTAKE_END), body)]
+        if starts or ends:
+            if len(starts) != 1 or len(ends) != 1 or ends[0] < starts[0]:
+                raise MacError("generated intake block is ambiguous")
+            if body[ends[0] + len(INTAKE_END):].strip():
+                raise MacError("generated intake block is not final")
+            source_digests = re.findall(
+                r"<!-- modelo:intake-source (sha256:[0-9a-f]{64}) -->",
+                body[starts[0]:ends[0]],
+            )
+            source = body[:starts[0]].rstrip()
+            actual = "sha256:" + hashlib.sha256(source.encode("utf-8")).hexdigest()
+            if source_digests != [actual]:
+                raise MacError("guided proposal human fields changed after payload generation")
         payload_matches = re.findall(
             r"(?ms)^### (?:Neutral MAC payload|Change details \(JSON\))\n\n```json\n([\s\S]*?)\n```(?:\n|$)", body
         )

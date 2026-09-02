@@ -31,6 +31,41 @@ class SchemaRuntimeTests(unittest.TestCase):
         findings = self.schemas.validate("evidence.schema.json", document, "e.yaml")
         self.assertTrue(any("format" in finding.message for finding in findings))
 
+    def test_mac_digest_pattern_matches_common_evidence_id(self) -> None:
+        # mac.schema.json is deliberately standalone-validatable (see
+        # test_mac_templates.py's bare Draft202012Validator use), so its
+        # digest shape is a local copy of common.schema.json's evidenceId
+        # rather than a cross-file $ref. Pin the two patterns equal so they
+        # cannot drift apart silently.
+        mac_schema = self.schemas.schema("mac.schema.json")
+        common_schema = self.schemas.schema("common.schema.json")
+        self.assertEqual(
+            mac_schema["$defs"]["digest"]["pattern"],
+            common_schema["$defs"]["evidenceId"]["pattern"],
+        )
+
+    def test_every_externally_sourced_field_has_a_valid_freshness_class(self) -> None:
+        valid_classes = set(
+            self.schemas.schema("freshness-policy.schema.json")["properties"]["classes_days"]["required"]
+        )
+        self.assertTrue(valid_classes)
+
+        def walk(node: object, name: str) -> None:
+            if isinstance(node, dict):
+                if node.get("x-modelo-provenance") == "external":
+                    self.assertIn(
+                        node.get("x-modelo-freshness-class"), valid_classes,
+                        f"{name} is externally sourced but has no valid x-modelo-freshness-class",
+                    )
+                for child in node.values():
+                    walk(child, name)
+            elif isinstance(node, list):
+                for child in node:
+                    walk(child, name)
+
+        for name, document in self.schemas.documents.items():
+            walk(document, name)
+
     def test_date_time_is_strict_rfc3339(self) -> None:
         valid = (
             "2026-08-30T12:34:56.123+05:30",

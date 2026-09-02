@@ -19,6 +19,15 @@ approval. To change the governed catalogue, start with the issue chooser rather
 than editing a record. It captures the intent and subjects that the later
 change request must preserve.
 
+## Product tour
+
+These labelled synthetic-demo captures show the generated site. They are not
+approval, launch or T10 evidence, and contain no production catalogue data.
+
+![Modelo synthetic-demo home showing navigation, synthetic status and catalogue totals](docs/img/modelo-home.png)
+
+![Modelo synthetic catalogue showing filters and model result cards](docs/img/modelo-catalogue.png)
+
 ## Why Facts And Approval Are Separate
 
 A model record says what a named model release is. It does not say that the

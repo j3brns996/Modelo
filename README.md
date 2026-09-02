@@ -113,7 +113,13 @@ uv run --locked modelo --version
 uv run --locked modelo --help
 uv run --locked modelo check --help
 uv run --locked modelo build --help
+uv run --locked modelo-local-ci --help
 ```
+
+`modelo-local-ci` is the shared, non-accepting preflight for contributors and
+the protected GitHub runner. Local mode can use up to three deterministic test
+processes; GitHub runs protected-base and proposed-head verification as parallel
+jobs, then requires both before the final `modelo/check` receipt step.
 
 `modelo check`, `modelo build` and `modelo platform check` are implemented. The
 templates and local assets are under `site/`; generated demo, validation and

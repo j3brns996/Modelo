@@ -66,6 +66,7 @@ commit invalidates earlier check and review evidence.
 ```bash
 uv sync --locked
 uv run --locked modelo --version
+uv build --offline --no-cache
 uv run --locked modelo-local-ci run --base <base-sha> --head <head-sha> --as-of YYYY-MM-DD --jobs 3
 ```
 
@@ -73,6 +74,11 @@ uv run --locked modelo-local-ci run --base <base-sha> --head <head-sha> --as-of 
 branch with its base, but it does not accept a change. `modelo/check` remains
 the acceptance gate. Use the exact base and head SHAs from your change request
 so the result matches the reviewed head.
+
+Candidate and final builds take explicit provenance inputs. `--base-commit`
+names the comparison baseline; the matching source and tree values bind the
+output to reviewed Git content. See [docs/contract.yaml](docs/contract.yaml)
+for the complete required input set.
 
 Run the command from a clean worktree after reading the repository rules and
 the schema that owns the changed files. Start with narrow tests, then use local

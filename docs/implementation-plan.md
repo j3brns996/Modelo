@@ -1,10 +1,15 @@
 # Modelo v0.1 implementation and verification plan
 
-Status: T8 pre-merge CI, T9 and a public synthetic Pages demo workflow are
-implemented. The accepted T6 head is `8694053c3366e162e0da6991ad08729aa8c95ad5`.
+Status: historical bootstrap delivery record and current control posture. T8
+pre-merge CI, T9 and the public synthetic Pages demo workflow are implemented.
+The accepted T6 head is `8694053c3366e162e0da6991ad08729aa8c95ad5`.
 Production post-merge release/receipt automation and the T10 remote sentinel,
 release/receipt and mirror-restore rehearsal remain launch gates, so no
 production catalogue record may merge.
+
+This document records completed delivery history and the current launch posture.
+It is not execution authority for new work. For current changes, follow
+`docs/contract.yaml` and the linked issue(s) instead of this plan.
 
 ## Outcome
 
@@ -63,6 +68,9 @@ All other edges are hard dependencies and later tasks run sequentially where
 they extend the same package. Each task uses a separate branch/worktree and one
 writer. Review agents are read-only. The integration writer alone updates the
 target branch after validating each task's exact head.
+
+The task graph is retained as delivery evidence. It describes the bootstrap
+work that was completed, not permission to start new changes.
 
 `tooling/modelo/src/modelo/cli.py` and `tests/unit/test_cli.py` are narrow shared
 integration paths for T5, T6 and T8. A task may change them only to expose its
@@ -204,7 +212,7 @@ cannot substitute for host controls.
 |---|---|
 | Six independent read-only architecture reviews | Complete |
 | T0 contract reconciliation | Complete; four independent exact-head gates returned READY |
-| Implementation swarm | T1–T7 accepted; T8 trusted pre-merge checks and T9 portable skills implemented in the bootstrap candidate |
+| Implementation swarm | T1–T7 accepted; T8 trusted pre-merge checks and T9 portable skills are part of the bootstrap delivery history |
 | Executable validator and CI | Validator and GitHub trusted pre-merge adapter implemented; remote host-control rehearsal remains T10 |
-| Static site and platform templates | Synthetic Pages demo and functional explorer are live; product-quality site experience v2 is implemented in the issue #37 candidate; production final publication remains T10 evidence |
+| Static site and platform templates | Synthetic Pages demo and functional explorer are live; the product-quality site experience v2 was delivered in the closed issue #37 history; production final publication remains T10 evidence |
 | Production catalogue launch | Blocked through T10 |

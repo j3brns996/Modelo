@@ -770,6 +770,14 @@ evidence is never accepted catalogue evidence. See `docs/mac-contract.md`.
 | Publication | Pages Actions artefact | Pages CI artefact |
 | Release | Protected tag and release | Protected tag and release |
 
+`modelo-local-ci` provides fast, non-accepting feedback with the same fixed test
+inventory and offline package gate used by GitHub. It classifies only the
+catalogue/control boundary; agent-approval eligibility remains a separate,
+narrower decision. In the trusted GitHub workflow, the runner itself always
+comes from the protected base. Protected-base and proposed-head verification
+run in parallel, and the final `modelo/check` job requires both before it writes
+a receipt. A local result never substitutes for that remote authority.
+
 Pages serves static HTML and JSON only. It has no write API and no custom auth.
 The current personal GitHub repository cannot satisfy the private Pages
 capability. It therefore publishes only the synthetic fixture profile to public

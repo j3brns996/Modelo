@@ -15,6 +15,7 @@ dev = [
 
 [project.scripts]
 modelo = "modelo.cli:main"
+modelo-local-ci = "modelo.local_ci:main"
 
 [build-system]
 requires = ["uv_build==0.11.33"]

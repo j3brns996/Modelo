@@ -67,6 +67,13 @@
   or security issue, runs both protected-base and proposed-head test/package
   gates, emits `control-check.json`, and requires a human CODEOWNER. A control
   change can never inherit agent approval eligibility.
+- `modelo-local-ci` is a non-accepting preflight. Its change-mode classifier
+  distinguishes catalogue, control and mixed changes but never decides agent
+  eligibility. GitHub executes the verifier from the protected base even when
+  the target is proposed code, so a contributor cannot replace the runner with
+  a no-op. Protected-base and proposed-head gates run as independent parallel
+  jobs; the final trusted job fails unless both succeed and remains the only
+  receipt writer.
 - GitHub requires a trusted required workflow sourced from the protected
   default branch. GitLab requires a Pipeline Execution Policy or equivalent
   control outside contributor modification; absence is an incapable platform,

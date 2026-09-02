@@ -505,6 +505,14 @@ site:
 
 validation:
   command: modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
+  local_ci:
+    command: modelo-local-ci run --base BASE --head HEAD --as-of YYYY-MM-DD --jobs 3
+    authority: advisory_non_accepting
+    fixed_gates: [complete_python_test_inventory, offline_package_build]
+    maximum_test_processes: 3
+    configurable_task_dsl: false
+    accepting_receipt_output: false
+    shared_remote_runner_source: protected_base
   change_modes:
     mac_data:
       paths: catalogue/**
@@ -518,6 +526,13 @@ validation:
       gates: [trusted_base_tests, proposed_head_tests, trusted_base_package, proposed_head_package]
       approval: human_codeowner_only
     mutually_exclusive: true
+    classification_does_not_determine_agent_approval_eligibility: true
+  github_control_parallelism:
+    parallel_jobs: [protected_base_tests_and_package, proposed_head_tests_and_package]
+    proposed_command_owner: protected_base_runner
+    final_aggregator: modelo/check
+    final_requires: [classification, protected_base_success, proposed_head_success]
+    receipt_gate_names_unchanged: true
   restricted_yaml: true
   change_aware: true
   deterministic: true

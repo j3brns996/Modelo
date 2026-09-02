@@ -6,9 +6,10 @@ These rules apply to every agent and every repository path. More specific
 ## Current state
 
 This repository contains the validator, deterministic candidate/final builders,
-static-site generator and trusted pre-merge GitHub adapter. Post-merge Pages,
-release/receipt automation and launch rehearsal remain absent. Do not add or
-merge production catalogue records until T10 passes remotely.
+static-site generator and trusted pre-merge GitHub adapter. A public synthetic
+Pages demo is live. Production post-merge publication, release, and receipt
+automation, plus the T10 rehearsal, remain absent. Do not add or merge
+production catalogue records until T10 passes remotely.
 
 ## Authority and workflow
 

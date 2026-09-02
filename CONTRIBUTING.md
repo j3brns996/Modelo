@@ -1,40 +1,56 @@
 # Contributing to Modelo
 
-Every move, add, change, revoke or batch starts from a linked MAC issue. Work on
-a topic branch, keep one writer per branch/worktree and submit a pull or merge
-request. Review agents are read-only. Never write directly to protected `main`.
+## Requester
 
-Before changing a path, read `AGENTS.md`, `modelo.yaml`, `docs/contract.yaml`
-and its owning specification or schema. External catalogue facts require
-admissible evidence; provider availability is not enterprise approval. Do not
-add real catalogue records before the T10 launch gate passes.
+- Open a linked MAC issue before any catalogue move, add, change, revoke, or batch change.
+- Open the linked control issue before any product or documentation change.
+- Use a topic branch and submit a change request instead of writing directly to the protected default branch.
 
-Control-plane paths require a human CODEOWNER. A future independent eligible
-agent may approve only allowlisted data paths, only after trusted CI succeeds
-for the exact current head, and never if it authored, committed or modified the
-change. A new commit invalidates that check and approval.
+## Author or contributor
 
-For T1, run:
+- Read `AGENTS.md`, `modelo.yaml`, `docs/contract.yaml`, and the owning specification or schema before editing.
+- Keep one writer per branch or worktree.
+- Treat GitHub and GitLab as adapters. Do not put host-specific fields in core records, schemas, or validation.
+- Do not create a Modelo application API. Workflow writes use the selected Git provider API; cloud provider APIs and MCP tools are read-only evidence sources.
+- Do not add production catalogue records before T10 passes remotely.
+
+## Reviewer
+
+- Review agents are read-only.
+- For data-only MAC work, an independent eligible agent may approve only after trusted CI succeeds for the exact current head and the evidence is recorded.
+- The approving agent must not be the author, committer, or modifier of the change.
+
+## Approver
+
+- Control paths require a human CODEOWNER.
+- Agent approval is disabled except for the current narrow allowlist: `catalogue/models/**`, `catalogue/offerings/**`, and `catalogue/evidence/**`.
+- Any new commit invalidates trusted CI evidence and any prior approval.
+- Agents may not merge, bypass controls, or push to the protected branch.
+
+## Local verification
+
+Setup:
 
 ```bash
 uv sync --locked
-uv run --locked python -m unittest discover -s tests/unit -v
-uv run --locked modelo --version
-uv run --locked modelo --help
 ```
 
-For normal local preflight, compare the topic branch with its base using the
-shared advisory runner:
+Local-ci:
 
 ```bash
 uv run --locked modelo-local-ci run \
   --base <base-sha> --head <head-sha> --as-of YYYY-MM-DD --jobs 3
 ```
 
-Control changes run the complete Python test inventory and offline package
-build. Catalogue-only changes run validation and execute no proposed tooling in
-trusted CI. Local success is feedback only; `modelo/check` remains authoritative.
+- Treat local success as advisory only; `modelo check` remains authoritative when it exists.
+- Control changes run the complete Python test inventory and offline package build.
+- Catalogue-only changes run validation and execute no proposed tooling in trusted CI.
 
-Do not commit `dist/` or weaken a test to make a change pass. Technical debt is
-permitted only with a linked issue that names an owner, rationale, removal
-criterion, target release or date, and test reference.
+## Non-negotiables
+
+- Start every move, add, change, revoke, or batch operation from a linked MAC issue.
+- Keep one writer per branch or worktree.
+- CI is the technical acceptance arbiter. Only the trusted final check for the exact current head is accepting; missing, skipped, neutral, cancelled, stale, or failed results are not.
+- Do not commit `dist/`.
+- Do not weaken validation to make data pass.
+- Do not introduce technical debt without a linked issue that names an owner, rationale, removal criterion, target release or date, and test reference.

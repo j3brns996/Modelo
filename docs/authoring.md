@@ -1,9 +1,9 @@
 # Authoring proposals and evidence
 
 Modelo provides local conveniences for preparing a change. They create drafts;
-they do not open an issue, retrieve provider facts, approve a record or produce
-trusted CI evidence. Start governed work from a linked MAC issue and treat every
-local input and output path as author-controlled.
+they do not open a linked issue, retrieve provider facts, approve a record or
+produce trusted CI evidence. Start governed work from a linked MAC issue and
+treat every local input and output path as author-controlled.
 
 ## Choose an intake path
 

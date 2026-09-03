@@ -42,7 +42,8 @@ uv run --locked modelo-local-ci run \
   --base <base-sha> --head <head-sha> --as-of YYYY-MM-DD --jobs 3
 ```
 
-- Treat local success as advisory only; `modelo check` remains authoritative when it exists.
+- Treat local success as advisory only; the remote exact-head `modelo/check`
+  required check is the acceptance gate.
 - Control changes run the complete Python test inventory and offline package build.
 - Catalogue-only changes run validation and execute no proposed tooling in trusted CI.
 

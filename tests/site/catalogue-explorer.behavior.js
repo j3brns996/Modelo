@@ -69,6 +69,7 @@ class FakeElement {
 }
 
 const source = fs.readFileSync(path.join(__dirname, "../../site/assets/catalogue.js"), "utf8");
+assert.doesNotMatch(source, /macBuilder|proposalBuilder|data-mac-builder|issues\/new/);
 vm.runInThisContext(source, { filename: "catalogue.js" });
 assert.equal(typeof alpineInitialiser, "function");
 alpineInitialiser();

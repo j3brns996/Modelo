@@ -266,10 +266,11 @@
         },
         "asset_routes": {
           "type": "object",
-          "required": ["asset_css", "asset_js", "asset_alpine", "asset_third_party_notices"],
+          "required": ["asset_css", "asset_catalogue_js", "asset_proposal_js", "asset_alpine", "asset_third_party_notices"],
           "properties": {
             "asset_css": { "$ref": "#/$defs/noParameterRoute" },
-            "asset_js": { "$ref": "#/$defs/noParameterRoute" },
+            "asset_catalogue_js": { "$ref": "#/$defs/noParameterRoute" },
+            "asset_proposal_js": { "$ref": "#/$defs/noParameterRoute" },
             "asset_alpine": { "$ref": "#/$defs/noParameterRoute" },
             "asset_third_party_notices": { "$ref": "#/$defs/noParameterRoute" }
           },
@@ -388,7 +389,7 @@
           "items": { "enum": ["data/catalogue.json", "data/change-delta.json"] }
         },
         "final_fixed_files": {
-          "type": "array", "minItems": 15, "maxItems": 15, "uniqueItems": true,
+          "type": "array", "minItems": 16, "maxItems": 16, "uniqueItems": true,
           "items": { "$ref": "#/$defs/path" }
         },
         "mac_metadata_ingestion": {

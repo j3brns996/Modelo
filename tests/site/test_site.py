@@ -614,9 +614,14 @@ class FinalSiteTests(unittest.TestCase):
                 build_final_site(self.request())
 
     def test_assets_have_no_unsafe_dom_or_remote_dependency(self) -> None:
-        javascript = (ROOT / "site/assets/catalogue.js").read_text().lower()
-        for forbidden in ("innerhtml", "outerhtml", "document.write", "fetch(", "xmlhttprequest"):
-            self.assertNotIn(forbidden, javascript)
+        assets = (
+            ROOT / "site/assets/catalogue.js",
+            ROOT / "site/assets/proposal.js",
+        )
+        for asset in assets:
+            javascript = asset.read_text().lower()
+            for forbidden in ("innerhtml", "outerhtml", "document.write", "fetch(", "xmlhttprequest"):
+                self.assertNotIn(forbidden, javascript, asset)
         base = (ROOT / "site/templates/base.html").read_text()
         self.assertIn("default-src 'none'", base)
         self.assertIn("style-src 'self' $font_style_origin", base)
@@ -661,6 +666,7 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn("Intrinsic evidence", model)
         for contract in ("@media (max-width: 880px)", "@media (max-width: 580px)", ".model-card {", ".fact-grid"):
             self.assertIn(contract, css)
+        self.assertIn("textarea[data-proposal-summary]", css)
 
     def test_catalogue_uses_dedicated_human_readable_model_cards(self) -> None:
         site = build_final_site(self.request()).output / "site"
@@ -715,9 +721,17 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn("textContent", javascript)
         self.assertLess(catalogue.index("/assets/catalogue.js"), catalogue.index("/assets/vendor/alpine-csp-3.16.3.min.js"))
         self.assertNotIn("<script src=\"http", catalogue)
-        home = (site / "index.html").read_text(encoding="utf-8")
-        self.assertNotIn("catalogue.js", home)
-        self.assertNotIn("alpine-csp", home)
+        propose = (site / "propose/index.html").read_text(encoding="utf-8")
+        self.assertIn('/Modelo/assets/proposal.js', propose)
+        self.assertNotIn("catalogue.js", propose)
+        self.assertNotIn("alpine-csp", propose)
+        for page in site.rglob("*.html"):
+            if page.relative_to(site).as_posix() in {"catalogue/index.html", "propose/index.html"}:
+                continue
+            rendered = page.read_text(encoding="utf-8")
+            self.assertNotIn("catalogue.js", rendered, page)
+            self.assertNotIn("proposal.js", rendered, page)
+            self.assertNotIn("alpine-csp", rendered, page)
 
     def test_search_facets_docs_evidence_footer_and_history_contract(self) -> None:
         site = build_final_site(self.request()).output / "site"
@@ -738,11 +752,11 @@ class FinalSiteTests(unittest.TestCase):
         for operation in ("add: ", "change: ", "revoke: "):
             self.assertIn(operation + "tests/fixtures/build/synthetic/history.txt", changes)
 
-    def test_proposal_form_builder_rendering_links_and_accessibility(self) -> None:
+    def test_proposal_form_builder_is_scoped_configured_and_noncanonical(self) -> None:
         site = build_final_site(self.request()).output / "site"
         propose_page = (site / "propose/index.html").read_text(encoding="utf-8")
 
-        self.assertIn('<form data-mac-builder', propose_page)
+        self.assertIn('<form data-proposal-builder', propose_page)
         for field in (
             'data-field="operation"',
             'data-field="subject-kind"',
@@ -755,33 +769,78 @@ class FinalSiteTests(unittest.TestCase):
         ):
             self.assertIn(field, propose_page)
 
-        for op in ("add", "change", "revoke", "move", "batch"):
+        for op in ("add", "change"):
             self.assertIn(f'value="{op}"', propose_page)
+        operation_control = propose_page.split('id="proposal-operation"', 1)[1].split("</select>", 1)[0]
+        for unsupported in ("revoke", "move", "batch"):
+            self.assertNotIn(f'value="{unsupported}"', operation_control)
+        self.assertEqual(propose_page.count('class="intake-card" rel="noopener noreferrer"'), 5)
         for kind in ("model", "offering", "evidence", "vendor", "inference-service", "condition"):
             self.assertIn(f'value="{kind}"', propose_page)
 
         for control_id in (
-            "mac-operation",
-            "mac-subject-kind",
-            "mac-subject-identity",
-            "mac-purpose",
-            "mac-requested-outcome",
-            "mac-reason",
-            "mac-candidate-evidence",
-            "mac-acceptance",
-            "mac-yaml-output",
+            "proposal-operation",
+            "proposal-subject-kind",
+            "proposal-subject-identity",
+            "proposal-purpose",
+            "proposal-requested-outcome",
+            "proposal-reason",
+            "proposal-candidate-evidence",
+            "proposal-acceptance",
+            "proposal-summary-output",
         ):
             self.assertIn(f'for="{control_id}"', propose_page)
             self.assertIn(f'id="{control_id}"', propose_page)
 
-        self.assertIn('data-mac-yaml', propose_page)
-        self.assertIn('data-copy-yaml', propose_page)
-        self.assertIn('data-github-issue-link', propose_page)
+        self.assertIn('data-proposal-summary', propose_page)
+        self.assertIn('data-copy-summary', propose_page)
+        self.assertIn('data-proposal-issue-link', propose_page)
+        self.assertIn('data-intake-add="https://github.com/j3brns996/Modelo/issues/new?template=mac-add.yml"', propose_page)
+        self.assertIn('data-intake-change="https://github.com/j3brns996/Modelo/issues/new?template=mac-change.yml"', propose_page)
         self.assertIn('href="https://github.com/j3brns996/Modelo/issues/new?template=mac-add.yml"', propose_page)
         self.assertIn('rel="noopener noreferrer"', propose_page)
+        self.assertIn("non-canonical", propose_page)
+        self.assertIn("not a MAC payload", propose_page)
+        self.assertNotIn("YAML", propose_page)
+        self.assertIn('/Modelo/assets/proposal.js', propose_page)
+        self.assertNotIn('/Modelo/assets/catalogue.js', propose_page)
+        self.assertNotIn('/Modelo/assets/vendor/alpine-csp-3.16.3.min.js', propose_page)
 
-        self.assertIn('/Modelo/assets/catalogue.js', propose_page)
-        self.assertIn('/Modelo/assets/vendor/alpine-csp-3.16.3.min.js', propose_page)
+    def test_proposal_urls_follow_overridden_repository_configuration(self) -> None:
+        git(self.root, "checkout", "--detach", self.source)
+        config_path = self.root / "modelo.yaml"
+        config = config_path.read_text(encoding="utf-8")
+        config = config.replace("host: github.com", "host: code.example.invalid")
+        config = config.replace("namespace: j3brns996", "namespace: platform")
+        config = config.replace("name: Modelo", "name: Registry")
+        config = config.replace(
+            "web_base: https://github.com/j3brns996/Modelo",
+            "web_base: https://code.example.invalid/platform/Registry",
+        )
+        config = config.replace(
+            "add: /issues/new?template=mac-add.yml",
+            "add: /tickets/new?intake=add-v2",
+        )
+        config = config.replace(
+            "change: /issues/new?template=mac-change.yml",
+            "change: /tickets/new?intake=change-v2",
+        )
+        config_path.write_text(config, encoding="utf-8", newline="\n")
+        git(self.root, "add", "modelo.yaml")
+        git(self.root, "commit", "-m", "override configured proposal routes")
+        source = git(self.root, "rev-parse", "HEAD")
+        request = replace(
+            self.demo_request(),
+            source_commit=source,
+            source_tree=git(self.root, "rev-parse", "HEAD^{tree}"),
+            source_date_epoch=int(git(self.root, "show", "-s", "--format=%at", source)),
+        )
+        page = (build_demo_site(request).output / "site/propose/index.html").read_text(encoding="utf-8")
+        add = "https://code.example.invalid/platform/Registry/tickets/new?intake=add-v2"
+        change = "https://code.example.invalid/platform/Registry/tickets/new?intake=change-v2"
+        self.assertIn(f'data-intake-add="{add}"', page)
+        self.assertIn(f'data-intake-change="{change}"', page)
+        self.assertNotIn("github.com/j3brns996/Modelo/issues/new", page)
 
     def test_generated_site_crawl_canonical_fragments_external_rel_and_captions(self) -> None:
         site = build_final_site(self.request()).output / "site"
@@ -862,7 +921,8 @@ class FinalSiteTests(unittest.TestCase):
             "home": "/", "catalogue": "/catalogue/", "model": "/models/{model_id}/",
             "offering": "/offerings/{inference_service_id}/{offering_id}/", "changes": "/changes/",
             "process": "/process/", "propose": "/propose/", "docs": "/docs/", "not_found": "/404.html",
-            "asset_css": "/assets/site.css", "asset_js": "/assets/catalogue.js",
+            "asset_css": "/assets/site.css", "asset_catalogue_js": "/assets/catalogue.js",
+            "asset_proposal_js": "/assets/proposal.js",
             "asset_alpine": "/assets/vendor/alpine-csp-3.16.3.min.js",
             "asset_third_party_notices": "/assets/vendor/THIRD-PARTY-NOTICES.md",
             "catalogue_data": "/data/catalogue.json", "change_delta_data": "/data/change-delta.json",

@@ -155,7 +155,7 @@ class _Resolver:
     def _validate_routes(self) -> None:
         expected_directories = {"home", "catalogue", "model", "offering", "changes", "process", "propose", "docs"}
         expected_files = {
-            "not_found", "asset_css", "asset_js", "asset_alpine",
+            "not_found", "asset_css", "asset_catalogue_js", "asset_proposal_js", "asset_alpine",
             "asset_third_party_notices", "catalogue_data", "change_delta_data",
             "manifest_data", "schemas_data", "human_specification", "machine_contract",
         }
@@ -390,9 +390,11 @@ def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, req
         "font_style_origin": escape(font_style_origin, quote=True),
         "font_file_origin": escape(font_file_origin, quote=True),
         "scripts": (
-            '<script src="' + escape(resolver.site("asset_js"), quote=True) + '" defer></script>\n  '
+            '<script src="' + escape(resolver.site("asset_catalogue_js"), quote=True) + '" defer></script>\n  '
             '<script src="' + escape(resolver.site("asset_alpine"), quote=True) + '" defer></script>'
-            if name in ("catalogue", "propose") else ""
+            if name == "catalogue" else
+            '<script src="' + escape(resolver.site("asset_proposal_js"), quote=True) + '" defer></script>'
+            if name == "propose" else ""
         ),
         "title": escape(title), "navigation": _navigation(resolver, route), "content": content,
         "page_name": escape(name, quote=True),
@@ -565,8 +567,13 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     process_content = _substitute(templates["process"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/process.md"))}, "process")
     intake = document["repository"]["web_routes"]["mac_intake"]
     intake_links = "".join('<a class="intake-card" rel="noopener noreferrer" href="' + escape(str(document["repository"]["web_base"]).rstrip("/") + intake[key], quote=True) + '"><span>' + escape(key.title()) + '</span><small>Open governed request</small><b aria-hidden="true">→</b></a>' for key in ("add", "change", "revoke", "move", "batch"))
-    web_base_url = escape(str(document["repository"]["web_base"]).rstrip("/"), quote=True)
-    propose_content = _substitute(templates["propose"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/propose.md")), "intake_links": intake_links, "web_base": web_base_url}, "propose")
+    web_base_url = str(document["repository"]["web_base"]).rstrip("/")
+    propose_content = _substitute(templates["propose"], {
+        "body": _markdown(_blob(root, request.source_commit, content_path + "/propose.md")),
+        "intake_links": intake_links,
+        "intake_add_url": escape(web_base_url + intake["add"], quote=True),
+        "intake_change_url": escape(web_base_url + intake["change"], quote=True),
+    }, "propose")
     docs_links = '<div class="reference-grid"><a href="' + escape(resolver.site("human_specification"), quote=True) + '"><strong>Human specification</strong><span>Rationale and invariants</span></a><a href="' + escape(resolver.site("machine_contract"), quote=True) + '"><strong>Machine contract</strong><span>Compact executable context</span></a><a href="' + escape(resolver.site("schemas_data") + "model.schema.json", quote=True) + '"><strong>Model schema</strong><span>Canonical model shape</span></a><a href="' + escape(resolver.site("schemas_data") + "offering.schema.json", quote=True) + '"><strong>Offering schema</strong><span>Consumption approval shape</span></a></div><div class="clone-command"><span>Clean clone</span><code>git clone ' + escape(str(document["repository"]["web_base"]) + ".git") + "</code></div>"
     docs_content = _substitute(templates["docs"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/docs.md")), "documentation_links": docs_links}, "docs")
     not_found_content = _substitute(templates["404"], {"home_url": escape(resolver.site("home"), quote=True)}, "404")
@@ -606,7 +613,8 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         path = resolver.output_path("offering", inference_service_id=offering["inference_service_id"], offering_id=offering["id"])
         files[path] = _page(root, request.source_commit, templates_path, resolver, request, "offering", offering["id"], content, "offering", {"inference_service_id": offering["inference_service_id"], "offering_id": offering["id"]})
     files[resolver.output_path("asset_css")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/site.css")
-    files[resolver.output_path("asset_js")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/catalogue.js")
+    files[resolver.output_path("asset_catalogue_js")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/catalogue.js")
+    files[resolver.output_path("asset_proposal_js")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/proposal.js")
     enhancement = document["site"]["progressive_enhancement"]
     alpine = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/" + enhancement["runtime_source"])
     if sha256_bytes(alpine) != enhancement["runtime_sha256"]:

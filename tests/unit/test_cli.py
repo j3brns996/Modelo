@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -181,6 +182,109 @@ class CliTests(unittest.TestCase):
             out_data = json.loads(out_file.read_text(encoding="utf-8"))
             self.assertEqual(out_data["projection"], {"providerName": "AWS"})
 
+    def test_dev_evidence_create_valid_api_record(self) -> None:
+        result = self.run_cli(
+            "dev", "evidence-create",
+            "--source-type", "first-party-read-api",
+            "--uri", "https://example.invalid/api",
+            "--observed-at", "2026-09-01T00:00:00Z",
+            "--projection", '{"modelName": "API Model"}',
+            "--operation", "GetFoundationModel",
+            "--region", "us-east-1",
+            "--retrieved-by", "mcp",
+            "--visibility", "public",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        record = json.loads(result.stdout)
+        self.assertEqual(record["source"]["operation"], "GetFoundationModel")
+        self.assertEqual(record["source"]["region"], "us-east-1")
+        self.assertEqual(record["retrieved_by"], "mcp")
+        self.assertEqual(record["visibility"], "public")
+
+    def test_dev_evidence_create_rejects_invalid_records_without_output(self) -> None:
+        base = (
+            "dev", "evidence-create",
+            "--source-type", "official-provider-documentation",
+            "--uri", "https://example.invalid/doc",
+            "--observed-at", "2026-09-01T00:00:00Z",
+            "--projection", '{"providerName": "AWS"}',
+        )
+        cases = (
+            ("source type", ("--source-type", "marketing-page")),
+            ("URI", ("--uri", "http://example.invalid/doc")),
+            ("timestamp", ("--observed-at", "2026-02-30T00:00:00Z")),
+            ("retriever", ("--retrieved-by", "browser")),
+            ("visibility", ("--visibility", "secret")),
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            for index, (name, override) in enumerate(cases):
+                arguments = list(base)
+                if override[0] in arguments:
+                    option = arguments.index(override[0])
+                    arguments[option + 1] = override[1]
+                else:
+                    arguments.extend(override)
+                output = tmp_path / f"existing-{index}.json"
+                output.write_text("preserve me\n", encoding="utf-8")
+                result = self.run_cli(*arguments, "--output", str(output))
+                with self.subTest(case=name):
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(result.stdout, "")
+                    self.assertIn("invalid evidence record", result.stderr)
+                    self.assertEqual(output.read_text(encoding="utf-8"), "preserve me\n")
+
+            absent = tmp_path / "absent.json"
+            result = self.run_cli(
+                *base, "--uri", "http://example.invalid/doc", "--output", str(absent)
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.stdout, "")
+            self.assertFalse(absent.exists())
+
+    def test_dev_evidence_create_api_requires_operation_and_region(self) -> None:
+        base = (
+            "dev", "evidence-create",
+            "--source-type", "first-party-read-api",
+            "--uri", "https://example.invalid/api",
+            "--observed-at", "2026-09-01T00:00:00Z",
+            "--projection", '{"modelName": "API Model"}',
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            for name, extra in (
+                ("operation", ("--region", "us-east-1")),
+                ("region", ("--operation", "GetFoundationModel")),
+            ):
+                output = Path(tmp_dir) / f"missing-{name}.json"
+                output.write_text("preserve me\n", encoding="utf-8")
+                result = self.run_cli(*base, *extra, "--output", str(output))
+                with self.subTest(missing=name):
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(result.stdout, "")
+                    self.assertIn("invalid evidence record", result.stderr)
+                    self.assertEqual(output.read_text(encoding="utf-8"), "preserve me\n")
+
+    def test_dev_evidence_create_uses_schema_from_configured_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            for name in ("modelo.yaml", "VERSION", ".python-version", "pyproject.toml", "uv.lock"):
+                shutil.copy2(ROOT / name, root / name)
+            shutil.copytree(ROOT / "schemas", root / "schemas")
+            schema_path = root / "schemas/evidence.schema.json"
+            schema = json.loads(schema_path.read_text(encoding="utf-8"))
+            schema["properties"]["retrieved_by"]["enum"] = ["manual"]
+            schema_path.write_text(json.dumps(schema), encoding="utf-8")
+            result = self.run_cli(
+                "--root", str(root), "dev", "evidence-create",
+                "--source-type", "official-provider-documentation",
+                "--uri", "https://example.invalid/doc",
+                "--observed-at", "2026-09-01T00:00:00Z",
+                "--projection", '{}',
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.stdout, "")
+            self.assertIn("invalid evidence record", result.stderr)
+
     def test_dev_mac_init_inline_and_validation_error(self) -> None:
         digest = "sha256-" + "a" * 64
         result = self.run_cli(
@@ -216,4 +320,3 @@ class CliTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

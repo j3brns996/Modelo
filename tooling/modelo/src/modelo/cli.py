@@ -27,6 +27,7 @@ from modelo.github_adapter import (
 )
 from modelo.evidence import create_evidence_record
 from modelo.mac import MacError, init_mac_payload
+from modelo.schemas import SchemaSet
 from modelo.validators import CheckSystemError, check_repository
 
 
@@ -119,7 +120,7 @@ def _parser() -> argparse.ArgumentParser:
     dev_subparsers = dev.add_subparsers(dest="dev_command", required=True)
 
     evidence_create = dev_subparsers.add_parser(
-        "evidence-create", help="create an evidence record"
+        "evidence-create", help="create a schema-valid local evidence record"
     )
     evidence_create.add_argument("--source-type", required=True)
     evidence_create.add_argument("--uri", required=True)
@@ -334,6 +335,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "dev":
         if arguments.dev_command == "evidence-create":
             try:
+                config = load_config(arguments.root.resolve())
+                schemas = SchemaSet(config.root, config.paths["schemas"])
                 projection = _parse_json_arg(arguments.projection)
                 scope = _parse_json_arg(arguments.scope) if arguments.scope else None
                 record = create_evidence_record(
@@ -341,6 +344,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     uri=arguments.uri,
                     observed_at=arguments.observed_at,
                     projection=projection,
+                    schemas=schemas,
                     operation=arguments.operation,
                     partition=arguments.partition,
                     region=arguments.region,
@@ -354,7 +358,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 else:
                     print(formatted, end="")
                 return 0
-            except (ValueError, json.JSONDecodeError, OSError) as exc:
+            except (ConfigError, ValueError, json.JSONDecodeError, OSError) as exc:
                 parser.exit(2, f"modelo: {exc}\n")
         if arguments.dev_command == "mac-init":
             try:

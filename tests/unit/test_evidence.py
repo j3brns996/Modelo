@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path, PurePosixPath
 
 from modelo.evidence import (
     canonical_json,
@@ -9,9 +10,17 @@ from modelo.evidence import (
     resolve_pointer,
     validate_content_addresses,
 )
+from modelo.schemas import SchemaSet
+
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class EvidenceTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.schemas = SchemaSet(ROOT, PurePosixPath("schemas"))
+
     def test_canonicalisation_is_deterministic_and_utf16_sorted(self) -> None:
         first = {"\U00010000": 1, "\ue000": 2, "a": [True, None, "x"]}
         second = dict(reversed(tuple(first.items())))
@@ -35,6 +44,7 @@ class EvidenceTests(unittest.TestCase):
             uri="https://example.invalid/doc",
             observed_at="2026-09-01T00:00:00Z",
             projection={"modelName": "Test Model"},
+            schemas=self.schemas,
         )
         self.assertTrue(record["id"].startswith("sha256-"))
         self.assertEqual(
@@ -54,6 +64,7 @@ class EvidenceTests(unittest.TestCase):
             uri="https://example.invalid/api",
             observed_at="2026-09-01T00:00:00Z",
             projection={"modelName": "API Model"},
+            schemas=self.schemas,
             operation="GetFoundationModel",
             partition="aws",
             region="us-east-1",
@@ -80,7 +91,45 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(record["visibility"], "public")
         self.assertEqual(validate_content_addresses([("test", record)]), ())
 
+    def test_create_evidence_record_rejects_schema_invalid_candidates(self) -> None:
+        cases = (
+            {"source_type": "marketing-page"},
+            {"uri": "http://example.invalid/doc"},
+            {"observed_at": "2026-02-30T00:00:00Z"},
+            {"retrieved_by": "browser"},
+            {"visibility": "secret"},
+        )
+        defaults = {
+            "source_type": "official-provider-documentation",
+            "uri": "https://example.invalid/doc",
+            "observed_at": "2026-09-01T00:00:00Z",
+            "projection": {"modelName": "Test Model"},
+            "schemas": self.schemas,
+        }
+        for changes in cases:
+            with self.subTest(changes=changes), self.assertRaisesRegex(
+                ValueError, "invalid evidence record"
+            ):
+                create_evidence_record(**(defaults | changes))
+
+    def test_create_api_evidence_requires_operation_and_region(self) -> None:
+        defaults = {
+            "source_type": "first-party-read-api",
+            "uri": "https://example.invalid/api",
+            "observed_at": "2026-09-01T00:00:00Z",
+            "projection": {"modelName": "API Model"},
+            "schemas": self.schemas,
+            "operation": "GetFoundationModel",
+            "region": "us-east-1",
+        }
+        for omitted in ("operation", "region"):
+            arguments = dict(defaults)
+            arguments.pop(omitted)
+            with self.subTest(omitted=omitted), self.assertRaisesRegex(
+                ValueError, "invalid evidence record"
+            ):
+                create_evidence_record(**arguments)
+
 
 if __name__ == "__main__":
     unittest.main()
-

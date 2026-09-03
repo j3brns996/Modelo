@@ -187,6 +187,8 @@ def create_evidence_record(
     uri: str,
     observed_at: str,
     projection: Any,
+    *,
+    schemas: SchemaSet,
     operation: str | None = None,
     partition: str | None = None,
     region: str | None = None,
@@ -194,7 +196,7 @@ def create_evidence_record(
     scope: dict[str, Any] | None = None,
     visibility: str = "internal",
 ) -> dict[str, Any]:
-    """Construct an evidence record dictionary, compute its canonical SHA-256 ID, and set id."""
+    """Construct and schema-validate a content-addressed evidence record."""
 
     if source_type == "first-party-read-api":
         source: dict[str, Any] = {
@@ -222,5 +224,11 @@ def create_evidence_record(
         "visibility": visibility,
     }
     calculated_id = evidence_id(envelope)
-    return {"id": calculated_id, **envelope}
-
+    record = {"id": calculated_id, **envelope}
+    findings = schemas.validate("evidence.schema.json", record, "<constructed-evidence>")
+    if findings:
+        details = "; ".join(
+            f"{finding.json_pointer or '/'}: {finding.message}" for finding in findings
+        )
+        raise ValueError(f"invalid evidence record: {details}")
+    return record

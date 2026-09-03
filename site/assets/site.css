@@ -229,7 +229,27 @@ th { color: var(--muted); font-size: .72rem; letter-spacing: .04em; text-transfo
 .card { padding: 1rem; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-sm); }
 .timeline .cards { grid-template-columns: 1fr; }
 .timeline .card { position: relative; padding-left: 1.5rem; border-left: 3px solid var(--accent); }
-.muted { color: var(--muted); }
+.mac-builder-section { margin-top: 3rem; margin-bottom: 4rem; padding: clamp(1.25rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
+.mac-builder-header { margin-bottom: 1.5rem; }
+.mac-builder-header h2 { margin: 0 0 .5rem; }
+.mac-builder-header p { margin: 0; color: var(--muted); }
+.mac-builder-form { display: grid; gap: 1.5rem; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
+.form-group { display: flex; flex-direction: column; gap: .35rem; }
+.form-group--full { grid-column: 1 / -1; }
+.form-group label { font-weight: 600; font-size: .88rem; color: var(--ink); }
+.form-group input, .form-group select, .form-group textarea { padding: .75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-family: inherit; font-size: .92rem; box-shadow: var(--shadow-sm); }
+.form-group textarea { resize: vertical; }
+.field-help { color: var(--muted); font-size: .75rem; }
+.mac-output-card { margin-top: 1rem; padding: 1.25rem; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); display: grid; gap: 1rem; }
+.mac-output-card h3 { margin: 0; font-size: 1.05rem; }
+.mac-output-actions { display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; }
+.intake-card--primary { background: var(--accent-soft); border-color: var(--accent); }
+.copy-button { padding: .75rem 1.25rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-weight: 650; cursor: pointer; display: inline-flex; align-items: center; gap: .5rem; }
+.copy-button:hover { border-color: var(--accent); background: var(--accent-soft); }
+.yaml-output-wrapper { display: flex; flex-direction: column; gap: .35rem; }
+.yaml-output-wrapper label { font-weight: 600; font-size: .88rem; color: var(--ink); }
+textarea[data-mac-yaml] { width: 100%; font-family: "JetBrains Mono", monospace; font-size: .85rem; padding: .75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
 
 .site-footer { margin-top: 3rem; background: #07101e; color: #cbd5e1; }
 .site-footer__inner { width: min(calc(100% - 2rem), var(--max)); margin: auto; padding: 3rem 0; display: grid; grid-template-columns: 1.2fr .8fr 1fr; gap: 3rem; }

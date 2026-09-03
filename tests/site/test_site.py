@@ -738,6 +738,51 @@ class FinalSiteTests(unittest.TestCase):
         for operation in ("add: ", "change: ", "revoke: "):
             self.assertIn(operation + "tests/fixtures/build/synthetic/history.txt", changes)
 
+    def test_proposal_form_builder_rendering_links_and_accessibility(self) -> None:
+        site = build_final_site(self.request()).output / "site"
+        propose_page = (site / "propose/index.html").read_text(encoding="utf-8")
+
+        self.assertIn('<form data-mac-builder', propose_page)
+        for field in (
+            'data-field="operation"',
+            'data-field="subject-kind"',
+            'data-field="subject-identity"',
+            'data-field="purpose"',
+            'data-field="outcome"',
+            'data-field="reason"',
+            'data-field="candidate-evidence"',
+            'data-field="acceptance"',
+        ):
+            self.assertIn(field, propose_page)
+
+        for op in ("add", "change", "revoke", "move", "batch"):
+            self.assertIn(f'value="{op}"', propose_page)
+        for kind in ("model", "offering", "evidence", "vendor", "inference-service", "condition"):
+            self.assertIn(f'value="{kind}"', propose_page)
+
+        for control_id in (
+            "mac-operation",
+            "mac-subject-kind",
+            "mac-subject-identity",
+            "mac-purpose",
+            "mac-requested-outcome",
+            "mac-reason",
+            "mac-candidate-evidence",
+            "mac-acceptance",
+            "mac-yaml-output",
+        ):
+            self.assertIn(f'for="{control_id}"', propose_page)
+            self.assertIn(f'id="{control_id}"', propose_page)
+
+        self.assertIn('data-mac-yaml', propose_page)
+        self.assertIn('data-copy-yaml', propose_page)
+        self.assertIn('data-github-issue-link', propose_page)
+        self.assertIn('href="https://github.com/j3brns996/Modelo/issues/new?template=mac-add.yml"', propose_page)
+        self.assertIn('rel="noopener noreferrer"', propose_page)
+
+        self.assertIn('/Modelo/assets/catalogue.js', propose_page)
+        self.assertIn('/Modelo/assets/vendor/alpine-csp-3.16.3.min.js', propose_page)
+
     def test_generated_site_crawl_canonical_fragments_external_rel_and_captions(self) -> None:
         site = build_final_site(self.request()).output / "site"
         emitted = {path.relative_to(site).as_posix() for path in site.rglob("*") if path.is_file()}

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -147,6 +149,71 @@ class CliTests(unittest.TestCase):
         after = {path: path.read_bytes() for path in protected}
         self.assertEqual(before, after)
 
+    def test_dev_evidence_create_inline_and_file_output(self) -> None:
+        result = self.run_cli(
+            "dev", "evidence-create",
+            "--source-type", "official-provider-documentation",
+            "--uri", "https://example.invalid/doc",
+            "--observed-at", "2026-09-01T00:00:00Z",
+            "--projection", '{"providerName": "AWS"}',
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        self.assertTrue(data["id"].startswith("sha256-"))
+        self.assertEqual(data["source"]["uri"], "https://example.invalid/doc")
+        self.assertEqual(data["projection"], {"providerName": "AWS"})
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            proj_file = tmp_path / "proj.json"
+            proj_file.write_text('{"providerName": "AWS"}', encoding="utf-8")
+            out_file = tmp_path / "evidence.json"
+            res_file = self.run_cli(
+                "dev", "evidence-create",
+                "--source-type", "official-provider-documentation",
+                "--uri", "https://example.invalid/doc",
+                "--observed-at", "2026-09-01T00:00:00Z",
+                "--projection", str(proj_file),
+                "--output", str(out_file),
+            )
+            self.assertEqual(res_file.returncode, 0, res_file.stderr)
+            self.assertEqual(res_file.stdout, "")
+            out_data = json.loads(out_file.read_text(encoding="utf-8"))
+            self.assertEqual(out_data["projection"], {"providerName": "AWS"})
+
+    def test_dev_mac_init_inline_and_validation_error(self) -> None:
+        digest = "sha256-" + "a" * 64
+        result = self.run_cli(
+            "dev", "mac-init",
+            "--operation", "add",
+            "--purpose", "Add test model for CLI test",
+            "--subjects", '[{"kind": "model", "identity": "test-model"}]',
+            "--requested-outcome", "Add record",
+            "--reason", "New model available",
+            "--candidate-evidence", f'[{{\"uri\": \"https://example.invalid/doc\", \"observed_at\": \"2026-09-01T00:00:00Z\", \"digest\": \"{digest}\"}}]',
+            "--acceptance", '["criterion 1"]',
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["operation"], "add")
+        self.assertTrue(payload["dedupe_key"].startswith("sha256-"))
+
+        bad_result = self.run_cli(
+            "dev", "mac-init",
+            "--operation", "invalid_operation",
+            "--purpose", "Purpose",
+            "--subjects", "[]",
+            "--requested-outcome", "Outcome",
+            "--reason", "Reason",
+            "--candidate-evidence", "[]",
+            "--acceptance", "[]",
+        )
+        self.assertEqual(bad_result.returncode, 2)
+        self.assertEqual(bad_result.stdout, "")
+        self.assertIn("modelo:", bad_result.stderr)
+        self.assertNotIn("Traceback", bad_result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
+

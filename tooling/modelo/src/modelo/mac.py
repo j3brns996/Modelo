@@ -16,7 +16,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any, Literal
 from urllib.parse import urlsplit
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from jsonschema import FormatChecker
 
@@ -516,3 +516,36 @@ def extract_issue_payload(body: str) -> dict[str, Any]:
     if markers != [payload_digest(payload)]:
         raise MacError("issue body must contain one matching canonical payload digest marker")
     return payload
+
+
+def init_mac_payload(
+    operation: str,
+    purpose: str,
+    subjects: list[dict[str, Any]],
+    requested_outcome: str,
+    reason: str,
+    candidate_evidence: list[dict[str, Any]],
+    acceptance: list[str],
+    item_operation: str | None = None,
+    batch_scope: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Initialize a MAC payload with a canonical UUID request_id, compute keys, and validate."""
+
+    payload: dict[str, Any] = {
+        "schema_version": "0.1",
+        "request_id": str(uuid4()),
+        "operation": operation,
+        "purpose": purpose,
+        "subjects": subjects,
+        "requested_outcome": requested_outcome,
+        "reason": reason,
+        "candidate_evidence": candidate_evidence,
+        "acceptance": acceptance,
+    }
+    if item_operation is not None:
+        payload["item_operation"] = item_operation
+    if batch_scope is not None:
+        payload["batch_scope"] = batch_scope
+
+    return with_computed_keys(payload)
+

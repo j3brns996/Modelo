@@ -392,7 +392,7 @@ def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, req
         "scripts": (
             '<script src="' + escape(resolver.site("asset_js"), quote=True) + '" defer></script>\n  '
             '<script src="' + escape(resolver.site("asset_alpine"), quote=True) + '" defer></script>'
-            if name == "catalogue" else ""
+            if name in ("catalogue", "propose") else ""
         ),
         "title": escape(title), "navigation": _navigation(resolver, route), "content": content,
         "page_name": escape(name, quote=True),
@@ -565,7 +565,8 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     process_content = _substitute(templates["process"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/process.md"))}, "process")
     intake = document["repository"]["web_routes"]["mac_intake"]
     intake_links = "".join('<a class="intake-card" rel="noopener noreferrer" href="' + escape(str(document["repository"]["web_base"]).rstrip("/") + intake[key], quote=True) + '"><span>' + escape(key.title()) + '</span><small>Open governed request</small><b aria-hidden="true">→</b></a>' for key in ("add", "change", "revoke", "move", "batch"))
-    propose_content = _substitute(templates["propose"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/propose.md")), "intake_links": intake_links}, "propose")
+    web_base_url = escape(str(document["repository"]["web_base"]).rstrip("/"), quote=True)
+    propose_content = _substitute(templates["propose"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/propose.md")), "intake_links": intake_links, "web_base": web_base_url}, "propose")
     docs_links = '<div class="reference-grid"><a href="' + escape(resolver.site("human_specification"), quote=True) + '"><strong>Human specification</strong><span>Rationale and invariants</span></a><a href="' + escape(resolver.site("machine_contract"), quote=True) + '"><strong>Machine contract</strong><span>Compact executable context</span></a><a href="' + escape(resolver.site("schemas_data") + "model.schema.json", quote=True) + '"><strong>Model schema</strong><span>Canonical model shape</span></a><a href="' + escape(resolver.site("schemas_data") + "offering.schema.json", quote=True) + '"><strong>Offering schema</strong><span>Consumption approval shape</span></a></div><div class="clone-command"><span>Clean clone</span><code>git clone ' + escape(str(document["repository"]["web_base"]) + ".git") + "</code></div>"
     docs_content = _substitute(templates["docs"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/docs.md")), "documentation_links": docs_links}, "docs")
     not_found_content = _substitute(templates["404"], {"home_url": escape(resolver.site("home"), quote=True)}, "404")

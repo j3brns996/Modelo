@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+import struct
 from urllib.parse import urlparse
 
 import yaml
@@ -15,6 +16,10 @@ DOCS_README = ROOT / "docs/README.md"
 IMPLEMENTATION_PLAN = ROOT / "docs/implementation-plan.md"
 LAUNCH_RUNBOOK = ROOT / "docs/launch-runbook.md"
 AGENTS = ROOT / "AGENTS.md"
+README_SCREENSHOTS = {
+    "docs/img/modelo-home.png": ("home", "navigation", "synthetic", "status", "catalogue"),
+    "docs/img/modelo-catalogue.png": ("catalogue", "filters", "model", "result", "cards"),
+}
 
 
 def _read(path: Path) -> str:
@@ -37,6 +42,10 @@ def _headings(text: str, level: int) -> list[str]:
 
 def _markdown_links(text: str) -> list[str]:
     return re.findall(r"(?<!!)\[[^\]]+\]\(([^)]+)\)", text)
+
+
+def _markdown_images(text: str) -> list[tuple[str, str]]:
+    return re.findall(r"!\[([^\]]+)\]\(([^)]+)\)", text)
 
 
 def _word_count(text: str) -> int:
@@ -79,6 +88,28 @@ def test_readme_guidance_contract_is_human_navigable() -> None:
     assert any(token in lowered for token in ("no root licence", "no root license", "undecided")), (
         "README must explain that root licence/reuse remains undecided"
     )
+
+
+def test_readme_product_tour_uses_real_bounded_screenshots() -> None:
+    images = {path: alt for alt, path in _markdown_images(_read(README))}
+    for relative_path, alt_tokens in README_SCREENSHOTS.items():
+        assert relative_path in images, f"README must embed {relative_path}"
+        normalised_alt = _normalise(images[relative_path])
+        assert all(token in normalised_alt for token in alt_tokens), (
+            f"README alt text for {relative_path} must describe its visible content"
+        )
+
+        screenshot = ROOT / relative_path
+        assert screenshot.is_file(), f"expected screenshot to exist: {relative_path}"
+        data = screenshot.read_bytes()
+        assert data.startswith(b"\x89PNG\r\n\x1a\n"), f"expected PNG signature: {relative_path}"
+        assert data[12:16] == b"IHDR", f"expected PNG IHDR chunk: {relative_path}"
+        assert struct.unpack(">II", data[16:24]) == (1440, 900), (
+            f"expected 1440x900 screenshot: {relative_path}"
+        )
+        assert 50_000 <= len(data) <= 2_000_000, (
+            f"expected a nontrivial, repository-sized screenshot: {relative_path}"
+        )
 
 
 def test_relative_markdown_links_resolve_for_guidance_documents() -> None:

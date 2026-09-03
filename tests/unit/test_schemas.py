@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import unittest
-import sys
 from pathlib import Path
 
 import yaml
@@ -219,4 +218,3 @@ class SchemaRuntimeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

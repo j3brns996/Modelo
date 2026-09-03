@@ -2,10 +2,9 @@
 
 Modelo is a Git-backed approval ledger and static publication system for an
 enterprise AI model catalogue. Model records describe facts. Offering records
-carry consumption approval. Git issues start work, pull requests or merge
-requests decide the change, and trusted CI decides acceptance. There is no
-application API. Host-specific concerns stay in the Git adapter layer, not in
-core records or schemas.
+carry consumption approval. Issues start work; change requests and trusted CI
+decide them. There is no application API. Host-specific concerns stay in the
+Git adapter layer, not in core records or schemas.
 
 ## Start Here
 
@@ -14,15 +13,14 @@ core records or schemas.
   for add, change, revoke, move or batch requests.
 - Repository rules and contracts: [SPEC.md](SPEC.md) and [docs/contract.yaml](docs/contract.yaml)
 
-The demo uses labelled synthetic records, so sample content is not enterprise
-approval. To change the governed catalogue, start with the issue chooser rather
-than editing a record. It captures the intent and subjects that the later
-change request must preserve.
+Demo records are synthetic, not enterprise approval. Catalogue work starts in
+the issue chooser, which captures the intent and subjects the change request
+must preserve.
 
 ## Product tour
 
-These labelled synthetic-demo captures show the generated site. They are not
-approval, launch or T10 evidence, and contain no production catalogue data.
+These synthetic-demo captures are not approval, launch or T10 evidence and
+contain no production data.
 
 ![Modelo synthetic-demo home showing navigation, synthetic status and catalogue totals](docs/img/modelo-home.png)
 

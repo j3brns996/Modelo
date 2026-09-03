@@ -98,5 +98,123 @@ class SchemaRuntimeTests(unittest.TestCase):
                 candidate = dict(base, observed_at=value)
                 self.assertTrue(any(error.validator == "format" for error in validator.iter_errors(candidate)))
 
+    def test_provider_adapter_schemas_validate_valid_and_invalid_routes(self) -> None:
+        valid_gcp_publisher = {
+            "id": "gemini-pro-route",
+            "location": "us-central1",
+            "reference": "publishers/google/models/gemini-1.5-pro",
+            "model_binding": {
+                "kind": "publisher-model",
+                "model_evidence": {
+                    "id": "sha256-" + "a" * 64,
+                    "id_pointer": "/name",
+                    "resource_pointer": "/resourceName",
+                    "name_pointer": "/displayName",
+                    "provider_pointer": "/publisher",
+                },
+            },
+        }
+        self.assertEqual(
+            self.schemas.validate("providers/gcp-vertex.schema.json", valid_gcp_publisher, "gcp-route.yaml"),
+            (),
+        )
+
+        valid_gcp_endpoint = {
+            "id": "vertex-endpoint-route",
+            "location": "us-central1",
+            "reference": "projects/my-project/locations/us-central1/endpoints/1234567890",
+            "model_binding": {
+                "kind": "endpoint-model",
+                "model_evidence": {
+                    "id": "sha256-" + "b" * 64,
+                    "resource_pointer": "/deployedModel",
+                    "name_pointer": "/modelDisplayName",
+                    "provider_pointer": "/publisher",
+                },
+            },
+        }
+        self.assertEqual(
+            self.schemas.validate("providers/gcp-vertex.schema.json", valid_gcp_endpoint, "gcp-endpoint.yaml"),
+            (),
+        )
+
+        invalid_gcp = dict(valid_gcp_publisher, location="INVALID_LOCATION")
+        findings = self.schemas.validate("providers/gcp-vertex.schema.json", invalid_gcp, "gcp-invalid.yaml")
+        self.assertTrue(len(findings) > 0)
+
+        valid_azure_deployment = {
+            "id": "gpt4o-azure-route",
+            "region": "eastus",
+            "reference": "gpt-4o-deployment",
+            "model_binding": {
+                "kind": "deployment-model",
+                "model_evidence": {
+                    "id": "sha256-" + "c" * 64,
+                    "id_pointer": "/name",
+                    "resource_pointer": "/id",
+                    "name_pointer": "/properties/model/name",
+                    "provider_pointer": "/properties/model/publisher",
+                },
+            },
+        }
+        self.assertEqual(
+            self.schemas.validate("providers/azure-foundry.schema.json", valid_azure_deployment, "azure-route.yaml"),
+            (),
+        )
+
+        invalid_azure = dict(valid_azure_deployment, region="INVALID REGION!")
+        findings = self.schemas.validate("providers/azure-foundry.schema.json", invalid_azure, "azure-invalid.yaml")
+        self.assertTrue(len(findings) > 0)
+
+    def test_offering_route_oneof_branches_keep_disjoint_discriminator_fields(self) -> None:
+        # Forward-compatibility guard (multicloud wiring plan §7): the three
+        # provider route schemas in offering.schema.json's `routes.items`
+        # oneOf are distinguished only by their own required field name
+        # (`source_region` / `location` / `region`), not by an explicit tag.
+        # `id`, `reference` and `model_binding` are required by every
+        # branch, so the property that must stay true isn't "every required
+        # field is globally unique" - it's "once the fields common to every
+        # branch are set aside, what's left (each branch's own
+        # discriminator) never collides with another branch's". This test
+        # proves that property mechanically today, and proves the check
+        # itself would catch a future collision, without needing a real
+        # fourth schema file: a synthetic fourth branch that reuses Azure's
+        # `region` discriminator is fed through the same collision check.
+        offering = self.schemas.schema("offering.schema.json")
+        branches = offering["properties"]["routes"]["items"]["oneOf"]
+        self.assertEqual(len(branches), 3)
+        required_sets = [
+            frozenset(self.schemas.resolve(branch, offering)[0]["required"])
+            for branch in branches
+        ]
+        common = frozenset.intersection(*required_sets)
+        self.assertIn("id", common)
+        self.assertIn("reference", common)
+        self.assertIn("model_binding", common)
+        discriminators = [required - common for required in required_sets]
+        self.assertEqual(
+            [set(discriminator) for discriminator in discriminators],
+            [{"source_region"}, {"location"}, {"region"}],
+        )
+
+        def colliding_pairs(sets: list[frozenset]) -> list[tuple[int, int]]:
+            return [
+                (i, j)
+                for i in range(len(sets))
+                for j in range(i + 1, len(sets))
+                if sets[i] & sets[j]
+            ]
+
+        self.assertEqual(colliding_pairs(discriminators), [])
+
+        hypothetical_fourth_branch_discriminator = frozenset({"region"})
+        self.assertNotEqual(
+            colliding_pairs(discriminators + [hypothetical_fourth_branch_discriminator]),
+            [],
+            "a hypothetical fourth branch reusing an existing discriminator "
+            "field name must be caught as a collision by this same check",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -25,7 +25,7 @@ erDiagram
     }
     INFERENCE_SERVICE {
         string id PK "kebab-case"
-        string adapter "const aws-bedrock, only value today"
+        string adapter "enum aws-bedrock, gcp-vertex, azure-foundry"
     }
     OFFERING {
         string id PK "kebab-case"
@@ -35,8 +35,7 @@ erDiagram
     }
     ROUTE {
         string id PK "scoped to the owning offering only"
-        string source_region "AWS region pattern"
-        string reference "ARN or model id matching bound kind"
+        string reference "provider-shaped reference matching bound kind"
     }
     CONDITION {
         string id PK "kebab-case"
@@ -78,16 +77,16 @@ entity's facts trace back to it through `evidence_refs`.
 | Model | `lifecycle` | | enum: `active` · `legacy` · `eol` |
 | Model | `context_window` | | integer ≥ 1, optional |
 | Inference service | `id` | PK | kebab-case |
-| Inference service | `adapter` | | const: `aws-bedrock` — the only value today |
+| Inference service | `adapter` | | enum: `aws-bedrock` · `gcp-vertex` · `azure-foundry` |
 | Offering | `id` | PK | kebab-case |
 | Offering | `model_id` | FK → model | required |
 | Offering | `inference_service_id` | FK → service | required |
 | Offering | `approval_rationale` | | 20–2048 chars, enterprise policy text |
-| Offering | `routes[]` | | 1 or more embedded Bedrock routes |
+| Offering | `routes[]` | | 1 or more embedded routes, each a `oneOf` of the three provider route schemas (schema-reachable; only `aws-bedrock` has an implemented semantic validator — see below) |
 | Offering | `condition_refs[]` | FK → condition | unique `{id, version}` pairs |
 | Route *(embedded in offering)* | `id` | PK | unique within the owning offering only |
-| Route | `source_region` | | AWS region pattern, e.g. `eu-west-2` |
-| Route | `reference` | | ARN or model id shaped to match the bound kind |
+| Route | discriminator field | | exactly one of `source_region` (`aws-bedrock`), `location` (`gcp-vertex`) or `region` (`azure-foundry`) — the three provider route schemas have no explicit tag and are distinguished by this required field alone |
+| Route | `reference` | | provider-shaped reference (ARN, publisher/endpoint resource name, or deployment name) matching the bound kind |
 | Condition | `id` + `version` | PK | composite; version is an integer ≥ 1 |
 | Condition | `title` / `owner` | | 1–256 chars each |
 | Evidence | `id` | PK | `sha256-<64 hex>`, content-addressed, immutable |
@@ -106,6 +105,19 @@ that evidence's own projection.
 pattern, so a `vendor_id` is schema-valid the moment it's well-formed.
 Whether it names a vendor that actually exists is checked separately, by the
 semantic pass in `tooling/modelo/src/modelo/validators.py`.
+
+**A schema-valid route isn't a semantically dispatched one.** An offering's
+`inference_service_id` resolves through the governed inference-service
+registry to an `adapter`; only `aws-bedrock` has an implemented semantic
+validator (evidence correlation, malformed-reference rejection, freshness).
+An `aws-bedrock`-adapter offering whose routes include a schema-valid
+`gcp-vertex`- or `azure-foundry`-shaped route fails that one route closed
+with `UNKNOWN_REFERENCE` rather than crashing or silently passing; sibling
+routes that do match the resolved adapter are unaffected. An offering
+resolved to a `gcp-vertex` or `azure-foundry` service is itself schema-valid
+but currently has no implemented validator at all — same diagnostic, same
+fail-closed behaviour, until Phase 2 (see `docs/providers/gcp-vertex.md` /
+`docs/providers/azure-foundry.md`).
 
 ## Audit notes
 
@@ -132,4 +144,6 @@ drift is still caught without weakening either property.
 `model.schema.json` · `offering.schema.json` · `evidence.schema.json` ·
 `condition.schema.json` · `vendors-registry.schema.json` ·
 `inference-services-registry.schema.json` ·
-`providers/aws-bedrock-route.schema.json` · `common.schema.json`
+`providers/aws-bedrock-route.schema.json` ·
+`providers/gcp-vertex.schema.json` · `providers/azure-foundry.schema.json` ·
+`common.schema.json`

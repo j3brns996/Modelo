@@ -103,8 +103,16 @@ not repeated there: `inference_service_id` resolves through the governed
 inference-service registry, whose `adapter` dispatches the AWS semantic
 validator at runtime. Service
 aliases may select `aws-bedrock`; unknown services and unsupported adapters fail
-closed. The current offering schema is an honest static AWS-only schema; it is
-not yet a dynamic multi-provider plug-in union.
+closed. The offering schema's `routes` field is a `oneOf` across all three
+provider route schemas (AWS Bedrock, GCP Vertex AI, Azure AI Foundry), so a
+service may register any of the three adapters and an offering may declare a
+route of the matching shape. Only the AWS adapter has an implemented semantic
+validator today: an `aws-bedrock`-resolved offering whose route doesn't carry
+`source_region` fails that route closed rather than being silently accepted,
+and a `gcp-vertex`- or `azure-foundry`-resolved offering fails closed the
+same way its adapter always has for any adapter with no implemented
+validator. This is schema reachability and safe dispatch, not semantic
+parity — see `docs/providers/gcp-vertex.md` and `docs/providers/azure-foundry.md`.
 Account IDs and account-owned ARNs may exist only in short-lived discovery
 configuration or raw private artefacts and are not retained in v0.1 catalogue
 evidence. None belongs in canonical filenames.

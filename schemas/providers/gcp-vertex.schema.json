@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/providers/gcp-vertex.schema.json",
+  "title": "Modelo GCP Vertex AI route",
+  "$defs": {
+    "gcpLocation": {
+      "type": "string",
+      "pattern": "^(?:global|[a-z]+-[a-z0-9]+)(?![\\s\\S])"
+    },
+    "publisherModelReference": {
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^publishers/[a-z0-9_-]+/models/[a-z0-9_.-]+(?:@[a-z0-9_.-]+)?(?![\\s\\S])"
+    },
+    "endpointModelReference": {
+      "oneOf": [
+        {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^projects/[a-z0-9-]{6,30}/locations/[a-z0-9-]{1,32}/endpoints/[a-zA-Z0-9_-]{1,128}(?![\\s\\S])"
+        },
+        {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^projects/[a-z0-9-]{6,30}/locations/[a-z0-9-]{1,32}/publishers/[a-z0-9_-]+/models/[a-z0-9_.-]+(?![\\s\\S])"
+        }
+      ]
+    },
+    "modelEvidence": {
+      "type": "object",
+      "required": ["id", "name_pointer", "provider_pointer"],
+      "properties": {
+        "id": { "$ref": "../common.schema.json#/$defs/evidenceId" },
+        "id_pointer": { "$ref": "../common.schema.json#/$defs/nonRootJsonPointer" },
+        "resource_pointer": { "$ref": "../common.schema.json#/$defs/nonRootJsonPointer" },
+        "name_pointer": { "$ref": "../common.schema.json#/$defs/nonRootJsonPointer" },
+        "provider_pointer": { "$ref": "../common.schema.json#/$defs/nonRootJsonPointer" }
+      },
+      "additionalProperties": false
+    },
+    "publisherModelBinding": {
+      "type": "object",
+      "required": ["kind", "model_evidence"],
+      "properties": {
+        "kind": { "const": "publisher-model" },
+        "model_evidence": {
+          "allOf": [
+            { "$ref": "#/$defs/modelEvidence" },
+            { "required": ["id_pointer"] }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "endpointModelBinding": {
+      "type": "object",
+      "required": ["kind", "model_evidence"],
+      "properties": {
+        "kind": { "const": "endpoint-model" },
+        "model_evidence": { "$ref": "#/$defs/modelEvidence" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["id", "location", "reference", "model_binding"],
+  "properties": {
+    "id": { "$ref": "../common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
+    "location": {
+      "$ref": "#/$defs/gcpLocation",
+      "x-modelo-provenance": "internal"
+    },
+    "reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "x-modelo-provenance": "external",
+      "x-modelo-freshness-class": "availability"
+    },
+    "model_binding": {
+      "oneOf": [
+        { "$ref": "#/$defs/publisherModelBinding" },
+        { "$ref": "#/$defs/endpointModelBinding" }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "model_binding": {
+            "properties": { "kind": { "const": "publisher-model" } },
+            "required": ["kind"]
+          }
+        },
+        "required": ["model_binding"]
+      },
+      "then": { "properties": { "reference": { "$ref": "#/$defs/publisherModelReference" } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "model_binding": {
+            "properties": { "kind": { "const": "endpoint-model" } },
+            "required": ["kind"]
+          }
+        },
+        "required": ["model_binding"]
+      },
+      "then": { "properties": { "reference": { "$ref": "#/$defs/endpointModelReference" } } }
+    }
+  ],
+  "additionalProperties": false
+}

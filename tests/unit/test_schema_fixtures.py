@@ -554,30 +554,46 @@ class SchemaFixtureTests(unittest.TestCase):
             path.relative_to(SCHEMAS).as_posix()
             for path in (SCHEMAS / "providers").glob("*.schema.json")
         }
+        # No orphans: every provider schema committed to the repository must
+        # be $ref-reachable from offering.schema.json, full stop. This half
+        # of the guard is unconditional regardless of implementation status.
+        self.assertEqual(provider_schema_inventory, reachable_provider_schemas)
+
+        # Multicloud wiring Phase 1 (issue #56) deliberately decouples
+        # "structurally admitted by the registry/offering schema" from "has
+        # an implemented semantic validator": docs/contract.yaml's
+        # provider_boundary.gcp_vertex_ai/.azure_ai_foundry are marked
+        # schema_reachable_semantic_dispatch_deferred_until_first_party_fixtures,
+        # not a real AWS-equivalent ruleset, and
+        # tooling/modelo/src/modelo/validators.py's _aws_checks dispatch
+        # falls through to "no implemented validator" for both. So this
+        # guard's second half checks a narrower, still-real invariant: every
+        # adapter value the registry will admit must be named somewhere in
+        # docs/contract.yaml's provider_boundary block (schema admission
+        # must never race ahead of what the contract has at least declared),
+        # not that admission implies full semantic implementation.
         contract = yaml.safe_load(
             (ROOT / "docs/contract.yaml").read_text(encoding="utf-8")
         )
-        implemented_adapters = {
-            boundary["adapter"]
-            for boundary in contract["provider_boundary"].values()
-            if isinstance(boundary, dict) and "adapter" in boundary
-        }
-        registry_adapter = self.schemas["inference-services-registry.schema.json"][
-            "properties"
-        ]["inference_services"]["additionalProperties"]["properties"]["adapter"][
-            "const"
-        ]
+        declared_adapters = {contract["provider_boundary"]["aws"]["adapter"]}
+        # provider_boundary's prose keys (gcp_vertex_ai, azure_ai_foundry)
+        # are free-form documentation spellings, not the registry's
+        # kebab-case adapter enum values (gcp-vertex, azure-foundry) - see
+        # docs/contract.yaml:189-190's naming-reconciliation comment. Map
+        # explicitly rather than assuming a mechanical transform.
+        if "gcp_vertex_ai" in contract["provider_boundary"]:
+            declared_adapters.add("gcp-vertex")
+        if "azure_ai_foundry" in contract["provider_boundary"]:
+            declared_adapters.add("azure-foundry")
 
-        self.assertEqual(
-            {
-                "provider_schemas": provider_schema_inventory,
-                "registry_adapters": {registry_adapter},
-            },
-            {
-                "provider_schemas": reachable_provider_schemas,
-                "registry_adapters": implemented_adapters,
-            },
-        )
+        registry_adapter_schema = self.schemas["inference-services-registry.schema.json"][
+            "properties"
+        ]["inference_services"]["additionalProperties"]["properties"]["adapter"]
+        registry_adapters = set(registry_adapter_schema.get("enum", []))
+        if not registry_adapters and "const" in registry_adapter_schema:
+            registry_adapters = {registry_adapter_schema["const"]}
+
+        self.assertEqual(registry_adapters, declared_adapters)
 
     def test_patterns_do_not_use_ambiguous_terminal_dollar_anchor(self) -> None:
         for name, document in self.schemas.items():

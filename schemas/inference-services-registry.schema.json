@@ -14,7 +14,7 @@
         "required": ["id", "adapter"],
         "properties": {
           "id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
-          "adapter": { "const": "aws-bedrock", "x-modelo-provenance": "internal" }
+          "adapter": { "enum": ["aws-bedrock", "gcp-vertex", "azure-foundry"], "x-modelo-provenance": "internal" }
         },
         "additionalProperties": false
       }

@@ -124,10 +124,12 @@
     {
       "schema": "inference-services-registry.schema.json",
       "valid": [
-        { "inference_services": { "aws-bedrock": { "id": "aws-bedrock", "adapter": "aws-bedrock" } } }
+        { "inference_services": { "aws-bedrock": { "id": "aws-bedrock", "adapter": "aws-bedrock" } } },
+        { "inference_services": { "gcp-vertex": { "id": "gcp-vertex", "adapter": "gcp-vertex" } } },
+        { "inference_services": { "azure-foundry": { "id": "azure-foundry", "adapter": "azure-foundry" } } }
       ],
       "invalid": [
-        { "name": "GCP deferred", "op": "set", "path": ["inference_services", "aws-bedrock", "adapter"], "value": "gcp-vertex-ai", "expect": ["const", ["inference_services", "aws-bedrock", "adapter"]] },
+        { "name": "unsupported adapter value", "op": "set", "path": ["inference_services", "aws-bedrock", "adapter"], "value": "gcp-vertex-ai", "expect": ["enum", ["inference_services", "aws-bedrock", "adapter"]] },
         { "name": "extra service assertion", "op": "set", "path": ["inference_services", "aws-bedrock", "availability"], "value": true, "expect": ["additionalProperties", ["inference_services", "aws-bedrock"]] },
         { "name": "service ID absent", "op": "remove", "path": ["inference_services", "aws-bedrock", "id"], "expect": ["required", ["inference_services", "aws-bedrock"]] }
       ]
@@ -217,6 +219,102 @@
       ]
     },
     {
+      "schema": "providers/gcp-vertex.schema.json",
+      "valid": [
+        {
+          "id": "gemini-pro-route",
+          "location": "us-central1",
+          "reference": "publishers/google/models/gemini-1.5-pro",
+          "model_binding": {
+            "kind": "publisher-model",
+            "model_evidence": {
+              "id": "sha256-1111111111111111111111111111111111111111111111111111111111111111",
+              "id_pointer": "/name",
+              "resource_pointer": "/resourceName",
+              "name_pointer": "/displayName",
+              "provider_pointer": "/publisher"
+            }
+          }
+        },
+        {
+          "id": "vertex-endpoint-route",
+          "location": "us-central1",
+          "reference": "projects/my-project/locations/us-central1/endpoints/1234567890",
+          "model_binding": {
+            "kind": "endpoint-model",
+            "model_evidence": {
+              "id": "sha256-2222222222222222222222222222222222222222222222222222222222222222",
+              "resource_pointer": "/deployedModel",
+              "name_pointer": "/modelDisplayName",
+              "provider_pointer": "/publisher"
+            }
+          }
+        }
+      ],
+      "valid_mutations": [
+        { "op": "set", "path": ["reference"], "value": "publishers/google/models/gemini-1.5-flash@001" },
+        { "valid_index": 1, "op": "set", "path": ["reference"], "value": "projects/my-project/locations/us-central1/publishers/google/models/gemini-1.5-pro" }
+      ],
+      "invalid": [
+        { "name": "route location absent", "op": "remove", "path": ["location"], "expect": ["required", []] },
+        { "name": "route location invalid", "op": "set", "path": ["location"], "value": "INVALID_LOCATION", "expect": ["pattern", ["location"]] },
+        { "name": "route reference absent", "op": "remove", "path": ["reference"], "expect": ["required", []] },
+        { "name": "publisher reference invalid", "op": "set", "path": ["reference"], "value": "invalid-ref", "expect": ["pattern", ["reference"]] },
+        { "name": "publisher binding lacks explicit ID pointer", "op": "remove", "path": ["model_binding", "model_evidence", "id_pointer"], "expect": ["required", ["model_binding", "model_evidence"]] },
+        { "name": "publisher binding uses endpoint reference", "op": "set", "path": ["reference"], "value": "projects/my-project/locations/us-central1/endpoints/1234567890", "expect": ["pattern", ["reference"]] },
+        { "name": "extra field forbidden", "op": "set", "path": ["extra_field"], "value": "test", "expect": ["additionalProperties", []] },
+        { "name": "unknown binding kind", "op": "set", "path": ["model_binding", "kind"], "value": "unknown-kind", "expect": ["oneOf", ["model_binding"]] }
+      ]
+    },
+    {
+      "schema": "providers/azure-foundry.schema.json",
+      "valid": [
+        {
+          "id": "gpt4o-azure-route",
+          "region": "eastus",
+          "reference": "gpt-4o-deployment",
+          "model_binding": {
+            "kind": "deployment-model",
+            "model_evidence": {
+              "id": "sha256-3333333333333333333333333333333333333333333333333333333333333333",
+              "id_pointer": "/name",
+              "resource_pointer": "/id",
+              "name_pointer": "/properties/model/name",
+              "provider_pointer": "/properties/model/publisher"
+            }
+          }
+        },
+        {
+          "id": "gpt4o-azure-arm-route",
+          "region": "swedencentral",
+          "reference": "/subscriptions/12345678-1234-1234-1234-123456789012/resourceGroups/rg-ai/providers/Microsoft.CognitiveServices/accounts/ai-foundry-acc/deployments/gpt-4o-mini",
+          "model_binding": {
+            "kind": "deployment-model",
+            "model_evidence": {
+              "id": "sha256-4444444444444444444444444444444444444444444444444444444444444444",
+              "id_pointer": "/name",
+              "resource_pointer": "/id",
+              "name_pointer": "/properties/model/name",
+              "provider_pointer": "/properties/model/publisher"
+            }
+          }
+        }
+      ],
+      "valid_mutations": [
+        { "op": "set", "path": ["reference"], "value": "custom-deployment" },
+        { "valid_index": 1, "op": "set", "path": ["region"], "value": "westeurope" }
+      ],
+      "invalid": [
+        { "name": "route region absent", "op": "remove", "path": ["region"], "expect": ["required", []] },
+        { "name": "route region invalid", "op": "set", "path": ["region"], "value": "East US!", "expect": ["pattern", ["region"]] },
+        { "name": "route reference absent", "op": "remove", "path": ["reference"], "expect": ["required", []] },
+        { "name": "deployment reference invalid", "op": "set", "path": ["reference"], "value": "/invalid/arm/path", "expect": ["oneOf", ["reference"]] },
+        { "name": "deployment binding lacks explicit ID pointer", "op": "remove", "path": ["model_binding", "model_evidence", "id_pointer"], "expect": ["required", ["model_binding", "model_evidence"]] },
+        { "name": "extra field forbidden", "op": "set", "path": ["extra_field"], "value": "test", "expect": ["additionalProperties", []] },
+        { "name": "unknown binding kind", "op": "set", "path": ["model_binding", "kind"], "value": "unknown-kind", "expect": ["oneOf", ["model_binding"]] }
+      ]
+    },
+    {
       "schema": "offering.schema.json",
       "valid": [
         {
@@ -255,10 +353,61 @@
               "projection_pointer": "/price"
             }
           }
+        },
+        {
+          "id": "test-offering-gcp-vertex",
+          "inference_service_id": "gcp-vertex",
+          "model_id": "test-model-1",
+          "approval_rationale": "Approved for schema validation of the governed offering workflow.",
+          "routes": [
+            {
+              "id": "gemini-pro-route",
+              "location": "us-central1",
+              "reference": "publishers/google/models/gemini-1.5-pro",
+              "model_binding": {
+                "kind": "publisher-model",
+                "model_evidence": {
+                  "id": "sha256-1111111111111111111111111111111111111111111111111111111111111111",
+                  "id_pointer": "/name",
+                  "resource_pointer": "/resourceName",
+                  "name_pointer": "/displayName",
+                  "provider_pointer": "/publisher"
+                }
+              }
+            }
+          ],
+          "condition_refs": [],
+          "evidence_refs": {}
+        },
+        {
+          "id": "test-offering-azure-foundry",
+          "inference_service_id": "azure-foundry",
+          "model_id": "test-model-1",
+          "approval_rationale": "Approved for schema validation of the governed offering workflow.",
+          "routes": [
+            {
+              "id": "gpt4o-azure-route",
+              "region": "eastus",
+              "reference": "gpt-4o-deployment",
+              "model_binding": {
+                "kind": "deployment-model",
+                "model_evidence": {
+                  "id": "sha256-3333333333333333333333333333333333333333333333333333333333333333",
+                  "id_pointer": "/name",
+                  "resource_pointer": "/id",
+                  "name_pointer": "/properties/model/name",
+                  "provider_pointer": "/properties/model/publisher"
+                }
+              }
+            }
+          ],
+          "condition_refs": [],
+          "evidence_refs": {}
         }
       ],
       "invalid": [
         { "name": "no consumable route", "op": "set", "path": ["routes"], "value": [], "expect": ["minItems", ["routes"]] },
+        { "name": "route matches no provider schema", "op": "remove", "path": ["routes", 0, "source_region"], "expect": ["oneOf", ["routes", 0]] },
         { "name": "numeric amount", "op": "set", "path": ["pricing", 0, "amount"], "value": 3.0, "expect": ["type", ["pricing", 0, "amount"]] },
         { "name": "zero quantity", "op": "set", "path": ["pricing", 0, "quantity"], "value": 0, "expect": ["minimum", ["pricing", 0, "quantity"]] },
         { "name": "condition version absent", "op": "remove", "path": ["condition_refs", 0, "version"], "expect": ["required", ["condition_refs", 0]] },

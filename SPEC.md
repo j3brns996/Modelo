@@ -528,10 +528,14 @@ routes:
 The core validates structure and references. It resolves
 `inference_service_id` through `governance/inference-services.yaml` and dispatches
 the provider validator at runtime by that registry's `adapter`; an alias service therefore
-uses the same provider rules. v0.1 has a static AWS-only route schema, not a
-runtime plug-in union. Unknown services and unsupported adapters fail closed.
-Route IDs are internal and stable; provider references may change through an
-evidenced MAC change.
+uses the same provider rules. v0.1 has a static three-provider route schema union
+(AWS Bedrock, GCP Vertex AI, Azure AI Foundry), not a runtime plug-in system,
+and only the AWS Bedrock adapter has an implemented semantic validator: GCP
+Vertex AI and Azure AI Foundry routes are schema-admitted but their adapters
+have no implemented validator yet, so they fail closed the same way an
+unknown or unsupported adapter does. Unknown services and unsupported
+adapters fail closed. Route IDs are internal and stable; provider references
+may change through an evidenced MAC change.
 
 For an AWS system inference profile, the adapter-owned object contains the
 profile evidence reference and one entry per destination:

@@ -93,7 +93,11 @@ internal ID and contains one or more approved provider routes.
 An invocable provider reference plus provider-owned invocation coordinates and
 consumption mode. The inference-service registry is the sole owner of the
 adapter; routes never repeat it. Provider references are opaque to the core.
-The first implemented provider schema is AWS Bedrock.
+Three provider route schemas are reachable in v0.1: AWS Bedrock, GCP Vertex AI
+and Azure AI Foundry. That is structural schema reachability, not semantic
+parity. AWS Bedrock is the only adapter with an implemented semantic validator;
+GCP Vertex AI and Azure AI Foundry routes fail closed until their semantic
+validators and first-party fixtures exist.
 
 ### Observation
 

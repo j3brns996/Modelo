@@ -48,7 +48,7 @@ entities:
     stored_under: offering
     core_fields: [id, reference]
     adapter_owner: inference_service_registry
-    adapter_dispatch: static_aws_only_schema_in_v0_1
+    adapter_dispatch: static_three_provider_schema_union_aws_only_semantic_dispatch_in_v0_1
     provider_reference_is_opaque_to_core: true
   evidence:
     identity: "sha256-{rfc8785_envelope_without_id}"
@@ -186,8 +186,11 @@ provider_boundary:
         every_reported_identity_equals: [canonical_model_name, governed_vendor_name]
         validator_global_evidence_search: forbidden
       transformed_or_ambiguous_mapping: deferred
-  gcp_vertex_ai: deferred_until_first_party_fixtures
-  azure_ai_foundry: deferred_until_first_party_fixtures
+  # adapter enum value: gcp-vertex / azure-foundry (registry `adapter` and
+  # route schema `$id`s stay hyphenated; these two prose keys stay
+  # snake_case as already written here).
+  gcp_vertex_ai: schema_reachable_semantic_dispatch_deferred_until_first_party_fixtures
+  azure_ai_foundry: schema_reachable_semantic_dispatch_deferred_until_first_party_fixtures
 
 mac:
   schema_config_key: paths.mac_schema

@@ -356,6 +356,21 @@ def _aws_offering_checks(
     semantic_routes: set[tuple[str, str, str]] = set()
     for index, route in enumerate(offering["routes"]):
         route_pointer = f"/routes/{index}"
+        # The offering's resolved service adapter is aws-bedrock, but
+        # `offering.schema.json`'s `routes.items` is now a provider-agnostic
+        # `oneOf` (schema-valid GCP/Azure-shaped routes can coexist here).
+        # A route lacking the aws-bedrock discriminator field cannot be an
+        # aws-bedrock route: fail this one route closed with a diagnostic and
+        # exclude it from every check below, including `semantic_routes`
+        # duplicate detection, rather than touching `route["source_region"]`
+        # and crashing. Every other route in this offering is unaffected.
+        if "source_region" not in route:
+            state.diagnostics.append(_diag(
+                "UNKNOWN_REFERENCE", path, route_pointer,
+                "route is not shaped for this offering's resolved aws-bedrock adapter",
+                "Use a route shaped for the aws-bedrock adapter, or resolve the offering to an inference service whose adapter matches this route's provider.",
+            ))
+            continue
         source_region = str(route["source_region"])
         binding = route["model_binding"]
         semantic_key = (source_region, str(binding["kind"]), str(route["reference"]))

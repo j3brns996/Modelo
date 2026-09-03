@@ -124,10 +124,12 @@
     {
       "schema": "inference-services-registry.schema.json",
       "valid": [
-        { "inference_services": { "aws-bedrock": { "id": "aws-bedrock", "adapter": "aws-bedrock" } } }
+        { "inference_services": { "aws-bedrock": { "id": "aws-bedrock", "adapter": "aws-bedrock" } } },
+        { "inference_services": { "gcp-vertex": { "id": "gcp-vertex", "adapter": "gcp-vertex" } } },
+        { "inference_services": { "azure-foundry": { "id": "azure-foundry", "adapter": "azure-foundry" } } }
       ],
       "invalid": [
-        { "name": "GCP deferred", "op": "set", "path": ["inference_services", "aws-bedrock", "adapter"], "value": "gcp-vertex-ai", "expect": ["const", ["inference_services", "aws-bedrock", "adapter"]] },
+        { "name": "unsupported adapter value", "op": "set", "path": ["inference_services", "aws-bedrock", "adapter"], "value": "gcp-vertex-ai", "expect": ["enum", ["inference_services", "aws-bedrock", "adapter"]] },
         { "name": "extra service assertion", "op": "set", "path": ["inference_services", "aws-bedrock", "availability"], "value": true, "expect": ["additionalProperties", ["inference_services", "aws-bedrock"]] },
         { "name": "service ID absent", "op": "remove", "path": ["inference_services", "aws-bedrock", "id"], "expect": ["required", ["inference_services", "aws-bedrock"]] }
       ]
@@ -351,10 +353,61 @@
               "projection_pointer": "/price"
             }
           }
+        },
+        {
+          "id": "test-offering-gcp-vertex",
+          "inference_service_id": "gcp-vertex",
+          "model_id": "test-model-1",
+          "approval_rationale": "Approved for schema validation of the governed offering workflow.",
+          "routes": [
+            {
+              "id": "gemini-pro-route",
+              "location": "us-central1",
+              "reference": "publishers/google/models/gemini-1.5-pro",
+              "model_binding": {
+                "kind": "publisher-model",
+                "model_evidence": {
+                  "id": "sha256-1111111111111111111111111111111111111111111111111111111111111111",
+                  "id_pointer": "/name",
+                  "resource_pointer": "/resourceName",
+                  "name_pointer": "/displayName",
+                  "provider_pointer": "/publisher"
+                }
+              }
+            }
+          ],
+          "condition_refs": [],
+          "evidence_refs": {}
+        },
+        {
+          "id": "test-offering-azure-foundry",
+          "inference_service_id": "azure-foundry",
+          "model_id": "test-model-1",
+          "approval_rationale": "Approved for schema validation of the governed offering workflow.",
+          "routes": [
+            {
+              "id": "gpt4o-azure-route",
+              "region": "eastus",
+              "reference": "gpt-4o-deployment",
+              "model_binding": {
+                "kind": "deployment-model",
+                "model_evidence": {
+                  "id": "sha256-3333333333333333333333333333333333333333333333333333333333333333",
+                  "id_pointer": "/name",
+                  "resource_pointer": "/id",
+                  "name_pointer": "/properties/model/name",
+                  "provider_pointer": "/properties/model/publisher"
+                }
+              }
+            }
+          ],
+          "condition_refs": [],
+          "evidence_refs": {}
         }
       ],
       "invalid": [
         { "name": "no consumable route", "op": "set", "path": ["routes"], "value": [], "expect": ["minItems", ["routes"]] },
+        { "name": "route matches no provider schema", "op": "remove", "path": ["routes", 0, "source_region"], "expect": ["oneOf", ["routes", 0]] },
         { "name": "numeric amount", "op": "set", "path": ["pricing", 0, "amount"], "value": 3.0, "expect": ["type", ["pricing", 0, "amount"]] },
         { "name": "zero quantity", "op": "set", "path": ["pricing", 0, "quantity"], "value": 0, "expect": ["minimum", ["pricing", 0, "quantity"]] },
         { "name": "condition version absent", "op": "remove", "path": ["condition_refs", 0, "version"], "expect": ["required", ["condition_refs", 0]] },

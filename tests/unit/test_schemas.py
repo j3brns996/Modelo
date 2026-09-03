@@ -167,6 +167,55 @@ class SchemaRuntimeTests(unittest.TestCase):
         findings = self.schemas.validate("providers/azure-foundry.schema.json", invalid_azure, "azure-invalid.yaml")
         self.assertTrue(len(findings) > 0)
 
+    def test_offering_route_oneof_branches_keep_disjoint_discriminator_fields(self) -> None:
+        # Forward-compatibility guard (multicloud wiring plan §7): the three
+        # provider route schemas in offering.schema.json's `routes.items`
+        # oneOf are distinguished only by their own required field name
+        # (`source_region` / `location` / `region`), not by an explicit tag.
+        # `id`, `reference` and `model_binding` are required by every
+        # branch, so the property that must stay true isn't "every required
+        # field is globally unique" - it's "once the fields common to every
+        # branch are set aside, what's left (each branch's own
+        # discriminator) never collides with another branch's". This test
+        # proves that property mechanically today, and proves the check
+        # itself would catch a future collision, without needing a real
+        # fourth schema file: a synthetic fourth branch that reuses Azure's
+        # `region` discriminator is fed through the same collision check.
+        offering = self.schemas.schema("offering.schema.json")
+        branches = offering["properties"]["routes"]["items"]["oneOf"]
+        self.assertEqual(len(branches), 3)
+        required_sets = [
+            frozenset(self.schemas.resolve(branch, offering)[0]["required"])
+            for branch in branches
+        ]
+        common = frozenset.intersection(*required_sets)
+        self.assertIn("id", common)
+        self.assertIn("reference", common)
+        self.assertIn("model_binding", common)
+        discriminators = [required - common for required in required_sets]
+        self.assertEqual(
+            [set(discriminator) for discriminator in discriminators],
+            [{"source_region"}, {"location"}, {"region"}],
+        )
+
+        def colliding_pairs(sets: list[frozenset]) -> list[tuple[int, int]]:
+            return [
+                (i, j)
+                for i in range(len(sets))
+                for j in range(i + 1, len(sets))
+                if sets[i] & sets[j]
+            ]
+
+        self.assertEqual(colliding_pairs(discriminators), [])
+
+        hypothetical_fourth_branch_discriminator = frozenset({"region"})
+        self.assertNotEqual(
+            colliding_pairs(discriminators + [hypothetical_fourth_branch_discriminator]),
+            [],
+            "a hypothetical fourth branch reusing an existing discriminator "
+            "field name must be caught as a collision by this same check",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

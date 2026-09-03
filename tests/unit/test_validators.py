@@ -471,6 +471,110 @@ class ValidatorTests(unittest.TestCase):
         self.assertIn("SCHEMA_VIOLATION", codes)
         self.assertNotIn("EVIDENCE_VALUE_MISMATCH", codes)
 
+    def _gcp_shaped_route(self, route_id: str, reference: str) -> dict:
+        return {
+            "id": route_id,
+            "location": "us-central1",
+            "reference": reference,
+            "model_binding": {
+                "kind": "publisher-model",
+                "model_evidence": {
+                    "id": "sha256-" + "1" * 64,
+                    "id_pointer": "/name",
+                    "resource_pointer": "/resourceName",
+                    "name_pointer": "/displayName",
+                    "provider_pointer": "/publisher",
+                },
+            },
+        }
+
+    def test_gcp_shaped_route_under_aws_bedrock_service_fails_closed_without_crash(self) -> None:
+        # offering.schema.json's routes.items is now a provider-agnostic
+        # oneOf (widened enum, Phase 1), so a schema-valid offering can
+        # resolve to the aws-bedrock adapter while its only route is
+        # GCP-shaped. _aws_offering_checks must not KeyError on the missing
+        # `source_region`; it must fail this route closed with a diagnostic.
+        offering_path = self.repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml"
+        offering = yaml.safe_load(offering_path.read_text(encoding="utf-8"))
+        offering["routes"][0] = self._gcp_shaped_route(
+            "gcp-mismatched", "publishers/google/models/gemini-1.5-pro"
+        )
+        offering["evidence_refs"] = {}
+        offering_path.write_text(yaml.safe_dump(offering, sort_keys=False), encoding="utf-8", newline="\n")
+        head = self.repository.commit("gcp-shaped route under aws-bedrock service")
+        findings = self.check(head=head)  # must not raise
+        self.assertTrue(any(
+            finding.code == "UNKNOWN_REFERENCE" and finding.json_pointer == "/routes/0"
+            for finding in findings
+        ))
+
+    def test_mixed_offering_route_mismatch_yields_exactly_one_diagnostic_and_preserves_aws_rigor(self) -> None:
+        # Distinct from the single-route case above (§6.2 of the wiring
+        # plan): one correctly-shaped AWS route and one mismatched
+        # GCP-shaped route together in the same aws-bedrock offering must
+        # yield exactly one diagnostic (the mismatched route), with the
+        # valid AWS sibling route validated with full, unweakened rigor and
+        # correctly excluded from the mismatched route's dedup handling.
+        # A guard that is accidentally offering-scoped instead of
+        # route-scoped would silently pass here (zero diagnostics) or
+        # downgrade the valid AWS route too - this test would catch either.
+        offering_path = self.repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml"
+        offering = yaml.safe_load(offering_path.read_text(encoding="utf-8"))
+        mismatched_reference = "publishers/google/models/gemini-1.5-pro"
+        offering["routes"].append(
+            self._gcp_shaped_route("gcp-mismatched", mismatched_reference)
+        )
+        availability_evidence = {
+            "source": {
+                "type": "official-provider-documentation",
+                "uri": "https://example.invalid/gcp-vertex-route",
+            },
+            "retrieved_by": "manual",
+            "observed_at": "2026-09-01T00:00:00Z",
+            "scope": {},
+            "projection": {"reference": mismatched_reference},
+            "visibility": "public",
+        }
+        evidence_identifier = evidence_id(availability_evidence)
+        availability_evidence["id"] = evidence_identifier
+        evidence_path = self.repository.root / "catalogue/evidence" / f"{evidence_identifier}.yaml"
+        evidence_path.write_text(yaml.safe_dump(availability_evidence, sort_keys=False), encoding="utf-8", newline="\n")
+        offering["evidence_refs"]["/routes/1/reference"] = {
+            "id": evidence_identifier, "projection_pointer": "/reference",
+        }
+        offering_path.write_text(yaml.safe_dump(offering, sort_keys=False), encoding="utf-8", newline="\n")
+        head = self.repository.commit("mixed aws and gcp-shaped routes")
+        findings = self.check(head=head)
+        self.assertEqual(len(findings), 1, findings)
+        self.assertEqual(findings[0].code, "UNKNOWN_REFERENCE")
+        self.assertEqual(findings[0].json_pointer, "/routes/1")
+
+    def test_schema_valid_gcp_vertex_adapter_has_no_implemented_validator_and_no_evidence_cascade(self) -> None:
+        # Genuinely new code path (§6.5 of the wiring plan): once the
+        # registry `adapter` enum widens, a service that legitimately
+        # registers `gcp-vertex` is schema-VALID and reaches _aws_checks'
+        # `else` branch for the first time - unlike
+        # test_unsupported_service_adapter_fails_closed above, whose
+        # adapter: "unsupported" fails the registry's own SCHEMA_VIOLATION
+        # before state.services is ever populated, so that test never
+        # reaches this branch at all.
+        registry_path = self.repository.root / "catalogue/governance/inference-services.yaml"
+        registry = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+        registry["inference_services"]["gcp-vertex"] = {
+            "id": "gcp-vertex", "adapter": "gcp-vertex",
+        }
+        registry_path.write_text(yaml.safe_dump(registry, sort_keys=False), encoding="utf-8", newline="\n")
+        old = self.repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml"
+        offering = yaml.safe_load(old.read_text(encoding="utf-8"))
+        offering["inference_service_id"] = "gcp-vertex"
+        new = self.repository.root / "catalogue/offerings/gcp-vertex/test-offering.yaml"
+        new.parent.mkdir(parents=True)
+        new.write_text(yaml.safe_dump(offering, sort_keys=False), encoding="utf-8", newline="\n")
+        old.unlink()
+        head = self.repository.commit("schema-valid but unimplemented gcp-vertex adapter")
+        findings = self.check(head=head)
+        self.assertEqual({finding.code for finding in findings}, {"UNKNOWN_REFERENCE"})
+
 
 if __name__ == "__main__":
     unittest.main()

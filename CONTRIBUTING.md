@@ -11,7 +11,10 @@
 - Read `AGENTS.md`, `modelo.yaml`, `docs/contract.yaml`, and the owning specification or schema before editing.
 - Keep one writer per branch or worktree.
 - Treat GitHub and GitLab as adapters. Do not put host-specific fields in core records, schemas, or validation.
-- Do not create a Modelo application API. Workflow writes use the selected Git provider API; cloud provider APIs and MCP tools are read-only evidence sources.
+- Do not create a Modelo application API. Workflow writes use the selected Git
+  provider API; cloud-provider APIs, CLIs and MCP tools are read-only evidence
+  sources. Local `modelo dev ... --output` may write only an explicitly
+  requested, author-controlled draft file.
 - Do not add production catalogue records before T10 passes remotely.
 
 ## Reviewer

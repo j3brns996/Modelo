@@ -36,6 +36,14 @@
   bot comment, but cannot write contents, branches, pull requests or approvals.
   The generated payload is bound to the human issue body digest, and invalid
   edits remove stale generated data.
+- Browser and local authoring helpers are outside the trust boundary. The
+  propose page's add/change summary is non-canonical, and its five operation
+  links only direct users to configured intake forms. `modelo dev mac-init`
+  creates a validated neutral draft with a random UUIDv4 and computed keys, but
+  has no issue or approval authority. `modelo dev evidence-create` validates
+  envelope shape and computes an ID, but performs no retrieval or admissibility,
+  truth, freshness or approval decision. All local inputs and output paths are
+  author-controlled until reviewed in a linked change.
 - Agent approval is disabled by default. Enabling it requires an enabled actor
   in the schema-valid actors registry, a distinct registered platform identity,
   independence from author/committer/last pusher, a current successful trusted

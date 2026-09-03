@@ -64,6 +64,14 @@ Version `0.1.0` does not:
 | Human rationale | `SPEC.md` and ADRs |
 | Compact agent context | `docs/contract.yaml` |
 
+`v0.1.0` is the contract/config and receipt-wire family named by this
+specification. Individual payload schemas retain their declared compatible
+versions, such as MAC `schema_version: "0.1"`. `VERSION` and `pyproject.toml`
+currently identify tool release `0.1.1`. Tool releases and wire contracts are
+related but not locked together: a compatible tool fix need not rewrite every
+stored wire version, and a wire change is versioned according to its
+compatibility impact.
+
 `SPEC.md` and `docs/contract.yaml` are checked explanations, not competing
 sources of executable truth. A conflict is a defect. It must not be excused by
 silently saying that code wins.
@@ -370,8 +378,10 @@ result counts, table/grid views, allowlisted shareable URL state and comparison
 of two to four canonical models. Comparison never treats an offering as a model,
 never invents facts and uses only safe DOM construction and `textContent`.
 Only table/grid preference is eligible for local storage; an explicit URL value
-wins and unavailable storage falls back to the configured grid view. Explorer scripts load
-only on the catalogue route.
+wins and unavailable storage falls back to the configured grid view. The
+catalogue route alone loads `catalogue.js` and the vendored Alpine CSP runtime.
+The propose route loads only its dedicated vanilla `proposal.js`; every other
+route has no browser runtime.
 
 The synthetic presentation is a product-quality demonstration rather than a
 minimal fixture dump: a shared responsive shell, guided landing journey,
@@ -753,6 +763,22 @@ homogeneous `item_operation` (`add`, `change` or `revoke`). The issue contains a
 schema-valid neutral payload whose canonical
 digest is bound into the change request and release receipt.
 
+The proposal page keeps five static, no-JavaScript cards whose destinations are
+the configured operation-specific intake URLs. Its interactive helper covers
+add and change only. It produces a non-canonical summary of human issue fields,
+not a neutral MAC payload; revoke, move and batch use their static cards. After
+an issue exists, the trusted default-branch GitHub compiler derives a stable
+UUIDv5 from the issue coordinate and computes the dedupe key, idempotency key
+and payload digest.
+
+Local `modelo dev mac-init` is a different convenience. It validates neutral
+JSON, creates a fresh UUIDv4 and computes the two keys, but it has no issue,
+reservation or approval authority. `modelo dev evidence-create` validates an
+evidence envelope's shape and computes its content address, but performs no
+retrieval and makes no admissibility, truth, freshness or approval decision.
+Inputs and outputs of both commands are author-controlled. Examples and exact
+limits are in `docs/authoring.md`.
+
 A dedupe key hashes a typed sorted identity reservation set, effective
 operation and purpose. An idempotency key hashes the full canonical intent.
 Both use RFC 8785 with hash fields omitted; idempotency also omits random
@@ -1014,11 +1040,12 @@ fixtures, templates, GitHub/GitLab adapters, synthetic Pages build, protected
 host controls, release receipt and mirror-restore rehearsal all pass.
 
 Implementation status at this revision: T8 pre-merge CI, T9, the public
-synthetic Pages demo workflow and the issue #34 functional explorer candidate
-are implemented. The accepted T6
+synthetic Pages demo and functional catalogue explorer are implemented and
+live. Local proposal and evidence authoring conveniences are implemented but
+remain non-accepting. The accepted T6
 head is `8694053c3366e162e0da6991ad08729aa8c95ad5`; the release-candidate adds the
 trusted GitHub check adapter, exact validation-site receipt and portable Agent
-Skills. Production post-merge release/receipt automation and T10 remote
-sentinel, release/restore rehearsal, first live demo deploy and host enforcement
-remain required evidence. Production
+Skills. Production post-merge release/receipt automation and the T10 remote
+sentinel, release/restore rehearsal and host enforcement remain required
+evidence. Production
 catalogue launch remains blocked and agent approval is disabled.

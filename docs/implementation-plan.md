@@ -72,6 +72,12 @@ target branch after validating each task's exact head.
 The task graph is retained as delivery evidence. It describes the bootstrap
 work that was completed, not permission to start new changes.
 
+Later maintenance added local `mac-init` and `evidence-create` authoring
+conveniences and an interactive proposal draft. Issue #58 reconciles their
+documentation and runtime boundaries: the catalogue owns Alpine-backed
+exploration, while the proposal page owns a small independent vanilla script.
+These additions do not create a new accepting authority or complete T10.
+
 `tooling/modelo/src/modelo/cli.py` and `tests/unit/test_cli.py` are narrow shared
 integration paths for T5, T6 and T8. A task may change them only to expose its
 already-tested command surface and must run the combined earlier-slice suite.
@@ -174,6 +180,10 @@ standard Alpine build, because the site forbids `unsafe-eval`. Alpine's and the
 bundled Vue reactivity dependency's MIT notices are published beside the runtime.
 Explorer state is bounded and allowlisted before
 it reaches search, filters, URL state or canonical-model comparison.
+Only the catalogue route loads the explorer and Alpine runtime. The proposal
+route loads only its dedicated vanilla script for an add/change issue-field
+draft; all five configured operation links remain static and no-JavaScript
+usable. Every other route loads no runtime.
 The locked suite proves structure and bounds. The supplementary command
 `node tests/site/catalogue-explorer.behavior.js` executes controller logic when
 Node already exists, but remains outside the locked build and cannot replace
@@ -215,4 +225,5 @@ cannot substitute for host controls.
 | Implementation swarm | T1–T7 accepted; T8 trusted pre-merge checks and T9 portable skills are part of the bootstrap delivery history |
 | Executable validator and CI | Validator and GitHub trusted pre-merge adapter implemented; remote host-control rehearsal remains T10 |
 | Static site and platform templates | Synthetic Pages demo and functional explorer are live; the product-quality site experience v2 was delivered in the closed issue #37 history; production final publication remains T10 evidence |
+| Local authoring conveniences | Neutral MAC and evidence-envelope drafting plus configured proposal links are implemented; outputs remain author-controlled and non-accepting |
 | Production catalogue launch | Blocked through T10 |

@@ -46,6 +46,19 @@ uv run --locked modelo-local-ci run \
 - Control changes run the complete Python test inventory and offline package build.
 - Catalogue-only changes run validation and execute no proposed tooling in trusted CI.
 
+## Authoring helpers
+
+- Read [docs/authoring.md](docs/authoring.md) before using the browser or CLI
+  drafting helpers.
+- The static proposal chooser covers add, change, revoke, move and batch. The
+  interactive helper is intentionally limited to add and change.
+- `modelo dev evidence-create` and `modelo dev mac-init` print a draft to
+  standard output by default. Use `--output` only when you explicitly want a
+  local file.
+- Treat every result as a drafting aid. It is not approval, accepted evidence
+  or canonical intake output; the linked issue and trusted compiler remain
+  authoritative.
+
 ## Non-negotiables
 
 - Start every move, add, change, revoke, or batch operation from a linked MAC issue.

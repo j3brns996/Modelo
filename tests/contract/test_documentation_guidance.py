@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 import re
 import struct
@@ -13,9 +14,14 @@ README = ROOT / "README.md"
 CONTRIBUTING = ROOT / "CONTRIBUTING.md"
 SECURITY = ROOT / "SECURITY.md"
 DOCS_README = ROOT / "docs/README.md"
+AUTHORING_GUIDE = ROOT / "docs/authoring.md"
 IMPLEMENTATION_PLAN = ROOT / "docs/implementation-plan.md"
 LAUNCH_RUNBOOK = ROOT / "docs/launch-runbook.md"
 AGENTS = ROOT / "AGENTS.md"
+SITE_DOCS = ROOT / "site/content/docs.md"
+SITE_PROPOSE = ROOT / "site/content/propose.md"
+CLI_SOURCE = ROOT / "tooling/modelo/src/modelo/cli.py"
+MODELO_CONFIG = ROOT / "modelo.yaml"
 README_SCREENSHOTS = {
     "docs/img/modelo-home.png": ("home", "navigation", "synthetic", "status", "catalogue"),
     "docs/img/modelo-catalogue.png": ("catalogue", "filters", "model", "result", "cards"),
@@ -67,6 +73,28 @@ def _assert_contains_all_tokens(text: str, groups: tuple[str, ...]) -> None:
     assert not missing, f"missing expected tokens: {missing!r}"
 
 
+def _registered_cli_commands() -> set[str]:
+    tree = ast.parse(_read(CLI_SOURCE))
+    return {
+        node.args[0].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "add_parser"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and isinstance(node.args[0].value, str)
+    }
+
+
+def _configured_site_url(route_name: str) -> str:
+    config = yaml.safe_load(_read(MODELO_CONFIG))
+    base_url = config["site"]["base_url"].rstrip("/")
+    route = config["site"]["routes"][route_name]
+    assert route.startswith("/")
+    return base_url + route
+
+
 def test_readme_guidance_contract_is_human_navigable() -> None:
     text = _read(README)
     assert 550 <= _word_count(text) <= 850
@@ -80,7 +108,9 @@ def test_readme_guidance_contract_is_human_navigable() -> None:
     )
     assert any(link == "CONTRIBUTING.md" for link in links)
     assert any(link == "docs/README.md" for link in links)
+    assert any(link == "docs/authoring.md" for link in links)
     assert any(link == "SECURITY.md" for link in links)
+    assert _configured_site_url("propose") + "#builder" in links
     lowered = text.lower()
     assert "t10" in lowered
     assert "public visibility" in lowered
@@ -143,6 +173,32 @@ def test_contributing_assigns_roles_and_governance_tokens() -> None:
     assert "accepting" in lowered
 
 
+def test_authoring_guidance_matches_registered_helpers_and_authority() -> None:
+    commands = _registered_cli_commands()
+    assert {"dev", "evidence-create", "mac-init"} <= commands
+
+    guide = _read(AUTHORING_GUIDE).lower()
+    contributing = _read(CONTRIBUTING).lower()
+    for command in ("modelo dev evidence-create", "modelo dev mac-init"):
+        assert command in guide
+        assert command in contributing
+    _assert_contains_all_tokens(guide, ("--output", "draft", "linked issue", "trusted"))
+    assert any(token in guide for token in ("standard output", "stdout"))
+    assert "approval" in guide and "admissib" in guide
+
+
+def test_site_authoring_prose_explains_bounded_interactive_scope() -> None:
+    docs = _read(SITE_DOCS).lower()
+    proposal = _read(SITE_PROPOSE).lower()
+
+    _assert_contains_all_tokens(docs, ("docs/authoring.md", "modelo dev", "draft", "admissib"))
+    _assert_contains_all_tokens(proposal, ("static", "interactive", "add", "change"))
+    for operation in ("revoke", "move", "batch"):
+        assert operation in proposal
+    _assert_contains_all_tokens(proposal, ("non-canonical", "trusted", "compiler"))
+    assert "mac payload" in proposal and "not a mac payload" in proposal
+
+
 def test_agents_distinguishes_public_demo_from_absent_production_publication() -> None:
     text = _read(AGENTS)
     lowered = text.lower()
@@ -152,6 +208,12 @@ def test_agents_distinguishes_public_demo_from_absent_production_publication() -
     assert "production" in lowered
     assert "post-merge" in lowered
     assert any(token in lowered for token in ("remain absent", "remains absent", "absent"))
+
+
+def test_agents_limits_read_only_cli_rule_to_cloud_providers() -> None:
+    text = _read(AGENTS).lower()
+    _assert_contains_all_tokens(text, ("cloud-provider cli", "read-only", "modelo dev", "--output"))
+    assert "local file" in text
 
 
 def test_implementation_plan_has_history_and_removes_stale_issue_reference() -> None:
@@ -198,6 +260,7 @@ def test_docs_readme_marks_internal_docs_as_non_site_content() -> None:
     assert "repository contributors" in lowered
     assert "published site route" in lowered
     assert any(phrase in lowered for phrase in ("not the published site route", "is not the published site route"))
+    assert "authoring.md" in lowered
 
 
 def test_contract_status_tokens_stay_aligned_with_guidance_docs() -> None:

@@ -20,8 +20,10 @@ production catalogue records until T10 passes remotely.
 - Treat GitHub and GitLab as adapters. Do not put host-specific fields in core
   records, schemas or validation.
 - Do not create a Modelo application API. All workflow writes use the selected
-  Git provider API; cloud provider APIs and MCP tools are read-only evidence
-  sources.
+  Git provider API; cloud-provider APIs, cloud-provider CLIs and MCP tools are
+  read-only evidence sources. Modelo's own `modelo dev` commands may write an
+  explicitly requested local file through `--output`; that is local authoring,
+  not a cloud or workflow write.
 - One writer owns each branch/worktree. Research and review agents are read-only
   unless a human explicitly grants a disjoint path scope.
 - CI is the technical acceptance arbiter. Only the trusted final check for the
@@ -72,8 +74,7 @@ production catalogue records until T10 passes remotely.
 Use open Agent Skills under `.agents/skills/` for portable workflows. Skills
 guide authorship and review; they are not build inputs or CI evidence. Required
 build commands use the locked Python/`uv` toolchain. Modelo does not use `npx`.
-`.codex/` and `.kiro/` may provide
-thin adapters, but must not contain the only copy of a rule. Modelo cloud
-adapters, CLI commands and MCP access are always read-only. A separately
-governed cloud change is outside Modelo and cannot be performed by its agents
-or adapters.
+`.codex/` and `.kiro/` may provide thin adapters, but must not contain the only
+copy of a rule. Modelo cloud adapters, cloud-provider CLI commands and MCP
+access are always read-only. A separately governed cloud change is outside
+Modelo and cannot be performed by its agents or adapters.

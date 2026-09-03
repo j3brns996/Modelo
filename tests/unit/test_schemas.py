@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import unittest
-import sys
 from pathlib import Path
 
 import yaml
@@ -99,75 +98,5 @@ class SchemaRuntimeTests(unittest.TestCase):
                 candidate = dict(base, observed_at=value)
                 self.assertTrue(any(error.validator == "format" for error in validator.iter_errors(candidate)))
 
-    def test_provider_adapter_schemas_validate_valid_and_invalid_routes(self) -> None:
-        valid_gcp_publisher = {
-            "id": "gemini-pro-route",
-            "location": "us-central1",
-            "reference": "publishers/google/models/gemini-1.5-pro",
-            "model_binding": {
-                "kind": "publisher-model",
-                "model_evidence": {
-                    "id": "sha256-" + "a" * 64,
-                    "id_pointer": "/name",
-                    "resource_pointer": "/resourceName",
-                    "name_pointer": "/displayName",
-                    "provider_pointer": "/publisher",
-                },
-            },
-        }
-        self.assertEqual(
-            self.schemas.validate("providers/gcp-vertex.schema.json", valid_gcp_publisher, "gcp-route.yaml"),
-            (),
-        )
-
-        valid_gcp_endpoint = {
-            "id": "vertex-endpoint-route",
-            "location": "us-central1",
-            "reference": "projects/my-project/locations/us-central1/endpoints/1234567890",
-            "model_binding": {
-                "kind": "endpoint-model",
-                "model_evidence": {
-                    "id": "sha256-" + "b" * 64,
-                    "resource_pointer": "/deployedModel",
-                    "name_pointer": "/modelDisplayName",
-                    "provider_pointer": "/publisher",
-                },
-            },
-        }
-        self.assertEqual(
-            self.schemas.validate("providers/gcp-vertex.schema.json", valid_gcp_endpoint, "gcp-endpoint.yaml"),
-            (),
-        )
-
-        invalid_gcp = dict(valid_gcp_publisher, location="INVALID_LOCATION")
-        findings = self.schemas.validate("providers/gcp-vertex.schema.json", invalid_gcp, "gcp-invalid.yaml")
-        self.assertTrue(len(findings) > 0)
-
-        valid_azure_deployment = {
-            "id": "gpt4o-azure-route",
-            "region": "eastus",
-            "reference": "gpt-4o-deployment",
-            "model_binding": {
-                "kind": "deployment-model",
-                "model_evidence": {
-                    "id": "sha256-" + "c" * 64,
-                    "id_pointer": "/name",
-                    "resource_pointer": "/id",
-                    "name_pointer": "/properties/model/name",
-                    "provider_pointer": "/properties/model/publisher",
-                },
-            },
-        }
-        self.assertEqual(
-            self.schemas.validate("providers/azure-foundry.schema.json", valid_azure_deployment, "azure-route.yaml"),
-            (),
-        )
-
-        invalid_azure = dict(valid_azure_deployment, region="INVALID REGION!")
-        findings = self.schemas.validate("providers/azure-foundry.schema.json", invalid_azure, "azure-invalid.yaml")
-        self.assertTrue(len(findings) > 0)
-
-
 if __name__ == "__main__":
     unittest.main()
-

@@ -523,6 +523,62 @@ class SchemaFixtureTests(unittest.TestCase):
                 with self.subTest(schema=name, reference=node["$ref"]):
                     self.assertIn(target, identifiers)
 
+    def test_provider_schema_inventory_matches_implemented_adapters(self) -> None:
+        id_to_name = {
+            document["$id"].split("#", 1)[0]: name
+            for name, document in self.schemas.items()
+        }
+        pending = ["offering.schema.json"]
+        visited: set[str] = set()
+        reachable_provider_schemas: set[str] = set()
+        while pending:
+            name = pending.pop()
+            if name in visited:
+                continue
+            visited.add(name)
+            document = self.schemas[name]
+            for node in _walk_json(document):
+                reference = node.get("$ref")
+                if not isinstance(reference, str):
+                    continue
+                target_id = urljoin(document["$id"], reference).split("#", 1)[0]
+                target_name = id_to_name.get(target_id)
+                if target_name is None:
+                    continue
+                if target_name.startswith("providers/"):
+                    reachable_provider_schemas.add(target_name)
+                if target_name not in visited:
+                    pending.append(target_name)
+
+        provider_schema_inventory = {
+            path.relative_to(SCHEMAS).as_posix()
+            for path in (SCHEMAS / "providers").glob("*.schema.json")
+        }
+        contract = yaml.safe_load(
+            (ROOT / "docs/contract.yaml").read_text(encoding="utf-8")
+        )
+        implemented_adapters = {
+            boundary["adapter"]
+            for boundary in contract["provider_boundary"].values()
+            if isinstance(boundary, dict) and "adapter" in boundary
+        }
+        registry_adapter = self.schemas["inference-services-registry.schema.json"][
+            "properties"
+        ]["inference_services"]["additionalProperties"]["properties"]["adapter"][
+            "const"
+        ]
+
+        self.assertEqual(
+            {
+                "provider_schemas": provider_schema_inventory,
+                "registry_adapters": {registry_adapter},
+            },
+            {
+                "provider_schemas": reachable_provider_schemas,
+                "registry_adapters": implemented_adapters,
+            },
+        )
+
     def test_patterns_do_not_use_ambiguous_terminal_dollar_anchor(self) -> None:
         for name, document in self.schemas.items():
             for node in _walk_json(document):

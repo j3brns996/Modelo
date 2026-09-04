@@ -510,7 +510,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 projection = _parse_json_arg(arguments.projection, "--projection")
                 scope = (
                     _parse_json_arg(arguments.scope, "--scope")
-                    if arguments.scope
+                    if arguments.scope is not None
                     else None
                 )
                 sanitised_parameters = (
@@ -551,7 +551,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 acceptance = _parse_json_arg(arguments.acceptance, "--acceptance")
                 batch_scope = (
                     _parse_json_arg(arguments.batch_scope, "--batch-scope")
-                    if arguments.batch_scope
+                    if arguments.batch_scope is not None
                     else None
                 )
                 payload = init_mac_payload(

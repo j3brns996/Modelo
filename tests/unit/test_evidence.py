@@ -187,6 +187,45 @@ class EvidenceTests(unittest.TestCase):
                     service=service,
                 )
 
+    def test_create_api_evidence_rejects_nested_sensitive_parameter_keys(self) -> None:
+        defaults = {
+            "source_type": "first-party-read-api",
+            "uri": "https://example.invalid/api",
+            "observed_at": "2026-09-01T00:00:00Z",
+            "projection": {},
+            "schemas": self.schemas,
+            "provider": "aws",
+            "service": "bedrock",
+            "operation": "GetFoundationModel",
+            "partition": "aws",
+            "region": "us-east-1",
+        }
+        cases = (
+            ({"offerToken": "secret"}, "offerToken"),
+            ({"auth": {"credentials": "secret"}}, "credentials"),
+            ({"items": [{"OFFER_TOKEN": "secret"}]}, "offerToken"),
+            ({"items": [{"CrE_Den-TiAls": "secret"}]}, "credentials"),
+        )
+        for parameters, key in cases:
+            with self.subTest(parameters=parameters), self.assertRaisesRegex(
+                ValueError,
+                f"sanitised_parameters contains prohibited sensitive key {key}",
+            ) as caught:
+                create_evidence_record(
+                    **defaults,
+                    sanitised_parameters=parameters,
+                )
+            self.assertNotIn("secret", str(caught.exception))
+
+        allowed = create_evidence_record(
+            **defaults,
+            sanitised_parameters={"maxTokens": 256},
+        )
+        self.assertEqual(
+            allowed["source"]["sanitised_parameters"],
+            {"maxTokens": 256},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,6 +12,36 @@ from modelo.schemas import SchemaSet
 
 
 _MISSING = object()
+_SENSITIVE_PARAMETER_KEYS = {
+    "credentials": "credentials",
+    "offertoken": "offerToken",
+}
+
+
+def _sensitive_parameter_key(value: Any) -> str | None:
+    pending = [value]
+    visited: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if isinstance(current, dict):
+            identity = id(current)
+            if identity in visited:
+                continue
+            visited.add(identity)
+            for key, child in current.items():
+                if isinstance(key, str):
+                    normalised = key.casefold().replace("_", "").replace("-", "")
+                    prohibited = _SENSITIVE_PARAMETER_KEYS.get(normalised)
+                    if prohibited is not None:
+                        return prohibited
+                pending.append(child)
+        elif isinstance(current, list):
+            identity = id(current)
+            if identity in visited:
+                continue
+            visited.add(identity)
+            pending.extend(current)
+    return None
 
 
 def _string(value: str) -> str:
@@ -229,6 +259,12 @@ def create_evidence_record(
             raise ValueError(
                 "invalid evidence record: first-party-read-api supports only "
                 "provider aws with service bedrock"
+            )
+        sensitive_key = _sensitive_parameter_key(sanitised_parameters)
+        if sensitive_key is not None:
+            raise ValueError(
+                "invalid evidence record: sanitised_parameters contains prohibited "
+                f"sensitive key {sensitive_key}"
             )
         source: dict[str, Any] = {
             "type": source_type,

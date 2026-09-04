@@ -344,6 +344,61 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 2)
                 self.assertIn("invalid choice", result.stderr)
 
+    def test_dev_evidence_create_rejects_sensitive_parameters_without_output(self) -> None:
+        base = (
+            "dev", "evidence-create",
+            "--source-type", "first-party-read-api",
+            "--uri", "https://example.invalid/api",
+            "--observed-at", "2026-09-01T00:00:00Z",
+            "--projection", '{}',
+            "--provider", "aws",
+            "--service", "bedrock",
+            "--operation", "GetFoundationModel",
+            "--partition", "aws",
+            "--region", "us-east-1",
+        )
+        cases = (
+            ({"offerToken": "secret"}, "offerToken"),
+            ({"auth": {"credentials": "secret"}}, "credentials"),
+            ({"items": [{"OFFER_TOKEN": "secret"}]}, "offerToken"),
+            ({"items": [{"CrE_Den-TiAls": "secret"}]}, "credentials"),
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            for index, (parameters, key) in enumerate(cases):
+                for existing in (False, True):
+                    output = tmp_path / f"sensitive-{index}-{existing}.json"
+                    if existing:
+                        output.write_text("preserve me\n", encoding="utf-8")
+                    result = self.run_cli(
+                        *base,
+                        "--sanitised-parameters", json.dumps(parameters),
+                        "--output", str(output),
+                    )
+                    with self.subTest(parameters=parameters, existing=existing):
+                        self.assertEqual(result.returncode, 2)
+                        self.assertEqual(result.stdout, "")
+                        self.assertIn(
+                            f"prohibited sensitive key {key}", result.stderr
+                        )
+                        self.assertNotIn("secret", result.stderr)
+                        if existing:
+                            self.assertEqual(
+                                output.read_text(encoding="utf-8"), "preserve me\n"
+                            )
+                        else:
+                            self.assertFalse(output.exists())
+
+            allowed = self.run_cli(
+                *base,
+                "--sanitised-parameters", '{"maxTokens": 256}',
+            )
+            self.assertEqual(allowed.returncode, 0, allowed.stderr)
+            self.assertEqual(
+                json.loads(allowed.stdout)["source"]["sanitised_parameters"],
+                {"maxTokens": 256},
+            )
+
     def test_dev_json_arguments_have_explicit_precedence_and_clear_errors(self) -> None:
         base = (
             "dev", "evidence-create",
@@ -398,6 +453,53 @@ class CliTests(unittest.TestCase):
             self.assertEqual(invalid_result.returncode, 2)
             self.assertIn("JSON file", invalid_result.stderr)
             self.assertIn("is invalid", invalid_result.stderr)
+
+    def test_dev_optional_json_rejects_explicit_empty_values_without_output(self) -> None:
+        digest = "sha256-" + "a" * 64
+        cases = (
+            (
+                (
+                    "dev", "evidence-create",
+                    "--source-type", "official-provider-documentation",
+                    "--uri", "https://example.invalid/doc",
+                    "--observed-at", "2026-09-01T00:00:00Z",
+                    "--projection", '{}',
+                    "--scope", "",
+                ),
+                "--scope",
+            ),
+            (
+                (
+                    "dev", "mac-init",
+                    "--operation", "add",
+                    "--purpose", "Add test record",
+                    "--subjects", '[{"kind":"model","identity":"test-model"}]',
+                    "--requested-outcome", "Add record",
+                    "--reason", "New record available",
+                    "--candidate-evidence", json.dumps([{
+                        "uri": "https://example.invalid/doc",
+                        "observed_at": "2026-09-01T00:00:00Z",
+                        "digest": digest,
+                    }]),
+                    "--acceptance", '["criterion 1"]',
+                    "--batch-scope", "",
+                ),
+                "--batch-scope",
+            ),
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            for index, (arguments, option) in enumerate(cases):
+                output = Path(tmp_dir) / f"existing-{index}.json"
+                output.write_text("preserve me\n", encoding="utf-8")
+                result = self.run_cli(*arguments, "--output", str(output))
+                with self.subTest(option=option):
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(result.stdout, "")
+                    self.assertIn(option, result.stderr)
+                    self.assertIn("inline JSON is invalid", result.stderr)
+                    self.assertEqual(
+                        output.read_text(encoding="utf-8"), "preserve me\n"
+                    )
 
     def test_dev_json_output_is_shared_pretty_and_preserved_on_input_failure(self) -> None:
         digest = "sha256-" + "a" * 64

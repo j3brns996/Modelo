@@ -103,20 +103,17 @@ CI for preflight. Never commit generated output from `dist/`.
 | Static presentation | `site/` | Templates, content and local assets |
 | Publication | `dist/` | Generated output, never committed |
 
-## Central Control: `modelo.yaml`
+## Configuration and validation authority
 
-[`modelo.yaml`](modelo.yaml) is the heart of the project. It defines the single source of truth for repository paths, publication profiles, host adapters (GitHub or GitLab), control identities, and central validation rules.
+[`modelo.yaml`](modelo.yaml) owns configured repository paths, site and issue
+routes, publication profiles, GitHub or GitLab adapter selection, platform
+controls, toolchain pins and build inputs. The tooling loads those values.
 
-Rather than duplicating regular expressions and enum lists across JavaScript, Python code, and JSON schemas, `modelo.yaml` anchors validation rules centrally:
-
-```yaml
-validation:
-  identity_pattern: "^[a-z0-9][a-z0-9._:/@+-]*$"
-  allowed_operations: [add, change, revoke, move, batch]
-  allowed_kinds: [model, offering, evidence, vendor, inference-service, condition]
-```
-
-When building the static site (`modelo build`) or drafting local changes (`modelo dev propose`), the system loads `modelo.yaml` so the web interface, CLI, and networkless validator (`modelo check`) enforce the exact same rules.
+Validation has separate, explicit owners. JSON schemas define record shapes
+and provenance annotations. The Python validator enforces cross-record,
+evidence and change semantics. [docs/contract.yaml](docs/contract.yaml) records
+the compact machine contract, while [SPEC.md](SPEC.md) explains its rationale.
+Configuration does not replace those shape or semantic authorities.
 
 ## Documentation Map
 

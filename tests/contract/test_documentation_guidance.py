@@ -197,6 +197,7 @@ def test_contributing_assigns_roles_and_governance_tokens() -> None:
 def test_authoring_guidance_matches_registered_helpers_and_authority() -> None:
     commands = _registered_cli_commands()
     assert {"dev", "evidence-create", "mac-init"} <= commands
+    assert "propose" not in commands
     assert {
         "--provider",
         "--service",
@@ -214,6 +215,36 @@ def test_authoring_guidance_matches_registered_helpers_and_authority() -> None:
     _assert_contains_all_tokens(guide, ("--output", "draft", "linked issue", "trusted"))
     assert any(token in guide for token in ("standard output", "stdout"))
     assert "approval" in guide and "admissib" in guide
+
+
+def test_removed_all_in_one_propose_cli_is_absent_from_active_guidance() -> None:
+    for path in (README, AUTHORING_GUIDE, ROOT / "docs/site-contract.md"):
+        assert "modelo dev propose" not in _read(path).lower()
+
+    guide = _normalise(_read(AUTHORING_GUIDE))
+    for concept in (
+        "browser helper",
+        "governed git provider issue intake",
+        "modelo dev mac init",
+        "modelo dev evidence create",
+    ):
+        assert _normalise(concept) in guide
+
+
+def test_readme_separates_configuration_from_validation_authority() -> None:
+    readme = _normalise(_read(README))
+    for concept in (
+        "repository paths",
+        "site and issue routes",
+        "publication profiles",
+        "github or gitlab adapter selection",
+        "toolchain pins",
+        "json schemas define record shapes",
+        "python validator enforces cross record evidence and change semantics",
+        "configuration does not replace",
+    ):
+        assert _normalise(concept) in readme
+    assert "identity pattern" not in readme
 
 
 def test_authoring_contract_defines_evidence_and_json_input_boundaries() -> None:

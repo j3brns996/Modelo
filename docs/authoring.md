@@ -22,22 +22,10 @@ dedupe key, idempotency key and payload digest.
 Use the static card for revoke, move or batch because those operations require
 shapes that the interactive draft does not compose.
 
-## Propose a candidate change locally
-
-`modelo dev propose` scaffolds an evidence record, computes canonical keys, and formats the complete Markdown issue body in a single step:
-
-```bash
-uv run --locked modelo dev propose \
-  --operation add \
-  --kind offering \
-  --identity aws-bedrock-nova-lite \
-  --purpose 'Approve Amazon Nova Lite for production inference' \
-  --reason 'Required for low-latency retail workload' \
-  --uri 'https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html' \
-  --output /tmp/proposal-issue.md
-```
-
-Omit `--output` to write the Markdown issue body directly to standard output for CLI piping (`gh issue create --body-file /tmp/proposal-issue.md`).
+For every operation, complete the governed Git-provider issue intake rather
+than treating a local draft as a request. The browser helper prepares issue
+fields; the two local helpers below separately prepare a neutral MAC payload or
+an evidence envelope for inspection.
 
 ## Initialise a neutral MAC locally
 

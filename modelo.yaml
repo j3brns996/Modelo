@@ -129,7 +129,8 @@ site:
     schemas: /data/schemas/
   asset_routes:
     asset_css: /assets/site.css
-    asset_js: /assets/catalogue.js
+    asset_catalogue_js: /assets/catalogue.js
+    asset_proposal_js: /assets/proposal.js
     asset_alpine: /assets/vendor/alpine-csp-3.16.3.min.js
     asset_third_party_notices: /assets/vendor/THIRD-PARTY-NOTICES.md
   progressive_enhancement:
@@ -199,6 +200,7 @@ build:
     - docs/index.html
     - assets/site.css
     - assets/catalogue.js
+    - assets/proposal.js
     - assets/vendor/alpine-csp-3.16.3.min.js
     - assets/vendor/THIRD-PARTY-NOTICES.md
     - data/catalogue.json

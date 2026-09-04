@@ -29,6 +29,7 @@ MAC_FIXTURES = ROOT / "tests/fixtures/mac"
 REQUIRED_FIXED_PUBLICATION_FILES = {
     "404.html",
     "assets/catalogue.js",
+    "assets/proposal.js",
     "assets/site.css",
     "assets/vendor/alpine-csp-3.16.3.min.js",
     "assets/vendor/THIRD-PARTY-NOTICES.md",

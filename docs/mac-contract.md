@@ -44,9 +44,12 @@ The four explanatory fields are deliberately distinct. `purpose` is the stable
 need, `requested_outcome` describes the desired catalogue state, `reason` tells
 a human reviewer why the current state should change, and `acceptance` lists the
 observable checks for completion. Git-provider forms use plain-language labels,
-and GitHub requesters do not construct JSON or calculate hashes. The trusted
+and GitHub requesters do not construct JSON or calculate hashes. The site's
+five static operation cards use the configured intake URLs and remain the
+complete chooser. Its optional add/change builder produces only a non-canonical
+issue-field summary; revoke, move and batch are not composed there. The trusted
 default-branch `modelo platform github-intake` compiler creates a stable UUID
-from the issue coordinate, validates subjects and evidence references, computes
+version 5 from the issue coordinate, validates subjects and evidence references, computes
 both intent keys and the payload digest, and appends the canonical payload as a
 generated issue block. The block carries a digest of the human-authored
 portion, so an edit cannot leave a stale payload looking valid. Invalid edits
@@ -125,6 +128,22 @@ it must be a distinct offering path that exists in the exact head. These fields 
 the correct neutral operation and subject identities and exactly equal the
 validated delta; T5 never derives them from deletion, payload prose or current
 time.
+
+## Local authoring utilities
+
+`modelo dev mac-init` accepts explicit author-controlled JSON arguments, or
+paths to such JSON, and emits to standard output unless optional `--output` is
+given. It validates a neutral payload, creates a fresh UUIDv4 request ID and
+computes the dedupe and idempotency keys. Unlike GitHub intake, it has no issue
+coordinate and does not create or bind an issue, check reservations, gather
+evidence, approve anything or change the catalogue.
+
+`modelo dev evidence-create` similarly writes a schema-valid evidence envelope
+with a content-addressed ID. It never retrieves the named URI or API operation
+and does not establish source admissibility, projection truth, freshness or
+approval. Its input, optional output path and result remain author-controlled
+until reviewed and committed through the MAC workflow. See
+`docs/authoring.md` for examples and limits.
 
 ## Adapter assets
 

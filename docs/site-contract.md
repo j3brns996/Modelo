@@ -10,7 +10,7 @@ accounts, telemetry and service architecture are explicitly not copied.
 ```text
 site/
   templates/{base,home,catalogue,model,offering,changes,process,propose,docs,404}.html
-  assets/{site.css,catalogue.js,vendor/alpine-csp-3.16.3.min.js,vendor/THIRD-PARTY-NOTICES.md}
+  assets/{site.css,catalogue.js,proposal.js,vendor/alpine-csp-3.16.3.min.js,vendor/THIRD-PARTY-NOTICES.md}
   content/{process,propose,docs}.md
 dist/candidate/site/             pre-merge generated and disposable
 dist/pages/site/                 public synthetic demo; never approval evidence
@@ -57,7 +57,7 @@ the T6 final artefact and cannot satisfy a release or approval gate.
 
 Completeness ownership is split: T5 enforces the exact candidate set above;
 T6 owns the executable final exact-set rule. Final manifest `files` keys must
-equal the fixed list in `docs/contract.yaml`—base route HTML, four local assets,
+equal the fixed list in `docs/contract.yaml`—base route HTML, five local assets,
 `data/catalogue.json` and `data/change-delta.json`—union every schema file
 beneath the configured schema root at the exact source commit, union
 `models/{model_id}/index.html` for every projected model and
@@ -76,7 +76,7 @@ tests; JSON Schema validates the wire shape but does not derive this inventory.
 | `offering` | `/offerings/{inference_service_id}/{offering_id}/` | Policy-authored approval rationale, routes, price, conditions, evidence, approval coordinates and protected release/receipt discovery link; no embedded receipt claim |
 | `changes` | `/changes/` | Add/change/revoke history from local Git first-parent deltas |
 | `process` | `/process/` | MAC, CI, approval and evidence rules |
-| `propose` | `/propose/` | Links to configured provider add/change/revoke/move/batch intake |
+| `propose` | `/propose/` | Five static links to configured add/change/revoke/move/batch intake, plus an optional add/change issue-field draft |
 | `docs` | `/docs/` | Specification, contract, schemas and clone commands |
 | `not_found` | `/404.html` | Recovery navigation |
 
@@ -98,9 +98,20 @@ allowlisted URL parameters so a view is shareable; unknown values are ignored.
 Facet values are ORed within a facet and ANDed across facets.
 Only table/grid view preference is stored locally under the configured key.
 An explicit valid URL `view` value takes precedence, and unavailable or invalid
-storage falls back to the configured grid view without breaking the explorer. Catalogue
-scripts are emitted only on the catalogue page; all other pages contain no
-browser runtime.
+storage falls back to the configured grid view without breaking the explorer.
+The catalogue route alone loads `catalogue.js` followed by the vendored Alpine
+CSP runtime. The propose route alone loads the independent vanilla
+`proposal.js`; it does not load Alpine or catalogue logic. Every other route
+contains no browser runtime.
+
+The propose route's five operation cards always resolve from
+`repository.web_routes.mac_intake` and work without JavaScript. Its optional
+interactive draft covers add and change only and directs each draft to that
+operation's configured intake URL. The displayed issue-field summary is
+non-canonical convenience output: it has no request UUID, keys or digest and is
+never MAC metadata. Revoke, move and batch continue through their static cards.
+Trusted default-branch intake tooling creates and validates the canonical
+payload after a Git-provider issue exists.
 
 The shared shell supplies sticky grouped navigation, source/publication
 affordances, a synthetic-status rail and structured footer. Home leads users

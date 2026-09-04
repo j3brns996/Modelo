@@ -259,7 +259,14 @@ mac:
     durable_history: release_delta_receipt
 
 versioning:
-  version_file_meaning: contract_and_tool_semver
+  version_file_meaning: tool_release_semver_independent_of_wire_contract_versions
+  tool_release_version_sources: [VERSION, pyproject.toml]
+  current_tool_release: "0.1.1"
+  current_wire_contract: "0.1.0"
+  wire_contract_version_sources: [contract.version, config_version, schema_version_fields]
+  individual_payload_schema_versions_remain_declared_values: true
+  tool_release_bump_implies_wire_contract_bump: false
+  wire_contract_bump_implies_tool_release_bump: change_dependent
   ordinary_data_change_bumps_version_file: false
   catalogue_revision: full_source_commit
   release_identity: "catalogue-YYYYMMDD.N"
@@ -397,6 +404,7 @@ build:
   manifest_required_fixed_files:
     - 404.html
     - assets/catalogue.js
+    - assets/proposal.js
     - assets/site.css
     - assets/vendor/alpine-csp-3.16.3.min.js
     - assets/vendor/THIRD-PARTY-NOTICES.md
@@ -440,7 +448,7 @@ site:
   contract_config_key: paths.site_contract
   routes_config_key: site.routes
   data_routes: [catalogue, change_delta, manifest, schemas]
-  asset_routes: [asset_css, asset_js, asset_alpine, asset_third_party_notices]
+  asset_routes: [asset_css, asset_catalogue_js, asset_proposal_js, asset_alpine, asset_third_party_notices]
   presentation:
     shell: responsive_product_catalogue
     references: [symphonic_information_architecture, local_model_filter_prototype]
@@ -470,7 +478,15 @@ site:
     cdn_npm_npx_runtime: forbidden
     no_javascript_navigation: required
     explorer_state: [search, multi_select_facets, deterministic_sort, result_count, table_grid_view, url_state, local_view_preference, compare_two_to_four_canonical_models]
-    script_scope: catalogue_page_only
+    script_scope:
+      catalogue: [assets/catalogue.js, assets/vendor/alpine-csp-3.16.3.min.js]
+      propose: [assets/proposal.js]
+      all_other_routes: []
+    proposal_runtime: dedicated_vanilla_javascript_no_alpine
+    proposal_supported_interactive_operations: [add, change]
+    proposal_all_operation_static_cards: [add, change, revoke, move, batch]
+    proposal_intake_url_source: repository.web_routes.mac_intake
+    proposal_output: noncanonical_human_issue_field_summary
   document_routes: [human_specification, machine_contract]
   templates_config_key: paths.site_templates
   generated_output_config_keys: [build.pages_root, build.final_root]
@@ -505,6 +521,35 @@ site:
     supplementary_controller_scope: [search_and_facets, sort_and_visibility, result_count, url_round_trip, url_over_local_view_precedence, storage_failure, comparison_bound]
     supplementary_controller_is_locked_build_input: false
     t10: [pinned_python_controlled_browser_outside_core_build, functional_explorer_behavior, human_keyboard_and_screen_reader_evidence]
+
+authoring:
+  guide: docs/authoring.md
+  local_inputs_and_outputs: author_controlled_nonaccepting
+  issue_form_cards:
+    operations: [add, change, revoke, move, batch]
+    destinations: repository.web_routes.mac_intake
+    javascript_required: false
+  browser_draft:
+    operations: [add, change]
+    output: human_issue_field_summary_not_neutral_mac_payload
+    omitted_trusted_values: [request_id, dedupe_key, idempotency_key, payload_digest]
+    authority: convenience_only
+  github_intake:
+    execution_source: trusted_default_branch
+    request_id: deterministic_uuidv5_from_issue_coordinate
+    computes: [dedupe_key, idempotency_key, payload_digest]
+    validates_human_fields: true
+  dev_mac_init:
+    output: validated_neutral_json_payload
+    request_id: fresh_random_uuidv4
+    computes: [dedupe_key, idempotency_key]
+    does_not: [create_or_bind_issue, check_reservations, gather_evidence, approve, write_catalogue]
+  dev_evidence_create:
+    output: schema_valid_evidence_envelope_with_content_addressed_id
+    network_retrieval: false
+    admissibility_truth_freshness_or_approval_decision: false
+    caller_responsible_for: [retrieval, accuracy, scope, sanitisation, output_review]
+  accepting_authority: trusted_exact_head_ci_and_required_review_only
 
 validation:
   command: modelo check --base BASE --head HEAD --as-of YYYY-MM-DD

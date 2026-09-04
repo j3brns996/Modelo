@@ -11,7 +11,10 @@
 - Read `AGENTS.md`, `modelo.yaml`, `docs/contract.yaml`, and the owning specification or schema before editing.
 - Keep one writer per branch or worktree.
 - Treat GitHub and GitLab as adapters. Do not put host-specific fields in core records, schemas, or validation.
-- Do not create a Modelo application API. Workflow writes use the selected Git provider API; cloud provider APIs and MCP tools are read-only evidence sources.
+- Do not create a Modelo application API. Workflow writes use the selected Git
+  provider API; cloud-provider APIs, CLIs and MCP tools are read-only evidence
+  sources. Local `modelo dev ... --output` may write only an explicitly
+  requested, author-controlled draft file.
 - Do not add production catalogue records before T10 passes remotely.
 
 ## Reviewer
@@ -42,9 +45,23 @@ uv run --locked modelo-local-ci run \
   --base <base-sha> --head <head-sha> --as-of YYYY-MM-DD --jobs 3
 ```
 
-- Treat local success as advisory only; `modelo check` remains authoritative when it exists.
+- Treat local success as advisory only; the remote exact-head `modelo/check`
+  required check is the acceptance gate.
 - Control changes run the complete Python test inventory and offline package build.
 - Catalogue-only changes run validation and execute no proposed tooling in trusted CI.
+
+## Authoring helpers
+
+- Read [docs/authoring.md](docs/authoring.md) before using the browser or CLI
+  drafting helpers.
+- The static proposal chooser covers add, change, revoke, move and batch. The
+  interactive helper is intentionally limited to add and change.
+- `modelo dev evidence-create` and `modelo dev mac-init` print a draft to
+  standard output by default. Use `--output` only when you explicitly want a
+  local file.
+- Treat every result as a drafting aid. It is not approval, accepted evidence
+  or canonical intake output; the linked issue and trusted compiler remain
+  authoritative.
 
 ## Non-negotiables
 

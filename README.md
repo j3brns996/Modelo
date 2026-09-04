@@ -2,27 +2,25 @@
 
 Modelo is a Git-backed approval ledger and static publication system for an
 enterprise AI model catalogue. Model records describe facts. Offering records
-carry consumption approval. Git issues start work, pull requests or merge
-requests decide the change, and trusted CI decides acceptance. There is no
-application API. Host-specific concerns stay in the Git adapter layer, not in
-core records or schemas.
+carry consumption approval. Issues start work; change requests and trusted CI
+decide them. There is no application API. Host-specific concerns stay in the
+Git adapter layer, not in core records or schemas.
 
 ## Start Here
 
 - Live synthetic demo: [j3brns996.github.io/Modelo/](https://j3brns996.github.io/Modelo/)
 - Guided issue chooser: [Open a Modelo MAC request](https://github.com/j3brns996/Modelo/issues/new/choose)
   for add, change, revoke, move or batch requests.
-- Repository rules and exact contracts: [SPEC.md](SPEC.md) and [docs/contract.yaml](docs/contract.yaml)
+- Repository rules and contracts: [SPEC.md](SPEC.md) and [docs/contract.yaml](docs/contract.yaml)
 
-The demo uses labelled synthetic records, so sample content is not enterprise
-approval. To change the governed catalogue, start with the issue chooser rather
-than editing a record. It captures the intent and subjects that the later
-change request must preserve.
+Demo records are synthetic, not enterprise approval. Catalogue work starts in
+the issue chooser, which captures the intent and subjects the change request
+must preserve.
 
 ## Product tour
 
-These labelled synthetic-demo captures show the generated site. They are not
-approval, launch or T10 evidence, and contain no production catalogue data.
+These synthetic-demo captures are not approval, launch or T10 evidence and
+contain no production data.
 
 ![Modelo synthetic-demo home showing navigation, synthetic status and catalogue totals](docs/img/modelo-home.png)
 
@@ -30,13 +28,11 @@ approval, launch or T10 evidence, and contain no production catalogue data.
 
 ## Why Facts And Approval Are Separate
 
-A model record says what a named model release is. It does not say that the
-enterprise may consume it. An offering record is the approval unit: it ties a
-model to one or more provider routes, enterprise policy text and evidenced
-conditions. That split matters because provider availability, documentation
-examples and public demos are only observations. They are not approval.
-The approved route is what the enterprise may use; the observed model is only
-what the provider says exists.
+A model record describes a named model release; it does not permit enterprise
+use. An offering is the approval unit, joining the model to provider routes,
+policy rationale and evidenced conditions. This separation matters: provider
+availability, documentation examples and public demos are observations, not
+approval. Enterprise use follows the approved offering and route.
 
 ## Current Status
 
@@ -55,8 +51,10 @@ Do not add real production catalogue data before T10 passes remotely.
 |---|---|
 | Browse the live site | [Synthetic demo](https://j3brns996.github.io/Modelo/) |
 | Start a proposed change | [Guided issue chooser](https://github.com/j3brns996/Modelo/issues/new/choose) |
+| Draft an add or change | [Interactive proposal helper](https://j3brns996.github.io/Modelo/propose/#builder) |
+| Use the local authoring commands | [Authoring guide](docs/authoring.md) |
 | Learn how to contribute safely | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| Read the compact docs index | [docs/README.md](docs/README.md) |
+| Read the docs index | [docs/README.md](docs/README.md) |
 | Understand the product rules | [SPEC.md](SPEC.md) |
 | Inspect the machine contract | [docs/contract.yaml](docs/contract.yaml) |
 
@@ -87,11 +85,14 @@ so the result matches the reviewed head.
 Candidate and final builds take explicit provenance inputs. `--base-commit`
 names the comparison baseline; the matching source and tree values bind the
 output to reviewed Git content. See [docs/contract.yaml](docs/contract.yaml)
-for the complete required input set.
+for the required input set.
+
+Authoring helpers prepare drafts only; the linked issue and trusted compiler
+remain authoritative.
 
 Run the command from a clean worktree after reading the repository rules and
 the schema that owns the changed files. Start with narrow tests, then use local
-CI for the broader preflight. Never commit generated output from `dist/`.
+CI for preflight. Never commit generated output from `dist/`.
 
 ## Four Planes
 
@@ -107,6 +108,8 @@ CI for the broader preflight. Never commit generated output from `dist/`.
 - [CONTRIBUTING.md](CONTRIBUTING.md) covers linked issues, topic branches,
   one-writer ownership and the local preflight flow.
 - [docs/README.md](docs/README.md) is the repository docs index.
+- [docs/authoring.md](docs/authoring.md) explains the browser and local drafting
+  helpers and where their authority ends.
 - [SPEC.md](SPEC.md) explains the product rationale, scope and invariants.
 - [docs/contract.yaml](docs/contract.yaml) is the compact machine contract.
   Read it when you need the authoritative field, path and acceptance rules.

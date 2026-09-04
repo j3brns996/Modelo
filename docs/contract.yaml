@@ -529,11 +529,26 @@ authoring:
     operations: [add, change, revoke, move, batch]
     destinations: repository.web_routes.mac_intake
     javascript_required: false
+    candidate_evidence:
+      optional_for: [add, change, batch]
+      blank_compiles_to: []
+      malformed_nonblank: reject
+    batch_scope: required_independently_of_candidate_evidence
   browser_draft:
     operations: [add, change]
     output: human_issue_field_summary_not_neutral_mac_payload
     omitted_trusted_values: [request_id, dedupe_key, idempotency_key, payload_digest]
     authority: convenience_only
+    url_prefill:
+      maximum_final_encoded_href_characters: 7000
+      measurement: final_percent_encoded_url_href
+      within_limit: preserve_configured_query_and_append_complete_user_fields
+      overflow_url: untouched_configured_intake_url_with_no_partial_user_fields
+      overflow_fallback: retained_full_human_issue_field_summary_for_manual_entry
+      rationale: conservative_headroom_below_common_8_kib_infrastructure_limits
+    accessible_status:
+      url_outcome: independent_polite_atomic_live_region
+      clipboard_outcome: independent_polite_atomic_live_region
   github_intake:
     execution_source: trusted_default_branch
     request_id: deterministic_uuidv5_from_issue_coordinate
@@ -546,9 +561,31 @@ authoring:
     does_not: [create_or_bind_issue, check_reservations, gather_evidence, approve, write_catalogue]
   dev_evidence_create:
     output: schema_valid_evidence_envelope_with_content_addressed_id
+    source_types: [first-party-read-api, official-provider-documentation, official-vendor-documentation]
+    first_party_read_api:
+      supported_provider_service: {provider: aws, service: bedrock}
+      explicit_required_arguments: [provider, service, operation, partition, region, sanitised_parameters]
+      sanitised_parameters: required_json_value_preserved_in_source
+      uri_mapping: documentation_uri
+    documentation_sources:
+      types: [official-provider-documentation, official-vendor-documentation]
+      source_specific_arguments: [uri]
+      rejects_api_only_arguments: [provider, service, operation, partition, region, sanitised_parameters]
     network_retrieval: false
     admissibility_truth_freshness_or_approval_decision: false
     caller_responsible_for: [retrieval, accuracy, scope, sanitisation, output_review]
+  json_arguments:
+    applies_to:
+      dev_mac_init: [subjects, candidate_evidence, acceptance, batch_scope]
+      dev_evidence_create: [projection, scope, sanitised_parameters]
+    parse_precedence: [inline_json_first, explicit_at_path_required_file, legacy_existing_plain_path_fallback]
+    explicit_at_path_missing_or_unreadable: error
+    legacy_path_attempted_only_after_inline_parse_failure: true
+  local_json_output:
+    destination: optional_explicit_output_file_otherwise_stdout
+    representation: two_space_indented_utf8_json_plus_final_lf
+    validation_before_write: true
+    failure: preserve_existing_output_bytes_and_do_not_create_missing_output
   accepting_authority: trusted_exact_head_ci_and_required_review_only
 
 validation:

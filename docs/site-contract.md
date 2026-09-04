@@ -109,9 +109,20 @@ The propose route's five operation cards always resolve from
 interactive draft covers add and change only and directs each draft to that
 operation's configured intake URL. The displayed issue-field summary is
 non-canonical convenience output: it has no request UUID, keys or digest and is
-never MAC metadata. Revoke, move and batch continue through their static cards.
-Trusted default-branch intake tooling creates and validates the canonical
-payload after a Git-provider issue exists.
+never MAC metadata. The complete final percent-encoded `URL.href`, including
+the configured query and every proposed issue field, is limited to 7,000
+characters. This leaves conservative headroom below common 8 KiB
+infrastructure limits. At or below the limit the configured query is preserved
+and the complete fields are appended. On overflow the destination remains the
+untouched configured intake URL: no partial user fields are applied, and the
+full displayed summary remains available for manual entry.
+
+URL-building and clipboard-copy outcomes use separate status nodes. Each is an
+atomic polite live region (`aria-live="polite"`, `aria-atomic="true"`), so one
+action cannot overwrite or conceal the assistive-technology result of the
+other. Revoke, move and batch continue through their static cards. Trusted
+default-branch intake tooling creates and validates the canonical payload after
+a Git-provider issue exists.
 
 The shared shell supplies sticky grouped navigation, source/publication
 affordances, a synthetic-status rail and structured footer. Home leads users

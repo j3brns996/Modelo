@@ -42,8 +42,18 @@ Omit `--output` to write the Markdown issue body directly to standard output for
 ## Initialise a neutral MAC locally
 
 `modelo dev mac-init` is useful when an author needs a schema-valid neutral JSON
-payload before opening or updating an issue. JSON arguments may be inline
-values or paths to author-controlled JSON files.
+payload before opening or updating an issue. Its JSON-valued arguments are
+`--subjects`, `--candidate-evidence`, `--acceptance` and, for a batch,
+`--batch-scope`. Supply JSON in one of these forms:
+
+1. inline JSON, which is always tried first;
+2. `@path/to/input.json`, which explicitly names a required file; or
+3. a plain existing path, retained as a legacy fallback only when the argument
+   is not valid inline JSON.
+
+An `@` file that is missing or unreadable fails; it is not reinterpreted as
+inline data. Prefer `@path` in scripts because it states the intent clearly.
+All input files and their contents remain author-controlled.
 
 ```bash
 uv run --locked modelo dev mac-init \
@@ -67,7 +77,11 @@ for the trusted issue compiler or exact-head CI metadata.
 ## Create an evidence envelope locally
 
 `modelo dev evidence-create` formats one evidence envelope and computes its
-content-addressed ID. For an official documentation observation:
+content-addressed ID. It accepts exactly three source types:
+`first-party-read-api`, `official-provider-documentation` and
+`official-vendor-documentation`.
+
+For an official documentation observation:
 
 ```bash
 uv run --locked modelo dev evidence-create \
@@ -83,15 +97,66 @@ uv run --locked modelo dev evidence-create \
 
 The URI and projection above are placeholders, not catalogue facts; replace
 them with one observed admissible source and its exact retained projection.
-Omit the optional `--output` to print the JSON to standard output. For
-`first-party-read-api`, also supply the exact `--operation`, `--partition` and
-`--region`; the v0.1 helper's API source is AWS Bedrock only. The command
+For both documentation source types, `--uri` is the only source-specific
+argument. They reject API-only `--provider`, `--service`, `--operation`,
+`--partition`, `--region` and `--sanitised-parameters` arguments instead of
+silently discarding them.
+
+The v0.1 helper supports AWS Bedrock as its only first-party API source. That
+choice must be explicit, as must the retained request parameters:
+
+```bash
+uv run --locked modelo dev evidence-create \
+  --source-type first-party-read-api \
+  --provider aws \
+  --service bedrock \
+  --operation GetFoundationModel \
+  --partition aws \
+  --region eu-west-1 \
+  --sanitised-parameters '{"modelIdentifier":"example.provider-model-v1"}' \
+  --uri https://example.invalid/api-reference \
+  --observed-at 2026-09-03T09:00:00Z \
+  --retrieved-by cli \
+  --scope '{"purpose":"authoring-example"}' \
+  --projection '{"modelId":"example.provider-model-v1"}' \
+  --visibility internal
+```
+
+Here `--uri` becomes the API source's `documentation_uri`. The API form
+requires all six API arguments: `--provider aws`, `--service bedrock`,
+`--operation`, `--partition`, `--region` and JSON
+`--sanitised-parameters`. The latter preserves the sanitised request scope; it
+must not contain credentials, private commercial terms or AWS agreement
+`offerToken` values. Other provider/service pairs fail rather than being
+labelled as AWS Bedrock.
+
+`--projection`, `--scope` and `--sanitised-parameters` use the same inline,
+explicit `@path`, then legacy existing-path JSON precedence described above.
+Omit the optional `--output` to print JSON to standard output. The command
 validates the envelope's schema shape and derives
 `id` from its RFC 8785 canonical content, but it performs no network retrieval
 and cannot decide that the source, scope, projection or freshness is truthful
 or admissible. The author must obtain facts through an allowed read-only source,
 remove credentials and private commercial data, and review the generated file.
 Candidate issue evidence is not a catalogue evidence record.
+
+Both local helpers validate and format the complete document before they write
+it. If parsing or validation fails, an existing `--output` file is preserved
+byte-for-byte and a missing target is not created. Successful output keeps the
+existing two-space-indented UTF-8 JSON representation with a final newline,
+whether it is sent to standard output or to the explicitly requested local
+file.
+
+## Keep issue observations distinct
+
+The add, change and batch Issue Forms allow candidate observations to be left
+blank; trusted intake compiles a blank field to `candidate_evidence: []`.
+Supplying the field is still strict: malformed nonblank JSON or an observation
+that does not match the candidate-evidence shape fails compilation. Batch
+source, observation scope and inference-service scope remain required even
+when candidate observations are blank. These issue hints are not accepted
+catalogue evidence and do not relax the linked-issue, validation or review
+gates.
 
 ## Finish the governed change
 

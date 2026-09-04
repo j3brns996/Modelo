@@ -15,6 +15,7 @@ CONTRIBUTING = ROOT / "CONTRIBUTING.md"
 SECURITY = ROOT / "SECURITY.md"
 DOCS_README = ROOT / "docs/README.md"
 AUTHORING_GUIDE = ROOT / "docs/authoring.md"
+MACHINE_CONTRACT = ROOT / "docs/contract.yaml"
 IMPLEMENTATION_PLAN = ROOT / "docs/implementation-plan.md"
 LAUNCH_RUNBOOK = ROOT / "docs/launch-runbook.md"
 AGENTS = ROOT / "AGENTS.md"
@@ -84,6 +85,23 @@ def _registered_cli_commands() -> set[str]:
         and node.args
         and isinstance(node.args[0], ast.Constant)
         and isinstance(node.args[0].value, str)
+    }
+
+
+def _registered_cli_options(parser_variable: str) -> set[str]:
+    tree = ast.parse(_read(CLI_SOURCE))
+    return {
+        node.args[0].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "add_argument"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == parser_variable
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and isinstance(node.args[0].value, str)
+        and node.args[0].value.startswith("--")
     }
 
 
@@ -176,6 +194,14 @@ def test_contributing_assigns_roles_and_governance_tokens() -> None:
 def test_authoring_guidance_matches_registered_helpers_and_authority() -> None:
     commands = _registered_cli_commands()
     assert {"dev", "evidence-create", "mac-init"} <= commands
+    assert {
+        "--provider",
+        "--service",
+        "--operation",
+        "--partition",
+        "--region",
+        "--sanitised-parameters",
+    } <= _registered_cli_options("evidence_create")
 
     guide = _read(AUTHORING_GUIDE).lower()
     contributing = _read(CONTRIBUTING).lower()
@@ -185,6 +211,104 @@ def test_authoring_guidance_matches_registered_helpers_and_authority() -> None:
     _assert_contains_all_tokens(guide, ("--output", "draft", "linked issue", "trusted"))
     assert any(token in guide for token in ("standard output", "stdout"))
     assert "approval" in guide and "admissib" in guide
+
+
+def test_authoring_contract_defines_evidence_and_json_input_boundaries() -> None:
+    authoring = yaml.safe_load(_read(MACHINE_CONTRACT))["authoring"]
+    evidence = authoring["dev_evidence_create"]
+    assert set(evidence["source_types"]) == {
+        "first-party-read-api",
+        "official-provider-documentation",
+        "official-vendor-documentation",
+    }
+    api = evidence["first_party_read_api"]
+    assert api["supported_provider_service"] == {"provider": "aws", "service": "bedrock"}
+    assert set(api["explicit_required_arguments"]) == {
+        "provider", "service", "operation", "partition", "region", "sanitised_parameters",
+    }
+    assert api["uri_mapping"] == "documentation_uri"
+    documentation = evidence["documentation_sources"]
+    assert set(documentation["types"]) == {
+        "official-provider-documentation", "official-vendor-documentation",
+    }
+    assert documentation["source_specific_arguments"] == ["uri"]
+    assert set(documentation["rejects_api_only_arguments"]) == set(
+        api["explicit_required_arguments"]
+    )
+
+    json_arguments = authoring["json_arguments"]
+    assert json_arguments["applies_to"] == {
+        "dev_mac_init": ["subjects", "candidate_evidence", "acceptance", "batch_scope"],
+        "dev_evidence_create": ["projection", "scope", "sanitised_parameters"],
+    }
+    assert json_arguments["parse_precedence"] == [
+        "inline_json_first",
+        "explicit_at_path_required_file",
+        "legacy_existing_plain_path_fallback",
+    ]
+    assert json_arguments["legacy_path_attempted_only_after_inline_parse_failure"] is True
+    assert json_arguments["explicit_at_path_missing_or_unreadable"] == "error"
+
+    output = authoring["local_json_output"]
+    assert output["validation_before_write"] is True
+    assert "preserve_existing_output_bytes" in output["failure"]
+    assert "do_not_create_missing_output" in output["failure"]
+
+    guide = _read(AUTHORING_GUIDE).lower()
+    for source_type in evidence["source_types"]:
+        assert source_type in guide
+    for option in api["explicit_required_arguments"]:
+        assert "--" + option.replace("_", "-") in guide
+    _assert_contains_all_tokens(
+        guide,
+        ("inline json", "@path", "legacy fallback", "preserve", "byte-for-byte", "final newline"),
+    )
+
+
+def test_authoring_contract_bounds_proposal_and_keeps_optional_observations_strict() -> None:
+    authoring = yaml.safe_load(_read(MACHINE_CONTRACT))["authoring"]
+    forms = authoring["issue_form_cards"]
+    assert forms["candidate_evidence"] == {
+        "optional_for": ["add", "change", "batch"],
+        "blank_compiles_to": [],
+        "malformed_nonblank": "reject",
+    }
+    assert forms["batch_scope"] == "required_independently_of_candidate_evidence"
+
+    browser = authoring["browser_draft"]
+    prefill = browser["url_prefill"]
+    assert prefill["maximum_final_encoded_href_characters"] == 7000
+    assert prefill["measurement"] == "final_percent_encoded_url_href"
+    assert "untouched_configured_intake_url" in prefill["overflow_url"]
+    assert "no_partial_user_fields" in prefill["overflow_url"]
+    assert "full_human_issue_field_summary" in prefill["overflow_fallback"]
+    assert browser["accessible_status"] == {
+        "url_outcome": "independent_polite_atomic_live_region",
+        "clipboard_outcome": "independent_polite_atomic_live_region",
+    }
+
+    site_contract = _normalise(_read(ROOT / "docs/site-contract.md"))
+    for concept in (
+        "final percent encoded url href",
+        "7 000 characters",
+        "untouched configured intake url",
+        "no partial user fields",
+        "full displayed summary",
+        "atomic polite live region",
+    ):
+        assert _normalise(concept) in site_contract
+
+    guide = _normalise(_read(AUTHORING_GUIDE))
+    for concept in (
+        "candidate observations",
+        "blank field",
+        "candidate evidence",
+        "malformed nonblank json",
+        "batch source",
+        "observation scope",
+        "remain required",
+    ):
+        assert _normalise(concept) in guide
 
 
 def test_site_authoring_prose_explains_bounded_interactive_scope() -> None:

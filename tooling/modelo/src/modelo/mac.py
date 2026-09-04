@@ -482,9 +482,26 @@ def extract_adapter_issue_payload(body: str, adapter: Adapter) -> dict[str, Any]
             r"(?m)^### (?:Neutral payload digest|Change fingerprint)\n\n(sha256-[0-9a-f]{64})$", body
         )
     elif adapter == "gitlab":
-        payload_matches = re.findall(r"(?ms)^```json\n([\s\S]*?)\n```(?:\n|$)", body)
+        starts = [match.start() for match in re.finditer(re.escape(INTAKE_START), body)]
+        ends = [match.start() for match in re.finditer(re.escape(INTAKE_END), body)]
+        if starts or ends:
+            if len(starts) != 1 or len(ends) != 1 or ends[0] < starts[0]:
+                raise MacError("generated intake block is ambiguous")
+            if body[ends[0] + len(INTAKE_END):].strip():
+                raise MacError("generated intake block is not final")
+            source_digests = re.findall(
+                r"<!-- modelo:intake-source (sha256:[0-9a-f]{64}) -->",
+                body[starts[0]:ends[0]],
+            )
+            source = body[:starts[0]].rstrip()
+            actual = "sha256:" + hashlib.sha256(source.encode("utf-8")).hexdigest()
+            if source_digests != [actual]:
+                raise MacError("guided proposal human fields changed after payload generation")
+        payload_matches = re.findall(
+            r"(?ms)^(?:### (?:Neutral MAC payload|Change details \(JSON\))\n\n)?```json\n([\s\S]*?)\n```(?:\n|$)", body
+        )
         digest_matches = re.findall(
-            r"(?m)^Neutral payload digest: `(sha256-[0-9a-f]{64})`$", body
+            r"(?m)^(?:### (?:Neutral payload digest|Change fingerprint)\n\n|Neutral payload digest: `)(sha256-[0-9a-f]{64})`?$", body
         )
     else:
         raise MacError("unsupported Git-provider adapter")

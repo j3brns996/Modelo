@@ -25,6 +25,11 @@ from modelo.github_adapter import (
     github_control_issue_reference, github_issue_reference, prepare_github,
     prepare_github_control,
 )
+from modelo.gitlab_adapter import (
+    write_gitlab_intake_outputs,
+    gitlab_control_issue_reference, gitlab_issue_reference, prepare_gitlab,
+    prepare_gitlab_control,
+)
 from modelo.evidence import create_evidence_record
 from modelo.mac import MacError, init_mac_payload
 from modelo.schemas import SchemaSet
@@ -115,6 +120,32 @@ def _parser() -> argparse.ArgumentParser:
     github_intake.add_argument("--event", type=Path, required=True)
     github_intake.add_argument("--issue-body-output", type=Path, required=True)
     github_intake.add_argument("--comment-output", type=Path, required=True)
+
+    gitlab_issue = platform_subparsers.add_parser("gitlab-issue", help="extract the linked MAC issue from GitLab MR")
+    gitlab_issue.add_argument("--event", type=Path, required=True)
+    gitlab_control_issue = platform_subparsers.add_parser("gitlab-control-issue", help="extract the linked control issue from GitLab MR")
+    gitlab_control_issue.add_argument("--event", type=Path, required=True)
+    gitlab_prepare = platform_subparsers.add_parser("gitlab-prepare", help="prepare trusted GitLab inputs")
+    gitlab_prepare.add_argument("--event", type=Path, required=True)
+    gitlab_prepare.add_argument("--issue", type=Path, required=True)
+    gitlab_prepare.add_argument("--validation-sha", required=True)
+    gitlab_prepare.add_argument("--validation-tree", required=True)
+    gitlab_prepare.add_argument("--as-of", required=True)
+    gitlab_prepare.add_argument("--metadata-output", type=Path, required=True)
+    gitlab_prepare.add_argument("--context-output", type=Path, required=True)
+    gitlab_control = platform_subparsers.add_parser("gitlab-prepare-control", help="prepare trusted GitLab control inputs")
+    gitlab_control.add_argument("--event", type=Path, required=True)
+    gitlab_control.add_argument("--issue", type=Path, required=True)
+    gitlab_control.add_argument("--validation-sha", required=True)
+    gitlab_control.add_argument("--validation-tree", required=True)
+    gitlab_control.add_argument("--as-of", required=True)
+    gitlab_control.add_argument("--context-output", type=Path, required=True)
+    gitlab_intake = platform_subparsers.add_parser(
+        "gitlab-intake", help="compile a guided GitLab issue proposal"
+    )
+    gitlab_intake.add_argument("--event", type=Path, required=True)
+    gitlab_intake.add_argument("--issue-body-output", type=Path, required=True)
+    gitlab_intake.add_argument("--comment-output", type=Path, required=True)
 
     dev = subparsers.add_parser("dev", help="developer and authoring suite utilities")
     dev_subparsers = dev.add_subparsers(dest="dev_command", required=True)
@@ -252,6 +283,51 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "platform" and arguments.platform_command == "github-intake":
         try:
             write_github_intake_outputs(
+                event_path=arguments.event,
+                issue_body_output=arguments.issue_body_output,
+                comment_output=arguments.comment_output,
+            )
+            return 0
+        except (ValueError, BuildError) as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "gitlab-issue":
+        try:
+            reference = gitlab_issue_reference(arguments.event)
+            print(reference)
+            return 0
+        except BuildError as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "gitlab-control-issue":
+        try:
+            reference = gitlab_control_issue_reference(arguments.event)
+            print(reference)
+            return 0
+        except BuildError as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "gitlab-prepare":
+        try:
+            prepare_gitlab(
+                root=arguments.root, event_path=arguments.event, issue_path=arguments.issue,
+                validation_sha=arguments.validation_sha, validation_tree=arguments.validation_tree,
+                as_of=parse_as_of(arguments.as_of), metadata_output=arguments.metadata_output,
+                context_output=arguments.context_output,
+            )
+            return 0
+        except (ValueError, BuildError) as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "gitlab-prepare-control":
+        try:
+            prepare_gitlab_control(
+                root=arguments.root, event_path=arguments.event, issue_path=arguments.issue,
+                validation_sha=arguments.validation_sha, validation_tree=arguments.validation_tree,
+                as_of=parse_as_of(arguments.as_of), context_output=arguments.context_output,
+            )
+            return 0
+        except (ValueError, BuildError) as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "gitlab-intake":
+        try:
+            write_gitlab_intake_outputs(
                 event_path=arguments.event,
                 issue_body_output=arguments.issue_body_output,
                 comment_output=arguments.comment_output,

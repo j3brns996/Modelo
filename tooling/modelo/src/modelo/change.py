@@ -18,7 +18,7 @@ class GitError(Exception):
     pass
 
 
-def _git(root: Path, *arguments: str, text: bool = True):
+def _git(root: Path, *arguments: str, text: bool = True, timeout: float = 60.0):
     try:
         result = subprocess.run(
             ["git", "-c", "core.quotePath=false", *arguments],
@@ -27,7 +27,10 @@ def _git(root: Path, *arguments: str, text: bool = True):
             capture_output=True,
             text=text,
             stdin=subprocess.DEVNULL,
+            timeout=timeout,
         )
+    except subprocess.TimeoutExpired as exc:
+        raise GitError(f"local Git command timed out after {timeout}s") from exc
     except OSError as exc:
         raise GitError(f"cannot execute local Git: {exc}") from exc
     if result.returncode != 0:
@@ -42,12 +45,15 @@ def resolve_commit(root: Path, revision: str) -> str:
     return _git(root, "rev-parse", "--verify", "--end-of-options", f"{revision}^{{commit}}").strip()
 
 
-def require_ancestor(root: Path, base: str, head: str) -> None:
+def require_ancestor(root: Path, base: str, head: str, timeout: float = 60.0) -> None:
     try:
         result = subprocess.run(
             ["git", "merge-base", "--is-ancestor", base, head],
             cwd=root, check=False, capture_output=True, text=True, stdin=subprocess.DEVNULL,
+            timeout=timeout,
         )
+    except subprocess.TimeoutExpired as exc:
+        raise GitError(f"ancestry check timed out after {timeout}s") from exc
     except OSError as exc:
         raise GitError(f"cannot execute local Git: {exc}") from exc
     if result.returncode == 1:

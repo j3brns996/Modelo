@@ -12,15 +12,76 @@ from datetime import date
 import json
 import os
 from pathlib import Path, PurePosixPath
+import re
 import tempfile
 from typing import Any
 
 from modelo.build import BuildError, _git, _layout, _strict_json_bytes, _strict_json_file
 from modelo.change import with_snapshot
 from modelo.config import load_config
+from modelo.mac import INTAKE_END, INTAKE_START, MAX_BODY_BYTES, MacError
 from modelo.receipt import canonical_bytes, publication_digest, sha256_bytes
 from modelo.schemas import SchemaSet
 from modelo.site import ValidationBuildRequest, build_validation_site
+
+
+_SECTION = re.compile(r"(?m)^### ([^\n]{1,80})\n\n")
+
+
+def _without_generated_intake(body: str) -> str:
+    if len(body.encode("utf-8")) > MAX_BODY_BYTES:
+        raise ValueError(f"issue body exceeds {MAX_BODY_BYTES} bytes")
+    start = body.find(INTAKE_START)
+    end = body.find(INTAKE_END)
+    if start < 0 and end < 0:
+        return body.rstrip()
+    if start < 0 or end < start or body.find(INTAKE_START, start + 1) >= 0 or body.find(INTAKE_END, end + 1) >= 0:
+        raise ValueError("issue contains an ambiguous generated intake block")
+    if body[end + len(INTAKE_END):].strip():
+        raise ValueError("generated intake block must be the final issue section")
+    return body[:start].rstrip()
+
+
+def _issue_sections(body: str) -> dict[str, str]:
+    matches = list(_SECTION.finditer(body))
+    sections: dict[str, str] = {}
+    for index, match in enumerate(matches):
+        label = match.group(1)
+        if label in sections:
+            raise MacError("guided proposal contains a duplicate field heading")
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(body)
+        sections[label] = body[match.end():end].strip()
+    return sections
+
+
+def _answer(sections: dict[str, str], label: str, *, plain: bool = False) -> str:
+    value = sections.get(label, "").strip()
+    if not value or value == "_No response_":
+        raise MacError(f"guided proposal is missing {label}")
+    return " ".join(value.split()) if plain else value
+
+
+def _lines(sections: dict[str, str], label: str, *, required: bool = True) -> list[str]:
+    value = sections.get(label, "").strip()
+    if not value or value == "_No response_":
+        if required:
+            raise MacError(f"guided proposal is missing {label}")
+        return []
+    values = [" ".join(line.split()) for line in value.splitlines() if line.strip()]
+    if required and not values:
+        raise MacError(f"guided proposal is missing {label}")
+    return values
+
+
+def _candidate_evidence(sections: dict[str, str]) -> list[dict[str, str]]:
+    records = []
+    for line in _lines(sections, "Supporting observations", required=False):
+        parts = line.split(" | ")
+        if len(parts) != 3:
+            raise MacError("each supporting observation must contain URL | UTC time | sha256- digest")
+        records.append({"uri": parts[0], "observed_at": parts[1], "digest": parts[2]})
+    return records
+
 
 
 @dataclass(frozen=True, slots=True)

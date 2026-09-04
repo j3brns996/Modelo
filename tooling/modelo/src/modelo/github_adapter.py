@@ -15,7 +15,10 @@ from modelo.mac import (
     MAX_BODY_BYTES, MacError, extract_adapter_issue_payload, payload_digest,
     with_computed_keys,
 )
-from modelo.platform import _atomic_write, _read_json
+from modelo.platform import (
+    _answer, _atomic_write, _candidate_evidence, _issue_sections, _lines,
+    _read_json, _without_generated_intake,
+)
 from modelo.receipt import canonical_bytes, sha256_bytes, sort_change_delta
 from modelo.site import _committed_yaml_config
 
@@ -28,7 +31,6 @@ _INTAKE_START = "<!-- modelo:intake-generated-start -->"
 _INTAKE_END = "<!-- modelo:intake-generated-end -->"
 _INTAKE_RESULT = "<!-- modelo:intake-result -->"
 _INTAKE_SOURCE = re.compile(r"<!-- modelo:intake-source (sha256:[0-9a-f]{64}) -->")
-_SECTION = re.compile(r"(?m)^### ([^\n]{1,80})\n\n")
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,60 +40,6 @@ class GitHubIntakeResult:
     comment_body: str
     payload: dict[str, Any] | None
 
-
-def _without_generated_intake(body: str) -> str:
-    if len(body.encode("utf-8")) > MAX_BODY_BYTES:
-        raise ValueError(f"issue body exceeds {MAX_BODY_BYTES} bytes")
-    start = body.find(_INTAKE_START)
-    end = body.find(_INTAKE_END)
-    if start < 0 and end < 0:
-        return body.rstrip()
-    if start < 0 or end < start or body.find(_INTAKE_START, start + 1) >= 0 or body.find(_INTAKE_END, end + 1) >= 0:
-        raise ValueError("issue contains an ambiguous generated intake block")
-    if body[end + len(_INTAKE_END):].strip():
-        raise ValueError("generated intake block must be the final issue section")
-    return body[:start].rstrip()
-
-
-def _issue_sections(body: str) -> dict[str, str]:
-    matches = list(_SECTION.finditer(body))
-    sections: dict[str, str] = {}
-    for index, match in enumerate(matches):
-        label = match.group(1)
-        if label in sections:
-            raise MacError("guided proposal contains a duplicate field heading")
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(body)
-        sections[label] = body[match.end():end].strip()
-    return sections
-
-
-def _answer(sections: dict[str, str], label: str, *, plain: bool = False) -> str:
-    value = sections.get(label, "").strip()
-    if not value or value == "_No response_":
-        raise MacError(f"guided proposal is missing {label}")
-    return " ".join(value.split()) if plain else value
-
-
-def _lines(sections: dict[str, str], label: str, *, required: bool = True) -> list[str]:
-    value = sections.get(label, "").strip()
-    if not value or value == "_No response_":
-        if required:
-            raise MacError(f"guided proposal is missing {label}")
-        return []
-    values = [" ".join(line.split()) for line in value.splitlines() if line.strip()]
-    if required and not values:
-        raise MacError(f"guided proposal is missing {label}")
-    return values
-
-
-def _candidate_evidence(sections: dict[str, str]) -> list[dict[str, str]]:
-    records = []
-    for line in _lines(sections, "Supporting observations", required=False):
-        parts = line.split(" | ")
-        if len(parts) != 3:
-            raise MacError("each supporting observation must contain URL | UTC time | sha256- digest")
-        records.append({"uri": parts[0], "observed_at": parts[1], "digest": parts[2]})
-    return records
 
 
 def _compile_guided_payload(

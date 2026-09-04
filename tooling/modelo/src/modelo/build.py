@@ -206,14 +206,18 @@ def _layout(root: Path) -> BuildLayout:
     )
 
 
-def _git(root: Path, *args: str, binary: bool = False) -> bytes | str:
-    result = subprocess.run(
-        ["git", *args], cwd=root, stdin=subprocess.DEVNULL,
-        capture_output=True, text=not binary, check=False,
-    )
+def _git(root: Path, *args: str, binary: bool = False, timeout: float = 60.0) -> bytes | str:
+    try:
+        result = subprocess.run(
+            ["git", *args], cwd=root, stdin=subprocess.DEVNULL,
+            capture_output=True, text=not binary, check=False, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise BuildError(f"local Git command timed out after {timeout}s") from exc
     if result.returncode:
         raise BuildError("local Git command failed")
     return result.stdout
+
 
 
 def _strict_json_bytes(raw: bytes, label: str) -> dict[str, Any]:

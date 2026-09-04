@@ -272,7 +272,7 @@ def test_authoring_contract_bounds_proposal_and_keeps_optional_observations_stri
     authoring = yaml.safe_load(_read(MACHINE_CONTRACT))["authoring"]
     forms = authoring["issue_form_cards"]
     assert forms["candidate_evidence"] == {
-        "optional_for": ["add", "change", "batch"],
+        "optional_in_forms": ["add", "change", "revoke", "move", "batch"],
         "blank_compiles_to": [],
         "malformed_nonblank": "reject",
     }
@@ -304,6 +304,7 @@ def test_authoring_contract_bounds_proposal_and_keeps_optional_observations_stri
     guide = _normalise(_read(AUTHORING_GUIDE))
     for concept in (
         "candidate observations",
+        "all five issue forms",
         "blank field",
         "candidate evidence",
         "malformed nonblank observation line",

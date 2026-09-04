@@ -530,7 +530,7 @@ authoring:
     destinations: repository.web_routes.mac_intake
     javascript_required: false
     candidate_evidence:
-      optional_for: [add, change, batch]
+      optional_in_forms: [add, change, revoke, move, batch]
       blank_compiles_to: []
       malformed_nonblank: reject
     batch_scope: required_independently_of_candidate_evidence

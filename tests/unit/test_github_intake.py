@@ -32,6 +32,23 @@ def common(operation: str) -> dict[str, str]:
     }
 
 
+def batch_fields() -> dict[str, str]:
+    values = common("batch")
+    values.pop("Subject identity")
+    values.update({
+        "Batch change type": "add",
+        "Subject type": "offering",
+        "Subject identities": "bedrock-model-a\nbedrock-model-b",
+        "Evidence source type": "first-party-read-api",
+        "Evidence source URL": "https://bedrock.us-east-1.amazonaws.com/foundation-models",
+        "Opaque scope reference": "production-scope",
+        "Provider partition": "aws",
+        "Source region": "us-east-1",
+        "Inference service": "aws-bedrock",
+    })
+    return values
+
+
 def test_guided_add_compiles_to_the_existing_neutral_contract() -> None:
     result = compile_github_intake(event(issue_body(**common("add"))))
     assert result.valid
@@ -57,20 +74,7 @@ def test_guided_move_and_batch_compile_operation_specific_fields() -> None:
         {"kind": "offering", "identity": "bedrock-model-new", "role": "destination"},
     ]
 
-    batch = common("batch")
-    batch.pop("Subject identity")
-    batch.update({
-        "Batch change type": "add",
-        "Subject type": "offering",
-        "Subject identities": "bedrock-model-a\nbedrock-model-b",
-        "Evidence source type": "first-party-read-api",
-        "Evidence source URL": "https://bedrock.us-east-1.amazonaws.com/foundation-models",
-        "Opaque scope reference": "production-scope",
-        "Provider partition": "aws",
-        "Source region": "us-east-1",
-        "Inference service": "aws-bedrock",
-    })
-    compiled = compile_github_intake(event(issue_body(**batch)))
+    compiled = compile_github_intake(event(issue_body(**batch_fields())))
     assert compiled.payload["item_operation"] == "add"
     assert len(compiled.payload["subjects"]) == 2
     assert compiled.payload["batch_scope"]["observation_scope"]["scope_ref"] == "production-scope"
@@ -85,6 +89,56 @@ def test_guided_change_and_revoke_preserve_the_expected_subject_kind() -> None:
     revoke["Offering identity"] = "bedrock-example-model"
     revoked = compile_github_intake(event(issue_body(**revoke)))
     assert revoked.payload["subjects"] == [{"kind": "offering", "identity": "bedrock-example-model"}]
+
+
+@pytest.mark.parametrize("operation", ["add", "change", "batch"])
+@pytest.mark.parametrize("blank", ["", "_No response_"])
+def test_optional_candidate_evidence_compiles_to_an_empty_array(
+    operation: str, blank: str,
+) -> None:
+    values = batch_fields() if operation == "batch" else common(operation)
+    values["Supporting observations"] = blank
+
+    result = compile_github_intake(event(issue_body(**values)))
+
+    assert result.valid
+    assert result.payload["candidate_evidence"] == []
+    assert validate_payload(result.payload)["candidate_evidence"] == []
+
+
+@pytest.mark.parametrize("operation", ["add", "change", "batch"])
+def test_nonblank_malformed_candidate_evidence_still_fails(operation: str) -> None:
+    values = batch_fields() if operation == "batch" else common(operation)
+    values["Supporting observations"] = "https://example.invalid/model without delimiters"
+
+    result = compile_github_intake(event(issue_body(**values)))
+
+    assert not result.valid
+    assert result.payload is None
+    assert "must contain URL | UTC time | sha256- digest" in result.comment_body
+
+
+@pytest.mark.parametrize(
+    "required_field",
+    [
+        "Evidence source type",
+        "Evidence source URL",
+        "Opaque scope reference",
+        "Provider partition",
+        "Source region",
+        "Inference service",
+    ],
+)
+def test_batch_source_and_scope_fields_remain_required(required_field: str) -> None:
+    values = batch_fields()
+    values.pop(required_field)
+    values["Supporting observations"] = "_No response_"
+
+    result = compile_github_intake(event(issue_body(**values)))
+
+    assert not result.valid
+    assert result.payload is None
+    assert f"missing {required_field}" in result.comment_body
 
 
 def test_invalid_edit_removes_stale_generated_payload_and_reports_one_error() -> None:

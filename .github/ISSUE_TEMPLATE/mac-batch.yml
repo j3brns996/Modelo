@@ -61,7 +61,7 @@ body:
     attributes:
       label: "Purpose"
       description: "In one short sentence, what business or governance need does this request serve?"
-      placeholder: "Example: Enable a reviewed summarisation workload"
+      placeholder: "Example: Apply one bounded provider observation to a related set of offerings"
     validations:
       required: true
   - type: textarea
@@ -69,7 +69,7 @@ body:
     attributes:
       label: "Requested outcome"
       description: "Describe the catalogue state that should be true when this work is complete."
-      placeholder: "Example: Add one evidenced model record. Do not approve a route."
+      placeholder: "Example: Apply the selected operation to every listed subject; make no other catalogue changes."
     validations:
       required: true
   - type: textarea
@@ -77,7 +77,7 @@ body:
     attributes:
       label: "Why is this needed?"
       description: "Give the reviewer the decision context. Explain why the current catalogue state is insufficient."
-      placeholder: "Example: The workload team needs a governed model record before it can request an offering."
+      placeholder: "Example: The subjects share one authoritative source, observation scope and inference service, so one reviewable batch is appropriate."
     validations:
       required: true
   - type: dropdown
@@ -137,18 +137,18 @@ body:
     id: candidate_evidence
     attributes:
       label: "Supporting observations"
-      description: "One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. These are candidate sources, not approval."
+      description: "Optional. One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. These are candidate sources, not approval."
       placeholder: "https://docs.example.com/model | 2026-09-02T08:00:00Z | sha256-0123…"
     validations:
-      required: true
+      required: false
   - type: textarea
     id: acceptance
     attributes:
       label: "Acceptance checks"
       description: "One observable completion check per line. State what a reviewer or CI can verify."
       placeholder: |
-        The model name matches retained evidence.
-        The proposed record passes Modelo validation.
+        Every listed subject has the selected operation and no subject outside the list changes.
+        Every item uses the declared source, scope and inference service and passes Modelo validation.
     validations:
       required: true
   - type: checkboxes

@@ -1,4 +1,4 @@
-name: "Add a model or offering"
+name: "Add a catalogue record"
 description: "Propose one new governed catalogue record."
 title: "Add: "
 body:
@@ -48,7 +48,7 @@ body:
     attributes:
       label: "Purpose"
       description: "In one short sentence, what business or governance need does this request serve?"
-      placeholder: "Example: Enable a reviewed summarisation workload"
+      placeholder: "Example: Register a governed vendor before its models or offerings are proposed"
     validations:
       required: true
   - type: textarea
@@ -56,7 +56,7 @@ body:
     attributes:
       label: "Requested outcome"
       description: "Describe the catalogue state that should be true when this work is complete."
-      placeholder: "Example: Add one evidenced model record. Do not approve a route."
+      placeholder: "Example: Create the vendor record acme-ai; leave model and offering approval unchanged."
     validations:
       required: true
   - type: textarea
@@ -64,25 +64,25 @@ body:
     attributes:
       label: "Why is this needed?"
       description: "Give the reviewer the decision context. Explain why the current catalogue state is insufficient."
-      placeholder: "Example: The workload team needs a governed model record before it can request an offering."
+      placeholder: "Example: The vendor must exist as a governed identity before related records can reference it."
     validations:
       required: true
   - type: textarea
     id: candidate_evidence
     attributes:
       label: "Supporting observations"
-      description: "One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. These are candidate sources, not approval."
+      description: "Optional. One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. These are candidate sources, not approval."
       placeholder: "https://docs.example.com/model | 2026-09-02T08:00:00Z | sha256-0123…"
     validations:
-      required: true
+      required: false
   - type: textarea
     id: acceptance
     attributes:
       label: "Acceptance checks"
       description: "One observable completion check per line. State what a reviewer or CI can verify."
       placeholder: |
-        The model name matches retained evidence.
-        The proposed record passes Modelo validation.
+        The new record has the requested stable identity at its canonical path.
+        The record and referenced evidence pass Modelo validation.
     validations:
       required: true
   - type: checkboxes

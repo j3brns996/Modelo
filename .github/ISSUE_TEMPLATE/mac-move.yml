@@ -42,7 +42,7 @@ body:
     attributes:
       label: "Purpose"
       description: "In one short sentence, what business or governance need does this request serve?"
-      placeholder: "Example: Enable a reviewed summarisation workload"
+      placeholder: "Example: Replace an offering whose governed identity has changed meaning"
     validations:
       required: true
   - type: textarea
@@ -50,7 +50,7 @@ body:
     attributes:
       label: "Requested outcome"
       description: "Describe the catalogue state that should be true when this work is complete."
-      placeholder: "Example: Add one evidenced model record. Do not approve a route."
+      placeholder: "Example: Add bedrock-example-new and withdraw bedrock-example-old in the same governed change."
     validations:
       required: true
   - type: textarea
@@ -58,14 +58,14 @@ body:
     attributes:
       label: "Why is this needed?"
       description: "Give the reviewer the decision context. Explain why the current catalogue state is insufficient."
-      placeholder: "Example: The workload team needs a governed model record before it can request an offering."
+      placeholder: "Example: The route now has a different governed identity, so retaining the old identity would be misleading."
     validations:
       required: true
   - type: textarea
     id: candidate_evidence
     attributes:
       label: "Supporting observations"
-      description: "One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. These are candidate sources, not approval."
+      description: "Optional. One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. These are candidate sources, not approval."
       placeholder: "https://docs.example.com/model | 2026-09-02T08:00:00Z | sha256-0123…"
     validations:
       required: false
@@ -75,8 +75,8 @@ body:
       label: "Acceptance checks"
       description: "One observable completion check per line. State what a reviewer or CI can verify."
       placeholder: |
-        The model name matches retained evidence.
-        The proposed record passes Modelo validation.
+        The destination offering is added and the source offering is revoked atomically.
+        The change delta contains no cosmetic rename or unrelated catalogue change.
     validations:
       required: true
   - type: checkboxes

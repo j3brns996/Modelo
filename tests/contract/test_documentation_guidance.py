@@ -212,6 +212,11 @@ def test_authoring_guidance_matches_registered_helpers_and_authority() -> None:
     for command in ("modelo dev evidence-create", "modelo dev mac-init"):
         assert command in guide
         assert command in contributing
+    for command in (
+        "modelo platform github-intake",
+        "modelo platform gitlab-intake",
+    ):
+        assert command in guide
     _assert_contains_all_tokens(guide, ("--output", "draft", "linked issue", "trusted"))
     assert any(token in guide for token in ("standard output", "stdout"))
     assert "approval" in guide and "admissib" in guide

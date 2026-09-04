@@ -14,10 +14,11 @@ and batch—whose destinations come from `repository.web_routes.mac_intake` in
 With JavaScript enabled, the same page can prepare an add or change draft and
 prefill the configured form for that operation. The displayed issue-field
 summary is only a convenience: it has no `request_id`, keys or payload digest
-and is not the canonical MAC payload. After the issue is submitted, trusted
-default-branch `modelo platform github-intake` tooling validates the human
-fields, derives a stable UUIDv5 from the issue coordinate and computes the
-dedupe key, idempotency key and payload digest.
+and is not the canonical MAC payload. After submission, trusted default-branch
+adapter tooling validates the human fields: `modelo platform github-intake`
+for GitHub or `modelo platform gitlab-intake` for GitLab. It derives a stable
+UUIDv5 from the issue coordinate and computes the dedupe key, idempotency key
+and payload digest.
 
 Use the static card for revoke, move or batch because those operations require
 shapes that the interactive draft does not compose.

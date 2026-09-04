@@ -225,6 +225,11 @@ def create_evidence_record(
                 "invalid evidence record: first-party-read-api requires "
                 + ", ".join(missing)
             )
+        if (provider, service) != ("aws", "bedrock"):
+            raise ValueError(
+                "invalid evidence record: first-party-read-api supports only "
+                "provider aws with service bedrock"
+            )
         source: dict[str, Any] = {
             "type": source_type,
             "provider": provider,

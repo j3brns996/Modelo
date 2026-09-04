@@ -161,6 +161,32 @@ class EvidenceTests(unittest.TestCase):
             ):
                 create_evidence_record(**(defaults | {name: value}))
 
+    def test_create_api_evidence_rejects_non_aws_bedrock_pairs(self) -> None:
+        defaults = {
+            "source_type": "first-party-read-api",
+            "uri": "https://example.invalid/api",
+            "observed_at": "2026-09-01T00:00:00Z",
+            "projection": {},
+            "schemas": self.schemas,
+            "operation": "GetFoundationModel",
+            "partition": "aws",
+            "region": "us-east-1",
+            "sanitised_parameters": {},
+        }
+        for provider, service in (
+            ("gcp", "vertex"),
+            ("aws", "vertex"),
+            ("gcp", "bedrock"),
+        ):
+            with self.subTest(provider=provider, service=service), self.assertRaisesRegex(
+                ValueError, "supports only provider aws with service bedrock"
+            ):
+                create_evidence_record(
+                    **defaults,
+                    provider=provider,
+                    service=service,
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

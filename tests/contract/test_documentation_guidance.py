@@ -4,6 +4,7 @@ import ast
 from pathlib import Path
 import re
 import struct
+import tomllib
 from urllib.parse import urlparse
 
 import yaml
@@ -16,6 +17,8 @@ SECURITY = ROOT / "SECURITY.md"
 DOCS_README = ROOT / "docs/README.md"
 AUTHORING_GUIDE = ROOT / "docs/authoring.md"
 MACHINE_CONTRACT = ROOT / "docs/contract.yaml"
+VERSION_FILE = ROOT / "VERSION"
+PYPROJECT = ROOT / "pyproject.toml"
 IMPLEMENTATION_PLAN = ROOT / "docs/implementation-plan.md"
 LAUNCH_RUNBOOK = ROOT / "docs/launch-runbook.md"
 AGENTS = ROOT / "AGENTS.md"
@@ -403,3 +406,12 @@ def test_contract_status_tokens_stay_aligned_with_guidance_docs() -> None:
     assert "disabled" in readme
     assert "production catalogue records" in agents
     assert "t10 passes remotely" in agents
+
+
+def test_machine_contract_reports_current_tool_release_without_changing_wire_version() -> None:
+    machine_contract = yaml.safe_load(_read(MACHINE_CONTRACT))
+    package = tomllib.loads(_read(PYPROJECT))
+    release = _read(VERSION_FILE).strip()
+    assert release == package["project"]["version"]
+    assert machine_contract["versioning"]["current_tool_release"] == release
+    assert machine_contract["contract"]["version"] == "0.1.0"

@@ -261,7 +261,7 @@ mac:
 versioning:
   version_file_meaning: tool_release_semver_independent_of_wire_contract_versions
   tool_release_version_sources: [VERSION, pyproject.toml]
-  current_tool_release: "0.1.1"
+  current_tool_release: "0.1.2"
   current_wire_contract: "0.1.0"
   wire_contract_version_sources: [contract.version, config_version, schema_version_fields]
   individual_payload_schema_versions_remain_declared_values: true

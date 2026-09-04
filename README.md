@@ -103,6 +103,21 @@ CI for preflight. Never commit generated output from `dist/`.
 | Static presentation | `site/` | Templates, content and local assets |
 | Publication | `dist/` | Generated output, never committed |
 
+## Central Control: `modelo.yaml`
+
+[`modelo.yaml`](modelo.yaml) is the heart of the project. It defines the single source of truth for repository paths, publication profiles, host adapters (GitHub or GitLab), control identities, and central validation rules.
+
+Rather than duplicating regular expressions and enum lists across JavaScript, Python code, and JSON schemas, `modelo.yaml` anchors validation rules centrally:
+
+```yaml
+validation:
+  identity_pattern: "^[a-z0-9][a-z0-9._:/@+-]*$"
+  allowed_operations: [add, change, revoke, move, batch]
+  allowed_kinds: [model, offering, evidence, vendor, inference-service, condition]
+```
+
+When building the static site (`modelo build`) or drafting local changes (`modelo dev propose`), the system loads `modelo.yaml` so the web interface, CLI, and networkless validator (`modelo check`) enforce the exact same rules.
+
 ## Documentation Map
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) covers linked issues, topic branches,

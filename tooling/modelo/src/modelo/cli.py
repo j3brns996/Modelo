@@ -6,8 +6,10 @@ import argparse
 from datetime import date
 from importlib.metadata import version
 import json
+import os
 from pathlib import Path
 from pathlib import PurePosixPath
+import tempfile
 from typing import Sequence
 
 from modelo.config import ConfigError, load_config
@@ -39,11 +41,77 @@ from modelo.validators import CheckSystemError, check_repository
 UNAVAILABLE = "modelo: {command} is not implemented in the current repository slice"
 
 
-def _parse_json_arg(value: str) -> Any:
-    candidate = Path(value)
-    if candidate.is_file():
-        return json.loads(candidate.read_text(encoding="utf-8"))
-    return json.loads(value)
+def _read_json_file(path: Path, option: str) -> Any:
+    try:
+        if not path.is_file():
+            raise ValueError(
+                f"{option} JSON file does not exist or is not a regular file: {path}"
+            )
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise ValueError(f"cannot read {option} JSON file {path}: {exc}") from exc
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"{option} JSON file {path} is invalid: {exc.msg} "
+            f"(line {exc.lineno}, column {exc.colno})"
+        ) from exc
+
+
+def _parse_json_arg(value: str, option: str) -> Any:
+    if value.startswith("@"):
+        path_value = value[1:]
+        if not path_value:
+            raise ValueError(f"{option} @path must name a JSON file")
+        return _read_json_file(Path(path_value), option)
+
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError as inline_error:
+        candidate = Path(value)
+        try:
+            is_file = candidate.is_file()
+        except OSError:
+            is_file = False
+        if is_file:
+            return _read_json_file(candidate, option)
+        raise ValueError(
+            f"{option} must be inline JSON, @path, or an existing JSON file; "
+            f"inline JSON is invalid: {inline_error.msg} "
+            f"(line {inline_error.lineno}, column {inline_error.colno})"
+        ) from inline_error
+
+
+def _emit_json(document: Any, output: Path | None) -> None:
+    formatted = json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    if output is None:
+        print(formatted, end="")
+        return
+
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="\n",
+            dir=output.parent,
+            prefix=f".{output.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(formatted)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, output)
+        temporary = None
+    finally:
+        if temporary is not None:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
 
 
 
@@ -153,13 +221,24 @@ def _parser() -> argparse.ArgumentParser:
     evidence_create = dev_subparsers.add_parser(
         "evidence-create", help="create a schema-valid local evidence record"
     )
-    evidence_create.add_argument("--source-type", required=True)
+    evidence_create.add_argument(
+        "--source-type",
+        required=True,
+        choices=(
+            "first-party-read-api",
+            "official-provider-documentation",
+            "official-vendor-documentation",
+        ),
+    )
     evidence_create.add_argument("--uri", required=True)
     evidence_create.add_argument("--observed-at", required=True)
     evidence_create.add_argument("--projection", required=True)
+    evidence_create.add_argument("--provider", choices=("aws",))
+    evidence_create.add_argument("--service", choices=("bedrock",))
     evidence_create.add_argument("--operation")
     evidence_create.add_argument("--partition")
     evidence_create.add_argument("--region")
+    evidence_create.add_argument("--sanitised-parameters")
     evidence_create.add_argument("--retrieved-by", default="cli")
     evidence_create.add_argument("--scope")
     evidence_create.add_argument("--visibility", default="internal")
@@ -425,16 +504,55 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "dev":
         if arguments.dev_command == "evidence-create":
             try:
+                api_options = {
+                    "--provider": arguments.provider,
+                    "--service": arguments.service,
+                    "--operation": arguments.operation,
+                    "--partition": arguments.partition,
+                    "--region": arguments.region,
+                    "--sanitised-parameters": arguments.sanitised_parameters,
+                }
+                if arguments.source_type == "first-party-read-api":
+                    missing = [
+                        name for name, value in api_options.items() if value is None
+                    ]
+                    if missing:
+                        raise ValueError(
+                            "first-party-read-api requires API arguments together: "
+                            + ", ".join(missing)
+                        )
+                else:
+                    supplied = [
+                        name for name, value in api_options.items() if value is not None
+                    ]
+                    if supplied:
+                        raise ValueError(
+                            "documentation sources do not accept API-only arguments: "
+                            + ", ".join(supplied)
+                        )
                 config = load_config(arguments.root.resolve())
                 schemas = SchemaSet(config.root, config.paths["schemas"])
-                projection = _parse_json_arg(arguments.projection)
-                scope = _parse_json_arg(arguments.scope) if arguments.scope else None
-                record = create_evidence_record(
+                projection = _parse_json_arg(arguments.projection, "--projection")
+                scope = (
+                    _parse_json_arg(arguments.scope, "--scope")
+                    if arguments.scope
+                    else None
+                )
+                sanitised_parameters = (
+                    _parse_json_arg(
+                        arguments.sanitised_parameters, "--sanitised-parameters"
+                    )
+                    if arguments.sanitised_parameters is not None
+                    else None
+                )
+                record_arguments = dict(
                     source_type=arguments.source_type,
                     uri=arguments.uri,
                     observed_at=arguments.observed_at,
                     projection=projection,
                     schemas=schemas,
+                    provider=arguments.provider,
+                    service=arguments.service,
                     operation=arguments.operation,
                     partition=arguments.partition,
                     region=arguments.region,
@@ -442,20 +560,25 @@ def main(argv: Sequence[str] | None = None) -> int:
                     scope=scope,
                     visibility=arguments.visibility,
                 )
-                formatted = json.dumps(record, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-                if arguments.output is not None:
-                    arguments.output.write_text(formatted, encoding="utf-8")
-                else:
-                    print(formatted, end="")
+                if arguments.sanitised_parameters is not None:
+                    record_arguments["sanitised_parameters"] = sanitised_parameters
+                record = create_evidence_record(**record_arguments)
+                _emit_json(record, arguments.output)
                 return 0
             except (ConfigError, ValueError, json.JSONDecodeError, OSError) as exc:
                 parser.exit(2, f"modelo: {exc}\n")
         if arguments.dev_command == "mac-init":
             try:
-                subjects = _parse_json_arg(arguments.subjects)
-                candidate_evidence = _parse_json_arg(arguments.candidate_evidence)
-                acceptance = _parse_json_arg(arguments.acceptance)
-                batch_scope = _parse_json_arg(arguments.batch_scope) if arguments.batch_scope else None
+                subjects = _parse_json_arg(arguments.subjects, "--subjects")
+                candidate_evidence = _parse_json_arg(
+                    arguments.candidate_evidence, "--candidate-evidence"
+                )
+                acceptance = _parse_json_arg(arguments.acceptance, "--acceptance")
+                batch_scope = (
+                    _parse_json_arg(arguments.batch_scope, "--batch-scope")
+                    if arguments.batch_scope
+                    else None
+                )
                 payload = init_mac_payload(
                     operation=arguments.operation,
                     purpose=arguments.purpose,
@@ -467,11 +590,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     item_operation=arguments.item_operation,
                     batch_scope=batch_scope,
                 )
-                formatted = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-                if arguments.output is not None:
-                    arguments.output.write_text(formatted, encoding="utf-8")
-                else:
-                    print(formatted, end="")
+                _emit_json(payload, arguments.output)
                 return 0
             except (ValueError, MacError, json.JSONDecodeError, OSError) as exc:
                 parser.exit(2, f"modelo: {exc}\n")

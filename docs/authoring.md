@@ -151,12 +151,11 @@ file.
 
 The add, change and batch Issue Forms allow candidate observations to be left
 blank; trusted intake compiles a blank field to `candidate_evidence: []`.
-Supplying the field is still strict: malformed nonblank JSON or an observation
-that does not match the candidate-evidence shape fails compilation. Batch
-source, observation scope and inference-service scope remain required even
-when candidate observations are blank. These issue hints are not accepted
-catalogue evidence and do not relax the linked-issue, validation or review
-gates.
+Supplying the field is still strict: a malformed nonblank observation line that
+does not match `URL | UTC time | sha256- digest` fails compilation. Batch source,
+observation scope and inference-service scope remain required even when
+candidate observations are blank. These issue hints are not accepted catalogue
+evidence and do not relax the linked-issue, validation or review gates.
 
 ## Finish the governed change
 

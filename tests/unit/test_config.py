@@ -31,7 +31,7 @@ class ConfigTests(unittest.TestCase):
     def test_checked_in_config_loads_as_frozen_bootstrap(self) -> None:
         config = load_config(ROOT)
         self.assertEqual(config.project_id, "modelo")
-        self.assertEqual(config.project_version, "0.1.1")
+        self.assertEqual(config.project_version, "0.1.2")
         self.assertEqual(config.python_version, "3.12.13")
         self.assertEqual(config.uv_version, "0.11.33")
         self.assertEqual(config.repository_path("site_templates"), ROOT / "site/templates")

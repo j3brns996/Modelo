@@ -603,28 +603,40 @@ class CliTests(unittest.TestCase):
         self.assertIn("modelo:", bad_result.stderr)
         self.assertNotIn("Traceback", bad_result.stderr)
 
-    def test_dev_propose_scaffolds_evidence_and_issue_body(self) -> None:
+    def test_dev_propose_is_unregistered_and_has_no_side_effects(self) -> None:
+        help_result = self.run_cli("dev", "--help")
+        self.assertEqual(help_result.returncode, 0, help_result.stderr)
+        self.assertIn("evidence-create", help_result.stdout)
+        self.assertIn("mac-init", help_result.stdout)
+        self.assertNotIn("propose", help_result.stdout)
+
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            for name in ("modelo.yaml", "VERSION", ".python-version", "pyproject.toml", "uv.lock"):
-                shutil.copy2(ROOT / name, root / name)
-            shutil.copytree(ROOT / "schemas", root / "schemas")
+            output = root / "proposal.md"
             result = self.run_cli(
                 "--root", str(root),
                 "dev", "propose",
-                "--operation", "add",
-                "--kind", "offering",
-                "--identity", "test-offering-propose",
-                "--purpose", "Test propose command purpose",
-                "--reason", "Test propose command reason",
-                "--uri", "https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html",
+                "--output", str(output),
             )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("### Request type\n\nadd", result.stdout)
-            self.assertIn("<!-- modelo:intake-generated-start -->", result.stdout)
-            self.assertIn("test-offering-propose", result.stdout)
-            evidence_files = list((root / "catalogue" / "evidence").glob("sha256-*.yaml"))
-            self.assertEqual(len(evidence_files), 1)
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.stdout, "")
+            self.assertIn("invalid choice", result.stderr)
+            self.assertFalse((root / "catalogue").exists())
+            self.assertFalse((root / "catalogue" / "evidence").exists())
+            self.assertFalse(output.exists())
+
+    def test_gitlab_platform_commands_remain_registered(self) -> None:
+        for command in (
+            "gitlab-issue",
+            "gitlab-control-issue",
+            "gitlab-prepare",
+            "gitlab-prepare-control",
+            "gitlab-intake",
+        ):
+            result = self.run_cli("platform", command, "--help")
+            with self.subTest(command=command):
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"modelo platform {command}", result.stdout)
 
 
 if __name__ == "__main__":

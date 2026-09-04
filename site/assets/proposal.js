@@ -1,5 +1,7 @@
 "use strict";
 
+const PROPOSAL_URL_MAX_LENGTH = 7000;
+
 function initProposalBuilder() {
   for (const form of document.querySelectorAll("form[data-proposal-builder]")) {
     if (form.dataset.proposalBuilderInitialized) continue;
@@ -10,7 +12,8 @@ function initProposalBuilder() {
     const summary = form.querySelector("[data-proposal-summary]");
     const issueLink = form.querySelector("[data-proposal-issue-link]");
     const copyButton = form.querySelector("[data-copy-summary]");
-    const copyLabel = form.querySelector("[data-copy-label]");
+    const urlStatus = form.querySelector("[data-proposal-url-status]");
+    const copyStatus = form.querySelector("[data-proposal-copy-status]");
 
     const identityPattern = /^[a-z0-9](?:[a-z0-9._:/@+-]*[a-z0-9])?$/;
 
@@ -42,7 +45,6 @@ function initProposalBuilder() {
       for (const [name, content] of fields) {
         content ? url.searchParams.set(name, content) : url.searchParams.delete(name);
       }
-      issueLink.href = url.toString();
       summary.value = [
         `Operation: ${operation}`,
         `Subject kind: ${value("subject-kind")}`,
@@ -55,11 +57,19 @@ function initProposalBuilder() {
         "Acceptance checks:",
         acceptance,
       ].join("\n");
+      if (url.href.length <= PROPOSAL_URL_MAX_LENGTH) {
+        issueLink.href = url.href;
+        urlStatus.textContent = "Issue form link updated with the draft fields.";
+      } else {
+        issueLink.href = configuredUrl;
+        urlStatus.textContent = "Draft fields are too long to pre-fill safely. Open the configured issue form and use the complete draft summary below as a manual guide.";
+      }
+      copyStatus.textContent = "";
     };
 
     const manualCopy = message => {
       summary.select();
-      copyLabel.textContent = message;
+      copyStatus.textContent = message;
     };
     copyButton.addEventListener("click", async () => {
       if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
@@ -68,9 +78,9 @@ function initProposalBuilder() {
       }
       try {
         await navigator.clipboard.writeText(summary.value);
-        copyLabel.textContent = "Copied";
+        copyStatus.textContent = "Draft summary copied.";
       } catch (_error) {
-        manualCopy("Copy failed — select text manually");
+        manualCopy("Copy failed. Select the draft summary and copy it manually.");
       }
     });
     form.addEventListener("submit", event => event.preventDefault());

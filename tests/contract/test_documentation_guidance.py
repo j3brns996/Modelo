@@ -17,6 +17,7 @@ SECURITY = ROOT / "SECURITY.md"
 DOCS_README = ROOT / "docs/README.md"
 AUTHORING_GUIDE = ROOT / "docs/authoring.md"
 MACHINE_CONTRACT = ROOT / "docs/contract.yaml"
+MAC_CONTRACT = ROOT / "docs/mac-contract.md"
 VERSION_FILE = ROOT / "VERSION"
 PYPROJECT = ROOT / "pyproject.toml"
 IMPLEMENTATION_PLAN = ROOT / "docs/implementation-plan.md"
@@ -234,6 +235,19 @@ def test_removed_all_in_one_propose_cli_is_absent_from_active_guidance() -> None
         "modelo dev evidence create",
     ):
         assert _normalise(concept) in guide
+
+
+def test_mac_contract_names_both_selected_intake_adapters() -> None:
+    contract = _read(MAC_CONTRACT).lower()
+    for command in (
+        "modelo platform github-intake",
+        "modelo platform gitlab-intake",
+    ):
+        assert command in contract
+    _assert_contains_all_tokens(
+        contract,
+        ("selected adapter", "uuid", "dedupe", "idempotency", "payload digest", "never edits"),
+    )
 
 
 def test_readme_separates_configuration_from_validation_authority() -> None:

@@ -6,10 +6,8 @@ import argparse
 from datetime import date
 from importlib.metadata import version
 import json
-import os
 from pathlib import Path
 from pathlib import PurePosixPath
-import tempfile
 from typing import Sequence
 
 from modelo.config import ConfigError, load_config
@@ -85,33 +83,10 @@ def _parse_json_arg(value: str, option: str) -> Any:
 
 def _emit_json(document: Any, output: Path | None) -> None:
     formatted = json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    if output is None:
+    if output is not None:
+        output.write_text(formatted, encoding="utf-8")
+    else:
         print(formatted, end="")
-        return
-
-    temporary: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            newline="\n",
-            dir=output.parent,
-            prefix=f".{output.name}.",
-            suffix=".tmp",
-            delete=False,
-        ) as stream:
-            temporary = Path(stream.name)
-            stream.write(formatted)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, output)
-        temporary = None
-    finally:
-        if temporary is not None:
-            try:
-                temporary.unlink()
-            except FileNotFoundError:
-                pass
 
 
 

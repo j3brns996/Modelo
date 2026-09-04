@@ -399,7 +399,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("JSON file", invalid_result.stderr)
             self.assertIn("is invalid", invalid_result.stderr)
 
-    def test_dev_json_output_is_shared_pretty_atomic_and_preserved_on_failure(self) -> None:
+    def test_dev_json_output_is_shared_pretty_and_preserved_on_input_failure(self) -> None:
         digest = "sha256-" + "a" * 64
         candidate_evidence = json.dumps([{
             "uri": "https://example.invalid/doc",

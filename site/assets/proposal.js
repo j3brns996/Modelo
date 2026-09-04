@@ -12,18 +12,32 @@ function initProposalBuilder() {
     const copyButton = form.querySelector("[data-copy-summary]");
     const copyLabel = form.querySelector("[data-copy-label]");
 
+    const identityPattern = /^[a-z0-9](?:[a-z0-9._:/@+-]*[a-z0-9])?$/;
+
     const update = () => {
       const operation = value("operation") === "change" ? "change" : "add";
       const configuredUrl = operation === "change" ? form.dataset.intakeChange : form.dataset.intakeAdd;
       const url = new URL(configuredUrl);
+      const identity = value("subject-identity");
+      const purpose = value("purpose");
+      const outcome = value("outcome");
+      const reason = value("reason");
+      const candidateEvidence = value("candidate-evidence");
+      const acceptance = value("acceptance");
+
+      let statusMsg = "";
+      if (identity && !identityPattern.test(identity)) {
+        statusMsg = "Subject identity must be lowercase ASCII (e.g. aws-bedrock-nova-lite).";
+      }
+
       const fields = [
         ["subject_kind", value("subject-kind")],
-        ["subject_identity", value("subject-identity")],
-        ["purpose", value("purpose")],
-        ["requested_outcome", value("outcome")],
-        ["reason", value("reason")],
-        ["candidate_evidence", value("candidate-evidence")],
-        ["acceptance", value("acceptance")],
+        ["subject_identity", identity],
+        ["purpose", purpose],
+        ["requested_outcome", outcome],
+        ["reason", reason],
+        ["candidate_evidence", candidateEvidence],
+        ["acceptance", acceptance],
       ];
       for (const [name, content] of fields) {
         content ? url.searchParams.set(name, content) : url.searchParams.delete(name);
@@ -32,14 +46,14 @@ function initProposalBuilder() {
       summary.value = [
         `Operation: ${operation}`,
         `Subject kind: ${value("subject-kind")}`,
-        `Subject identity: ${value("subject-identity")}`,
-        `Purpose: ${value("purpose")}`,
-        `Requested outcome: ${value("outcome")}`,
-        `Why needed: ${value("reason")}`,
+        `Subject identity: ${identity}${statusMsg ? ` (Warning: ${statusMsg})` : ""}`,
+        `Purpose: ${purpose}`,
+        `Requested outcome: ${outcome}`,
+        `Why needed: ${reason}`,
         "Candidate evidence:",
-        value("candidate-evidence"),
+        candidateEvidence,
         "Acceptance checks:",
-        value("acceptance"),
+        acceptance,
       ].join("\n");
     };
 

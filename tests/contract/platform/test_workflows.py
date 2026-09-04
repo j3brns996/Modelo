@@ -105,5 +105,6 @@ def test_gitlab_adapter_is_explicitly_fail_closed_until_rehearsed() -> None:
     document = yaml.safe_load(raw)
     assert "modelo/check" in document
     assert "npx" not in raw and "npm " not in raw
-    assert "receipt adapter capability must be activated" in raw
-    assert raw.rstrip().endswith("- exit 1")
+    assert "gitlab-prepare" in raw
+    assert "modelo platform check" in raw
+    assert "pages:" in raw

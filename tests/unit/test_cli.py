@@ -317,6 +317,29 @@ class CliTests(unittest.TestCase):
         self.assertIn("modelo:", bad_result.stderr)
         self.assertNotIn("Traceback", bad_result.stderr)
 
+    def test_dev_propose_scaffolds_evidence_and_issue_body(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            for name in ("modelo.yaml", "VERSION", ".python-version", "pyproject.toml", "uv.lock"):
+                shutil.copy2(ROOT / name, root / name)
+            shutil.copytree(ROOT / "schemas", root / "schemas")
+            result = self.run_cli(
+                "--root", str(root),
+                "dev", "propose",
+                "--operation", "add",
+                "--kind", "offering",
+                "--identity", "test-offering-propose",
+                "--purpose", "Test propose command purpose",
+                "--reason", "Test propose command reason",
+                "--uri", "https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("### Request type\n\nadd", result.stdout)
+            self.assertIn("<!-- modelo:intake-generated-start -->", result.stdout)
+            self.assertIn("test-offering-propose", result.stdout)
+            evidence_files = list((root / "catalogue" / "evidence").glob("sha256-*.yaml"))
+            self.assertEqual(len(evidence_files), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -21,9 +21,14 @@ from modelo.platform import (
     run_trusted_control_check,
 )
 from modelo.github_adapter import (
-    write_github_intake_outputs,
+    _intake_issue_body, write_github_intake_outputs,
     github_control_issue_reference, github_issue_reference, prepare_github,
     prepare_github_control,
+)
+from modelo.gitlab_adapter import (
+    write_gitlab_intake_outputs,
+    gitlab_control_issue_reference, gitlab_issue_reference, prepare_gitlab,
+    prepare_gitlab_control,
 )
 from modelo.evidence import create_evidence_record
 from modelo.mac import MacError, init_mac_payload
@@ -116,6 +121,32 @@ def _parser() -> argparse.ArgumentParser:
     github_intake.add_argument("--issue-body-output", type=Path, required=True)
     github_intake.add_argument("--comment-output", type=Path, required=True)
 
+    gitlab_issue = platform_subparsers.add_parser("gitlab-issue", help="extract the linked MAC issue from GitLab MR")
+    gitlab_issue.add_argument("--event", type=Path, required=True)
+    gitlab_control_issue = platform_subparsers.add_parser("gitlab-control-issue", help="extract the linked control issue from GitLab MR")
+    gitlab_control_issue.add_argument("--event", type=Path, required=True)
+    gitlab_prepare = platform_subparsers.add_parser("gitlab-prepare", help="prepare trusted GitLab inputs")
+    gitlab_prepare.add_argument("--event", type=Path, required=True)
+    gitlab_prepare.add_argument("--issue", type=Path, required=True)
+    gitlab_prepare.add_argument("--validation-sha", required=True)
+    gitlab_prepare.add_argument("--validation-tree", required=True)
+    gitlab_prepare.add_argument("--as-of", required=True)
+    gitlab_prepare.add_argument("--metadata-output", type=Path, required=True)
+    gitlab_prepare.add_argument("--context-output", type=Path, required=True)
+    gitlab_control = platform_subparsers.add_parser("gitlab-prepare-control", help="prepare trusted GitLab control inputs")
+    gitlab_control.add_argument("--event", type=Path, required=True)
+    gitlab_control.add_argument("--issue", type=Path, required=True)
+    gitlab_control.add_argument("--validation-sha", required=True)
+    gitlab_control.add_argument("--validation-tree", required=True)
+    gitlab_control.add_argument("--as-of", required=True)
+    gitlab_control.add_argument("--context-output", type=Path, required=True)
+    gitlab_intake = platform_subparsers.add_parser(
+        "gitlab-intake", help="compile a guided GitLab issue proposal"
+    )
+    gitlab_intake.add_argument("--event", type=Path, required=True)
+    gitlab_intake.add_argument("--issue-body-output", type=Path, required=True)
+    gitlab_intake.add_argument("--comment-output", type=Path, required=True)
+
     dev = subparsers.add_parser("dev", help="developer and authoring suite utilities")
     dev_subparsers = dev.add_subparsers(dest="dev_command", required=True)
 
@@ -147,6 +178,20 @@ def _parser() -> argparse.ArgumentParser:
     mac_init.add_argument("--item-operation")
     mac_init.add_argument("--batch-scope")
     mac_init.add_argument("--output", type=Path)
+
+    dev_propose = dev_subparsers.add_parser(
+        "propose", help="propose a candidate catalogue change in a single command"
+    )
+    dev_propose.add_argument("--operation", default="add", choices=("add", "change", "revoke", "move", "batch"))
+    dev_propose.add_argument("--kind", default="offering", choices=("offering", "model", "vendor", "inference-service", "condition"))
+    dev_propose.add_argument("--identity", required=True, help="logical identity (e.g. aws-bedrock-nova-lite)")
+    dev_propose.add_argument("--purpose", required=True, help="business/technical purpose of the proposal")
+    dev_propose.add_argument("--reason", required=True, help="rationale explaining why this change is needed")
+    dev_propose.add_argument("--uri", required=True, help="HTTPS documentation or discovery observation URL")
+    dev_propose.add_argument("--outcome", help="requested outcome summary")
+    dev_propose.add_argument("--acceptance", help="acceptance check description")
+    dev_propose.add_argument("--observed-at", help="UTC ISO timestamp of observation")
+    dev_propose.add_argument("--output", type=Path, help="output path for the generated issue body markdown")
 
     return parser
 
@@ -252,6 +297,51 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "platform" and arguments.platform_command == "github-intake":
         try:
             write_github_intake_outputs(
+                event_path=arguments.event,
+                issue_body_output=arguments.issue_body_output,
+                comment_output=arguments.comment_output,
+            )
+            return 0
+        except (ValueError, BuildError) as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "gitlab-issue":
+        try:
+            reference = gitlab_issue_reference(arguments.event)
+            print(reference)
+            return 0
+        except BuildError as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "gitlab-control-issue":
+        try:
+            reference = gitlab_control_issue_reference(arguments.event)
+            print(reference)
+            return 0
+        except BuildError as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "gitlab-prepare":
+        try:
+            prepare_gitlab(
+                root=arguments.root, event_path=arguments.event, issue_path=arguments.issue,
+                validation_sha=arguments.validation_sha, validation_tree=arguments.validation_tree,
+                as_of=parse_as_of(arguments.as_of), metadata_output=arguments.metadata_output,
+                context_output=arguments.context_output,
+            )
+            return 0
+        except (ValueError, BuildError) as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "gitlab-prepare-control":
+        try:
+            prepare_gitlab_control(
+                root=arguments.root, event_path=arguments.event, issue_path=arguments.issue,
+                validation_sha=arguments.validation_sha, validation_tree=arguments.validation_tree,
+                as_of=parse_as_of(arguments.as_of), context_output=arguments.context_output,
+            )
+            return 0
+        except (ValueError, BuildError) as exc:
+            parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command == "gitlab-intake":
+        try:
+            write_gitlab_intake_outputs(
                 event_path=arguments.event,
                 issue_body_output=arguments.issue_body_output,
                 comment_output=arguments.comment_output,
@@ -384,6 +474,61 @@ def main(argv: Sequence[str] | None = None) -> int:
                     print(formatted, end="")
                 return 0
             except (ValueError, MacError, json.JSONDecodeError, OSError) as exc:
+                parser.exit(2, f"modelo: {exc}\n")
+        if arguments.dev_command == "propose":
+            try:
+                from datetime import datetime, timezone
+                config = load_config(arguments.root.resolve())
+                schemas = SchemaSet(config.root, config.paths["schemas"])
+                observed_at = arguments.observed_at or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                projection = {"identity": arguments.identity, "purpose": arguments.purpose}
+                evidence_record = create_evidence_record(
+                    source_type="official-provider-documentation",
+                    uri=arguments.uri,
+                    observed_at=observed_at,
+                    projection=projection,
+                    schemas=schemas,
+                )
+                evidence_id = evidence_record["id"]
+                evidence_dir = config.root / "catalogue" / "evidence"
+                evidence_dir.mkdir(parents=True, exist_ok=True)
+                evidence_path = evidence_dir / f"{evidence_id}.yaml"
+                import yaml
+                evidence_path.write_text(
+                    yaml.dump(evidence_record, sort_keys=True, allow_unicode=True),
+                    encoding="utf-8",
+                )
+
+                subjects = [{"kind": arguments.kind, "identity": arguments.identity}]
+                candidate_evidence = [{"uri": arguments.uri, "observed_at": observed_at, "digest": evidence_id}]
+                outcome = arguments.outcome or f"{arguments.operation.title()} candidate {arguments.kind} record"
+                acceptance = [arguments.acceptance or "Record passes modelo check validation."]
+                payload = init_mac_payload(
+                    operation=arguments.operation,
+                    purpose=arguments.purpose,
+                    subjects=subjects,
+                    requested_outcome=outcome,
+                    reason=arguments.reason,
+                    candidate_evidence=candidate_evidence,
+                    acceptance=acceptance,
+                )
+                source_text = (
+                    f"### Request type\n\n{arguments.operation}\n\n"
+                    f"### Subject type\n\n{arguments.kind}\n\n"
+                    f"### Subject identity\n\n{arguments.identity}\n\n"
+                    f"### Purpose\n\n{arguments.purpose}\n\n"
+                    f"### Requested outcome\n\n{outcome}\n\n"
+                    f"### Why is this needed?\n\n{arguments.reason}\n\n"
+                    f"### Supporting observations\n\n{arguments.uri} | {observed_at} | {evidence_id}\n\n"
+                    f"### Acceptance checks\n\n{acceptance[0]}\n"
+                )
+                issue_body = _intake_issue_body(source_text, payload)
+                if arguments.output is not None:
+                    arguments.output.write_text(issue_body, encoding="utf-8")
+                else:
+                    print(issue_body, end="")
+                return 0
+            except (ConfigError, ValueError, MacError, OSError) as exc:
                 parser.exit(2, f"modelo: {exc}\n")
     parser.exit(2, f"{UNAVAILABLE.format(command=arguments.command)}\n")
     return 2

@@ -122,7 +122,7 @@ class MacTemplateTests(unittest.TestCase):
 
     def test_github_issue_form_common_fields_match_the_trusted_compiler(self) -> None:
         common = {
-            "request_type": ("Request type", True),
+            "request_type": ("Modelo MAC request type", True),
             "purpose": ("Purpose", True),
             "requested_outcome": ("Requested outcome", True),
             "reason": ("Why is this needed?", True),
@@ -170,6 +170,15 @@ class MacTemplateTests(unittest.TestCase):
                     option["required"]
                     for option in fields["final_checks"]["attributes"]["options"]
                 ))
+
+        batch_description = next(
+            item["attributes"]["description"]
+            for item in yaml.safe_load(
+                (ROOT / ".github/ISSUE_TEMPLATE/mac-batch.yml").read_text(encoding="utf-8")
+            )["body"]
+            if item.get("id") == "subject_kind"
+        )
+        self.assertIn("Revoke batches support offerings only", batch_description)
 
     def test_github_issue_contact_link_is_derived_from_site_config(self) -> None:
         repository = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))

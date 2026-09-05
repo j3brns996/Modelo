@@ -2,19 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date
 import json
 from pathlib import Path
 import re
 from typing import Any
-from uuid import NAMESPACE_URL, uuid5
 
 from modelo.build import BuildError, _git
-from modelo.mac import (
-    MAX_BODY_BYTES, MacError, extract_adapter_issue_payload, payload_digest,
-    with_computed_keys,
-)
+from modelo.guided_intake import GuidedIntakeResult, compile_guided_intake
+from modelo.mac import MacError, extract_adapter_issue_payload
 from modelo.platform import _atomic_write, _read_json
 from modelo.receipt import canonical_bytes, sha256_bytes, sort_change_delta
 from modelo.site import _committed_yaml_config
@@ -24,160 +20,14 @@ _ISSUE = re.compile(r"<!-- modelo:mac-issue -->(https://github\.com/([^/]+)/([^/
 _CONTROL_ISSUE = re.compile(r"<!-- modelo:control-issue -->(https://github\.com/([^/]+)/([^/]+)/issues/([1-9][0-9]{0,19}))<!-- /modelo:control-issue -->")
 _DELTA = re.compile(r"(?ms)<!-- modelo:change-delta -->\s*```json\n(\[[\s\S]*?\])\n```\s*<!-- /modelo:change-delta -->")
 _DIGEST = re.compile(r"(?m)^- Neutral payload digest: `(sha256:[0-9a-f]{64})`$")
-_INTAKE_START = "<!-- modelo:intake-generated-start -->"
-_INTAKE_END = "<!-- modelo:intake-generated-end -->"
-_INTAKE_RESULT = "<!-- modelo:intake-result -->"
-_INTAKE_SOURCE = re.compile(r"<!-- modelo:intake-source (sha256:[0-9a-f]{64}) -->")
-_SECTION = re.compile(r"(?m)^### ([^\n]{1,80})\n\n")
+_REPOSITORY = re.compile(
+    r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?/"
+    r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?"
+)
+GitHubIntakeResult = GuidedIntakeResult
 
 
-@dataclass(frozen=True, slots=True)
-class GitHubIntakeResult:
-    valid: bool
-    issue_body: str
-    comment_body: str
-    payload: dict[str, Any] | None
-
-
-def _without_generated_intake(body: str) -> str:
-    if len(body.encode("utf-8")) > MAX_BODY_BYTES:
-        raise ValueError(f"issue body exceeds {MAX_BODY_BYTES} bytes")
-    start = body.find(_INTAKE_START)
-    end = body.find(_INTAKE_END)
-    if start < 0 and end < 0:
-        return body.rstrip()
-    if start < 0 or end < start or body.find(_INTAKE_START, start + 1) >= 0 or body.find(_INTAKE_END, end + 1) >= 0:
-        raise ValueError("issue contains an ambiguous generated intake block")
-    if body[end + len(_INTAKE_END):].strip():
-        raise ValueError("generated intake block must be the final issue section")
-    return body[:start].rstrip()
-
-
-def _issue_sections(body: str) -> dict[str, str]:
-    matches = list(_SECTION.finditer(body))
-    sections: dict[str, str] = {}
-    for index, match in enumerate(matches):
-        label = match.group(1)
-        if label in sections:
-            raise MacError("guided proposal contains a duplicate field heading")
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(body)
-        sections[label] = body[match.end():end].strip()
-    return sections
-
-
-def _answer(sections: dict[str, str], label: str, *, plain: bool = False) -> str:
-    value = sections.get(label, "").strip()
-    if not value or value == "_No response_":
-        raise MacError(f"guided proposal is missing {label}")
-    return " ".join(value.split()) if plain else value
-
-
-def _lines(sections: dict[str, str], label: str, *, required: bool = True) -> list[str]:
-    value = sections.get(label, "").strip()
-    if not value or value == "_No response_":
-        if required:
-            raise MacError(f"guided proposal is missing {label}")
-        return []
-    values = [" ".join(line.split()) for line in value.splitlines() if line.strip()]
-    if required and not values:
-        raise MacError(f"guided proposal is missing {label}")
-    return values
-
-
-def _candidate_evidence(sections: dict[str, str]) -> list[dict[str, str]]:
-    records = []
-    for line in _lines(sections, "Supporting observations", required=False):
-        parts = line.split(" | ")
-        if len(parts) != 3:
-            raise MacError("each supporting observation must contain URL | UTC time | sha256- digest")
-        records.append({"uri": parts[0], "observed_at": parts[1], "digest": parts[2]})
-    return records
-
-
-def _compile_guided_payload(
-    sections: dict[str, str], repository: str, issue_number: int,
-) -> dict[str, Any]:
-    operation = _answer(sections, "Request type")
-    if operation not in {"add", "change", "revoke", "move", "batch"}:
-        raise MacError("guided proposal has an unsupported request type")
-    payload: dict[str, Any] = {
-        "schema_version": "0.1",
-        "request_id": str(uuid5(NAMESPACE_URL, f"https://github.com/{repository}/issues/{issue_number}")),
-        "operation": operation,
-        "purpose": _answer(sections, "Purpose", plain=True),
-        "requested_outcome": _answer(sections, "Requested outcome", plain=True),
-        "reason": _answer(sections, "Why is this needed?", plain=True),
-        "candidate_evidence": _candidate_evidence(sections),
-        "acceptance": _lines(sections, "Acceptance checks"),
-    }
-    if operation in {"add", "change"}:
-        payload["subjects"] = [{
-            "kind": _answer(sections, "Subject type"),
-            "identity": _answer(sections, "Subject identity"),
-        }]
-    elif operation == "revoke":
-        payload["subjects"] = [{
-            "kind": "offering", "identity": _answer(sections, "Offering identity"),
-        }]
-    elif operation == "move":
-        payload["subjects"] = [
-            {"kind": "offering", "identity": _answer(sections, "Current offering identity"), "role": "source"},
-            {"kind": "offering", "identity": _answer(sections, "Replacement offering identity"), "role": "destination"},
-        ]
-    else:
-        kind = _answer(sections, "Subject type")
-        payload["item_operation"] = _answer(sections, "Batch change type")
-        payload["subjects"] = [
-            {"kind": kind, "identity": identity}
-            for identity in _lines(sections, "Subject identities")
-        ]
-        payload["batch_scope"] = {
-            "source": {
-                "type": _answer(sections, "Evidence source type"),
-                "uri": _answer(sections, "Evidence source URL"),
-            },
-            "observation_scope": {
-                "scope_ref": _answer(sections, "Opaque scope reference"),
-                "partition": _answer(sections, "Provider partition"),
-                "region": _answer(sections, "Source region"),
-            },
-            "inference_service_id": _answer(sections, "Inference service"),
-        }
-    return with_computed_keys(payload)
-
-
-def _intake_issue_body(source: str, payload: dict[str, Any]) -> str:
-    pretty = json.dumps(payload, ensure_ascii=False, allow_nan=False, indent=2, sort_keys=True)
-    body = (
-        source + "\n\n" + _INTAKE_START + "\n"
-        + f"<!-- modelo:intake-source {sha256_bytes(source.encode('utf-8'))} -->\n"
-        + f"### Change details (JSON)\n\n```json\n{pretty}\n```\n\n"
-        + f"### Change fingerprint\n\n{payload_digest(payload)}\n"
-        + _INTAKE_END + "\n"
-    )
-    if len(body.encode("utf-8")) > MAX_BODY_BYTES:
-        raise MacError("generated proposal exceeds the GitHub issue body limit")
-    return body
-
-
-def _intake_comment(payload: dict[str, Any]) -> str:
-    identities = ", ".join(
-        f"{item['kind']}:{item['identity']}" for item in payload["subjects"]
-    )
-    digest = sha256_bytes(canonical_bytes(payload))
-    return (
-        _INTAKE_RESULT + "\n## Proposal ready\n\n"
-        "Modelo validated the guided answers and generated the canonical request above. "
-        "This is still a proposal, not approval.\n\n"
-        "### Copy into the pull request\n\n"
-        f"- Neutral payload digest: `{digest}`\n"
-        f"- Operation: `{payload['operation']}`\n"
-        f"- Affected logical identities: {identities}\n\n"
-        "Next: add the governed records and admissible evidence on a topic branch, then open the MAC pull request.\n"
-    )
-
-
-def compile_github_intake(event: dict[str, Any]) -> GitHubIntakeResult:
+def compile_github_intake(event: dict[str, Any]) -> GuidedIntakeResult:
     repository = event.get("repository")
     issue = event.get("issue")
     if not isinstance(repository, dict) or not isinstance(issue, dict) or issue.get("state") != "open":
@@ -185,31 +35,22 @@ def compile_github_intake(event: dict[str, Any]) -> GitHubIntakeResult:
     full_name = repository.get("full_name")
     number = issue.get("number")
     body = issue.get("body")
-    if not isinstance(full_name, str) or not isinstance(number, int) or not isinstance(body, str):
+    if (
+        not isinstance(full_name, str)
+        or not _REPOSITORY.fullmatch(full_name)
+        or not isinstance(number, int)
+        or isinstance(number, bool)
+        or number <= 0
+        or not isinstance(body, str)
+    ):
         raise ValueError("GitHub intake event fields are invalid")
-    had_generated = _INTAKE_START in body or _INTAKE_END in body
-    source = _without_generated_intake(body)
-    sections = _issue_sections(source)
-    if "Request type" not in sections:
-        if had_generated:
-            comment = (
-                _INTAKE_RESULT + "\n## Proposal needs attention\n\n"
-                "guided proposal is missing Request type. Restore the form field or open a new proposal.\n"
-            )
-            return GitHubIntakeResult(False, source + "\n", comment, None)
-        raise ValueError("issue is not a supported guided proposal")
-    try:
-        payload = _compile_guided_payload(sections, full_name, number)
-        issue_body = _intake_issue_body(source, payload)
-        comment_body = _intake_comment(payload)
-    except (MacError, ValueError) as exc:
-        message = str(exc).splitlines()[0]
-        comment = (
-            _INTAKE_RESULT + "\n## Proposal needs attention\n\n"
-            + message + ". Update the issue fields and Modelo will check them again.\n"
-        )
-        return GitHubIntakeResult(False, source + "\n", comment, None)
-    return GitHubIntakeResult(True, issue_body, comment_body, payload)
+    return compile_guided_intake(
+        body=body,
+        issue_url=f"https://github.com/{full_name}/issues/{number}",
+        request_labels=("Modelo MAC request type", "Request type"),
+        provider_name="GitHub",
+        change_request_name="pull request",
+    )
 
 
 def write_github_intake_outputs(
@@ -235,18 +76,43 @@ def _pull_request(event_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
 
 def github_issue_reference(event_path: Path) -> str:
     pull, repository = _pull_request(event_path)
-    matches = _ISSUE.findall(str(pull.get("body", "")))
+    return _github_issue_reference(pull, repository, control=False)
+
+
+def _github_issue_reference(
+    pull: dict[str, Any], repository: dict[str, Any], *, control: bool,
+) -> str:
+    pattern = _CONTROL_ISSUE if control else _ISSUE
+    matches = pattern.findall(str(pull.get("body", "")))
     if len(matches) != 1 or f"{matches[0][1]}/{matches[0][2]}" != repository.get("full_name"):
-        raise BuildError("pull request lacks one same-repository MAC issue marker")
+        noun = "implementation" if control else "MAC"
+        prefix = "control " if control else ""
+        raise BuildError(
+            f"{prefix}pull request lacks one same-repository {noun} issue marker"
+        )
     return matches[0][3]
 
 
 def github_control_issue_reference(event_path: Path) -> str:
     pull, repository = _pull_request(event_path)
-    matches = _CONTROL_ISSUE.findall(str(pull.get("body", "")))
-    if len(matches) != 1 or f"{matches[0][1]}/{matches[0][2]}" != repository.get("full_name"):
-        raise BuildError("control pull request lacks one same-repository implementation issue marker")
-    return matches[0][3]
+    return _github_issue_reference(pull, repository, control=True)
+
+
+def _require_github_config(configured: dict[str, Any], repository: dict[str, Any]) -> None:
+    full_name = repository.get("full_name")
+    if not isinstance(full_name, str) or full_name.count("/") != 1:
+        raise BuildError("GitHub repository identity is invalid")
+    owner, name = full_name.split("/", 1)
+    repo_config = configured["repository"]
+    if (
+        repo_config["adapter"] != "github"
+        or repo_config["host"] != "github.com"
+        or repo_config["namespace"] != owner
+        or repo_config["name"] != name
+        or repo_config["web_base"] != f"https://github.com/{full_name}"
+        or configured["project"]["default_branch"] != repository.get("default_branch")
+    ):
+        raise BuildError("GitHub repository identity differs from modelo.yaml")
 
 
 def prepare_github(
@@ -254,9 +120,18 @@ def prepare_github(
     validation_tree: str, as_of: date, metadata_output: Path, context_output: Path,
 ) -> None:
     pull, repository = _pull_request(event_path)
-    issue_reference = github_issue_reference(event_path)
+    issue_reference = _github_issue_reference(pull, repository, control=False)
     issue = _read_json(issue_path, "GitHub issue")
-    if str(issue.get("number")) != issue_reference or issue.get("state") != "open":
+    expected_issue_url = f"https://github.com/{repository['full_name']}/issues/{issue_reference}"
+    issue_number = issue.get("number")
+    if (
+        not isinstance(issue_number, int)
+        or isinstance(issue_number, bool)
+        or issue_number <= 0
+        or str(issue_number) != issue_reference
+        or issue.get("state") != "open"
+        or issue.get("html_url") != expected_issue_url
+    ):
         raise BuildError("GitHub issue response differs from linked open MAC issue")
     try:
         payload = extract_adapter_issue_payload(str(issue.get("body", "")), "github")
@@ -291,10 +166,7 @@ def prepare_github(
     tree = str(_git(root, "rev-parse", f"{head}^{{tree}}")).strip()
     epoch = int(str(_git(root, "show", "-s", "--format=%at", head)).strip())
     configured = _committed_yaml_config(root, head, "modelo.yaml")
-    if configured["repository"]["adapter"] != "github":
-        raise BuildError("proposed configuration does not select the GitHub adapter")
-    if configured["project"]["default_branch"] != repository.get("default_branch"):
-        raise BuildError("GitHub default branch differs from modelo.yaml")
+    _require_github_config(configured, repository)
     profile = configured["publication"]["active_profile"]
     profile_config = configured["publication"]["profiles"][profile]
     if profile_config["delivery"] != "pages" or profile_config["visibility"] != "public":
@@ -330,11 +202,16 @@ def prepare_github_control(
     as_of: date, context_output: Path,
 ) -> None:
     pull, repository = _pull_request(event_path)
-    issue_reference = github_control_issue_reference(event_path)
+    issue_reference = _github_issue_reference(pull, repository, control=True)
     issue = _read_json(issue_path, "GitHub control issue")
     expected_issue_url = f"https://github.com/{repository['full_name']}/issues/{issue_reference}"
+    issue_number = issue.get("number")
     if (
-        str(issue.get("number")) != issue_reference or issue.get("state") != "open"
+        not isinstance(issue_number, int)
+        or isinstance(issue_number, bool)
+        or issue_number <= 0
+        or str(issue_number) != issue_reference
+        or issue.get("state") != "open"
         or issue.get("html_url") != expected_issue_url
     ):
         raise BuildError("GitHub control issue response differs from linked open issue")
@@ -344,10 +221,8 @@ def prepare_github_control(
     epoch = int(str(_git(root, "show", "-s", "--format=%at", head)).strip())
     configured = _committed_yaml_config(root, head, "modelo.yaml")
     protected = _committed_yaml_config(root, base, "modelo.yaml")
-    if configured["repository"]["adapter"] != "github" or configured["project"]["default_branch"] != repository.get("default_branch"):
-        raise BuildError("GitHub adapter/default branch differs from proposed modelo.yaml")
-    if protected["repository"]["adapter"] != "github" or protected["project"]["default_branch"] != repository.get("default_branch"):
-        raise BuildError("trusted workflow identity differs from protected modelo.yaml")
+    _require_github_config(configured, repository)
+    _require_github_config(protected, repository)
     owner, name = str(repository["full_name"]).split("/", 1)
     context = {
         "contract_version": "0.1.0",

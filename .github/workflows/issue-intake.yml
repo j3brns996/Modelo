@@ -15,7 +15,7 @@ concurrency:
 jobs:
   compile:
     name: Validate and compile proposal
-    if: ${{ github.event.issue.pull_request == null && (contains(github.event.issue.body, '### Request type') || contains(github.event.issue.body, '<!-- modelo:intake-generated-start -->')) }}
+    if: ${{ github.event.issue.pull_request == null && (contains(github.event.issue.body, '### Modelo MAC request type') || contains(github.event.issue.body, '<!-- modelo:intake-generated-start -->') || contains(github.event.issue.body, '<!-- modelo:intake-generated-end -->')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

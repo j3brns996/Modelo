@@ -93,6 +93,9 @@ def test_github_issue_intake_uses_trusted_code_and_one_bounded_comment_writer() 
     assert "github-intake" in raw
     assert "modelo:intake-result" in raw
     assert "modelo:intake-generated-start" in raw
+    assert "modelo:intake-generated-end" in raw
+    assert "### Modelo MAC request type" in raw
+    assert "### Request type" not in raw
     assert "${{ github.event.issue.body }}" not in raw
     assert "npx" not in raw and "npm " not in raw and "actions/checkout" not in raw
     uses = re.findall(r"^\s*uses:\s*([^\s#]+)", raw, re.MULTILINE)

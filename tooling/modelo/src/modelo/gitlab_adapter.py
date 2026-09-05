@@ -261,7 +261,7 @@ def prepare_gitlab(
         "source_date_epoch": epoch, "profile": profile,
         "base_url": configured["site"]["base_url"], "base_path": configured["site"]["base_path"],
         "publication_capability": "public-pages",
-        "workflow_identity": f"{project['path_with_namespace']}/{configured['paths']['gitlab_ci']:.gitlab-ci.yml}@{configured['project']['default_branch']}",
+        "workflow_identity": f"{project['path_with_namespace']}/{configured['paths']['gitlab_ci']}@{configured['project']['default_branch']}",
         "workflow_sha": base, "run_id": str(__import__('os').environ.get("CI_PIPELINE_ID", "local")),
         "check_name": "modelo/check",
         "gates": {"lock": "success", "schema": "success", "tests": "success", "package": "success"},

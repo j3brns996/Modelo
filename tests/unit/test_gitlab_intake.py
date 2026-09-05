@@ -1,11 +1,14 @@
-from __future__ import annotations
-
+from datetime import date
+import json
+from pathlib import Path
 from uuid import UUID
 
 import pytest
 
-from modelo.gitlab_adapter import compile_gitlab_intake
+from modelo.gitlab_adapter import compile_gitlab_intake, prepare_gitlab
 from modelo.mac import MacError, extract_adapter_issue_payload, validate_payload
+from modelo.receipt import canonical_bytes, sha256_bytes
+
 
 
 def issue_body(**sections: str) -> str:
@@ -97,3 +100,50 @@ def test_gitlab_invalid_edit_removes_stale_generated_payload_and_reports_one_err
     assert "modelo:intake-generated-start" not in result.issue_body
     with pytest.raises(MacError):
         extract_adapter_issue_payload(result.issue_body, "gitlab")
+
+
+def test_prepare_gitlab_generates_valid_workflow_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    event_path = tmp_path / "event.json"
+    issue_path = tmp_path / "issue.json"
+    meta_path = tmp_path / "metadata.json"
+    ctx_path = tmp_path / "context.json"
+
+    intake_res = compile_gitlab_intake(event(issue_body(**common("add"))))
+    digest = sha256_bytes(canonical_bytes(intake_res.payload))
+    event_data = {
+        "project": {"path_with_namespace": "j3brns996/Modelo", "default_branch": "main", "web_url": "https://gitlab.com/j3brns996/Modelo"},
+        "object_attributes": {
+            "iid": 12, "state": "opened", "target_branch": "main", "source_branch": "feat/test",
+            "description": (
+                "<!-- modelo:mac-issue -->https://gitlab.com/j3brns996/Modelo/-/issues/12<!-- /modelo:mac-issue -->\n"
+                "<!-- modelo:change-delta -->\n```json\n[{\"operation\": \"add\", \"path\": \"catalogue/models/example.yaml\", \"subject_kind\": \"model\", \"subject_identity\": \"example-model-v1\", \"after\": \"sha256-1111111111111111111111111111111111111111111111111111111111111111\"}]\n```\n<!-- /modelo:change-delta -->\n"
+                f"- Neutral payload digest: `{digest}`"
+            ),
+            "last_commit": {"id": "1" * 40}, "target": {"sha": "0" * 40},
+        },
+    }
+    issue_data = {
+        "iid": 12, "state": "opened", "web_url": "https://gitlab.com/j3brns996/Modelo/-/issues/12",
+        "description": intake_res.issue_body,
+    }
+    event_path.write_text(json.dumps(event_data), encoding="utf-8")
+    issue_path.write_text(json.dumps(issue_data), encoding="utf-8")
+
+    monkeypatch.setattr("modelo.gitlab_adapter._git", lambda root, *args: "0" * 40 if "rev-parse" in args else "1700000000")
+    monkeypatch.setattr("modelo.gitlab_adapter._committed_yaml_config", lambda root, commit, path: {
+        "repository": {"adapter": "gitlab", "host": "gitlab.com"},
+        "project": {"default_branch": "main"},
+        "publication": {"active_profile": "public-pages-demo", "profiles": {"public-pages-demo": {"delivery": "pages", "visibility": "public"}}},
+        "site": {"base_url": "https://example.invalid", "base_path": "/"},
+        "paths": {"gitlab_ci": ".gitlab-ci.yml"},
+    })
+
+    prepare_gitlab(
+        root=Path.cwd(), event_path=event_path, issue_path=issue_path,
+        validation_sha="0" * 40, validation_tree="0" * 40, as_of=date(2026, 9, 5),
+        metadata_output=meta_path, context_output=ctx_path,
+    )
+
+    ctx = json.loads(ctx_path.read_text(encoding="utf-8"))
+    assert ctx["workflow_identity"] == "j3brns996/Modelo/.gitlab-ci.yml@main"
+

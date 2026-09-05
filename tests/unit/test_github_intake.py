@@ -8,7 +8,10 @@ from uuid import UUID
 import pytest
 
 from modelo.build import BuildError
-from modelo.github_adapter import compile_github_intake, prepare_github
+from modelo.github_adapter import (
+    compile_github_intake, github_control_issue_reference, github_issue_reference,
+    prepare_github,
+)
 from modelo.mac import (
     MacError, extract_adapter_issue_payload, render_adapter_issue_body, validate_payload,
 )
@@ -351,3 +354,37 @@ def test_github_prepare_binds_exact_repository_and_issue_and_preserves_outputs_o
             invoke(selected_issue=selected_issue, selected_config=selected_config)
         assert metadata_output.read_bytes() == sentinel
         assert context_output.read_bytes() == sentinel
+
+
+@pytest.mark.parametrize(
+    "marker, reference, extra_token",
+    [
+        ("mac-issue", github_issue_reference, "<!-- modelo:mac-issue -->"),
+        (
+            "control-issue",
+            github_control_issue_reference,
+            "<!-- /modelo:control-issue -->",
+        ),
+    ],
+)
+def test_github_issue_markers_reject_ambiguous_raw_tokens(
+    tmp_path, marker: str, reference, extra_token: str,
+) -> None:
+    issue_url = "https://github.com/j3brns996/Modelo/issues/43"
+    body = (
+        f"<!-- modelo:{marker} -->{issue_url}<!-- /modelo:{marker} -->\n"
+        + extra_token
+    )
+    raw_event = {
+        "repository": {"full_name": "j3brns996/Modelo", "default_branch": "main"},
+        "pull_request": {
+            "state": "open",
+            "body": body,
+            "base": {"ref": "main"},
+            "head": {"repo": {"full_name": "j3brns996/Modelo"}},
+        },
+    }
+    event_path = tmp_path / f"{marker}.json"
+    event_path.write_bytes(canonical_bytes(raw_event))
+    with pytest.raises(BuildError, match="one same-repository"):
+        reference(event_path)

@@ -83,8 +83,17 @@ def _github_issue_reference(
     pull: dict[str, Any], repository: dict[str, Any], *, control: bool,
 ) -> str:
     pattern = _CONTROL_ISSUE if control else _ISSUE
-    matches = pattern.findall(str(pull.get("body", "")))
-    if len(matches) != 1 or f"{matches[0][1]}/{matches[0][2]}" != repository.get("full_name"):
+    marker = "control-issue" if control else "mac-issue"
+    opening = f"<!-- modelo:{marker} -->"
+    closing = f"<!-- /modelo:{marker} -->"
+    body = str(pull.get("body", ""))
+    matches = pattern.findall(body)
+    if (
+        len(matches) != 1
+        or body.count(opening) != 1
+        or body.count(closing) != 1
+        or f"{matches[0][1]}/{matches[0][2]}" != repository.get("full_name")
+    ):
         noun = "implementation" if control else "MAC"
         prefix = "control " if control else ""
         raise BuildError(

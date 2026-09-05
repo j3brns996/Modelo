@@ -62,8 +62,9 @@ approvals or cloud state.
 GitHub intake refetches the current issue before any mutation and requires its
 body to equal the triggering body exactly. It scans at most 1,000 comments and
 fails closed if that bound is exhausted or more than one marked bot comment is
-present. A body update ends the current invocation; an eligible follow-up issue
-event performs the single marked-comment update.
+present. After a body update, it refetches and requires the current body to
+equal the exact compiled or cleaned body. A mismatch fails closed; otherwise,
+the same invocation updates or creates the single marked result comment.
 
 `change` preserves identity. In v0.1, `move` and `revoke` apply only to
 offerings. A move changes offering identity and compiles to atomic

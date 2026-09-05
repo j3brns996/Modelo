@@ -62,6 +62,32 @@ _FIELD_LABELS = {
 }
 _DISPLAY_LABELS = {field: label for label, field in _FIELD_LABELS.items()}
 _DISPLAY_LABELS["request_type"] = "Request type"
+_COMMON_FIELDS = {
+    "request_type",
+    "purpose",
+    "requested_outcome",
+    "reason",
+    "candidate_evidence",
+    "acceptance",
+    "final_checks",
+}
+_OPERATION_FIELDS = {
+    "add": {"subject_kind", "subject_identity"},
+    "change": {"subject_kind", "subject_identity"},
+    "revoke": {"offering_identity"},
+    "move": {"source_identity", "destination_identity"},
+    "batch": {
+        "item_operation",
+        "subject_kind",
+        "subject_identities",
+        "source_type",
+        "source_url",
+        "scope_ref",
+        "partition",
+        "region",
+        "inference_service",
+    },
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,8 +179,14 @@ def _compile_payload(
     sections: dict[str, str], issue_url: str, request_label: str,
 ) -> dict[str, Any]:
     operation = _answer(sections, "request_type", display_label=request_label)
-    if operation not in {"add", "change", "revoke", "move", "batch"}:
+    if operation not in _OPERATION_FIELDS:
         raise MacError("guided proposal has an unsupported request type")
+    inapplicable = set(sections) - _COMMON_FIELDS - _OPERATION_FIELDS[operation]
+    if inapplicable:
+        field = min(inapplicable, key=_FIELD_ORDER.index)
+        raise MacError(
+            f"guided proposal field heading {_DISPLAY_LABELS[field]} is not valid for {operation}"
+        )
     payload: dict[str, Any] = {
         "schema_version": "0.1",
         "request_id": str(uuid5(NAMESPACE_URL, issue_url)),

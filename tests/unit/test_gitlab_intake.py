@@ -183,6 +183,20 @@ def test_gitlab_parser_preserves_unknown_headings_and_rejects_known_reordering()
     assert "out of order" in invalid.comment_body
 
 
+def test_gitlab_rejects_inapplicable_recognized_heading_without_losing_prose() -> None:
+    values = common("change")
+    values["Why is this needed?"] = (
+        "Keep the complete explanation.\n\n"
+        "### Evidence source type\n\n"
+        "This batch-only heading is user prose."
+    )
+    result = compile_gitlab_intake(event(issue_body(**values)))
+    assert not result.valid
+    assert result.payload is None
+    assert "Evidence source type is not valid for change" in result.comment_body
+    assert "### Evidence source type\n\nThis batch-only heading is user prose." in result.issue_body
+
+
 def test_gitlab_markers_bind_nested_namespace_host_and_exact_cardinality(tmp_path) -> None:
     project_url = "https://gitlab.example.invalid/group/platform/Modelo"
     marker = (

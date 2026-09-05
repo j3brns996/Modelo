@@ -107,10 +107,27 @@ def test_github_issue_intake_uses_trusted_code_and_one_bounded_comment_writer() 
     assert "scan exceeded 1000 comments" in script
     assert "if (markedComments.length > 1)" in script
     assert "multiple Modelo intake result comments" in script
-    assert "github.rest.issues.get({ owner, repo, issue_number })" in script
+    assert "let current = await github.rest.issues.get({ owner, repo, issue_number })" in script
+    assert script.count("github.rest.issues.get({ owner, repo, issue_number })") == 2
     assert "current.data.body !== context.payload.issue.body" in script
     issue_update = script.split("await github.rest.issues.update(", 1)[1]
-    assert "return;" in issue_update.split("if (existing)", 1)[0]
+    before_comment_handling = issue_update.split("if (existing)", 1)[0]
+    assert "return;" not in before_comment_handling
+    assert "current = await github.rest.issues.get(" in before_comment_handling
+    assert "if (current.data.body !== issueBody)" in before_comment_handling
+    assert "compiled issue body was not retained" in before_comment_handling
+    assert before_comment_handling.index("current = await github.rest.issues.get(") < (
+        before_comment_handling.index("if (current.data.body !== issueBody)")
+    )
+    # The opaque compiler output can remove every intake trigger marker on an
+    # invalid legacy edit; comment handling must still complete in this run.
+    comment_handling = script.index("if (existing)")
+    final_body_guard = script.rindex(
+        "if (current.data.body !== issueBody)", 0, comment_handling,
+    )
+    assert script.index("await github.rest.issues.update(") < final_body_guard
+    assert final_body_guard < comment_handling
+    assert "modelo:intake-generated" not in script[final_body_guard:]
     first_write = min(
         script.index("github.rest.issues.update("),
         script.index("github.rest.issues.updateComment("),

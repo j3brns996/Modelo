@@ -91,14 +91,17 @@ jobs:
             if (!completeCommentScan) {
               throw new Error("Modelo intake comment scan exceeded 1000 comments");
             }
-            const current = await github.rest.issues.get({ owner, repo, issue_number });
+            let current = await github.rest.issues.get({ owner, repo, issue_number });
             if (current.data.body !== context.payload.issue.body) {
               throw new Error("issue changed after this intake event; refusing stale writes");
             }
             const existing = markedComments[0];
             if (current.data.body !== issueBody) {
               await github.rest.issues.update({ owner, repo, issue_number, body: issueBody });
-              return;
+              current = await github.rest.issues.get({ owner, repo, issue_number });
+            }
+            if (current.data.body !== issueBody) {
+              throw new Error("compiled issue body was not retained; refusing comment write");
             }
             if (existing) {
               if (existing.body !== commentBody) {

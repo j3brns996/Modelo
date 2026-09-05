@@ -260,6 +260,20 @@ def test_unrecognized_level_three_heading_remains_part_of_the_human_answer() -> 
     ]
 
 
+def test_operation_inapplicable_recognized_heading_fails_without_losing_prose() -> None:
+    values = common("add")
+    values["Why is this needed?"] = (
+        "Keep the complete explanation.\n\n"
+        "### Evidence source type\n\n"
+        "This batch-only heading is user prose."
+    )
+    result = compile_github_intake(event(issue_body(**values)))
+    assert not result.valid
+    assert result.payload is None
+    assert "Evidence source type is not valid for add" in result.comment_body
+    assert "### Evidence source type\n\nThis batch-only heading is user prose." in result.issue_body
+
+
 def test_github_prepare_binds_exact_repository_and_issue_and_preserves_outputs_on_failure(
     tmp_path,
 ) -> None:

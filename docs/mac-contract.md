@@ -59,6 +59,13 @@ remove the stale generated block and update one marked bot comment with a
 bounded diagnostic. The compiler never edits catalogue files, branches,
 approvals or cloud state.
 
+GitHub intake refetches the current issue before any mutation and requires its
+body to equal the triggering body exactly. It scans at most 1,000 comments and
+fails closed if that bound is exhausted or more than one marked bot comment is
+present. After a body update, it refetches and requires the current body to
+equal the exact compiled or cleaned body. A mismatch fails closed; otherwise,
+the same invocation updates or creates the single marked result comment.
+
 `change` preserves identity. In v0.1, `move` and `revoke` apply only to
 offerings. A move changes offering identity and compiles to atomic
 add-destination plus revoke-source; it has exactly two subjects, one with each
@@ -88,6 +95,15 @@ only the same repository's issue metadata and emits a bounded canonical MAC
 input bound to the head SHA. The networkless core check verifies repository,
 immutable platform issue identifier, open state, payload, digest and affected
 identities from that input. Labels are routing hints only.
+
+The adapter must prove that provider event data describes the repository in
+the committed configuration. GitHub requires the exact repository coordinate
+and canonical issue URL. GitLab additionally requires positive, equal project
+identifiers across the project, source and target contexts; a canonical HTTPS
+project URL whose path matches the complete namespace and project name; and a
+linked issue with the same project identifier, IID, open state and exact URL.
+Nested GitLab namespaces remain part of the repository namespace. Credentials,
+ports, queries and fragments are not accepted in the project URL.
 
 The `--mac-metadata` input is an explicit file path; `schemas/mac-metadata.schema.json`
 is its validation contract, not a second input. T8 alone creates the file from the
@@ -160,6 +176,13 @@ The canonical examples/schema render to:
 Adapter conformance tests must recover identical neutral objects. GitHub's
 generated block remains compatible with the earlier direct canonical-payload
 transport. Checkboxes and labels are assertions, not evidence.
+
+Trusted workflow identity is provider-specific and derived from protected-base
+configuration: GitHub uses
+`<namespace>/<name>/.github/workflows/modelo.yml@<branch>` and GitLab uses
+`<namespace>/<name>/.gitlab-ci.yml@<branch>`. The adapter may emit the
+`public-pages` capability only when the selected active profile has `pages`
+delivery and public visibility.
 
 ## Acceptance and approval
 

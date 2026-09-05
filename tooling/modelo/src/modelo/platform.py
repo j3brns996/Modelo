@@ -20,7 +20,7 @@ from modelo.change import with_snapshot
 from modelo.config import load_config
 from modelo.receipt import canonical_bytes, publication_digest, sha256_bytes
 from modelo.schemas import SchemaSet
-from modelo.site import ValidationBuildRequest, build_validation_site
+from modelo.site import ValidationBuildRequest, _committed_yaml_config, build_validation_site
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +79,33 @@ def _atomic_write(path: Path, data: bytes) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _verify_protected_workflow(context: dict[str, Any], protected: dict[str, Any]) -> None:
+    repository = context["repository"]
+    protected_repository = protected["repository"]
+    provider = protected_repository["adapter"]
+    if provider not in {"github", "gitlab"} or repository["provider"] not in {
+        "github", "gitlab",
+    }:
+        raise BuildError("trusted workflow provider is unsupported")
+    if repository != {
+        "provider": provider,
+        "host": protected_repository["host"],
+        "namespace": protected_repository["namespace"],
+        "name": protected_repository["name"],
+    }:
+        raise BuildError("trusted workflow repository identity differs from protected modelo.yaml")
+    if provider == "github":
+        workflow_path = f"{protected['paths']['github_adapter']}/workflows/modelo.yml"
+    else:
+        workflow_path = protected["paths"]["gitlab_ci"]
+    expected = (
+        f"{protected_repository['namespace']}/{protected_repository['name']}/"
+        f"{workflow_path}@{protected['project']['default_branch']}"
+    )
+    if context["workflow_identity"] != expected:
+        raise BuildError("trusted workflow identity differs from protected modelo.yaml")
+
+
 def run_trusted_check(request: TrustedCheckRequest) -> dict[str, Any]:
     root = request.root.resolve()
     config = load_config(root)
@@ -103,6 +130,8 @@ def run_trusted_check(request: TrustedCheckRequest) -> dict[str, Any]:
         raise BuildError("trusted repository identity differs from modelo.yaml")
     if context["workflow_sha"] != context["base_sha"]:
         raise BuildError("trusted workflow SHA must equal the protected base SHA")
+    protected_document = _committed_yaml_config(root, context["base_sha"], "modelo.yaml")
+    _verify_protected_workflow(context, protected_document)
     if context["validation_tree_sha"] != context["head_tree_sha"]:
         raise BuildError("validation tree must equal proposed head tree")
     changed_raw = bytes(_git(root, "diff", "--name-only", "-z", context["base_sha"], head, binary=True))
@@ -186,9 +215,7 @@ def run_trusted_control_check(request: TrustedControlCheckRequest) -> dict[str, 
     )
     if findings:
         raise BuildError(f"trusted control context violates schema: {findings[0].message}")
-    document = __import__("modelo.site", fromlist=["_committed_yaml_config"])._committed_yaml_config(
-        root, head, "modelo.yaml"
-    )
+    document = _committed_yaml_config(root, head, "modelo.yaml")
     repository = context["repository"]
     configured = document["repository"]
     if repository != {
@@ -198,16 +225,8 @@ def run_trusted_control_check(request: TrustedControlCheckRequest) -> dict[str, 
         raise BuildError("trusted repository identity differs from proposed modelo.yaml")
     if context["workflow_sha"] != context["base_sha"]:
         raise BuildError("trusted workflow SHA must equal the protected base SHA")
-    protected_document = __import__(
-        "modelo.site", fromlist=["_committed_yaml_config"]
-    )._committed_yaml_config(root, base, "modelo.yaml")
-    expected_workflow = (
-        f"{repository['namespace']}/{repository['name']}/"
-        f"{protected_document['paths']['github_adapter']}/workflows/modelo.yml@"
-        f"{protected_document['project']['default_branch']}"
-    )
-    if context["workflow_identity"] != expected_workflow:
-        raise BuildError("trusted workflow identity differs from protected modelo.yaml")
+    protected_document = _committed_yaml_config(root, base, "modelo.yaml")
+    _verify_protected_workflow(context, protected_document)
     validation = context["validation_sha"]
     actual_head_tree = str(_git(root, "rev-parse", f"{head}^{{tree}}")).strip()
     actual_validation_tree = str(_git(root, "rev-parse", f"{validation}^{{tree}}")).strip()

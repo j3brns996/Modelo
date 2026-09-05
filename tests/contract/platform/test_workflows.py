@@ -93,8 +93,49 @@ def test_github_issue_intake_uses_trusted_code_and_one_bounded_comment_writer() 
     assert "github-intake" in raw
     assert "modelo:intake-result" in raw
     assert "modelo:intake-generated-start" in raw
+    assert "modelo:intake-generated-end" in raw
+    assert "### Modelo MAC request type" in raw
+    assert "### Request type" not in raw
     assert "${{ github.event.issue.body }}" not in raw
     assert "npx" not in raw and "npm " not in raw and "actions/checkout" not in raw
+    script = raw.split("          script: |", 1)[1]
+    assert "const maxCommentPages = 10" in script
+    assert "page <= maxCommentPages" in script
+    assert "per_page: 100, page" in script
+    assert "response.data.length < 100" in script
+    assert "if (!completeCommentScan)" in script
+    assert "scan exceeded 1000 comments" in script
+    assert "if (markedComments.length > 1)" in script
+    assert "multiple Modelo intake result comments" in script
+    assert "let current = await github.rest.issues.get({ owner, repo, issue_number })" in script
+    assert script.count("github.rest.issues.get({ owner, repo, issue_number })") == 2
+    assert "current.data.body !== context.payload.issue.body" in script
+    issue_update = script.split("await github.rest.issues.update(", 1)[1]
+    before_comment_handling = issue_update.split("if (existing)", 1)[0]
+    assert "return;" not in before_comment_handling
+    assert "current = await github.rest.issues.get(" in before_comment_handling
+    assert "if (current.data.body !== issueBody)" in before_comment_handling
+    assert "compiled issue body was not retained" in before_comment_handling
+    assert before_comment_handling.index("current = await github.rest.issues.get(") < (
+        before_comment_handling.index("if (current.data.body !== issueBody)")
+    )
+    # The opaque compiler output can remove every intake trigger marker on an
+    # invalid legacy edit; comment handling must still complete in this run.
+    comment_handling = script.index("if (existing)")
+    final_body_guard = script.rindex(
+        "if (current.data.body !== issueBody)", 0, comment_handling,
+    )
+    assert script.index("await github.rest.issues.update(") < final_body_guard
+    assert final_body_guard < comment_handling
+    assert "modelo:intake-generated" not in script[final_body_guard:]
+    first_write = min(
+        script.index("github.rest.issues.update("),
+        script.index("github.rest.issues.updateComment("),
+        script.index("github.rest.issues.createComment("),
+    )
+    assert script.index("github.rest.issues.get(") < first_write
+    assert script.index("if (!completeCommentScan)") < first_write
+    assert script.index("if (markedComments.length > 1)") < first_write
     uses = re.findall(r"^\s*uses:\s*([^\s#]+)", raw, re.MULTILINE)
     assert uses and all(re.fullmatch(r"[^@]+@[0-9a-f]{40}", value) for value in uses)
     assert "actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd" in raw

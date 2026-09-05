@@ -24,7 +24,7 @@ for (const [name, value] of [
   ["purpose", "Evaluate alpha"],
   ["outcome", "Add a reviewed model"],
   ["reason", "A team needs it"],
-  ["candidate-evidence", "https://docs.example.invalid/alpha"],
+  ["candidate-evidence", "https://docs.example.invalid/alpha | 2026-09-05T09:00:00Z | sha256-alpha"],
   ["acceptance", "Evidence matches"],
 ]) fields.set(name, control(value));
 
@@ -32,7 +32,6 @@ const summary = control();
 summary.selected = false;
 summary.select = () => { summary.selected = true; };
 const issueLink = { href: "" };
-const copyLabel = { textContent: "Copy draft summary" };
 const urlStatus = { textContent: "" };
 const copyStatus = { textContent: "" };
 const copyButton = control();
@@ -49,7 +48,6 @@ const form = {
       "[data-proposal-summary]": summary,
       "[data-proposal-issue-link]": issueLink,
       "[data-copy-summary]": copyButton,
-      "[data-copy-label]": copyLabel,
       "[data-proposal-url-status]": urlStatus,
       "[data-proposal-copy-status]": copyStatus,
     }[selector] || null;
@@ -70,6 +68,9 @@ Object.defineProperty(global, "navigator", {
 });
 
 const source = fs.readFileSync(path.join(__dirname, "../../site/assets/proposal.js"), "utf8");
+const template = fs.readFileSync(path.join(__dirname, "../../site/templates/propose.html"), "utf8");
+assert.match(template, /data-copy-summary><span>Copy draft summary<\/span>/);
+assert.doesNotMatch(template, /data-copy-label/);
 vm.runInThisContext(source, { filename: "proposal.js" });
 assert.equal(typeof documentListeners.get("DOMContentLoaded"), "function");
 documentListeners.get("DOMContentLoaded")();
@@ -167,12 +168,10 @@ assert.equal(copyButton.listeners.has("click"), true);
   let resolveWrite;
   navigator.clipboard.writeText = () => new Promise(resolve => { resolveWrite = resolve; });
   const success = click();
-  assert.equal(copyLabel.textContent, "Copy draft summary");
   assert.equal(copyStatus.textContent, "");
   const overflowAnnouncement = urlStatus.textContent;
   resolveWrite();
   await success;
-  assert.equal(copyLabel.textContent, "Copy draft summary");
   assert.equal(copyStatus.textContent, "Draft summary copied.");
   assert.equal(urlStatus.textContent, overflowAnnouncement);
 
@@ -180,7 +179,6 @@ assert.equal(copyButton.listeners.has("click"), true);
   summary.selected = false;
   navigator.clipboard.writeText = async () => { throw new Error("denied"); };
   await click();
-  assert.equal(copyLabel.textContent, "Copy draft summary");
   assert.equal(copyStatus.textContent, "Copy failed. Select the draft summary and copy it manually.");
   assert.equal(summary.selected, true);
   assert.equal(urlStatus.textContent, overflowAnnouncement);
@@ -189,7 +187,6 @@ assert.equal(copyButton.listeners.has("click"), true);
   summary.selected = false;
   navigator.clipboard = undefined;
   await click();
-  assert.equal(copyLabel.textContent, "Copy draft summary");
   assert.equal(copyStatus.textContent, "Select and copy manually");
   assert.equal(summary.selected, true);
   assert.equal(urlStatus.textContent, overflowAnnouncement);

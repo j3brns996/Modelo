@@ -804,6 +804,16 @@ evidence is never accepted catalogue evidence. See `docs/mac-contract.md`.
 | Publication | Pages Actions artefact | Pages CI artefact |
 | Release | Protected tag and release | Protected tag and release |
 
+Both adapters bind event repository identity and the linked issue's exact URL
+to committed configuration. GitLab also requires equal positive project,
+source-project and target-project identifiers and a canonical HTTPS project
+URL matching the complete namespace and project path. Trusted workflow identity
+comes from protected-base configuration: GitHub names
+`<namespace>/<name>/.github/workflows/modelo.yml@<branch>`, while GitLab names
+`<namespace>/<name>/.gitlab-ci.yml@<branch>`. Neither adapter may assert
+`public-pages` unless the selected active profile uses `pages` delivery with
+public visibility.
+
 `modelo-local-ci` provides fast, non-accepting feedback with the same fixed test
 inventory and offline package gate used by GitHub. It classifies only the
 catalogue/control boundary; agent-approval eligibility remains a separate,

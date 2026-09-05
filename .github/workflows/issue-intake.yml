@@ -15,7 +15,7 @@ concurrency:
 jobs:
   compile:
     name: Validate and compile proposal
-    if: ${{ github.event.issue.pull_request == null && (contains(github.event.issue.body, '### Request type') || contains(github.event.issue.body, '<!-- modelo:intake-generated-start -->')) }}
+    if: ${{ github.event.issue.pull_request == null && (contains(github.event.issue.body, '### Modelo MAC request type') || contains(github.event.issue.body, '<!-- modelo:intake-generated-start -->') || contains(github.event.issue.body, '<!-- modelo:intake-generated-end -->')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -69,16 +69,40 @@ jobs:
             const issue_number = context.issue.number;
             const issueBody = fs.readFileSync(process.env.ISSUE_BODY_OUTPUT, "utf8");
             const commentBody = fs.readFileSync(process.env.COMMENT_OUTPUT, "utf8");
-            if (context.payload.issue.body !== issueBody) {
-              await github.rest.issues.update({ owner, repo, issue_number, body: issueBody });
-            }
-            const response = await github.rest.issues.listComments({
-              owner, repo, issue_number, per_page: 100,
-            });
             const marker = "<!-- modelo:intake-result -->";
-            const existing = response.data.find(comment =>
-              comment.user?.login === "github-actions[bot]" && comment.body?.includes(marker)
-            );
+            const maxCommentPages = 10;
+            const markedComments = [];
+            let completeCommentScan = false;
+            for (let page = 1; page <= maxCommentPages; page += 1) {
+              const response = await github.rest.issues.listComments({
+                owner, repo, issue_number, per_page: 100, page,
+              });
+              markedComments.push(...response.data.filter(comment =>
+                comment.user?.login === "github-actions[bot]" && comment.body?.includes(marker)
+              ));
+              if (markedComments.length > 1) {
+                throw new Error("multiple Modelo intake result comments found");
+              }
+              if (response.data.length < 100) {
+                completeCommentScan = true;
+                break;
+              }
+            }
+            if (!completeCommentScan) {
+              throw new Error("Modelo intake comment scan exceeded 1000 comments");
+            }
+            let current = await github.rest.issues.get({ owner, repo, issue_number });
+            if (current.data.body !== context.payload.issue.body) {
+              throw new Error("issue changed after this intake event; refusing stale writes");
+            }
+            const existing = markedComments[0];
+            if (current.data.body !== issueBody) {
+              await github.rest.issues.update({ owner, repo, issue_number, body: issueBody });
+              current = await github.rest.issues.get({ owner, repo, issue_number });
+            }
+            if (current.data.body !== issueBody) {
+              throw new Error("compiled issue body was not retained; refusing comment write");
+            }
             if (existing) {
               if (existing.body !== commentBody) {
                 await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: commentBody });

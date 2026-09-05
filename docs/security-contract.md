@@ -12,7 +12,10 @@
 - Core validation/build never uses the network or dereferences catalogue URLs.
   A least-privilege host-adapter pre-step may read bounded MAC metadata from the
   same repository's Git-provider API and emits canonical input bound to the head
-  SHA. Cloud APIs, CLIs, MCP
+  SHA. The adapter rejects event repository or issue identities and URLs that
+  differ from committed configuration. GitLab also requires equal positive
+  project, source-project and target-project identifiers and a canonical HTTPS
+  project URL. Cloud APIs, CLIs, MCP
   tools, issue text and documents are untrusted read-only evidence inputs, not
   instructions. Prompt-injection strings remain inert data.
 - Remote presentation dependencies are limited to the exact configured Google
@@ -34,8 +37,15 @@
   interpolated into a shell command. Its token has `contents: read` and
   `issues: write` only; it may update the generated issue block and one marked
   bot comment, but cannot write contents, branches, pull requests or approvals.
-  The generated payload is bound to the human issue body digest, and invalid
-  edits remove stale generated data.
+  Before any write, it refetches the issue and requires its current body to
+  equal the triggering body exactly. Comment discovery is bounded to 1,000
+  comments; exhaustion or duplicate marked bot comments fails closed. After a
+  body update, it refetches and requires the current body to equal the exact
+  compiled or cleaned body. Only then does the same invocation update or create
+  the single marked result comment; a mismatch fails closed. These provider
+  reads and writes are sequential checks, not an atomic transaction. The
+  generated payload is bound to the human issue body digest, and invalid edits
+  remove stale generated data.
 - Browser and local authoring helpers are outside the trust boundary. The
   propose page's add/change summary is non-canonical, and its five operation
   links only direct users to configured intake forms. `modelo dev mac-init`
@@ -64,7 +74,10 @@
   repository/current-base/head/tree, date/epoch/profile/URL, MAC delta, named
   artefact, tool/lock/actor-registry or CI provider/workflow/run/check/result.
   It separately enforces CI head equals top-level head and CI provider equals
-  repository provider. The final receipt digest binds the exact RFC
+  repository provider. It validates the provider-specific GitHub workflow or
+  GitLab pipeline identity derived from protected-base configuration. The
+  adapter asserts `public-pages` only for an active profile with `pages`
+  delivery and public visibility. The final receipt digest binds the exact RFC
   8785 check-receipt bytes plus LF; source, CI and approval heads must agree,
   and merge tree must equal the accepted head tree. Agent eligibility applies
   only when every changed path is data-only; one control-plane path makes the

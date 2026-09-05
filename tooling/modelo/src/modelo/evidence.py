@@ -234,15 +234,15 @@ def create_evidence_record(
 ) -> dict[str, Any]:
     """Construct and schema-validate a content-addressed evidence record."""
 
+    api_fields = {
+        "provider": provider,
+        "service": service,
+        "operation": operation,
+        "partition": partition,
+        "region": region,
+        "sanitised_parameters": sanitised_parameters,
+    }
     if source_type == "first-party-read-api":
-        api_fields = {
-            "provider": provider,
-            "service": service,
-            "operation": operation,
-            "partition": partition,
-            "region": region,
-            "sanitised_parameters": sanitised_parameters,
-        }
         missing = [
             name
             for name, value in api_fields.items()
@@ -277,14 +277,6 @@ def create_evidence_record(
             "documentation_uri": uri,
         }
     else:
-        api_fields = {
-            "provider": provider,
-            "service": service,
-            "operation": operation,
-            "partition": partition,
-            "region": region,
-            "sanitised_parameters": sanitised_parameters,
-        }
         supplied = [
             name
             for name, value in api_fields.items()

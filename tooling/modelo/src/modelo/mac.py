@@ -455,56 +455,50 @@ def _bounded_body(body: str) -> None:
         raise MacError(f"issue body exceeds {MAX_BODY_BYTES} bytes")
 
 
+def _validate_generated_intake_envelope(body: str) -> None:
+    """Validate the optional generated block against its exact human source."""
+
+    starts = [match.start() for match in re.finditer(re.escape(INTAKE_START), body)]
+    ends = [match.start() for match in re.finditer(re.escape(INTAKE_END), body)]
+    if not starts and not ends:
+        return
+    if len(starts) != 1 or len(ends) != 1 or ends[0] < starts[0]:
+        raise MacError("generated intake block is ambiguous")
+    if body[ends[0] + len(INTAKE_END):].strip():
+        raise MacError("generated intake block is not final")
+
+    source_digests = re.findall(
+        r"<!-- modelo:intake-source (sha256:[0-9a-f]{64}) -->",
+        body[starts[0]:ends[0]],
+    )
+    source = body[:starts[0]].rstrip()
+    actual = "sha256:" + hashlib.sha256(source.encode("utf-8")).hexdigest()
+    if source_digests != [actual]:
+        raise MacError("guided proposal human fields changed after payload generation")
+
+
 def extract_adapter_issue_payload(body: str, adapter: Adapter) -> dict[str, Any]:
     """Recover a payload from the actual filled GitHub or GitLab template shape."""
 
     _bounded_body(body)
+    if adapter not in {"github", "gitlab"}:
+        raise MacError("unsupported Git-provider adapter")
+    _validate_generated_intake_envelope(body)
+
     if adapter == "github":
-        starts = [match.start() for match in re.finditer(re.escape(INTAKE_START), body)]
-        ends = [match.start() for match in re.finditer(re.escape(INTAKE_END), body)]
-        if starts or ends:
-            if len(starts) != 1 or len(ends) != 1 or ends[0] < starts[0]:
-                raise MacError("generated intake block is ambiguous")
-            if body[ends[0] + len(INTAKE_END):].strip():
-                raise MacError("generated intake block is not final")
-            source_digests = re.findall(
-                r"<!-- modelo:intake-source (sha256:[0-9a-f]{64}) -->",
-                body[starts[0]:ends[0]],
-            )
-            source = body[:starts[0]].rstrip()
-            actual = "sha256:" + hashlib.sha256(source.encode("utf-8")).hexdigest()
-            if source_digests != [actual]:
-                raise MacError("guided proposal human fields changed after payload generation")
         payload_matches = re.findall(
             r"(?ms)^### (?:Neutral MAC payload|Change details \(JSON\))\n\n```json\n([\s\S]*?)\n```(?:\n|$)", body
         )
         digest_matches = re.findall(
             r"(?m)^### (?:Neutral payload digest|Change fingerprint)\n\n(sha256-[0-9a-f]{64})$", body
         )
-    elif adapter == "gitlab":
-        starts = [match.start() for match in re.finditer(re.escape(INTAKE_START), body)]
-        ends = [match.start() for match in re.finditer(re.escape(INTAKE_END), body)]
-        if starts or ends:
-            if len(starts) != 1 or len(ends) != 1 or ends[0] < starts[0]:
-                raise MacError("generated intake block is ambiguous")
-            if body[ends[0] + len(INTAKE_END):].strip():
-                raise MacError("generated intake block is not final")
-            source_digests = re.findall(
-                r"<!-- modelo:intake-source (sha256:[0-9a-f]{64}) -->",
-                body[starts[0]:ends[0]],
-            )
-            source = body[:starts[0]].rstrip()
-            actual = "sha256:" + hashlib.sha256(source.encode("utf-8")).hexdigest()
-            if source_digests != [actual]:
-                raise MacError("guided proposal human fields changed after payload generation")
+    else:
         payload_matches = re.findall(
             r"(?ms)^(?:### (?:Neutral MAC payload|Change details \(JSON\))\n\n)?```json\n([\s\S]*?)\n```(?:\n|$)", body
         )
         digest_matches = re.findall(
             r"(?m)^(?:### (?:Neutral payload digest|Change fingerprint)\n\n|Neutral payload digest: `)(sha256-[0-9a-f]{64})`?$", body
         )
-    else:
-        raise MacError("unsupported Git-provider adapter")
     if len(payload_matches) != 1 or len(digest_matches) != 1:
         raise MacError("adapter issue body must contain one MAC payload and one digest field")
     payload = _parse_json_payload(payload_matches[0])
@@ -565,4 +559,3 @@ def init_mac_payload(
         payload["batch_scope"] = batch_scope
 
     return with_computed_keys(payload)
-

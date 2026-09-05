@@ -7,6 +7,9 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any, get_type_hints
+
+from modelo.cli import _parse_json_arg, _read_json_file
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests/fixtures/semantic"))
@@ -22,6 +25,11 @@ class CliTests(unittest.TestCase):
             capture_output=True,
             check=False,
         )
+
+    def test_json_helper_annotations_resolve_at_runtime(self) -> None:
+        for helper in (_read_json_file, _parse_json_arg):
+            with self.subTest(helper=helper.__name__):
+                self.assertIs(get_type_hints(helper)["return"], Any)
 
     def test_version_is_deterministic(self) -> None:
         result = self.run_cli("--version")

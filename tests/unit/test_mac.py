@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import unittest
 from copy import deepcopy
@@ -152,6 +153,48 @@ class MacTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(MacError):
                 extract_issue_payload(candidate)
 
+    def test_adapter_transport_rejects_invalid_generated_intake_envelopes(self) -> None:
+        payload = self.fixtures()["add"]
+        intake_start = "<!-- modelo:intake-generated-start -->"
+        intake_end = "<!-- modelo:intake-generated-end -->"
+        human_source = "### Request type\n\nAdd\n\n### Reason\n\nA governed request"
+        source_digest = "sha256:" + hashlib.sha256(human_source.encode("utf-8")).hexdigest()
+
+        for adapter in ("github", "gitlab"):
+            native_body = render_adapter_issue_body(payload, adapter)
+            source_marker = f"<!-- modelo:intake-source {source_digest} -->"
+            generated = (
+                f"{human_source}\n\n{intake_start}\n{source_marker}\n"
+                f"{native_body}{intake_end}\n"
+            )
+            wrong_source_marker = "<!-- modelo:intake-source sha256:" + "f" * 64 + " -->"
+            wrong_payload_digest = "sha256-" + "f" * 64
+            reversed_markers = (
+                f"{human_source}\n\n{intake_end}\n{source_marker}\n"
+                f"{native_body}{intake_start}\n"
+            )
+            cases = {
+                "missing start marker": generated.replace(intake_start, "", 1),
+                "missing end marker": generated.replace(intake_end, "", 1),
+                "duplicate start marker": generated.replace(intake_start, intake_start * 2, 1),
+                "duplicate end marker": generated.replace(intake_end, intake_end * 2, 1),
+                "reversed markers": reversed_markers,
+                "non-final generated block": generated + "unexpected trailing content",
+                "absent source digest": generated.replace(source_marker, "", 1),
+                "duplicate source digest": generated.replace(source_marker, source_marker * 2, 1),
+                "wrong source digest": generated.replace(source_marker, wrong_source_marker, 1),
+                "altered human source": generated.replace("A governed request", "An altered request", 1),
+                "wrong canonical digest": generated.replace(
+                    payload_digest(payload), wrong_payload_digest, 1
+                ),
+            }
+            for name, candidate in cases.items():
+                with self.subTest(adapter=adapter, mutation=name), self.assertRaises(MacError):
+                    extract_adapter_issue_payload(candidate, adapter)
+
+            with self.subTest(adapter=adapter, mutation="valid envelope"):
+                self.assertEqual(extract_adapter_issue_payload(generated, adapter), payload)
+
     def test_helpers_do_not_mutate_callers(self) -> None:
         payload = self.fixtures()["batch"]
         before = deepcopy(payload)
@@ -236,4 +279,3 @@ class MacTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

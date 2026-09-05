@@ -18,7 +18,8 @@ from modelo.mac import compute_keys
 from modelo.mac import render_adapter_issue_body
 from modelo.github_adapter import prepare_github, prepare_github_control
 from modelo.platform import (
-    TrustedCheckRequest, TrustedControlCheckRequest, run_trusted_check,
+    TrustedCheckRequest, TrustedControlCheckRequest, _verify_protected_workflow,
+    run_trusted_check,
     run_trusted_control_check,
 )
 from modelo.receipt import canonical_bytes, manifest_entries, publication_digest, sha256_bytes
@@ -370,11 +371,79 @@ class FinalSiteTests(unittest.TestCase):
             run_trusted_check(TrustedCheckRequest(
                 root=self.root, context=external, mac_metadata=self.metadata_path, output=output,
             ))
+        bad = dict(context)
+        bad["workflow_identity"] = "j3brns996/Modelo/.github/workflows/forged.yml@main"
+        external.write_bytes(canonical_bytes(bad))
+        with self.assertRaisesRegex(BuildError, "workflow identity"):
+            run_trusted_check(TrustedCheckRequest(
+                root=self.root, context=external, mac_metadata=self.metadata_path, output=output,
+            ))
         external.write_text('{"contract_version":"0.1.0","contract_version":"0.1.0"}\n', encoding="utf-8")
         with self.assertRaisesRegex(BuildError, "strict trusted check context JSON"):
             run_trusted_check(TrustedCheckRequest(
                 root=self.root, context=external, mac_metadata=self.metadata_path, output=output,
             ))
+
+    def test_protected_workflow_identity_is_provider_specific_and_exact(self) -> None:
+        github = {
+            "repository": {
+                "adapter": "github", "host": "github.example.invalid",
+                "namespace": "platform", "name": "registry",
+            },
+            "paths": {"github_adapter": ".github", "gitlab_ci": ".gitlab-ci.yml"},
+            "project": {"default_branch": "main"},
+        }
+        github_context = {
+            "repository": {
+                "provider": "github", "host": "github.example.invalid",
+                "namespace": "platform", "name": "registry",
+            },
+            "workflow_identity": "platform/registry/.github/workflows/modelo.yml@main",
+        }
+        _verify_protected_workflow(github_context, github)
+
+        gitlab = json.loads(json.dumps(github))
+        gitlab["repository"].update({
+            "adapter": "gitlab", "host": "gitlab.example.invalid",
+            "namespace": "group/subgroup", "name": "catalogue",
+        })
+        gitlab["project"]["default_branch"] = "stable"
+        gitlab_context = {
+            "repository": {
+                "provider": "gitlab", "host": "gitlab.example.invalid",
+                "namespace": "group/subgroup", "name": "catalogue",
+            },
+            "workflow_identity": "group/subgroup/catalogue/.gitlab-ci.yml@stable",
+        }
+        _verify_protected_workflow(gitlab_context, gitlab)
+
+        for forged_identity in (
+            "other/catalogue/.gitlab-ci.yml@stable",
+            "group/subgroup/other/.gitlab-ci.yml@stable",
+            "group/subgroup/catalogue/ci/forged.yml@stable",
+            "group/subgroup/catalogue/.gitlab-ci.yml@main",
+        ):
+            forged = {**gitlab_context, "workflow_identity": forged_identity}
+            with self.subTest(workflow_identity=forged_identity):
+                with self.assertRaisesRegex(BuildError, "workflow identity"):
+                    _verify_protected_workflow(forged, gitlab)
+
+        for field, value in (
+            ("provider", "github"),
+            ("host", "gitlab.invalid"),
+            ("namespace", "forged/group"),
+            ("name", "forged"),
+        ):
+            forged_repository = {**gitlab_context["repository"], field: value}
+            forged = {**gitlab_context, "repository": forged_repository}
+            with self.subTest(repository_field=field):
+                with self.assertRaisesRegex(BuildError, "repository identity"):
+                    _verify_protected_workflow(forged, gitlab)
+
+        unknown = json.loads(json.dumps(gitlab))
+        unknown["repository"]["adapter"] = "unknown"
+        with self.assertRaisesRegex(BuildError, "provider is unsupported"):
+            _verify_protected_workflow(gitlab_context, unknown)
 
     def test_github_adapter_binds_issue_pr_and_git_coordinates(self) -> None:
         validation = git(

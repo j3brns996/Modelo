@@ -89,6 +89,15 @@ input bound to the head SHA. The networkless core check verifies repository,
 immutable platform issue identifier, open state, payload, digest and affected
 identities from that input. Labels are routing hints only.
 
+The adapter must prove that provider event data describes the repository in
+the committed configuration. GitHub requires the exact repository coordinate
+and canonical issue URL. GitLab additionally requires positive, equal project
+identifiers across the project, source and target contexts; a canonical HTTPS
+project URL whose path matches the complete namespace and project name; and a
+linked issue with the same project identifier, IID, open state and exact URL.
+Nested GitLab namespaces remain part of the repository namespace. Credentials,
+ports, queries and fragments are not accepted in the project URL.
+
 The `--mac-metadata` input is an explicit file path; `schemas/mac-metadata.schema.json`
 is its validation contract, not a second input. T8 alone creates the file from the
 current same-repository provider context. It contains canonical repository
@@ -160,6 +169,13 @@ The canonical examples/schema render to:
 Adapter conformance tests must recover identical neutral objects. GitHub's
 generated block remains compatible with the earlier direct canonical-payload
 transport. Checkboxes and labels are assertions, not evidence.
+
+Trusted workflow identity is provider-specific and derived from protected-base
+configuration: GitHub uses
+`<namespace>/<name>/.github/workflows/modelo.yml@<branch>` and GitLab uses
+`<namespace>/<name>/.gitlab-ci.yml@<branch>`. The adapter may emit the
+`public-pages` capability only when the selected active profile has `pages`
+delivery and public visibility.
 
 ## Acceptance and approval
 

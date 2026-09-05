@@ -28,6 +28,13 @@ than treating a local draft as a request. The browser helper prepares issue
 fields; the two local helpers below separately prepare a neutral MAC payload or
 an evidence envelope for inspection.
 
+Current GitHub forms submit `### Modelo MAC request type` as their intake
+discriminator. A generic `### Request type` heading in an ordinary issue does
+not schedule the automatic intake workflow. The direct compiler remains
+compatible with that older heading, while automatic legacy recompilation is
+scheduled only when a Modelo-generated marker is already present. Open new
+requests through the guided chooser.
+
 ## Initialise a neutral MAC locally
 
 `modelo dev mac-init` is useful when an author needs a schema-valid neutral JSON

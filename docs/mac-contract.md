@@ -59,6 +59,12 @@ remove the stale generated block and update one marked bot comment with a
 bounded diagnostic. The compiler never edits catalogue files, branches,
 approvals or cloud state.
 
+GitHub intake refetches the current issue before any mutation and requires its
+body to equal the triggering body exactly. It scans at most 1,000 comments and
+fails closed if that bound is exhausted or more than one marked bot comment is
+present. A body update ends the current invocation; an eligible follow-up issue
+event performs the single marked-comment update.
+
 `change` preserves identity. In v0.1, `move` and `revoke` apply only to
 offerings. A move changes offering identity and compiles to atomic
 add-destination plus revoke-source; it has exactly two subjects, one with each

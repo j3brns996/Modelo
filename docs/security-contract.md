@@ -37,8 +37,12 @@
   interpolated into a shell command. Its token has `contents: read` and
   `issues: write` only; it may update the generated issue block and one marked
   bot comment, but cannot write contents, branches, pull requests or approvals.
-  The generated payload is bound to the human issue body digest, and invalid
-  edits remove stale generated data.
+  Before any write, it refetches the issue and requires its current body to
+  equal the triggering body exactly. Comment discovery is bounded to 1,000
+  comments; exhaustion or duplicate marked bot comments fails closed. After a
+  body update the invocation returns; an eligible follow-up issue event writes
+  the single result comment. The generated payload is bound to the human
+  issue body digest, and invalid edits remove stale generated data.
 - Browser and local authoring helpers are outside the trust boundary. The
   propose page's add/change summary is non-canonical, and its five operation
   links only direct users to configured intake forms. `modelo dev mac-init`

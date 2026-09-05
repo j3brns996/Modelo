@@ -8,7 +8,7 @@ from importlib.metadata import version
 import json
 from pathlib import Path
 from pathlib import PurePosixPath
-from typing import Sequence
+from typing import Any, Sequence
 
 from modelo.config import ConfigError, load_config
 from modelo.loader import load_yaml_mapping

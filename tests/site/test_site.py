@@ -795,6 +795,9 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn('data-proposal-summary', propose_page)
         self.assertIn('data-copy-summary', propose_page)
         self.assertIn('data-proposal-issue-link', propose_page)
+        for status in ("data-proposal-url-status", "data-proposal-copy-status"):
+            self.assertIn(status, propose_page)
+        self.assertEqual(propose_page.count('role="status" aria-live="polite" aria-atomic="true"'), 2)
         self.assertIn('data-intake-add="https://github.com/j3brns996/Modelo/issues/new?template=mac-add.yml"', propose_page)
         self.assertIn('data-intake-change="https://github.com/j3brns996/Modelo/issues/new?template=mac-change.yml"', propose_page)
         self.assertIn('href="https://github.com/j3brns996/Modelo/issues/new?template=mac-add.yml"', propose_page)

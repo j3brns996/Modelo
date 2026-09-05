@@ -1,10 +1,9 @@
 # Modelo
 
-Modelo is a Git-backed approval ledger and static publication system for an
-enterprise AI model catalogue. Model records describe facts. Offering records
-carry consumption approval. Issues start work; change requests and trusted CI
-decide them. There is no application API. Host-specific concerns stay in the
-Git adapter layer, not in core records or schemas.
+Modelo is a Git-backed approval ledger and static publisher for an enterprise
+AI model catalogue. Models record facts; offerings carry consumption approval.
+Issues start work, while change requests and trusted CI decide it. There is no
+application API; host concerns stay in Git adapters, not core records or schemas.
 
 ## Start Here
 
@@ -14,8 +13,7 @@ Git adapter layer, not in core records or schemas.
 - Repository rules and contracts: [SPEC.md](SPEC.md) and [docs/contract.yaml](docs/contract.yaml)
 
 Demo records are synthetic, not enterprise approval. Catalogue work starts in
-the issue chooser, which captures the intent and subjects the change request
-must preserve.
+the issue chooser, capturing the intent and subjects a change must preserve.
 
 ## Product tour
 
@@ -28,20 +26,18 @@ contain no production data.
 
 ## Why Facts And Approval Are Separate
 
-A model record describes a named model release; it does not permit enterprise
-use. An offering is the approval unit, joining the model to provider routes,
-policy rationale and evidenced conditions. This separation matters: provider
-availability, documentation examples and public demos are observations, not
-approval. Enterprise use follows the approved offering and route.
+A model describes a named release; it does not permit enterprise use. An
+offering is the approval unit, joining it to provider routes, policy rationale
+and evidenced conditions. Provider availability, documentation and demos are
+observations, not approval. Enterprise use follows the approved offering and
+route.
 
 ## Current Status
 
-T8 pre-merge CI, T9 and the public synthetic Pages demo are implemented. The
-synthetic demo is for the labelled demo slice only. Production post-merge
-release and receipt automation, plus the T10 remote evidence gate, are still
-blocked. No real production catalogue data is published, and agent approval is
-disabled. The site guides readers and validates the static publication flow;
-it does not claim launch completion.
+T8 pre-merge CI, T9 and the public synthetic Pages demo are implemented.
+Production post-merge release and receipt automation and the T10 remote gate
+remain blocked. No production catalogue data is published; agent approval is
+disabled. The site demonstrates static publication, not launch completion.
 
 Do not add real production catalogue data before T10 passes remotely.
 
@@ -60,13 +56,12 @@ Do not add real production catalogue data before T10 passes remotely.
 
 ## How A Change Is Decided
 
-A proposal begins with a linked issue and continues on a topic branch with one
-writer. The change request binds its operation to the exact base, head and tree
-under review. Trusted CI validates that head; a missing, stale, skipped or
-failed result cannot accept the change. Catalogue facts need admissible
-evidence, while policy text explains why an offering is approved. Human
+A proposal starts with a linked issue and continues on a one-writer topic
+branch. The change request binds its operation to the reviewed base, head and
+tree. Trusted CI validates that exact head; missing, stale, skipped or failed
+results cannot accept it. Catalogue facts need admissible evidence. Human
 CODEOWNER approval remains required for control and documentation paths. A new
-commit invalidates earlier check and review evidence.
+commit invalidates earlier checks and reviews.
 
 ## Five-Minute Setup
 
@@ -77,22 +72,18 @@ uv build --offline --no-cache
 uv run --locked modelo-local-ci run --base <base-sha> --head <head-sha> --as-of YYYY-MM-DD --jobs 3
 ```
 
-`modelo-local-ci` is advisory preflight only. It helps you compare a topic
-branch with its base, but it does not accept a change. `modelo/check` remains
-the acceptance gate. Use the exact base and head SHAs from your change request
-so the result matches the reviewed head.
+`modelo-local-ci` is advisory; `modelo/check` remains the acceptance gate. Use
+the change request's exact base and head SHAs so preflight matches review.
 
-Candidate and final builds take explicit provenance inputs. `--base-commit`
-names the comparison baseline; the matching source and tree values bind the
-output to reviewed Git content. See [docs/contract.yaml](docs/contract.yaml)
-for the required input set.
+Builds take explicit provenance inputs. `--base-commit` names the baseline;
+source and tree values bind output to reviewed Git content. See
+[docs/contract.yaml](docs/contract.yaml) for the required set.
 
 Authoring helpers prepare drafts only; the linked issue and trusted compiler
 remain authoritative.
 
-Run the command from a clean worktree after reading the repository rules and
-the schema that owns the changed files. Start with narrow tests, then use local
-CI for preflight. Never commit generated output from `dist/`.
+Work from a clean worktree after reading repository rules and relevant schemas.
+Run narrow tests before local CI. Never commit generated `dist/` output.
 
 ## Four Planes
 
@@ -103,31 +94,25 @@ CI for preflight. Never commit generated output from `dist/`.
 | Static presentation | `site/` | Templates, content and local assets |
 | Publication | `dist/` | Generated output, never committed |
 
-## Central Control: `modelo.yaml`
+## Configuration and validation authority
 
-[`modelo.yaml`](modelo.yaml) is the heart of the project. It defines the single source of truth for repository paths, publication profiles, host adapters (GitHub or GitLab), control identities, and central validation rules.
+[`modelo.yaml`](modelo.yaml) owns configured repository paths, site and issue
+routes, publication profiles, GitHub or GitLab adapter selection, platform
+controls, toolchain pins and build inputs. The tooling loads those values.
 
-Rather than duplicating regular expressions and enum lists across JavaScript, Python code, and JSON schemas, `modelo.yaml` anchors validation rules centrally:
-
-```yaml
-validation:
-  identity_pattern: "^[a-z0-9][a-z0-9._:/@+-]*$"
-  allowed_operations: [add, change, revoke, move, batch]
-  allowed_kinds: [model, offering, evidence, vendor, inference-service, condition]
-```
-
-When building the static site (`modelo build`) or drafting local changes (`modelo dev propose`), the system loads `modelo.yaml` so the web interface, CLI, and networkless validator (`modelo check`) enforce the exact same rules.
+Validation has separate, explicit owners. JSON schemas define record shapes
+and provenance annotations. The Python validator enforces cross-record,
+evidence and change semantics. [docs/contract.yaml](docs/contract.yaml) records
+the compact machine contract, while [SPEC.md](SPEC.md) explains its rationale.
+Configuration does not replace those shape or semantic authorities.
 
 ## Documentation Map
 
-- [CONTRIBUTING.md](CONTRIBUTING.md) covers linked issues, topic branches,
-  one-writer ownership and the local preflight flow.
+- [CONTRIBUTING.md](CONTRIBUTING.md) covers governed contribution and preflight.
 - [docs/README.md](docs/README.md) is the repository docs index.
-- [docs/authoring.md](docs/authoring.md) explains the browser and local drafting
-  helpers and where their authority ends.
+- [docs/authoring.md](docs/authoring.md) explains drafting helpers and authority.
 - [SPEC.md](SPEC.md) explains the product rationale, scope and invariants.
 - [docs/contract.yaml](docs/contract.yaml) is the compact machine contract.
-  Read it when you need the authoritative field, path and acceptance rules.
 
 ## Security And Reuse
 

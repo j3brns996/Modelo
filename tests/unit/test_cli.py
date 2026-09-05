@@ -189,8 +189,12 @@ class CliTests(unittest.TestCase):
             "--uri", "https://example.invalid/api",
             "--observed-at", "2026-09-01T00:00:00Z",
             "--projection", '{"modelName": "API Model"}',
+            "--provider", "aws",
+            "--service", "bedrock",
             "--operation", "GetFoundationModel",
+            "--partition", "aws",
             "--region", "us-east-1",
+            "--sanitised-parameters", '{"modelIdentifier": "model-1"}',
             "--retrieved-by", "mcp",
             "--visibility", "public",
         )
@@ -198,8 +202,21 @@ class CliTests(unittest.TestCase):
         record = json.loads(result.stdout)
         self.assertEqual(record["source"]["operation"], "GetFoundationModel")
         self.assertEqual(record["source"]["region"], "us-east-1")
+        self.assertEqual(record["source"]["provider"], "aws")
+        self.assertEqual(record["source"]["service"], "bedrock")
+        self.assertEqual(
+            record["source"]["sanitised_parameters"],
+            {"modelIdentifier": "model-1"},
+        )
         self.assertEqual(record["retrieved_by"], "mcp")
         self.assertEqual(record["visibility"], "public")
+
+        null_parameters = list(result.args[3:])
+        parameter_index = null_parameters.index("--sanitised-parameters")
+        null_parameters[parameter_index + 1] = "null"
+        null_result = self.run_cli(*null_parameters)
+        self.assertEqual(null_result.returncode, 0, null_result.stderr)
+        self.assertIsNone(json.loads(null_result.stdout)["source"]["sanitised_parameters"])
 
     def test_dev_evidence_create_rejects_invalid_records_without_output(self) -> None:
         base = (
@@ -210,7 +227,6 @@ class CliTests(unittest.TestCase):
             "--projection", '{"providerName": "AWS"}',
         )
         cases = (
-            ("source type", ("--source-type", "marketing-page")),
             ("URI", ("--uri", "http://example.invalid/doc")),
             ("timestamp", ("--observed-at", "2026-02-30T00:00:00Z")),
             ("retriever", ("--retrieved-by", "browser")),
@@ -242,27 +258,297 @@ class CliTests(unittest.TestCase):
             self.assertEqual(result.stdout, "")
             self.assertFalse(absent.exists())
 
-    def test_dev_evidence_create_api_requires_operation_and_region(self) -> None:
+        invalid_source = self.run_cli(*base, "--source-type", "marketing-page")
+        self.assertEqual(invalid_source.returncode, 2)
+        self.assertIn("invalid choice", invalid_source.stderr)
+
+    def test_dev_evidence_create_api_requires_all_api_arguments_together(self) -> None:
         base = (
             "dev", "evidence-create",
             "--source-type", "first-party-read-api",
             "--uri", "https://example.invalid/api",
             "--observed-at", "2026-09-01T00:00:00Z",
             "--projection", '{"modelName": "API Model"}',
+            "--provider", "aws",
+            "--service", "bedrock",
+            "--operation", "GetFoundationModel",
+            "--partition", "aws",
+            "--region", "us-east-1",
+            "--sanitised-parameters", '{}',
         )
         with tempfile.TemporaryDirectory() as tmp_dir:
-            for name, extra in (
-                ("operation", ("--region", "us-east-1")),
-                ("region", ("--operation", "GetFoundationModel")),
+            for option in (
+                "--provider", "--service", "--operation", "--partition", "--region",
+                "--sanitised-parameters",
             ):
+                arguments = list(base)
+                position = arguments.index(option)
+                del arguments[position:position + 2]
+                name = option.removeprefix("--")
                 output = Path(tmp_dir) / f"missing-{name}.json"
                 output.write_text("preserve me\n", encoding="utf-8")
-                result = self.run_cli(*base, *extra, "--output", str(output))
+                result = self.run_cli(*arguments, "--output", str(output))
                 with self.subTest(missing=name):
                     self.assertEqual(result.returncode, 2)
                     self.assertEqual(result.stdout, "")
-                    self.assertIn("invalid evidence record", result.stderr)
+                    self.assertIn("requires API arguments together", result.stderr)
+                    self.assertIn(option, result.stderr)
                     self.assertEqual(output.read_text(encoding="utf-8"), "preserve me\n")
+
+    def test_dev_evidence_create_documentation_rejects_each_api_argument(self) -> None:
+        base = (
+            "dev", "evidence-create",
+            "--source-type", "official-provider-documentation",
+            "--uri", "https://example.invalid/doc",
+            "--observed-at", "2026-09-01T00:00:00Z",
+            "--projection", '{}',
+        )
+        for option, value in (
+            ("--provider", "aws"),
+            ("--service", "bedrock"),
+            ("--operation", "GetFoundationModel"),
+            ("--partition", "aws"),
+            ("--region", "us-east-1"),
+            ("--sanitised-parameters", "{}"),
+        ):
+            result = self.run_cli(*base, option, value)
+            with self.subTest(option=option):
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(result.stdout, "")
+                self.assertIn(
+                    "documentation sources do not accept API-only arguments",
+                    result.stderr,
+                )
+                self.assertIn(option, result.stderr)
+
+    def test_dev_evidence_create_choices_are_exact(self) -> None:
+        base = (
+            "dev", "evidence-create",
+            "--source-type", "first-party-read-api",
+            "--uri", "https://example.invalid/api",
+            "--observed-at", "2026-09-01T00:00:00Z",
+            "--projection", '{}',
+        )
+        for option, value in (
+            ("--source-type", "provider-docs"),
+            ("--provider", "gcp"),
+            ("--service", "vertex"),
+        ):
+            arguments = list(base)
+            if option in arguments:
+                arguments[arguments.index(option) + 1] = value
+            else:
+                arguments.extend((option, value))
+            result = self.run_cli(*arguments)
+            with self.subTest(option=option):
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("invalid choice", result.stderr)
+
+    def test_dev_evidence_create_rejects_sensitive_parameters_without_output(self) -> None:
+        base = (
+            "dev", "evidence-create",
+            "--source-type", "first-party-read-api",
+            "--uri", "https://example.invalid/api",
+            "--observed-at", "2026-09-01T00:00:00Z",
+            "--projection", '{}',
+            "--provider", "aws",
+            "--service", "bedrock",
+            "--operation", "GetFoundationModel",
+            "--partition", "aws",
+            "--region", "us-east-1",
+        )
+        cases = (
+            ({"offerToken": "secret"}, "offerToken"),
+            ({"auth": {"credentials": "secret"}}, "credentials"),
+            ({"items": [{"OFFER_TOKEN": "secret"}]}, "offerToken"),
+            ({"items": [{"CrE_Den-TiAls": "secret"}]}, "credentials"),
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            for index, (parameters, key) in enumerate(cases):
+                for existing in (False, True):
+                    output = tmp_path / f"sensitive-{index}-{existing}.json"
+                    if existing:
+                        output.write_text("preserve me\n", encoding="utf-8")
+                    result = self.run_cli(
+                        *base,
+                        "--sanitised-parameters", json.dumps(parameters),
+                        "--output", str(output),
+                    )
+                    with self.subTest(parameters=parameters, existing=existing):
+                        self.assertEqual(result.returncode, 2)
+                        self.assertEqual(result.stdout, "")
+                        self.assertIn(
+                            f"prohibited sensitive key {key}", result.stderr
+                        )
+                        self.assertNotIn("secret", result.stderr)
+                        if existing:
+                            self.assertEqual(
+                                output.read_text(encoding="utf-8"), "preserve me\n"
+                            )
+                        else:
+                            self.assertFalse(output.exists())
+
+            allowed = self.run_cli(
+                *base,
+                "--sanitised-parameters", '{"maxTokens": 256}',
+            )
+            self.assertEqual(allowed.returncode, 0, allowed.stderr)
+            self.assertEqual(
+                json.loads(allowed.stdout)["source"]["sanitised_parameters"],
+                {"maxTokens": 256},
+            )
+
+    def test_dev_json_arguments_have_explicit_precedence_and_clear_errors(self) -> None:
+        base = (
+            "dev", "evidence-create",
+            "--source-type", "official-vendor-documentation",
+            "--uri", "https://example.invalid/doc",
+            "--observed-at", "2026-09-01T00:00:00Z",
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            legacy = tmp_path / "legacy.json"
+            legacy.write_text('{"mode": "legacy"}', encoding="utf-8")
+
+            legacy_result = self.run_cli(*base, "--projection", str(legacy))
+            self.assertEqual(legacy_result.returncode, 0, legacy_result.stderr)
+            self.assertEqual(
+                json.loads(legacy_result.stdout)["projection"], {"mode": "legacy"}
+            )
+
+            at_result = self.run_cli(*base, "--projection", f"@{legacy}")
+            self.assertEqual(at_result.returncode, 0, at_result.stderr)
+            self.assertEqual(
+                json.loads(at_result.stdout)["projection"], {"mode": "legacy"}
+            )
+
+            inline_path_string = self.run_cli(
+                *base, "--projection", json.dumps(str(legacy))
+            )
+            self.assertEqual(inline_path_string.returncode, 0, inline_path_string.stderr)
+            self.assertEqual(
+                json.loads(inline_path_string.stdout)["projection"], str(legacy)
+            )
+
+            for value, message in (
+                (
+                    f"@{tmp_path / 'missing.json'}",
+                    "does not exist or is not a regular file",
+                ),
+                ("@", "@path must name a JSON file"),
+                (
+                    "not-json-or-a-file",
+                    "must be inline JSON, @path, or an existing JSON file",
+                ),
+            ):
+                result = self.run_cli(*base, "--projection", value)
+                with self.subTest(value=value):
+                    self.assertEqual(result.returncode, 2)
+                    self.assertIn(message, result.stderr)
+
+            invalid = tmp_path / "invalid.json"
+            invalid.write_text("{bad", encoding="utf-8")
+            invalid_result = self.run_cli(*base, "--projection", f"@{invalid}")
+            self.assertEqual(invalid_result.returncode, 2)
+            self.assertIn("JSON file", invalid_result.stderr)
+            self.assertIn("is invalid", invalid_result.stderr)
+
+    def test_dev_optional_json_rejects_explicit_empty_values_without_output(self) -> None:
+        digest = "sha256-" + "a" * 64
+        cases = (
+            (
+                (
+                    "dev", "evidence-create",
+                    "--source-type", "official-provider-documentation",
+                    "--uri", "https://example.invalid/doc",
+                    "--observed-at", "2026-09-01T00:00:00Z",
+                    "--projection", '{}',
+                    "--scope", "",
+                ),
+                "--scope",
+            ),
+            (
+                (
+                    "dev", "mac-init",
+                    "--operation", "add",
+                    "--purpose", "Add test record",
+                    "--subjects", '[{"kind":"model","identity":"test-model"}]',
+                    "--requested-outcome", "Add record",
+                    "--reason", "New record available",
+                    "--candidate-evidence", json.dumps([{
+                        "uri": "https://example.invalid/doc",
+                        "observed_at": "2026-09-01T00:00:00Z",
+                        "digest": digest,
+                    }]),
+                    "--acceptance", '["criterion 1"]',
+                    "--batch-scope", "",
+                ),
+                "--batch-scope",
+            ),
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            for index, (arguments, option) in enumerate(cases):
+                output = Path(tmp_dir) / f"existing-{index}.json"
+                output.write_text("preserve me\n", encoding="utf-8")
+                result = self.run_cli(*arguments, "--output", str(output))
+                with self.subTest(option=option):
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(result.stdout, "")
+                    self.assertIn(option, result.stderr)
+                    self.assertIn("inline JSON is invalid", result.stderr)
+                    self.assertEqual(
+                        output.read_text(encoding="utf-8"), "preserve me\n"
+                    )
+
+    def test_dev_json_output_is_shared_pretty_and_preserved_on_input_failure(self) -> None:
+        digest = "sha256-" + "a" * 64
+        candidate_evidence = json.dumps([{
+            "uri": "https://example.invalid/doc",
+            "observed_at": "2026-09-01T00:00:00Z",
+            "digest": digest,
+        }])
+        common = (
+            "dev", "mac-init",
+            "--operation", "add",
+            "--purpose", "Add test record",
+            "--subjects", '[{"kind":"model","identity":"test-model"}]',
+            "--requested-outcome", "Add record",
+            "--reason", "New record available",
+            "--candidate-evidence", candidate_evidence,
+            "--acceptance", '["criterion 1"]',
+        )
+        stdout_result = self.run_cli(*common)
+        self.assertEqual(stdout_result.returncode, 0, stdout_result.stderr)
+        self.assertTrue(stdout_result.stdout.endswith("\n"))
+        self.assertEqual(
+            stdout_result.stdout,
+            json.dumps(
+                json.loads(stdout_result.stdout),
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            ) + "\n",
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output = Path(tmp_dir) / "payload.json"
+            output.write_text("preserve me\n", encoding="utf-8")
+            bad = self.run_cli(
+                *common, "--subjects", "@missing.json", "--output", str(output)
+            )
+            self.assertEqual(bad.returncode, 2)
+            self.assertEqual(output.read_text(encoding="utf-8"), "preserve me\n")
+
+            good = self.run_cli(*common, "--output", str(output))
+            self.assertEqual(good.returncode, 0, good.stderr)
+            written = output.read_text(encoding="utf-8")
+            self.assertEqual(
+                written,
+                json.dumps(
+                    json.loads(written), ensure_ascii=False, indent=2, sort_keys=True
+                ) + "\n",
+            )
 
     def test_dev_evidence_create_uses_schema_from_configured_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -317,28 +603,40 @@ class CliTests(unittest.TestCase):
         self.assertIn("modelo:", bad_result.stderr)
         self.assertNotIn("Traceback", bad_result.stderr)
 
-    def test_dev_propose_scaffolds_evidence_and_issue_body(self) -> None:
+    def test_dev_propose_is_unregistered_and_has_no_side_effects(self) -> None:
+        help_result = self.run_cli("dev", "--help")
+        self.assertEqual(help_result.returncode, 0, help_result.stderr)
+        self.assertIn("evidence-create", help_result.stdout)
+        self.assertIn("mac-init", help_result.stdout)
+        self.assertNotIn("propose", help_result.stdout)
+
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            for name in ("modelo.yaml", "VERSION", ".python-version", "pyproject.toml", "uv.lock"):
-                shutil.copy2(ROOT / name, root / name)
-            shutil.copytree(ROOT / "schemas", root / "schemas")
+            output = root / "proposal.md"
             result = self.run_cli(
                 "--root", str(root),
                 "dev", "propose",
-                "--operation", "add",
-                "--kind", "offering",
-                "--identity", "test-offering-propose",
-                "--purpose", "Test propose command purpose",
-                "--reason", "Test propose command reason",
-                "--uri", "https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html",
+                "--output", str(output),
             )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("### Request type\n\nadd", result.stdout)
-            self.assertIn("<!-- modelo:intake-generated-start -->", result.stdout)
-            self.assertIn("test-offering-propose", result.stdout)
-            evidence_files = list((root / "catalogue" / "evidence").glob("sha256-*.yaml"))
-            self.assertEqual(len(evidence_files), 1)
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.stdout, "")
+            self.assertIn("invalid choice", result.stderr)
+            self.assertFalse((root / "catalogue").exists())
+            self.assertFalse((root / "catalogue" / "evidence").exists())
+            self.assertFalse(output.exists())
+
+    def test_gitlab_platform_commands_remain_registered(self) -> None:
+        for command in (
+            "gitlab-issue",
+            "gitlab-control-issue",
+            "gitlab-prepare",
+            "gitlab-prepare-control",
+            "gitlab-intake",
+        ):
+            result = self.run_cli("platform", command, "--help")
+            with self.subTest(command=command):
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"modelo platform {command}", result.stdout)
 
 
 if __name__ == "__main__":

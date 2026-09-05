@@ -33,6 +33,8 @@ summary.selected = false;
 summary.select = () => { summary.selected = true; };
 const issueLink = { href: "" };
 const copyLabel = { textContent: "Copy draft summary" };
+const urlStatus = { textContent: "" };
+const copyStatus = { textContent: "" };
 const copyButton = control();
 
 const form = {
@@ -48,6 +50,8 @@ const form = {
       "[data-proposal-issue-link]": issueLink,
       "[data-copy-summary]": copyButton,
       "[data-copy-label]": copyLabel,
+      "[data-proposal-url-status]": urlStatus,
+      "[data-proposal-copy-status]": copyStatus,
     }[selector] || null;
   },
   addEventListener(name, callback) { formListeners.set(name, callback); },
@@ -80,9 +84,24 @@ assert.equal(copyButton.listeners.has("click"), true);
   assert.equal(url.origin + url.pathname, "https://code.example.invalid/group/catalogue/new");
   assert.equal(url.searchParams.get("template"), "configured-add");
   assert.equal(url.searchParams.get("subject_identity"), "alpha-model");
+  assert.equal(urlStatus.textContent, "Issue form link updated with the draft fields.");
+  assert.equal(copyStatus.textContent, "");
   assert.match(summary.value, /^Operation: add/m);
   assert.match(summary.value, /Subject identity: alpha-model/);
+  assert.doesNotMatch(summary.value, /Warning:/);
   assert.doesNotMatch(summary.value, /schema_version|YAML|subjects:/);
+}
+
+// Invalid identities remain visible and pre-filled, with the PR #63 warning retained.
+{
+  fields.get("subject-identity").value = "Bad Identity";
+  formListeners.get("input")();
+  const url = new URL(issueLink.href);
+  assert.equal(url.searchParams.get("subject_identity"), "Bad Identity");
+  assert.match(summary.value, /Subject identity: Bad Identity \(Warning: Subject identity must be lowercase ASCII/);
+  fields.get("subject-identity").value = "alpha-model";
+  formListeners.get("input")();
+  assert.doesNotMatch(summary.value, /Warning:/);
 }
 
 // Only the supported selector value changes the configured intake base URL.
@@ -96,6 +115,51 @@ assert.equal(copyButton.listeners.has("click"), true);
   assert.equal(url.searchParams.get("purpose"), "Evaluate alpha");
 }
 
+// The length bound is inclusive and is applied to the final percent-encoded href.
+{
+  fields.get("operation").value = "add";
+  for (const name of ["subject-kind", "subject-identity", "purpose", "outcome", "reason", "candidate-evidence", "acceptance"]) {
+    fields.get(name).value = "";
+  }
+  formListeners.get("input")();
+  const configuredLength = form.dataset.intakeAdd.length;
+  fields.get("reason").value = "x".repeat(7000 - configuredLength - "&reason=".length);
+  formListeners.get("input")();
+  assert.equal(issueLink.href.length, 7000);
+  assert.equal(new URL(issueLink.href).searchParams.get("reason"), fields.get("reason").value);
+  assert.equal(urlStatus.textContent, "Issue form link updated with the draft fields.");
+
+  fields.get("reason").value += "x";
+  const completeBoundaryReason = fields.get("reason").value;
+  formListeners.get("input")();
+  assert.equal(issueLink.href, form.dataset.intakeAdd);
+  assert.equal(new URL(issueLink.href).searchParams.has("reason"), false);
+  assert.equal(summary.value.includes(completeBoundaryReason), true);
+}
+
+// A short raw value whose percent-encoded href exceeds the bound also falls back atomically.
+{
+  fields.get("operation").value = "change";
+  fields.get("reason").value = "€".repeat(800);
+  const completeReason = fields.get("reason").value;
+  const encodedCandidate = new URL(form.dataset.intakeChange);
+  encodedCandidate.searchParams.set("reason", completeReason);
+  assert.equal(completeReason.length, 800);
+  assert.equal(encodedCandidate.href.length > 7000, true);
+  formListeners.get("change")();
+  assert.equal(issueLink.href, form.dataset.intakeChange);
+  const fallback = new URL(issueLink.href);
+  assert.equal(fallback.searchParams.get("template"), "configured-change");
+  assert.equal(fallback.searchParams.get("kept"), "yes");
+  for (const userParam of ["subject_kind", "subject_identity", "purpose", "requested_outcome", "reason", "candidate_evidence", "acceptance"]) {
+    assert.equal(fallback.searchParams.has(userParam), false);
+  }
+  assert.match(urlStatus.textContent, /too long to pre-fill safely/);
+  assert.match(urlStatus.textContent, /complete draft summary/);
+  assert.equal(copyStatus.textContent, "");
+  assert.equal(summary.value.includes(completeReason), true);
+}
+
 (async () => {
   const click = copyButton.listeners.get("click");
 
@@ -104,23 +168,31 @@ assert.equal(copyButton.listeners.has("click"), true);
   navigator.clipboard.writeText = () => new Promise(resolve => { resolveWrite = resolve; });
   const success = click();
   assert.equal(copyLabel.textContent, "Copy draft summary");
+  assert.equal(copyStatus.textContent, "");
+  const overflowAnnouncement = urlStatus.textContent;
   resolveWrite();
   await success;
-  assert.equal(copyLabel.textContent, "Copied");
+  assert.equal(copyLabel.textContent, "Copy draft summary");
+  assert.equal(copyStatus.textContent, "Draft summary copied.");
+  assert.equal(urlStatus.textContent, overflowAnnouncement);
 
   // Rejection never produces a success claim and selects a truthful manual fallback.
   summary.selected = false;
   navigator.clipboard.writeText = async () => { throw new Error("denied"); };
   await click();
-  assert.equal(copyLabel.textContent, "Copy failed — select text manually");
+  assert.equal(copyLabel.textContent, "Copy draft summary");
+  assert.equal(copyStatus.textContent, "Copy failed. Select the draft summary and copy it manually.");
   assert.equal(summary.selected, true);
+  assert.equal(urlStatus.textContent, overflowAnnouncement);
 
   // Missing Clipboard API also exposes only the manual action.
   summary.selected = false;
   navigator.clipboard = undefined;
   await click();
-  assert.equal(copyLabel.textContent, "Select and copy manually");
+  assert.equal(copyLabel.textContent, "Copy draft summary");
+  assert.equal(copyStatus.textContent, "Select and copy manually");
   assert.equal(summary.selected, true);
+  assert.equal(urlStatus.textContent, overflowAnnouncement);
 
   console.log("proposal builder behavior: passed");
 })().catch(error => {

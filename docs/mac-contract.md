@@ -48,10 +48,12 @@ and GitHub requesters do not construct JSON or calculate hashes. The site's
 five static operation cards use the configured intake URLs and remain the
 complete chooser. Its optional add/change builder produces only a non-canonical
 issue-field summary; revoke, move and batch are not composed there. The trusted
-default-branch `modelo platform github-intake` compiler creates a stable UUID
-version 5 from the issue coordinate, validates subjects and evidence references, computes
-both intent keys and the payload digest, and appends the canonical payload as a
-generated issue block. The block carries a digest of the human-authored
+default branch uses the selected adapter compiler: `modelo platform github-intake`
+for GitHub guided forms or `modelo platform gitlab-intake` for GitLab adapter
+intake. Each creates a stable UUID version 5 from the issue
+coordinate, validates subjects and evidence references, computes both intent
+keys and the payload digest, and appends the canonical payload as a generated
+issue block. The block carries a digest of the human-authored
 portion, so an edit cannot leave a stale payload looking valid. Invalid edits
 remove the stale generated block and update one marked bot comment with a
 bounded diagnostic. The compiler never edits catalogue files, branches,

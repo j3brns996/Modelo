@@ -11,6 +11,39 @@ from modelo.diagnostics import Diagnostic, Severity
 from modelo.schemas import SchemaSet
 
 
+_MISSING = object()
+_SENSITIVE_PARAMETER_KEYS = {
+    "credentials": "credentials",
+    "offertoken": "offerToken",
+}
+
+
+def _sensitive_parameter_key(value: Any) -> str | None:
+    pending = [value]
+    visited: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if isinstance(current, dict):
+            identity = id(current)
+            if identity in visited:
+                continue
+            visited.add(identity)
+            for key, child in current.items():
+                if isinstance(key, str):
+                    normalised = key.casefold().replace("_", "").replace("-", "")
+                    prohibited = _SENSITIVE_PARAMETER_KEYS.get(normalised)
+                    if prohibited is not None:
+                        return prohibited
+                pending.append(child)
+        elif isinstance(current, list):
+            identity = id(current)
+            if identity in visited:
+                continue
+            visited.add(identity)
+            pending.extend(current)
+    return None
+
+
 def _string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
@@ -189,9 +222,12 @@ def create_evidence_record(
     projection: Any,
     *,
     schemas: SchemaSet,
+    provider: str | None = None,
+    service: str | None = None,
     operation: str | None = None,
     partition: str | None = None,
     region: str | None = None,
+    sanitised_parameters: Any = _MISSING,
     retrieved_by: str = "cli",
     scope: dict[str, Any] | None = None,
     visibility: str = "internal",
@@ -199,17 +235,68 @@ def create_evidence_record(
     """Construct and schema-validate a content-addressed evidence record."""
 
     if source_type == "first-party-read-api":
+        api_fields = {
+            "provider": provider,
+            "service": service,
+            "operation": operation,
+            "partition": partition,
+            "region": region,
+            "sanitised_parameters": sanitised_parameters,
+        }
+        missing = [
+            name
+            for name, value in api_fields.items()
+            if name != "sanitised_parameters" and value is None
+        ]
+        if sanitised_parameters is _MISSING:
+            missing.append("sanitised_parameters")
+        if missing:
+            raise ValueError(
+                "invalid evidence record: first-party-read-api requires "
+                + ", ".join(missing)
+            )
+        if (provider, service) != ("aws", "bedrock"):
+            raise ValueError(
+                "invalid evidence record: first-party-read-api supports only "
+                "provider aws with service bedrock"
+            )
+        sensitive_key = _sensitive_parameter_key(sanitised_parameters)
+        if sensitive_key is not None:
+            raise ValueError(
+                "invalid evidence record: sanitised_parameters contains prohibited "
+                f"sensitive key {sensitive_key}"
+            )
         source: dict[str, Any] = {
             "type": source_type,
-            "provider": "aws",
-            "service": "bedrock",
-            "operation": operation or "",
-            "partition": partition or "aws",
-            "region": region or "",
-            "sanitised_parameters": {},
+            "provider": provider,
+            "service": service,
+            "operation": operation,
+            "partition": partition,
+            "region": region,
+            "sanitised_parameters": sanitised_parameters,
             "documentation_uri": uri,
         }
     else:
+        api_fields = {
+            "provider": provider,
+            "service": service,
+            "operation": operation,
+            "partition": partition,
+            "region": region,
+            "sanitised_parameters": sanitised_parameters,
+        }
+        supplied = [
+            name
+            for name, value in api_fields.items()
+            if name != "sanitised_parameters" and value is not None
+        ]
+        if sanitised_parameters is not _MISSING:
+            supplied.append("sanitised_parameters")
+        if supplied:
+            raise ValueError(
+                "invalid evidence record: documentation sources do not accept "
+                + ", ".join(supplied)
+            )
         source = {
             "type": source_type,
             "uri": uri,

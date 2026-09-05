@@ -93,6 +93,11 @@ class MacTemplateTests(unittest.TestCase):
                     self.assertIn(required, {item["id"] for item in fields})
                 self.assertNotIn("labels", form)
 
+        add_form = yaml.safe_load(
+            (ROOT / ".github/ISSUE_TEMPLATE/mac-add.yml").read_text(encoding="utf-8")
+        )
+        self.assertEqual(add_form["name"], "Add a catalogue record")
+
     def test_github_issue_forms_explain_the_request_in_plain_language(self) -> None:
         expected = {
             "add": "Add something new",
@@ -115,32 +120,68 @@ class MacTemplateTests(unittest.TestCase):
                 self.assertNotIn("Change details (JSON)", rendered)
                 self.assertNotIn("Change fingerprint", rendered)
 
-    def test_github_issue_form_labels_match_the_trusted_compiler(self) -> None:
+    def test_github_issue_form_common_fields_match_the_trusted_compiler(self) -> None:
         common = {
-            "Request type", "Purpose", "Requested outcome", "Why is this needed?",
-            "Supporting observations", "Acceptance checks", "Before submitting",
+            "request_type": ("Request type", True),
+            "purpose": ("Purpose", True),
+            "requested_outcome": ("Requested outcome", True),
+            "reason": ("Why is this needed?", True),
+            "candidate_evidence": ("Supporting observations", False),
+            "acceptance": ("Acceptance checks", True),
         }
         specific = {
-            "add": {"Subject type", "Subject identity"},
-            "change": {"Subject type", "Subject identity"},
-            "revoke": {"Offering identity"},
-            "move": {"Current offering identity", "Replacement offering identity"},
+            "add": {"subject_kind": "Subject type", "subject_identity": "Subject identity"},
+            "change": {"subject_kind": "Subject type", "subject_identity": "Subject identity"},
+            "revoke": {"subject_identity": "Offering identity"},
+            "move": {
+                "source_identity": "Current offering identity",
+                "destination_identity": "Replacement offering identity",
+            },
             "batch": {
-                "Batch change type", "Subject type", "Subject identities",
-                "Evidence source type", "Evidence source URL", "Opaque scope reference",
-                "Provider partition", "Source region", "Inference service",
+                "item_operation": "Batch change type",
+                "subject_kind": "Subject type",
+                "subject_identities": "Subject identities",
+                "source_type": "Evidence source type",
+                "source_url": "Evidence source URL",
+                "scope_ref": "Opaque scope reference",
+                "partition": "Provider partition",
+                "region": "Source region",
+                "inference_service": "Inference service",
             },
         }
-        for operation, operation_labels in specific.items():
+        for operation, operation_fields in specific.items():
             form = yaml.safe_load(
                 (ROOT / f".github/ISSUE_TEMPLATE/mac-{operation}.yml").read_text(encoding="utf-8")
             )
-            labels = {
-                item["attributes"]["label"] for item in form["body"]
+            fields = {
+                item["id"]: item for item in form["body"]
                 if item["type"] != "markdown"
             }
             with self.subTest(operation=operation):
-                self.assertEqual(labels, common | operation_labels)
+                self.assertEqual(set(fields), set(common) | set(operation_fields) | {"final_checks"})
+                for field_id, (label, required) in common.items():
+                    self.assertEqual(fields[field_id]["attributes"]["label"], label)
+                    self.assertIs(fields[field_id]["validations"]["required"], required)
+                for field_id, label in operation_fields.items():
+                    self.assertEqual(fields[field_id]["attributes"]["label"], label)
+                    self.assertTrue(fields[field_id]["validations"]["required"])
+                self.assertEqual(fields["final_checks"]["attributes"]["label"], "Before submitting")
+                self.assertTrue(all(
+                    option["required"]
+                    for option in fields["final_checks"]["attributes"]["options"]
+                ))
+
+    def test_github_issue_contact_link_is_derived_from_site_config(self) -> None:
+        repository = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
+        chooser = yaml.safe_load(
+            (ROOT / ".github/ISSUE_TEMPLATE/config.yml").read_text(encoding="utf-8")
+        )
+        expected = (
+            repository["site"]["base_url"].rstrip("/")
+            + repository["site"]["routes"]["process"]
+        )
+        self.assertEqual(len(chooser["contact_links"]), 1)
+        self.assertEqual(chooser["contact_links"][0]["url"], expected)
 
     def test_pull_request_templates_lead_with_decision_and_evidence(self) -> None:
         mac = (ROOT / ".github/PULL_REQUEST_TEMPLATE/mac.md").read_text(encoding="utf-8")

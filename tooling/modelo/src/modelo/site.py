@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from html import escape
 import hashlib
+from importlib.metadata import version as _tooling_version
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -374,7 +375,7 @@ def _navigation(resolver: _Resolver, current: str) -> str:
     )
 
 
-def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, request: _SiteBuildRequest, name: str, title: str, content: str, route: str, route_values: Mapping[str, str] | None = None) -> bytes:
+def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, request: _SiteBuildRequest, name: str, title: str, content: str, route: str, data_version: str, site_version: str, route_values: Mapping[str, str] | None = None) -> bytes:
     base = _template(root, source, templates_path, "base")
     try:
         font_stylesheet = str(resolver.fonts["stylesheet_url"])
@@ -416,6 +417,7 @@ def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, req
         "integration_commit_url": escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True),
         "source_commit_short": escape(request.source_commit[:12]), "as_of": request.as_of.isoformat(),
         "integration_commit_short": escape(request.integration_commit[:12]),
+        "data_version": escape(data_version), "site_version": escape(site_version),
     }
     return (_substitute(base, values, name) + "\n").encode("utf-8")
 
@@ -433,6 +435,8 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     for item in catalogue["offerings"]:
         offerings_by_model.setdefault(item["model_id"], []).append(item)
     history = _history(root, request.integration_commit, document["publication"]["profiles"][request.profile]["source"], resolver)
+    data_version = str(catalogue["contract_version"])
+    site_version = str(_tooling_version("modelo-tooling"))
     metrics = (
         ("Models", len(catalogue["models"])), ("Offerings", len(catalogue["offerings"])),
         ("Evidence", len(catalogue["evidence"])), ("Conditions", len(catalogue["conditions"])),
@@ -440,10 +444,14 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     summary = '<div class="console-grid">' + "".join(
         '<div><span>' + label + '</span><strong>' + str(value) + "</strong></div>"
         for label, value in metrics
-    ) + "</div><div class=\"console-foot\"><span>profile</span><code>" + escape(request.profile) + "</code><span>as_of</span><code>" + request.as_of.isoformat() + "</code></div>"
-    governance_flow = '<ol class="governance-flow"><li><span>01</span><strong>Find the facts</strong><p>Read the provider source and record when and where the facts were seen.</p></li><li><span>02</span><strong>Keep the proof</strong><p>Link each published claim to a fixed, content-addressed evidence record.</p></li><li><span>03</span><strong>Make a decision</strong><p>Review the proposed change and explain why the offering should be approved.</p></li><li><span>04</span><strong>Publish exactly</strong><p>Build the reviewed Git revision once and publish those exact files.</p></li></ol>'
+    ) + (
+        "</div><div class=\"console-foot\"><span>profile</span><code>" + escape(request.profile)
+        + "</code><span>as_of</span><code>" + request.as_of.isoformat()
+        + "</code><span>data</span><code>v" + escape(data_version)
+        + "</code><span>site</span><code>v" + escape(site_version) + "</code></div>"
+    )
     home_content = _substitute(templates["home"], {
-        "summary": summary, "governance_flow": governance_flow,
+        "summary": summary,
         "recent_changes": _history_summary_html(history[:3]),
         "catalogue_url": escape(resolver.site("catalogue"), quote=True),
         "process_url": escape(resolver.site("process"), quote=True),
@@ -586,7 +594,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         resolver.output_path("docs"): ("docs", "Documentation", docs_content, "docs"),
         resolver.output_path("not_found"): ("404", "Page not found", not_found_content, "not_found"),
     }
-    files = {path: _page(root, request.source_commit, templates_path, resolver, request, name, title, content, route) for path, (name, title, content, route) in page_specs.items()}
+    files = {path: _page(root, request.source_commit, templates_path, resolver, request, name, title, content, route, data_version, site_version) for path, (name, title, content, route) in page_specs.items()}
     for model in catalogue["models"]:
         model_refs = sorted({reference["id"] for reference in model.get("evidence_refs", {}).values()})
         facts = '<dl class="fact-grid"><div><dt>Identifier</dt><dd><code>' + escape(model["id"]) + "</code></dd></div><div><dt>Vendor</dt><dd>" + escape(model.get("vendor_id", "")) + "</dd></div><div><dt>Context window</dt><dd>" + (f'{model["context_window"]:,}' if model.get("context_window") else "Not stated") + "</dd></div><div><dt>Licence</dt><dd>" + escape(model.get("licensing", "Not stated")) + "</dd></div><div><dt>Capabilities</dt><dd>" + (_tags(model.get("capabilities", [])) or "Not stated") + "</dd></div><div><dt>Modalities</dt><dd>" + (_tags(model.get("modalities", [])) or "Not stated") + "</dd></div></dl>"
@@ -598,7 +606,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
             "model_status": '<span class="status-pill status-pill--' + escape(model.get("lifecycle", "unknown"), quote=True) + '">' + escape(model.get("lifecycle", "Unspecified").title()) + "</span>",
             "evidence_summary": '<p class="evidence-count"><strong>' + str(len(model_refs)) + '</strong><span>bound fact references</span></p><p>Every externally sourced field links to a content-addressed evidence projection.</p><div class="evidence-ids">' + (_tags(model_refs) or "None") + "</div>",
         }, "model")
-        files[resolver.output_path("model", model_id=model["id"])] = _page(root, request.source_commit, templates_path, resolver, request, "model", model.get("name", model["id"]), content, "model", {"model_id": model["id"]})
+        files[resolver.output_path("model", model_id=model["id"])] = _page(root, request.source_commit, templates_path, resolver, request, "model", model.get("name", model["id"]), content, "model", data_version, site_version, {"model_id": model["id"]})
     releases_url = str(document["repository"]["web_base"]).rstrip("/") + document["repository"]["web_routes"]["releases"]
     for offering in catalogue["offerings"]:
         if request.kind == "final":
@@ -611,7 +619,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         conditions = [f'{item["id"]}@{item["version"]}' for item in offering.get("condition_refs", [])]
         content = _substitute(templates["offering"], {"offering_name": escape(offering["id"]), "approval": approval, "approval_rationale": escape(offering["approval_rationale"]), "route_table": _route_rows(offering, evidence), "pricing_table": _pricing_rows(offering), "conditions_evidence": '<dl class="fact-grid"><div><dt>Conditions</dt><dd>' + (_tags(conditions) or "None") + '</dd></div><div><dt>Evidence</dt><dd>' + (_tags(refs) or "None") + "</dd></div></dl>"}, "offering")
         path = resolver.output_path("offering", inference_service_id=offering["inference_service_id"], offering_id=offering["id"])
-        files[path] = _page(root, request.source_commit, templates_path, resolver, request, "offering", offering["id"], content, "offering", {"inference_service_id": offering["inference_service_id"], "offering_id": offering["id"]})
+        files[path] = _page(root, request.source_commit, templates_path, resolver, request, "offering", offering["id"], content, "offering", data_version, site_version, {"inference_service_id": offering["inference_service_id"], "offering_id": offering["id"]})
     files[resolver.output_path("asset_css")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/site.css")
     files[resolver.output_path("asset_catalogue_js")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/catalogue.js")
     files[resolver.output_path("asset_proposal_js")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/proposal.js")

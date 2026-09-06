@@ -23,16 +23,16 @@ function proposalMarkdown(fields) {
     + "- [ ] I understand that this request is not approval.\n";
 }
 
-function proposalURL(configured, provider, fields, markdown) {
+function proposalURL(configured, provider, fields, markdown, title = proposalTitle(fields)) {
   const url = new URL(configured);
   if (provider === "gitlab") {
     url.searchParams.delete("issuable_template");
     url.searchParams.delete("description_template");
-    url.searchParams.set("issue[title]", proposalTitle(fields));
+    url.searchParams.set("issue[title]", title);
     url.searchParams.set("issue[description]", markdown);
     url.searchParams.set("issue[issue_type]", "issue");
   } else if (provider === "github") {
-    url.searchParams.set("title", proposalTitle(fields));
+    url.searchParams.set("title", title);
     for (const field of fields) {
       const name = field.name === "offering_identity" ? "subject_identity" : field.name;
       field.value ? url.searchParams.set(name, field.value) : url.searchParams.delete(name);
@@ -55,7 +55,7 @@ function proposalErrors(fields, records) {
         || /(^|\n)\s*(?:#{1,6}\s|\/\w|```)|<!--|-->/.test(field.value)) {
       errors[field.name] = "Use plain answers here, without headings, hidden comments or GitLab quick actions.";
     }
-    if (["purpose", "requested_outcome", "reason", "scope_ref", "partition", "region", "source_url"].includes(field.name)) {
+    if (["purpose", "requested_outcome", "reason", "scope_ref", "partition", "region", "source_url", "model_reference", "need"].includes(field.name)) {
       const limit = field.name === "purpose" ? 160 : (["scope_ref", "partition", "region"].includes(field.name) ? 256 : 2048);
       if (field.value.length > limit) errors[field.name] = `Keep this answer within ${limit} characters.`;
     }
@@ -87,6 +87,92 @@ function proposalErrors(fields, records) {
     })) errors.candidate_evidence = "Use up to 25 lines: HTTPS URL | UTC time (for example 2026-09-01T09:00:00Z) | sha256- followed by 64 hexadecimal characters.";
   }
   return errors;
+}
+
+function modelRequest(reference, need) {
+  const fields = [
+    {name: "model_reference", label: "Model card or provider", value: reference.trim()},
+    {name: "need", label: "What do you need?", value: need.trim(), required: true},
+  ];
+  const title = `Model request: ${fields[1].value.split("\n")[0] || "Review a model"}`.slice(0, 255);
+  const markdown = `# ${title}\n\nA maintainer or agent will prepare any catalogue change. This request is not approval.\n\n`
+    + fields.map(field => `### ${field.label}\n\n${field.value || "_No response_"}`).join("\n\n") + "\n";
+  return {fields, title, markdown, errors: proposalErrors(fields, [])};
+}
+
+async function testRepositoryAccess(configured) {
+  try {
+    const response = await fetch(configured, {method: "GET", credentials: "include",
+      redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(10000)});
+    if (response.type === "opaqueredirect" || response.status === 0) return "Could not verify: sign-in or another redirect may be required. Open the repository to continue.";
+    if (response.status === 200) return "Repository returned 200. This confirms access to that page, not your login or permission to submit.";
+    if (response.status === 403) return "Repository returned 403: access denied. Open the repository to sign in or check your permissions.";
+    return `Repository returned ${response.status}. Open the repository to check access.`;
+  } catch (_) {
+    return "Could not verify access from this page. Open the repository to check access and sign in.";
+  }
+}
+
+function initModelRequest() {
+  for (const form of document.querySelectorAll("form[data-model-request]")) {
+    if (form.dataset.initialized) continue;
+    form.dataset.initialized = "true";
+    const reference = form.querySelector("[data-request-reference]");
+    const need = form.querySelector("[data-request-need]");
+    const link = form.querySelector("[data-request-link]");
+    const summary = form.querySelector("[data-request-summary]");
+    const status = form.querySelector("[data-request-status]");
+    const copyStatus = form.querySelector("[data-request-copy-status]");
+    let checked = false;
+    function refresh() {
+      const draft = modelRequest(reference.value, need.value);
+      summary.value = draft.markdown;
+      const result = proposalURL(form.dataset.requestUrl, form.dataset.provider, draft.fields, draft.markdown, draft.title);
+      const invalid = Object.keys(draft.errors).length > 0;
+      link.href = invalid ? form.dataset.requestUrl : result.href;
+      link.setAttribute("aria-disabled", String(invalid));
+      for (const [name, input, selector] of [["model_reference", reference, "reference"], ["need", need, "need"]]) {
+        const error = checked ? draft.errors[name] : "";
+        input.setAttribute("aria-invalid", String(Boolean(error)));
+        form.querySelector(`[data-request-${selector}-error]`).textContent = error || "";
+      }
+      status.textContent = invalid ? "Add a short note about what you need before opening the form."
+        : result.overflow ? "This request is too long to prefill. Copy the prepared request and paste its answers into the native form."
+        : "Ready to review in the native issue form. Nothing has been submitted.";
+      copyStatus.textContent = "";
+      return draft.errors;
+    }
+    form.addEventListener("input", refresh);
+    const check = event => {
+      checked = true;
+      const errors = refresh();
+      if (Object.keys(errors).length) {
+        event.preventDefault();
+        (errors.model_reference ? reference : need).focus();
+      }
+    };
+    link.addEventListener("click", check);
+    form.addEventListener("submit", event => {event.preventDefault(); check(event);});
+    form.querySelector("[data-request-copy]").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(summary.value);
+        copyStatus.textContent = "Request copied. Review it before submitting.";
+      } catch (_) {
+        summary.closest("details").open = true;
+        summary.focus(); summary.select();
+        copyStatus.textContent = "Select and copy the request manually.";
+      }
+    });
+    const access = form.querySelector("[data-test-access]");
+    if (access) access.addEventListener("click", async () => {
+      const result = form.querySelector("[data-access-status]");
+      access.disabled = true;
+      result.textContent = "Checking repository access...";
+      try { result.textContent = await testRepositoryAccess(access.dataset.testAccess); }
+      finally { access.disabled = false; }
+    });
+    refresh(); form.hidden = false;
+  }
 }
 
 function initProposalBuilder() {
@@ -211,11 +297,14 @@ function initProposalBuilder() {
     refresh();
     form.hidden = false;
     const anchor = document.getElementById(window.location.hash.slice(1));
+    const details = document.getElementById("detailed-proposal");
+    if (details && (Object.hasOwn(PROPOSAL_OPERATIONS, initialOperation) || (anchor && details.contains(anchor)))) details.open = true;
     if (anchor && form.contains(anchor)) anchor.scrollIntoView();
   }
 }
 
 if (typeof document !== "undefined") {
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initProposalBuilder);
-  else initProposalBuilder();
+  const init = () => { initModelRequest(); initProposalBuilder(); };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
 }

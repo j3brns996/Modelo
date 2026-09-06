@@ -1120,3 +1120,24 @@ Skills. Production post-merge release/receipt automation and the T10 remote
 sentinel, release/restore rehearsal and host enforcement remain required
 evidence. Production
 catalogue launch remains blocked and agent approval is disabled.
+
+## Reader overview and request entry
+
+The configured `overview` route explains the system using 5W+H, a static ER
+diagram, and a review flow. IDs and references are file-level relationships
+validated by Modelo, not database-enforced PK/FK constraints. Internal model
+identity remains canonical within Modelo; provider route references and input
+links are not canonical model identities. The catalogue stores metadata and
+evidence, not `.pkl` files, model weights, or inference runtimes.
+
+The primary proposal form collects an optional model/provider reference and a
+short need for triage. It uses `repository.web_routes.request_intake`; it does
+not generate a MAC. The detailed composer remains available. The GitLab access
+button makes one optional read-only GET to the configured repository GUI URL.
+An observable 200 is not proof of login. Redirects, CORS failures, and timeouts
+remain indeterminate. Native forms enforce authentication and submission.
+
+Embedded AI in vertical products is outside the current component catalogue
+scope. The external AI-use inventory remains responsible for it. This is not
+an exclusion from NIST risk management. Issue 78 tracks coverage criteria and
+external inventory integration after T10.

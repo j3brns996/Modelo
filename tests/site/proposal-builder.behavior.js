@@ -139,3 +139,36 @@ assert.ok(check("add", "candidate_evidence", observation.slice(0,-1)).candidate_
   assert.equal(controls.get("subject_identity").focused,true);
   console.log("proposal builder transport, validation and controller: passed");
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
+(async () => {
+  const request = modelRequest("", "Summarize customer documents");
+  assert.deepEqual(request.errors, {});
+  assert.equal(request.title, "Model request: Summarize customer documents");
+  assert.doesNotMatch(request.markdown, /### (?:Request type|Modelo MAC request type)|subject_identity/);
+  assert.ok(modelRequest("", "").errors.need);
+  assert.ok(modelRequest("/close", "Need a model").errors.model_reference);
+  assert.ok(modelRequest("", "x".repeat(2049)).errors.need);
+  for (const provider of ["github", "gitlab"]) {
+    const configured = provider === "github" ? gh.replace("mac-add.yml", "model-request.yml") : gl;
+    const url = new URL(proposalURL(configured, provider, request.fields, request.markdown, request.title).href);
+    assert.equal(url.searchParams.get(provider === "github" ? "title" : "issue[title]"), request.title);
+    assert.equal(url.searchParams.get(provider === "github" ? "need" : "issue[description]"), provider === "github" ? request.fields[1].value : request.markdown);
+  }
+  const nativeFetch = global.fetch;
+  try {
+    for (const [status, type, expected] of [[200, "basic", /not your login/], [403, "basic", /access denied/], [401, "basic", /401/], [404, "basic", /404/], [0, "opaqueredirect", /Could not verify/]]) {
+      global.fetch = async (url, options) => {
+        assert.equal(url, "https://gitlab.example.invalid/group/project");
+        assert.equal(options.method, "GET");
+        assert.equal(options.credentials, "include");
+        assert.equal(options.redirect, "manual");
+        assert.equal(options.cache, "no-store");
+        return {status, type};
+      };
+      assert.match(await testRepositoryAccess("https://gitlab.example.invalid/group/project"), expected);
+    }
+    global.fetch = async () => {throw new TypeError("CORS, network or timeout");};
+    assert.match(await testRepositoryAccess("https://gitlab.example.invalid/group/project"), /Could not verify/);
+  } finally {global.fetch = nativeFetch;}
+  console.log("simple request and GUI access status: passed");
+})().catch(error => {console.error(error);process.exitCode = 1;});

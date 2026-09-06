@@ -24,6 +24,18 @@ OPERATIONS = {"add", "change", "revoke", "move", "batch"}
 
 
 class MacTemplateTests(unittest.TestCase):
+    def test_simple_request_is_triage_not_mac(self) -> None:
+        github = yaml.safe_load((ROOT / ".github/ISSUE_TEMPLATE/model-request.yml").read_text(encoding="utf-8"))
+        fields = [item for item in github["body"] if item["type"] != "markdown"]
+        self.assertEqual([item["id"] for item in fields], ["model_reference", "need"])
+        self.assertEqual([item["validations"]["required"] for item in fields], [False, True])
+        gitlab = (ROOT / ".gitlab/issue_templates/Model-Request.md").read_text(encoding="utf-8")
+        self.assertEqual(re.findall(r"^### (.+)$", gitlab, re.M), [item["attributes"]["label"] for item in fields])
+        for body in (json.dumps(github), gitlab):
+            self.assertNotIn("Modelo MAC request type", body)
+            self.assertNotIn("modelo:mac", body)
+
+
     def fixtures(self) -> dict[str, dict[str, object]]:
         return {
             path.stem: json.loads(path.read_text(encoding="utf-8"))
@@ -282,7 +294,7 @@ class MacTemplateTests(unittest.TestCase):
             ("plain", True),
             ("two words", True),
             ("internal\u00a0space", True),
-            ("Unicode café", True),
+            ("Unicode cafÃ©", True),
             (" leading", False),
             ("trailing ", False),
             ("\u00a0leading-nbsp", False),
@@ -329,7 +341,7 @@ class MacTemplateTests(unittest.TestCase):
             ("https://example.invalid./path", False),
             ("https:///missing-host", False),
             ("https://example.invalid/a path", False),
-            ("https://example.invalid/café", False),
+            ("https://example.invalid/cafÃ©", False),
             ("https://example.invalid/line\nbreak", False),
             ("https://example.invalid/" + "a" * 2_024, True),
             ("https://example.invalid/" + "a" * 2_025, False),

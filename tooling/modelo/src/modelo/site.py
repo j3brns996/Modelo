@@ -178,7 +178,7 @@ class _Resolver:
         self._validate_routes()
 
     def _validate_routes(self) -> None:
-        expected_directories = {"home", "catalogue", "model", "offering", "changes", "process", "propose", "docs"}
+        expected_directories = {"home", "catalogue", "model", "offering", "changes", "process", "propose", "docs", "overview"}
         expected_files = {
             "not_found", "asset_css", "asset_catalogue_js", "asset_proposal_js", "asset_alpine",
             "asset_third_party_notices", "catalogue_data", "change_delta_data",
@@ -389,7 +389,7 @@ def _history_summary_html(history: Iterable[Mapping[str, Any]]) -> str:
 
 def _navigation(resolver: _Resolver, current: str) -> str:
     labels = (
-        ("catalogue", "Catalogue"), ("process", "How it works"),
+        ("catalogue", "Catalogue"), ("overview", "How it works"),
         ("changes", "Changes"), ("propose", "Make a proposal"), ("docs", "Field guide"),
     )
     return "".join(
@@ -401,7 +401,9 @@ def _navigation(resolver: _Resolver, current: str) -> str:
 
 def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, request: _SiteBuildRequest, name: str, title: str, content: str, route: str, route_values: Mapping[str, str] | None = None) -> bytes:
     base = _template(root, source, templates_path, "base")
+    repository = urlsplit(str(resolver.repository["web_base"]))
     values = {
+        "repository_connect_source": escape(" " + repository.scheme + "://" + repository.netloc, quote=True) if name == "propose" and resolver.repository["adapter"] == "gitlab" else "",
         "canonical_url": escape(resolver.canonical(route, **dict(route_values or {})), quote=True),
         "asset_css_url": escape(resolver.site("asset_css"), quote=True),
         "asset_third_party_notices_url": escape(resolver.site("asset_third_party_notices"), quote=True),
@@ -418,6 +420,7 @@ def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, req
         "catalogue_url": escape(resolver.site("catalogue"), quote=True),
         "process_url": escape(resolver.site("process"), quote=True),
         "docs_url": escape(resolver.site("docs"), quote=True),
+        "overview_url": escape(resolver.site("overview"), quote=True),
         "repository_url": escape(str(resolver.repository["web_base"]), quote=True),
         "source_commit_url": escape(resolver.repository_url("commit", commit_sha=request.source_commit), quote=True),
         "status_banner": (
@@ -443,7 +446,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     all_routes.update(document["site"]["document_routes"])
     resolver = _Resolver(request.base_url, request.base_path, all_routes, document["repository"], document["site"]["fonts"])
     templates_path = document["paths"]["site_templates"]
-    templates = {name: _template(root, request.source_commit, templates_path, name) for name in ("home", "catalogue", "model", "offering", "changes", "process", "propose", "docs", "404")}
+    templates = {name: _template(root, request.source_commit, templates_path, name) for name in ("home", "catalogue", "model", "offering", "changes", "process", "propose", "docs", "overview", "404")}
     evidence = {item["id"]: item for item in catalogue["evidence"]}
     offerings_by_model: dict[str, list[Mapping[str, Any]]] = {}
     for item in catalogue["offerings"]:
@@ -579,6 +582,8 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         "body": _markdown(_blob(root, request.source_commit, content_path + "/propose.md")),
         "intake_links": intake_links,
         "intake_add_url": escape(web_base_url + intake["add"], quote=True),
+        "access_test": ('<button type="button" class="button" data-test-access="' + escape(web_base_url, quote=True) + '">Test GitLab access</button><p data-access-status role="status" aria-live="polite" aria-atomic="true"></p><p class="field-help"><a target="_blank" rel="noopener noreferrer" href="' + escape(web_base_url, quote=True) + '">Open GitLab repository</a> to check access or sign in. This optional test does not submit your draft.</p>') if document["repository"]["adapter"] == "gitlab" else "",
+        "request_intake_url": escape(resolver.repository_url("request_intake"), quote=True),
         "intake_attributes": " ".join('data-intake-' + key + '="' + escape(web_base_url + intake[key], quote=True) + '"' for key in OPERATIONS),
         "provider": escape(document["repository"]["adapter"], quote=True),
         "provider_label": "GitLab" if document["repository"]["adapter"] == "gitlab" else "GitHub",
@@ -587,7 +592,8 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         "proposal_fields": render_fields(json.loads(_blob(root, request.source_commit, content_path + "/proposal-fields.json"))),
     }, "propose")
     docs_links = '<div class="reference-grid"><a href="' + escape(resolver.site("human_specification"), quote=True) + '"><strong>Human specification</strong><span>Rationale and invariants</span></a><a href="' + escape(resolver.site("machine_contract"), quote=True) + '"><strong>Machine contract</strong><span>Compact executable context</span></a><a href="' + escape(resolver.site("schemas_data") + "model.schema.json", quote=True) + '"><strong>Model schema</strong><span>Canonical model shape</span></a><a href="' + escape(resolver.site("schemas_data") + "offering.schema.json", quote=True) + '"><strong>Offering schema</strong><span>Consumption approval shape</span></a></div><div class="clone-command"><span>Clean clone</span><code>git clone ' + escape(str(document["repository"]["web_base"]) + ".git") + "</code></div>"
-    docs_content = _substitute(templates["docs"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/docs.md")), "documentation_links": docs_links}, "docs")
+    docs_content = _substitute(templates["docs"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/docs.md")), "documentation_links": docs_links, "overview_url": escape(resolver.site("overview"), quote=True)}, "docs")
+    overview_content = _substitute(templates["overview"], {"propose_url": escape(resolver.site("propose"), quote=True), "spec_url": escape(resolver.site("human_specification"), quote=True), "docs_url": escape(resolver.site("docs"), quote=True)}, "overview")
     not_found_content = _substitute(templates["404"], {"home_url": escape(resolver.site("home"), quote=True)}, "404")
     page_specs = {
         resolver.output_path("home"): ("home", "Modelo", home_content, "home"),
@@ -595,6 +601,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         resolver.output_path("changes"): ("changes", "Changes", history_content, "changes"),
         resolver.output_path("process"): ("process", "Process", process_content, "process"),
         resolver.output_path("propose"): ("propose", "Propose", propose_content, "propose"),
+        resolver.output_path("overview"): ("overview", "How Modelo works", overview_content, "overview"),
         resolver.output_path("docs"): ("docs", "Documentation", docs_content, "docs"),
         resolver.output_path("not_found"): ("404", "Page not found", not_found_content, "not_found"),
     }

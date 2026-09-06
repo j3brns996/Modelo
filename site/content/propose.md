@@ -6,9 +6,8 @@ Choose the request that matches what you want to happen:
 - **Move** an offering when its stable identity must be replaced.
 - **Batch** up to 25 related requests from one source and scope.
 
-The five cards below are the static operation chooser and remain the direct
-route for every operation. The [interactive helper](#builder) can prepare all
-five operations, explain each field and look up exact IDs from this publication.
+The five cards provide a static operation chooser for direct intake. The [interactive helper](#builder) can prepare all
+five operations, explain each field, and look up exact IDs from this publication.
 
 The GitHub forms and GitLab Markdown templates ask for the subject, purpose, desired outcome, reason,
 supporting observations and acceptance checks in plain language. Trusted

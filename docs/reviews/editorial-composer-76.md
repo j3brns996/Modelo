@@ -69,3 +69,41 @@ itself cannot be certified in the live native GUI before human review and merge.
 
 GitHub documents [title and text-field URL prefills](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/creating-an-issue#creating-an-issue-from-a-url-query)
 and [text-input default values](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema#input).
+
+### Request form and overview follow-up
+
+The primary form now asks for an optional model/provider reference and a short
+need. It creates a triage issue, not a MAC. The detailed composer remains
+available. Both providers receive an explicit title. GitLab receives bounded
+Markdown through its configured GUI route. The native form opens in a fresh tab.
+
+The optional GitLab access button reads the configured repository GUI URL.
+Tests cover 200, 403, other statuses, redirects, and failed requests. A 200 does
+not assert login or issue-creation permission. In the browser, the reserved
+invalid-host fixture reported that access could not be verified; the prepared
+request link remained available. No live GitLab instance was configured.
+
+The overview adds 5W+H, an ER diagram, review flow, file-key explanations, Git
+review criteria, and artifact boundaries. Provider selectors are noncanonical;
+internal model identities remain canonical within Modelo. The catalogue does
+not hold `.pkl` files or weights. Embedded vertical-product AI is outside the
+current component scope, not outside NIST risk management. Issue 78 tracks
+external inventory integration.
+
+Authored copy and diagram labels use concise, objective wording and sentence
+case based on the Microsoft Writing Style Guide. Protocol field IDs and source
+records retain their required spelling. Both diagrams have text alternatives.
+At a 375-pixel document width, the overview had no page overflow; the 760-pixel
+ER diagram scrolls inside its region. Desktop labels and connections were
+visually inspected. The earlier performance samples describe the initial
+redesign, before this additional prose and UI; they are not new measurements.
+
+Review images: [simple request with GitLab access result](../img/modelo-request.jpg)
+and [entity relationships and file keys](../img/modelo-entities.jpg).
+
+Final local verification: 126 affected schema, contract, and site tests passed.
+After the last wording and navigation edits, 45 targeted checks passed, including
+SVG accessibility structure, native request templates, and the generated-site
+link crawl. These sets overlap. Both JavaScript behavior checks and locked
+offline source/wheel builds passed. The three baseline production governance
+files remain absent; local `modelo check` is not a passing acceptance result.

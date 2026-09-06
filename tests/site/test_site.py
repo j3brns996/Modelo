@@ -249,7 +249,10 @@ class FinalSiteTests(unittest.TestCase):
         from xml.etree import ElementTree
         diagrams = re.findall(r"<svg\b.*?</svg>", guide, re.S)
         self.assertEqual(len(diagrams), 2)
-        for raw in diagrams:
+        overview = (site / "overview/index.html").read_text(encoding="utf-8")
+        overview_diagrams = re.findall(r"<svg\b.*?</svg>", overview, re.S)
+        self.assertEqual(len(overview_diagrams), 2)
+        for raw in diagrams + overview_diagrams:
             svg = ElementTree.fromstring(raw)
             self.assertEqual(svg.attrib["role"], "img")
             ids = {node.attrib["id"] for node in svg.iter() if "id" in node.attrib}
@@ -725,7 +728,9 @@ class FinalSiteTests(unittest.TestCase):
         )
         for asset in assets:
             javascript = asset.read_text().lower()
-            for forbidden in ("innerhtml", "outerhtml", "document.write", "fetch(", "xmlhttprequest"):
+            if asset.name == "catalogue.js":
+                self.assertNotIn("fetch(", javascript)
+            for forbidden in ("innerhtml", "outerhtml", "document.write", "xmlhttprequest"):
                 self.assertNotIn(forbidden, javascript, asset)
         base = (ROOT / "site/templates/base.html").read_text()
         self.assertIn("default-src 'none'", base)
@@ -848,6 +853,15 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn("Supporting evidence", model)
         self.assertIn("sha256-", model)
         docs = (site / "docs/index.html").read_text(encoding="utf-8")
+        overview = (site / "overview/index.html").read_text(encoding="utf-8")
+        self.assertIn('/Modelo/overview/', docs)
+        for section in ("what", "why", "who", "where", "when", "how"):
+            self.assertIn(f'id="{section}"', overview)
+        self.assertIn("PK and FK", overview)
+        self.assertIn(".pkl", overview)
+        self.assertIn("noncanonical", overview)
+        self.assertIn("not a NIST exemption", overview)
+        self.assertNotIn("<script", overview)
         self.assertIn("/Modelo/docs/SPEC.md", docs)
         self.assertIn("/Modelo/docs/contract.yaml", docs)
         home = (site / "index.html").read_text(encoding="utf-8")
@@ -902,7 +916,11 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn('data-proposal-issue-link', propose_page)
         for status in ("data-proposal-url-status", "data-proposal-copy-status"):
             self.assertIn(status, propose_page)
-        self.assertEqual(propose_page.count('role="status" aria-live="polite" aria-atomic="true"'), 3)
+        self.assertEqual(propose_page.count('role="status" aria-live="polite" aria-atomic="true"'), 5)
+        self.assertIn('data-model-request', propose_page)
+        self.assertIn('data-request-url="https://github.com/j3brns996/Modelo/issues/new?template=model-request.yml"', propose_page)
+        self.assertIn('<details id="detailed-proposal"', propose_page)
+        self.assertNotIn('data-test-access=', propose_page)
         self.assertIn('data-intake-add="https://github.com/j3brns996/Modelo/issues/new?template=mac-add.yml"', propose_page)
         self.assertIn('data-intake-change="https://github.com/j3brns996/Modelo/issues/new?template=mac-change.yml"', propose_page)
         self.assertIn('href="https://github.com/j3brns996/Modelo/issues/new?template=mac-add.yml"', propose_page)
@@ -918,7 +936,9 @@ class FinalSiteTests(unittest.TestCase):
         git(self.root, "checkout", "--detach", self.source)
         config_path = self.root / "modelo.yaml"
         config = config_path.read_text(encoding="utf-8")
+        config = config.replace("adapter: github", "adapter: gitlab")
         config = config.replace("host: github.com", "host: code.example.invalid")
+        config = config.replace("request_intake: /issues/new?template=model-request.yml", "request_intake: /-/issues/new?issuable_template=Model-Request")
         config = config.replace("namespace: j3brns996", "namespace: platform")
         config = config.replace("name: Modelo", "name: Registry")
         config = config.replace(
@@ -946,6 +966,9 @@ class FinalSiteTests(unittest.TestCase):
         page = (build_demo_site(request).output / "site/propose/index.html").read_text(encoding="utf-8")
         add = "https://code.example.invalid/platform/Registry/tickets/new?intake=add-v2"
         change = "https://code.example.invalid/platform/Registry/tickets/new?intake=change-v2"
+        self.assertIn('data-test-access="https://code.example.invalid/platform/Registry"', page)
+        self.assertIn("connect-src 'self' https://code.example.invalid;", page)
+        self.assertIn('data-request-url="https://code.example.invalid/platform/Registry/-/issues/new?issuable_template=Model-Request"', page)
         self.assertIn(f'data-intake-add="{add}"', page)
         self.assertIn(f'data-intake-change="{change}"', page)
         self.assertNotIn("github.com/j3brns996/Modelo/issues/new", page)
@@ -1028,7 +1051,7 @@ class FinalSiteTests(unittest.TestCase):
         routes = {
             "home": "/", "catalogue": "/catalogue/", "model": "/models/{model_id}/",
             "offering": "/offerings/{inference_service_id}/{offering_id}/", "changes": "/changes/",
-            "process": "/process/", "propose": "/propose/", "docs": "/docs/", "not_found": "/404.html",
+            "process": "/process/", "propose": "/propose/", "docs": "/docs/", "overview": "/overview/", "not_found": "/404.html",
             "asset_css": "/assets/site.css", "asset_catalogue_js": "/assets/catalogue.js",
             "asset_proposal_js": "/assets/proposal.js",
             "asset_alpine": "/assets/vendor/alpine-csp-3.16.3.min.js",

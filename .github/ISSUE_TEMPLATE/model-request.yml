@@ -1,0 +1,23 @@
+name: "Request a model review"
+description: "Share a model/provider link if known and tell us what you need."
+title: "Model request: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share what you know. A maintainer or agent will identify the records and prepare any catalogue change. This request is not approval. Do not include secrets or private commercial terms.
+  - type: input
+    id: model_reference
+    attributes:
+      label: Model card or provider
+      description: Paste a link or name the model or provider, if known. It is fine to leave this blank.
+      placeholder: "https://… or a model/provider name"
+    validations:
+      required: false
+  - type: textarea
+    id: need
+    attributes:
+      label: What do you need?
+      description: A short note about what you want to do and who it is for.
+    validations:
+      required: true

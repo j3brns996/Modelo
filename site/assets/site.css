@@ -205,3 +205,15 @@ details p { max-width: 65ch; }
   .comparison-tray { align-items: start; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+.simple-request { max-width: 48rem; }
+.simple-request label { display: block; font-weight: 650; margin-top: 1.5rem; }
+.simple-request input, .simple-request textarea { width: 100%; }
+.simple-request .field-help { margin-top: .3rem; }
+.simple-request details { margin-top: 1rem; }
+.maintainer-composer { border-top: 1px solid var(--line); margin-top: 2rem; padding-top: .7rem; }
+
+.entity-diagram { margin: 1.5rem 0; }
+.diagram-scroll { overflow-x: auto; }
+.entity-diagram svg { display: block; width: 100%; min-width: 760px; }
+.entity-diagram figcaption { color: var(--muted); font-size: .9rem; }

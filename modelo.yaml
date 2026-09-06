@@ -19,6 +19,7 @@ repository:
     tag: /releases/tag/{tag_name}
     release: /releases/tag/{tag_name}
     releases: /releases
+    request_intake: /issues/new?template=model-request.yml
     mac_intake:
       add: /issues/new?template=mac-add.yml
       change: /issues/new?template=mac-change.yml
@@ -118,6 +119,7 @@ site:
     process: /process/
     propose: /propose/
     docs: /docs/
+    overview: /overview/
     not_found: /404.html
   data_routes:
     catalogue: /data/catalogue.json
@@ -195,6 +197,7 @@ build:
     - process/index.html
     - propose/index.html
     - docs/index.html
+    - overview/index.html
     - assets/site.css
     - assets/catalogue.js
     - assets/proposal.js

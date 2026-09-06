@@ -77,6 +77,7 @@ tests; JSON Schema validates the wire shape but does not derive this inventory.
 | `process` | `/process/` | MAC, CI, approval and evidence rules |
 | `propose` | `/propose/` | Five static links to configured add/change/revoke/move/batch intake, plus a guided draft for all five operations |
 | `docs` | `/docs/` | Specification, contract, schemas and clone commands |
+| `overview` | `/overview/` | 5W+H, entity relationships, file keys, Git rationale, review criteria, and scope |
 | `not_found` | `/404.html` | Recovery navigation |
 
 One route resolver owns every internal URL and Git receipt link. Its inputs are
@@ -308,3 +309,36 @@ checks search/facet composition, sort/visibility, URL round-trip, URL-over-local
 view precedence, storage failure and comparison bounds without npm, `npx` or a
 DOM package. It is not part of `uv` acceptance and does not claim browser layout,
 focus or assistive-technology behavior; those remain controlled-browser/T10 work.
+
+## Request form and access test
+
+The primary form collects an optional model/provider reference and a required
+short description of the need, each bounded to 2,048 characters. It creates a
+triage request, not a canonical MAC. `repository.web_routes.request_intake`
+selects the native form. The detailed composer is collapsed by default; an
+explicit operation or contained fragment opens it. Both forms retain copy
+fallbacks and open native forms in a fresh tab.
+
+Only the GitLab proposal page offers a user-triggered GUI repository GET.
+Its CSP permits connections to the configured repository origin and self.
+No other route gains a remote connection source. The test uses session cookies
+where browser policy permits, does not follow redirects, and times out after
+ten seconds. It reports HTTP status or an indeterminate result; it does not
+infer authentication from 200 or gate submission. Cross-origin responses need
+GitLab CORS support. The build itself remains offline.
+
+## Writing and diagrams
+
+Apply the [Microsoft Writing Style Guide](https://learn.microsoft.com/en-us/style-guide/top-10-tips-style-voice)
+to authored prose, field help, captions, and diagram labels. Lead with the fact
+or action. Use short sentences, active voice, sentence case, and consistent
+entity names. Keep claims objective. Preserve schema keys, protocol headings,
+source quotations, and historical records exactly where their meaning depends
+on the original text.
+
+The overview uses static SVG with accessible titles, descriptions, captions,
+and adjacent text. Its ER diagram distinguishes file identities and validated
+references from database PK/FK constraints. Model artifacts and embedded AI in
+vertical products remain outside the current component catalogue scope.
+Embedded AI still requires organizational risk management; NIST does not grant
+an exemption. Integration work is tracked in issue 78.

@@ -38,6 +38,7 @@ REQUIRED_FIXED_PUBLICATION_FILES = {
     "data/catalogue.json",
     "data/change-delta.json",
     "docs/index.html",
+    "overview/index.html",
     "docs/SPEC.md",
     "docs/contract.yaml",
     "index.html",

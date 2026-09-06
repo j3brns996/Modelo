@@ -227,3 +227,11 @@ cannot substitute for host controls.
 | Static site and platform templates | Synthetic Pages demo and functional explorer are live; the product-quality site experience v2 was delivered in the closed issue #37 history; production final publication remains T10 evidence |
 | Local authoring conveniences | Neutral MAC and evidence-envelope drafting plus configured proposal links are implemented; outputs remain author-controlled and non-accepting |
 | Production catalogue launch | Blocked through T10 |
+
+## Backlog: embedded AI in vertical products
+
+[Issue 78](https://github.com/j3brns996/Modelo/issues/78) tracks external inventory
+coverage and links for embedded AI. Owner: j3brns. Target: post-T10 scope review
+by 2026-12-05. Completion requires reviewed coverage criteria, a minimal reference
+contract, and tests for known, unknown, stale, and revoked bindings. Modelo does
+not acquire an application inventory. NIST scope is not an exemption from review.

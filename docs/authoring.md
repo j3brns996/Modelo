@@ -5,6 +5,25 @@ they do not open a linked issue, retrieve provider facts, approve a record or
 produce trusted CI evidence. Start governed work from a linked MAC issue and
 treat every local input and output path as author-controlled.
 
+## Request a model review
+
+Use the default proposal form for an optional model-card or provider link and a
+short description of the need. This creates an ordinary request for triage,
+not a MAC. A maintainer or agent prepares the governed change without inventing
+IDs or evidence. The detailed composer remains available for all five operations.
+
+`repository.web_routes.request_intake` configures the native request form in
+`modelo.yaml`. GitHub uses `/issues/new?template=model-request.yml`. For GitLab
+18.1 EE, configure the installed GUI route, such as
+`/-/issues/new?issuable_template=Model-Request`. The form opens in a fresh tab;
+GitLab handles sign-in and submission. The draft stays in the original tab.
+
+The optional **Test GitLab access** button sends one read-only GET to the
+configured `repository.web_base` GUI URL. It reports an observable HTTP status,
+not authentication or issue-creation permission. Redirects, timeouts, and CORS
+failures report that access could not be verified. This check never blocks
+submission. It uses no API endpoint, token, proxy, or Modelo service.
+
 ## Choose an intake path
 
 The published `/propose/` page has five static cards—add, change, revoke, move

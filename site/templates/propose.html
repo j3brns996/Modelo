@@ -1,5 +1,23 @@
-<header class="page-intro"><p class="eyebrow">Contribute to the catalogue</p><h1>Make a proposal</h1><p class="lede">Explain what you need. Find the right records. Review your request before submitting it.</p></header>
-<noscript><p>Use the five <a href="#native-forms">native issue forms below</a> to prepare your proposal without JavaScript.</p></noscript>
+<header class="page-intro"><p class="eyebrow">Contribute to the catalogue</p><h1>Make a proposal</h1><p class="lede">Share a link if you have one, and tell us what you need. A maintainer or agent prepares the catalogue change.</p></header>
+<section class="simple-request">
+<form data-model-request data-provider="$provider" data-request-url="$request_intake_url" hidden novalidate>
+$access_test
+<label for="request-reference">Model card or provider <span class="optional">(optional)</span></label>
+<p class="field-help" id="request-reference-help">Paste a link or name the model or provider, if you know it. It is fine to leave this blank.</p>
+<input id="request-reference" data-request-reference type="text" maxlength="2048" placeholder="https://… or a model/provider name" aria-describedby="request-reference-help request-reference-error">
+<p id="request-reference-error" class="field-error" data-request-reference-error></p>
+<label for="request-need">What do you need?</label>
+<p class="field-help" id="request-need-help">A short note about what you want to do and who it is for.</p>
+<textarea id="request-need" data-request-need rows="3" maxlength="2048" placeholder="For example: Our support team needs to summarise long customer documents." aria-describedby="request-need-help request-need-error"></textarea>
+<p id="request-need-error" class="field-error" data-request-need-error></p>
+<a class="button button--primary" data-request-link href="$request_intake_url" target="_blank" rel="noopener noreferrer">Review request in $provider_label</a>
+<p data-request-status role="status" aria-live="polite" aria-atomic="true"></p>
+<p class="field-help">A fresh tab opens the native issue form. Sign in there if asked, then review and submit. Your draft stays here. A maintainer or agent will identify the records and prepare any catalogue change; this request is not approval.</p>
+<details><summary>Copy or read the prepared request</summary><label for="request-summary">Prepared request</label><textarea id="request-summary" data-request-summary rows="8" readonly></textarea><button class="button" type="button" data-request-copy>Copy request</button><p data-request-copy-status role="status" aria-live="polite" aria-atomic="true"></p></details>
+</form>
+<noscript><p><a rel="noopener noreferrer" target="_blank" href="$request_intake_url">Open the simple request form in $provider_label</a>. Add an optional model/provider link and a short note about what you need.</p></noscript>
+</section>
+<details id="detailed-proposal" class="maintainer-composer"><summary>Preparing a catalogue change? Open the detailed composer</summary>
 <section id="builder" class="composer-section">
 <form data-proposal-builder data-provider="$provider" $intake_attributes data-records="$lookup_records" hidden novalidate>
 <nav class="composer-steps" aria-label="Proposal steps"><a href="#proposal-request-type">1. Choose a change</a><a href="#proposal-purpose">2. Explain the need</a><a href="#proposal-review">3. Review and submit</a></nav>
@@ -14,3 +32,4 @@ $proposal_fields
 <details><summary>What happens after I submit?</summary><p>The provider stores your issue. The configured Modelo adapter validates the answers and prepares a request for review. Submission is not approval. This draft is non-canonical: it is not a MAC payload. Trusted CI and an independent reviewer must check the proposed records.</p></details>
 </section></form></section>
 <section id="native-forms" class="content-band"><h2>Start directly in the issue form</h2><p>These links work without the composer or JavaScript. Each form explains what to provide.</p><div class="intake-grid">$intake_links</div><details><summary>Which operation should I choose?</summary>$body</details></section>
+</details>

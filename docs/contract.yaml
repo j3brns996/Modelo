@@ -426,6 +426,7 @@ build:
     - data/catalogue.json
     - data/change-delta.json
     - docs/index.html
+    - overview/index.html
     - docs/SPEC.md
     - docs/contract.yaml
     - index.html
@@ -462,7 +463,9 @@ site:
   routes_config_key: site.routes
   data_routes: [catalogue, change_delta, manifest, schemas]
   asset_routes: [asset_css, asset_catalogue_js, asset_proposal_js, asset_alpine, asset_third_party_notices]
+  overview: {route: overview, format: static_5wh_with_accessible_svg, includes: [entities, file_keys, git_rationale, review_criteria, artifact_boundary, embedded_ai_scope]}
   presentation:
+    writing_style: microsoft_technical_style_objective_concise_sentence_case
     shell: editorial_reference_catalogue
     font_families: [Georgia, system-ui, ui-monospace]
     remote_fonts: forbidden
@@ -545,6 +548,18 @@ authoring:
       blank_compiles_to: []
       malformed_nonblank: reject
     batch_scope: required_independently_of_candidate_evidence
+  simple_request:
+    fields: [optional_model_reference, required_need]
+    maximum_field_characters: 2048
+    destination: repository.web_routes.request_intake
+    output: triage_request_not_mac
+    detailed_composer_default: collapsed
+    navigation: fresh_tab_native_provider_form
+    gitlab_access_test: user_triggered_gui_get_to_repository_web_base
+    access_result: observable_http_status_or_indeterminate_never_authentication_proof
+    access_test_blocks_submission: false
+    access_timeout_seconds: 10
+    browser_connect_source: self_and_configured_repository_origin_on_gitlab_propose_only
   browser_draft:
     operations: [add, change, revoke, move, batch]
     field_definitions: site/content/proposal-fields.json

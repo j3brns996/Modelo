@@ -28,14 +28,34 @@ authority:
   remote_enforcement: platform_adapter_and_host_settings
   rationale: SPEC.md
 
+entity_acceptance:
+  profile: "0.3.0"
+  publication_entry_schema: catalogue-output.schema.json
+  source_schemas: {model: model.schema.json, offering: offering.schema.json, evidence: evidence.schema.json, condition: condition.schema.json, vendors: vendors-registry.schema.json, inference_services: inference-services-registry.schema.json}
+  required_layers: [configured_path_and_filename, closed_json_schema, semantic_references_and_evidence, git_change_and_history]
+  semantic_adapters: [aws-bedrock]
+  schema_only_adapters: [gcp-vertex, azure-foundry]
+  schema_ids: unique_logical_identifiers_resolved_offline
+  schema_duplicate_json_keys: reject
+  entity_file_extension: .yaml
+  entity_directory_document_allowlist: [README.md]
+  unknown_catalogue_yaml_paths: reject
+  missing_optional_facts: unknown_not_inferred
+  capacity_regression: tests/scale/test_entity_scale.py
+  capacity_entity_count: 5000
+
 entities:
   model:
     identity: id
-    entity_acceptance_profile: "0.2.0"
+    entity_acceptance_profile: "0.3.0"
     canonical_urn: "urn:modelo:model-release:{id}"
+    rights_owner: optional_reviewed_rights_owner_vendor_id_requiring_evidenced_legal_name
     external_identity: optional_namespaced_evidenced_claims
     identity_claim_lifecycle: retain_namespace_value_relation_allow_reviewed_status_changes
-    identity_claim_uniqueness: namespace_value_relation_regardless_status
+    identity_claim_uniqueness: namespace_value_relation_regardless_status_within_model
+    route_eligible_claim_global_uniqueness: [verified, vendor-asserted, provider-mapped]
+    supersession: acyclic_no_approval_transfer
+    family_id: grouping_label_not_foreign_key
     release_date_lifecycle: evidenced_metadata_not_immutable_identity
     path: "{paths.models}/{model_id}.yaml"
     meaning: canonical_named_model_release
@@ -43,6 +63,7 @@ entities:
     identity: id
     registry: "{paths.governance}/inference-services.yaml"
     first_implemented_value: aws-bedrock
+    operator: optional_reviewed_operator_vendor_id_requiring_evidenced_legal_name
   offering:
     identity: id
     canonical_urn: "urn:modelo:offering:{id}"
@@ -51,7 +72,9 @@ entities:
     path: "{paths.offerings}/{inference_service_id}/{offering_id}.yaml"
     meaning: consumable_approval_unit
     minimum_routes: 1
-    required_policy_explanation: approval_rationale
+    required_policy_fields: [approval_rationale, approval_owner, approved_use]
+    empty_conditions: explicit_no_conditions_rationale_required
+    review_by: optional_inclusive_date_overdue_fails_check_without_automatic_revocation
   route:
     identity: id
     stored_under: offering
@@ -273,7 +296,7 @@ versioning:
   version_file_meaning: tool_release_semver_independent_of_wire_contract_versions
   tool_release_version_sources: [VERSION, pyproject.toml]
   current_tool_release: "0.2.0"
-  entity_acceptance_profile: "0.2.0"
+  entity_acceptance_profile: "0.3.0"
   entity_profile_compatibility: additive_shape_breaking_aws_consumption_validation
   current_wire_contract: "0.1.0"
   wire_contract_version_sources: [contract.version, config_version, schema_version_fields]

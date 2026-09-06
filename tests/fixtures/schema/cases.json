@@ -127,7 +127,7 @@
       "invalid": [
         { "name": "empty registry", "op": "set", "path": ["vendors"], "value": {}, "expect": ["minProperties", ["vendors"]] },
         { "name": "bad registry key", "op": "rename", "path": ["vendors", "test-vendor"], "value": "Test Vendor", "expect": ["pattern", ["vendors"]] },
-        { "name": "vendor nested unknown", "op": "set", "path": ["vendors", "test-vendor", "domicile"], "value": "us", "expect": ["additionalProperties", ["vendors", "test-vendor"]] },
+        { "name": "vendor nested unknown", "op": "set", "path": ["vendors", "test-vendor", "unrecognised_metadata"], "value": "us", "expect": ["additionalProperties", ["vendors", "test-vendor"]] },
         { "name": "vendor evidence digest control", "op": "set", "path": ["vendors", "test-vendor", "evidence_refs", "/name", "id"], "value": "sha256-ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\u0000", "expect": ["pattern", ["vendors", "test-vendor", "evidence_refs", "/name", "id"]] }
       ]
     },
@@ -332,6 +332,8 @@
           "inference_service_id": "aws-bedrock",
           "model_id": "test-model-1",
           "approval_rationale": "Approved for schema validation of the governed offering workflow.",
+          "approval_owner": "Modelo test maintainers",
+          "approved_use": "Synthetic schema validation only; no business data or production permission.",
           "routes": [
             {
               "id": "london-direct",
@@ -369,6 +371,8 @@
           "inference_service_id": "gcp-vertex",
           "model_id": "test-model-1",
           "approval_rationale": "Approved for schema validation of the governed offering workflow.",
+          "approval_owner": "Modelo test maintainers",
+          "approved_use": "Synthetic schema validation only; no business data or production permission.",
           "routes": [
             {
               "id": "gemini-pro-route",
@@ -394,6 +398,8 @@
           "inference_service_id": "azure-foundry",
           "model_id": "test-model-1",
           "approval_rationale": "Approved for schema validation of the governed offering workflow.",
+          "approval_owner": "Modelo test maintainers",
+          "approved_use": "Synthetic schema validation only; no business data or production permission.",
           "routes": [
             {
               "id": "gpt4o-azure-route",

@@ -19,7 +19,6 @@ class DiscoveryTests(unittest.TestCase):
             "catalogue/z.yaml",
             "catalogue/a.yaml",
             "catalogue/nested/b.yaml",
-            "catalogue/nested/ignored.yml",
             "catalogue/README.md",
         ):
             target = root / relative
@@ -33,6 +32,16 @@ class DiscoveryTests(unittest.TestCase):
                 PurePosixPath("catalogue/z.yaml"),
             ),
         )
+
+    def test_wrong_extensions_are_errors_not_silently_omitted_records(self) -> None:
+        for filename in ("model.yml", "model.YAML", "model.json", ".hidden", "model.yaml.bak"):
+            with self.subTest(filename=filename):
+                root = self.repository()
+                (root / "models").mkdir()
+                (root / "models" / filename).write_text("id: model\n")
+                with self.assertRaises(DiscoveryError) as caught:
+                    discover_yaml_files(root, "models")
+                self.assertEqual(caught.exception.diagnostic.path, f"models/{filename}")
 
     def test_empty_directory_is_valid_and_missing_directory_fails(self) -> None:
         root = self.repository()

@@ -8,7 +8,7 @@ from typing import Any, Mapping
 
 from modelo.evidence import evidence_id, resolve_pointer
 
-ENTITY_PROFILE = "0.2.0"
+ENTITY_PROFILE = "0.3.0"
 AWS_MODEL_NAMESPACE = "aws.bedrock.foundation-model"
 BOUND_STATUSES = frozenset({"verified", "vendor-asserted", "provider-mapped"})
 

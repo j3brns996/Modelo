@@ -94,7 +94,7 @@ def _confined_directory(repository_root: Path, relative: PurePosixPath) -> tuple
 
 
 def discover_yaml_files(
-    repository_root: Path, configured_root: str | PurePosixPath
+    repository_root: Path, configured_root: str | PurePosixPath, *, allow_documents: bool = False
 ) -> tuple[PurePosixPath, ...]:
     """Return repository-relative ``.yaml`` files in stable lexical order.
 
@@ -133,6 +133,12 @@ def discover_yaml_files(
                 elif entry.is_file(follow_symlinks=False):
                     if entry.name.endswith(".yaml"):
                         discovered.append(relative)
+                    elif entry.name != "README.md" and (not allow_documents or entry_path.suffix.lower() in {".yaml", ".yml"}):
+                        raise _error(
+                            "unrecognised file beneath governed entity root",
+                            "Use the exact .yaml entity filename; keep supporting documents outside entity roots (README.md is allowed).",
+                            path=relative.as_posix(),
+                        )
                 else:
                     raise _error(
                         "special filesystem entries are forbidden beneath governed roots",

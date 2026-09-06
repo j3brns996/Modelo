@@ -250,12 +250,20 @@ def validate_condition_history(
     locked: dict[tuple[str, int], tuple[str, str]] = {}
     changed: dict[tuple[str, int], str] = {}
     missing_references: set[tuple[str, str, int]] = set()
+    documents: dict[str, dict[str, object]] = {}
+
+    def historical(object_id: str, path: str) -> dict[str, object]:
+        # Git blob IDs bind immutable bytes. Reuse parsing within this check,
+        # never a persistent cache that could outlive the checked repository.
+        if object_id not in documents:
+            documents[object_id] = _load_historical_mapping(root, object_id, path)
+        return documents[object_id]
     # A condition is frozen by its accepted-base presence or its first reference.
     # Candidate-only drafts remain mutable until one of those events occurs.
     for commit in commits:
         current: dict[tuple[str, int], tuple[str, str]] = {}
         for path, object_id in _tree_blobs(root, commit, conditions_root):
-            document = _load_historical_mapping(root, object_id, path)
+            document = historical(object_id, path)
             identifier = document.get("id")
             version = document.get("version")
             if not isinstance(identifier, str) or isinstance(version, bool) or not isinstance(version, int):
@@ -270,7 +278,7 @@ def validate_condition_history(
             if previous is not None and previous[0] != canonical:
                 changed[key] = path
         for path, object_id in _tree_blobs(root, commit, offerings_root):
-            offering = _load_historical_mapping(root, object_id, path)
+            offering = historical(object_id, path)
             references = offering.get("condition_refs", [])
             if not isinstance(references, list):
                 raise GitError(f"historical offering has invalid condition_refs: {path}")

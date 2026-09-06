@@ -218,6 +218,8 @@ class BuildTests(unittest.TestCase):
                 "id": "test-offering", "inference_service_id": "aws-bedrock",
                 "model_id": "test-model",
                 "approval_rationale": "Approved for deterministic multi-region build testing.",
+                "approval_owner": "Modelo test maintainers",
+                "approved_use": "Synthetic build testing; no business data or production permission.",
                 "routes": [routes[key] for key in order],
                 "pricing": [
                     {**prices[key], "route_ids": [f"{key}-route"]}

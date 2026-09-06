@@ -101,6 +101,21 @@ invent a deployment or turn a demonstration record into an approval.
 | Validate the result | Check field limits, required answers, references, evidence, and, for a complete MAC, its own schema. | Intake completeness and record validity are different checks. |
 | Hand off | Open the configured issue form in a fresh tab, populated for human submission. | Uses the organization's existing login and issue controls without an API token. |
 
+## Negative examples and corrections
+
+| Invalid example | Why it fails | Correction |
+|---|---|---|
+| "Approve Nova because the provider lists it." | Availability is an observation; the name does not establish identity, approval, or suitability. | Match an evidenced model and offering, then state the intended use and remaining approval decision. |
+| "The synthetic offering is approved for our production workload." | Demonstration records cannot authorize enterprise use. | Mark the result as a synthetic example and report that production approval has not been established. |
+| "Need AI. Use it for everything." | No team, outcome, task, data, or oversight is stated. | Ask for those missing business facts; do not invent answers to complete the form. |
+| "Set `inference_service_id` to `Other`." | A UI choice is not a canonical registry key. | Identify the service from evidence; prepare its prerequisite add form if no registry entry exists. |
+| "The model is American, so processing territory is USA." | Rights-owner domicile does not establish route processing locations. | Record both separately, leaving territory unknown until the proposed route is evidenced. |
+| "Paste the GitHub YAML form definition as the proposal body." | YAML describes controls; it is not a completed native form. | Fill the fields identified by YAML `id`, preserving required answers and human attestations. |
+| "Remove GitLab headings and tick all attestations so validation passes." | The parser needs prescribed structure; attestations require human consideration. | Preserve the Markdown template and leave human attestations unticked. |
+| "Inventory validation passed" after reading JSON by eye. | Reading is not schema validation, and schemas alone do not check every cross-record rule. | Run the stated checks and report actual results; say "not run" when tooling is unavailable. |
+| "A fetch failed, so this model must be new." | An unavailable snapshot is not an empty inventory. | Report the fetch failure and defer the duplicate/match conclusion. |
+| "Submit through the issue API using a token." | This requester workflow uses the browser issue form. | Return or open the prefilled native form for the requester to review and submit. |
+
 ## 1. Establish the need
 
 Ask only for missing information that changes the decision. Capture who needs

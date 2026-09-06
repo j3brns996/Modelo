@@ -1,6 +1,16 @@
 {
   "cases": [
     {
+      "schema": "model-release.schema.json",
+      "valid": [{"vendor_label": "Example Release", "precision": "named-release"}],
+      "invalid": [{"name": "family-is-not-release-precision", "op": "set", "path": ["precision"], "value": "family", "expect": ["enum", ["precision"]]}]
+    },
+    {
+      "schema": "nist-ai-rmf-mapping.schema.json",
+      "valid_source": "docs/assurance/nist-ai-rmf-mapping.yaml",
+      "invalid": [{"name": "certification-is-not-equivalence", "op": "set", "path": ["disclaimer"], "value": "NIST certified", "expect": ["const", ["disclaimer"]]}]
+    },
+    {
       "schema": "model.schema.json",
       "valid": [
         {

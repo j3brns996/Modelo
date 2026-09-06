@@ -19,6 +19,18 @@ at `/docs/`.
 
 ## How to use the map
 
+- [ELI21](eli21.md): model-release, Offering and AI-use distinctions.
+- [NIST method equivalence](assurance/nist-ai-rmf-method-equivalence.md) and
+  [machine mapping](assurance/nist-ai-rmf-mapping.yaml): bounded outcome support.
+- [Maturity profile](assurance/modelo-maturity-profile.md): target, local, remote
+  and operating evidence distinguished.
+- [Embedded AI coverage](assurance/embedded-ai-coverage.md): external
+  covered-by-parent policy, not exemption from governance.
+- [Identity ADR](adr/0002-model-release-identity.md) and
+  [inventory boundary/diagrams](adr/0003-ai-inventory-boundary.md).
+- [Schema guide](schema-guide.md) and
+  [implementation plan](reviews/nist-rmf-implementation-plan.md).
+
 - Normative files define the rules the repository currently follows.
 - Current files describe live process, posture or status.
 - The authoring guide explains helpers; it does not grant approval or replace

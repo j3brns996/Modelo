@@ -183,6 +183,27 @@ def _history_commits(root: Path, head: str) -> tuple[str, ...]:
     return commits
 
 
+def validate_reserved_identity_history(root: Path, base: str, changes: tuple[tuple[str, str], ...], models_root: str, offerings_root: str) -> tuple[Diagnostic, ...]:
+    """Accepted first-parent history reserves IDs, including revoked Offerings."""
+    additions = [(path, kind_root) for status, path in changes if status == "A"
+                 for kind_root in (models_root, offerings_root) if path.startswith(kind_root + "/")]
+    if not additions:
+        return ()
+    diagnostics = []
+    reserved: dict[str, set[str]] = {models_root: set(), offerings_root: set()}
+    for commit in _history_commits(root, base):
+        for kind_root in reserved:
+            reserved[kind_root].update(PurePosixPath(path).stem for path, _ in _tree_blobs(root, commit, kind_root))
+    deletions = {PurePosixPath(path).stem for status, path in changes if status == "D" and path.startswith(offerings_root + "/")}
+    for path, kind_root in additions:
+        identifier = PurePosixPath(path).stem
+        if identifier in reserved[kind_root] and not (kind_root == offerings_root and identifier in deletions):
+            diagnostics.append(Diagnostic("CHANGE_INVALID", Severity.ERROR, path, "/id",
+                "internal ID was reserved in accepted history and cannot be reused",
+                "Use a new internal identity; preserve retired records and history."))
+    return tuple(diagnostics)
+
+
 def _tree_blobs(root: Path, commit: str, governed_root: str) -> tuple[tuple[str, str], ...]:
     output = _git(root, "ls-tree", "-r", "-z", commit, "--", governed_root, text=False)
     records: list[tuple[str, str]] = []

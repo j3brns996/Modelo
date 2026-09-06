@@ -119,6 +119,17 @@ evidence. None belongs in canonical filenames.
 
 ## Route-to-model binding
 
+Entity acceptance profile 0.2.0 requires explicit `selector_type`:
+`provider-model-id` for direct routes and `inference-profile` for system profiles.
+Neither asserts immutable model weights. Every direct ID and every profile
+destination must match an evidenced `aws.bedrock.foundation-model` identity claim
+on the ModelRelease with eligible status (`verified`, `vendor-asserted` or
+`provider-mapped`). Matching display names alone never proves identity.
+Routes sharing an Offering must have the same source Region and binding kind;
+profile routes must also share the complete destination Region set. Use separate
+Offerings when those scopes differ. For claim maintenance and migration, see the
+[schema guide](../schema-guide.md) and [identity ADR](../adr/0002-model-release-identity.md).
+
 A direct foundation-model route retains evidenced `modelId`/`modelArn`,
 `modelName` and `providerName` and binds them by exact equality to the canonical
 model's evidenced identity facts. A system inference profile retains every

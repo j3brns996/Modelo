@@ -108,6 +108,12 @@ Configuration does not replace those shape or semantic authorities.
 
 ## Documentation Map
 
+- [ELI21: what Modelo does](docs/eli21.md) explains ModelRelease, Offering and
+  the external AI-system inventory boundary.
+- [NIST AI RMF profile](docs/assurance/nist-ai-rmf-method-equivalence.md)
+  describes selected inventory outcome support—not certification or a complete
+  organisational inventory. M1 is a target, not a production-operating claim.
+
 - [CONTRIBUTING.md](CONTRIBUTING.md) covers governed contribution and preflight.
 - [docs/README.md](docs/README.md) is the repository docs index.
 - [docs/authoring.md](docs/authoring.md) explains drafting helpers and authority.

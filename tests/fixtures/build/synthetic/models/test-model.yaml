@@ -1,6 +1,12 @@
 id: test-model
 vendor_id: test-vendor
 name: Atlas Reasoning
+canonical_urn: urn:modelo:model-release:test-model
+identity_claims:
+  - namespace: aws.bedrock.foundation-model
+    value: test.model-v1
+    relation: identifies
+    status: provider-mapped
 description: Synthetic reasoning model for governed catalogue demonstrations.
 capabilities: [chat, function-calling, reasoning]
 modalities: [text]
@@ -8,6 +14,9 @@ context_window: 128000
 licensing: proprietary
 lifecycle: active
 evidence_refs:
+  /identity_claims/0/value:
+    id: sha256-e5d79edf1a0f8d61c3ea1e0d7b113da9ef7ac1be52dd38881a54621ca98dd837
+    projection_pointer: /modelId
   /name:
     id: sha256-e5d79edf1a0f8d61c3ea1e0d7b113da9ef7ac1be52dd38881a54621ca98dd837
     projection_pointer: /modelName

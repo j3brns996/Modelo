@@ -20,7 +20,7 @@ from modelo.build import BuildError, BuildRequest, build_candidate, recover_cand
 from modelo.evidence import evidence_id
 from modelo.mac import compute_keys
 from modelo.receipt import canonical_bytes, manifest_entries, publication_digest, sha256_bytes
-from modelo.validators import check_repository
+from modelo.validators import _validate_state, check_repository
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests/fixtures/semantic"))
@@ -120,7 +120,7 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(set(manifest["files"]), {"data/catalogue.json", "data/change-delta.json"})
         self.assertNotIn("actors", json.loads(first.catalogue_bytes))
 
-    def test_two_source_region_profile_repository_orders_produce_identical_candidate(self) -> None:
+    def test_separate_region_profile_offerings_produce_identical_candidate(self) -> None:
         def evidence_path(repository, identifier):
             return repository.root / "catalogue/evidence" / f"{identifier}.yaml"
 
@@ -195,6 +195,7 @@ class BuildTests(unittest.TestCase):
             for key in ("eu", "us"):
                 routes[key] = {
                     "id": f"{key}-route", "source_region": regions[key],
+                    "selector_type": "inference-profile",
                     "reference": "global.test.profile-v1",
                     "model_binding": {
                         "kind": "system-inference-profile",
@@ -239,9 +240,32 @@ class BuildTests(unittest.TestCase):
                 repository.root
                 / "catalogue/offerings/aws-bedrock/test-offering.yaml"
             )
+            original_offering = offering_path.read_text(encoding="utf-8")
             offering_path.write_text(
                 yaml.safe_dump(offering, sort_keys=False), encoding="utf-8", newline="\n"
             )
+            self.assertTrue(any(
+                "scope" in finding.message
+                for finding in _validate_state(repository.root, date(2026, 9, 1)).diagnostics
+            ))
+            # Preserve the original Offering and introduce two independently
+            # governed profile Offerings. Distinct residency is not interchangeable.
+            offering_path.write_text(original_offering, encoding="utf-8", newline="\n")
+            for key in order:
+                separate = deepcopy(offering)
+                separate["id"] = f"test-profile-{key}"
+                separate["routes"] = [routes[key]]
+                separate["pricing"] = [{**prices[key], "route_ids": [f"{key}-route"]}]
+                separate["evidence_refs"] = {
+                    "/routes/0/reference": {"id": profile_ids[key], "projection_pointer": "/profileId"},
+                }
+                for field in ("dimension", "unit", "quantity", "amount", "currency"):
+                    separate["evidence_refs"][f"/pricing/0/{field}"] = {
+                        "id": price_evidence_id, "projection_pointer": f"/prices/{key}/{field}",
+                    }
+                offering_path.with_name(f"test-profile-{key}.yaml").write_text(
+                    yaml.safe_dump(separate, sort_keys=False), encoding="utf-8", newline="\n"
+                )
             synthetic = repository.root / "tests/fixtures/build/synthetic"
             shutil.rmtree(synthetic)
             shutil.copytree(repository.root / "catalogue", synthetic)
@@ -261,18 +285,15 @@ class BuildTests(unittest.TestCase):
         forward_bytes, forward = make(("eu", "us"))
         reverse_bytes, reverse = make(("us", "eu"))
         self.assertEqual(forward_bytes, reverse_bytes)
-        normal = forward["offerings"][0]
-        self.assertEqual(
-            [route["id"] for route in normal["routes"]], ["eu-route", "us-route"]
-        )
-        self.assertEqual(
-            normal["evidence_refs"]["/routes/0/reference"]["id"],
-            normal["routes"][0]["model_binding"]["profile_evidence"]["id"],
-        )
-        self.assertEqual(
-            [price["route_ids"] for price in normal["pricing"]],
-            [["eu-route"], ["us-route"]],
-        )
+        profiles = [item for item in forward["offerings"] if item["id"].startswith("test-profile-")]
+        self.assertEqual([item["id"] for item in profiles], ["test-profile-eu", "test-profile-us"])
+        for key, normal in zip(("eu", "us"), profiles, strict=True):
+            self.assertEqual([route["id"] for route in normal["routes"]], [f"{key}-route"])
+            self.assertEqual(
+                normal["evidence_refs"]["/routes/0/reference"]["id"],
+                normal["routes"][0]["model_binding"]["profile_evidence"]["id"],
+            )
+            self.assertEqual([price["route_ids"] for price in normal["pricing"]], [[f"{key}-route"]])
         self.assertEqual(forward, reverse)
 
     def test_wrong_correlations_and_paths_fail_closed(self) -> None:

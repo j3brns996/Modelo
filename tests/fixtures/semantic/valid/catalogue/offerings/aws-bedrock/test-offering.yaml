@@ -4,6 +4,7 @@ model_id: test-model
 approval_rationale: Approved for validator integration testing of the governed offering workflow.
 routes:
   - id: london-direct
+    selector_type: provider-model-id
     source_region: eu-west-2
     reference: test.model-v1
     model_binding:

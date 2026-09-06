@@ -31,6 +31,12 @@ authority:
 entities:
   model:
     identity: id
+    entity_acceptance_profile: "0.2.0"
+    canonical_urn: "urn:modelo:model-release:{id}"
+    external_identity: optional_namespaced_evidenced_claims
+    identity_claim_lifecycle: retain_namespace_value_relation_allow_reviewed_status_changes
+    identity_claim_uniqueness: namespace_value_relation_regardless_status
+    release_date_lifecycle: evidenced_metadata_not_immutable_identity
     path: "{paths.models}/{model_id}.yaml"
     meaning: canonical_named_model_release
   inference_service:
@@ -39,6 +45,9 @@ entities:
     first_implemented_value: aws-bedrock
   offering:
     identity: id
+    canonical_urn: "urn:modelo:offering:{id}"
+    model_binding_change: requires_new_offering
+    route_grouping: governance_equivalent_only
     path: "{paths.offerings}/{inference_service_id}/{offering_id}.yaml"
     meaning: consumable_approval_unit
     minimum_routes: 1
@@ -50,6 +59,8 @@ entities:
     adapter_owner: inference_service_registry
     adapter_dispatch: static_three_provider_schema_union_aws_only_semantic_dispatch_in_v0_1
     provider_reference_is_opaque_to_core: true
+    aws_selector_type: explicit_provider_model_id_or_inference_profile
+    immutable_selector_inference_from_spelling: forbidden
   evidence:
     identity: "sha256-{rfc8785_envelope_without_id}"
     path: "{paths.evidence}/{evidence_id}.yaml"
@@ -261,7 +272,9 @@ mac:
 versioning:
   version_file_meaning: tool_release_semver_independent_of_wire_contract_versions
   tool_release_version_sources: [VERSION, pyproject.toml]
-  current_tool_release: "0.1.2"
+  current_tool_release: "0.2.0"
+  entity_acceptance_profile: "0.2.0"
+  entity_profile_compatibility: additive_shape_breaking_aws_consumption_validation
   current_wire_contract: "0.1.0"
   wire_contract_version_sources: [contract.version, config_version, schema_version_fields]
   individual_payload_schema_versions_remain_declared_values: true
@@ -722,3 +735,18 @@ deferred:
   - gcp_and_azure_adapters
   - gitlab_remote_adapter_activation_until_host_switch_rehearsal
   - live_telemetry_and_runtime_health
+
+assurance:
+  mapping: docs/assurance/nist-ai-rmf-mapping.yaml
+  mapping_schema: schemas/nist-ai-rmf-mapping.schema.json
+  supports_selected_nist_ai_rmf_outcomes: true
+  certification: false
+  complete_organisational_ai_system_inventory: false
+  current_levels: {GOVERN-1.6: P, GV-1.6-001: P, GV-1.6-002: S, GV-1.6-003: P}
+  target_component_level_gv_1_6_003: D
+  operating_equivalence_allowed_in_this_profile: false
+  maturity_scale_owner: organisation_not_nist
+  target_product_maturity: M1
+  production_operating_maturity: unproven
+  external_inventory_records: [AIUseBinding, InventoryCoverageDetermination]
+  covered_by_parent_is_governance_exemption: false

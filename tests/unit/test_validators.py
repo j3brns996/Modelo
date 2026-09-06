@@ -64,6 +64,7 @@ class ValidatorTests(unittest.TestCase):
         evidence_path = self.repository.root / "catalogue/evidence" / f"{profile_id}.yaml"
         evidence_path.write_text(yaml.safe_dump(profile, sort_keys=False), encoding="utf-8", newline="\n")
         offering["routes"][0] = {
+            "selector_type": "inference-profile",
             "id": "eu-profile", "source_region": "eu-west-2", "reference": "eu.test.profile-v1",
             "model_binding": {
                 "kind": "system-inference-profile",
@@ -186,6 +187,7 @@ class ValidatorTests(unittest.TestCase):
             "model_binding": {"kind": "system-inference-profile", "profile_evidence": {"id": profile_id, "projection_pointer": "/profileId", "type_pointer": "/type", "status_pointer": "/status", "destinations_pointer": "/models"}, "destinations": [{"destination_pointer": "/models/0/modelArn", "model_evidence": {"id": "sha256-9f19d4dfb29b0414ef63fe8ef528f37e5d50deca65a6de0ab752f46b316cbf43", "arn_pointer": "/modelArn", "name_pointer": "/modelName", "provider_pointer": "/providerName"}}]},
         }
         offering["evidence_refs"]["/routes/0/reference"] = {"id": profile_id, "projection_pointer": "/profileId"}
+        offering["routes"][0]["selector_type"] = "inference-profile"
         offering_path.write_text(yaml.safe_dump(offering, sort_keys=False), encoding="utf-8", newline="\n")
         head = self.repository.commit()
         self.assertEqual(self.check(head=head), ())

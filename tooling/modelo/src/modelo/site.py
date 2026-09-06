@@ -22,10 +22,34 @@ from modelo.change import with_snapshot
 from modelo.config import load_config
 from modelo.receipt import canonical_bytes, publication_digest, sha256_bytes
 from modelo.schemas import SchemaSet
+from modelo.identity import canonical_urn, release_precision
 
 
 _ID = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 _PRIVATE_CANARY = b"MODELO_PRIVATE_CANARY"
+
+
+def _model_release_facts(model: Mapping[str, Any]) -> str:
+    """Render advisory identity facts without turning claims into approval."""
+    release = model.get("release", {})
+    precision = release_precision(model)
+    if "release" not in model:
+        precision += " (implicit Modelo baseline)"
+    fields = (
+        ("Internal ModelRelease URN", canonical_urn("model-release", model["id"])),
+        ("Release label", release.get("vendor_label", model["name"])),
+        ("Identity precision", precision),
+        ("Release date", release.get("released_at", "Not stated")),
+    )
+    facts = "".join(f"<div><dt>{escape(label)}</dt><dd>{escape(str(value))}</dd></div>" for label, value in fields)
+    claims = "".join(
+        "<li><code>" + escape(claim["namespace"]) + ": " + escape(claim["value"])
+        + "</code> — " + escape(claim["relation"]) + "; status: " + escape(claim["status"]) + "</li>"
+        for claim in model.get("identity_claims", [])
+    )
+    return '<dl class="fact-grid">' + facts + '</dl><h2>External identity claims</h2>' + (
+        "<ul>" + claims + "</ul>" if claims else "<p>Not stated.</p>"
+    ) + "<p>Identity claim status is not consumption approval; only an Offering grants consumption.</p>"
 
 
 @dataclass(frozen=True, slots=True)
@@ -594,7 +618,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         content = _substitute(templates["model"], {
             "model_name": escape(model.get("name", model["id"])),
             "model_description": escape(model.get("description", "No description published.")),
-            "model_facts": facts, "offering_links": '<div class="related-grid">' + links + "</div>",
+            "model_facts": facts + _model_release_facts(model), "offering_links": '<div class="related-grid">' + links + "</div>",
             "model_status": '<span class="status-pill status-pill--' + escape(model.get("lifecycle", "unknown"), quote=True) + '">' + escape(model.get("lifecycle", "Unspecified").title()) + "</span>",
             "evidence_summary": '<p class="evidence-count"><strong>' + str(len(model_refs)) + '</strong><span>bound fact references</span></p><p>Every externally sourced field links to a content-addressed evidence projection.</p><div class="evidence-ids">' + (_tags(model_refs) or "None") + "</div>",
         }, "model")

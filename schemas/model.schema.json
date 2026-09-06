@@ -1,10 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://modelo.invalid/schemas/model.schema.json",
-  "title": "Modelo canonical model",
+  "title": "Modelo canonical named ModelRelease",
+  "x-modelo-entity-profile": "0.2.0",
   "type": "object",
   "required": ["id", "vendor_id", "name", "evidence_refs"],
   "properties": {
+    "canonical_urn": { "type": "string", "pattern": "^urn:modelo:model-release:[a-z0-9-]+(?![\\s\\S])", "x-modelo-provenance": "internal" },
+    "family_id": { "$ref": "common.schema.json#/$defs/id", "description": "Optional internal grouping, not a canonical release or external family assertion.", "x-modelo-provenance": "internal" },
+    "release": { "$ref": "model-release.schema.json#/$defs/release" },
+    "identity_claims": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "$ref": "model-release.schema.json#/$defs/claim" } },
+    "supersedes_model_id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
     "id": {
       "$ref": "common.schema.json#/$defs/id",
       "x-modelo-provenance": "internal"

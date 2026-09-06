@@ -1,0 +1,92 @@
+profile_version: '1.0'
+disclaimer: 'Supports selected NIST AI RMF outcomes; not a certification; not a complete organisational AI-system inventory.'
+assessment_dimensions: [intent, scope, mechanism, authority, evidence, timeliness, failure_behaviour]
+mappings:
+  - id: GOVERN-1.6
+    function: GOVERN
+    category: GOVERN 1
+    subcategory: GOVERN 1.6
+    action: null
+    source: https://airc.nist.gov/airmf-resources/airmf/5-sec-core/
+    intent: Maintain inventory mechanisms with resources prioritised by organisational risk.
+    scope: Model-release and approved provider-offering components only.
+    mechanism: Git-backed records with evidence, Conditions and controlled acceptance.
+    authority: Protected Git branch, trusted exact-head CI and independent authorised review.
+    evidence: [Repository tests and synthetic publication demonstrate local mechanisms, No production operating assessment is available]
+    timeliness: Explicit as-of date and governed evidence freshness; organisational completeness review remains external.
+    failure_behaviour: Invalid or stale proposals fail closed; discovery absence never revokes approval automatically.
+    artefacts: [SPEC.md, docs/contract.yaml, modelo.yaml, tooling/modelo/src/modelo/validators.py]
+    limitations: Does not enumerate systems or establish organisational staffing and risk-resource allocation.
+    external_dependencies: [Organisational AI-system inventory, Inventory owner and risk-prioritised resources]
+    current_level: P
+    target_level: P
+    assessment_criteria: [Inspect component coverage against external inventory, Review inventory owner and resource allocation, Verify exact-head control evidence]
+    responsible_role: AI inventory owner with Modelo control owner
+    review_frequency: Quarterly and on material scope or control changes
+    operating_assessments: []
+  - id: GV-1.6-001
+    function: GOVERN
+    category: GOVERN 1
+    subcategory: GOVERN 1.6
+    action: GV-1.6-001
+    source: https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.600-1.pdf
+    intent: Enumerate organisational GAI systems and adapt inventory requirements to GAI risks.
+    scope: Governed model and access-mode component contribution, not all organisational uses.
+    mechanism: Stable Offering URNs referenced by the external AI-use inventory.
+    authority: Modelo owns component approval; the external inventory owns enumeration.
+    evidence: [Stable internal identities and synthetic fixture tests, No operating inventory integration evidence]
+    timeliness: External inventory registration and reconciliation cadence must be defined by its owner.
+    failure_behaviour: Missing or revoked Offering references are gaps for external review, never implicit permissions.
+    artefacts: [docs/adr/0003-ai-inventory-boundary.md, docs/eli21.md, tooling/modelo/src/modelo/identity.py]
+    limitations: Modelo alone cannot demonstrate organisational GAI completeness.
+    external_dependencies: [External AI-system inventory and accountable use owners]
+    current_level: P
+    target_level: P
+    assessment_criteria: [Sample AI-use bindings against accepted Offering revisions, Measure unregistered and unresolvable uses externally]
+    responsible_role: Organisational AI inventory owner
+    review_frequency: Quarterly and at onboarding or retirement
+    operating_assessments: []
+  - id: GV-1.6-002
+    function: GOVERN
+    category: GOVERN 1
+    subcategory: GOVERN 1.6
+    action: GV-1.6-002
+    source: https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.600-1.pdf
+    intent: Define organisational inventory treatment for GAI embedded in application software.
+    scope: Supporting external covered-by-parent policy; no embedded SaaS feature catalogue.
+    mechanism: Policy-versioned external coverage determination with reassessment triggers.
+    authority: External inventory and parent-system owners; Modelo only supplies known Offering references.
+    evidence: [Non-authoritative coverage example and seven policy criteria]
+    timeliness: Reassess on purpose, data, autonomy, supplier terms or provider changes.
+    failure_behaviour: Any failed coverage criterion requires a separate external AI-use entry; no fabricated model mapping.
+    artefacts: [docs/assurance/embedded-ai-coverage.md, docs/adr/0003-ai-inventory-boundary.md]
+    limitations: Coverage is not exemption from governance; policy operation is outside Modelo.
+    external_dependencies: [Approved inventory-scope policy, Inventoried parent application, Responsible owner]
+    current_level: S
+    target_level: S
+    assessment_criteria: [Review all seven criteria and recorded parent capability, Sample triggered reassessments externally]
+    responsible_role: External inventory policy owner and parent-system owner
+    review_frequency: At capability onboarding and every material change; annual policy review
+    operating_assessments: []
+  - id: GV-1.6-003
+    function: GOVERN
+    category: GOVERN 1
+    subcategory: GOVERN 1.6
+    action: GV-1.6-003
+    source: https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.600-1.pdf
+    intent: Capture provenance, issues, oversight, rights and sensitive-data considerations, underlying models, versions and access modes.
+    scope: D target applies only to the model-release, route, provenance and versioned-Condition component, not the whole action.
+    mechanism: Evidenced identity claims, explicit provider selectors and bindings, immutable evidence and Conditions.
+    authority: Governed Git acceptance; external inventory owns use context and human oversight.
+    evidence: [Schema and identity regression tests, Exact-head review contract, Synthetic build evidence only]
+    timeliness: Intrinsic facts and route observations use governed freshness classes; use-context review is external.
+    failure_behaviour: Missing identity evidence, changed release binding or unsupported selector semantics fail validation.
+    artefacts: [schemas/model.schema.json, schemas/model-release.schema.json, schemas/offering.schema.json, schemas/providers/aws-bedrock-route.schema.json, schemas/condition.schema.json, tooling/modelo/src/modelo/validators.py]
+    limitations: No complete known-issues, impact, rights or oversight inventory; no operating-equivalence claim.
+    external_dependencies: [System-use context, Human oversight, Impact assessments and known issues, Rights and sensitive-data review]
+    current_level: P
+    target_level: D
+    assessment_criteria: [Test provider ID linkage rather than display-name matching, Verify all profile destinations and evidence freshness, Inspect external oversight and data-context links, Require operating-period evidence before any O claim]
+    responsible_role: Modelo steward with external AI-use risk owner
+    review_frequency: Each proposal and quarterly profile review
+    operating_assessments: []

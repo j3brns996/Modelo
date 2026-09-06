@@ -1,7 +1,16 @@
 id: test-model
 vendor_id: test-vendor
 name: Test Model
+canonical_urn: urn:modelo:model-release:test-model
+identity_claims:
+  - namespace: aws.bedrock.foundation-model
+    value: test.model-v1
+    relation: identifies
+    status: provider-mapped
 evidence_refs:
+  /identity_claims/0/value:
+    id: sha256-9f19d4dfb29b0414ef63fe8ef528f37e5d50deca65a6de0ab752f46b316cbf43
+    projection_pointer: /modelId
   /name:
     id: sha256-9f19d4dfb29b0414ef63fe8ef528f37e5d50deca65a6de0ab752f46b316cbf43
     projection_pointer: /modelName

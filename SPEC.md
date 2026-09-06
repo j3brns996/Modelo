@@ -520,6 +520,8 @@ id: <stable-offering-id>
 inference_service_id: aws-bedrock
 model_id: <stable-canonical-model-id>
 approval_rationale: <policy-authored reason this route is approved>
+approval_owner: <accountable internal team or role>
+approved_use: <approved task, data boundary and human oversight>
 routes:
   - id: <stable-route-id>
     source_region: <aws-request-region>

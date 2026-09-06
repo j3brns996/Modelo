@@ -190,6 +190,7 @@ def test_schema_profile_matches_published_acceptance_contract(state):
     contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
     assert contract["entity_acceptance"]["profile"] == ENTITY_PROFILE
     assert state.schemas.schema("model.schema.json")["x-modelo-entity-profile"] == ENTITY_PROFILE
+    assert state.schemas.schema("catalogue-output.schema.json")["x-modelo-entity-profile"] == ENTITY_PROFILE
     assert contract["entity_acceptance"]["semantic_adapters"] == ["aws-bedrock"]
     for schema in contract["entity_acceptance"]["source_schemas"].values():
         assert schema in state.schemas.documents
@@ -207,6 +208,18 @@ def test_offering_ids_remain_global_and_route_ids_are_local(state):
     offering["routes"].append(deepcopy(offering["routes"][0]))
     _reference_checks(state)
     assert any("route ids are not unique" in d.message for d in state.diagnostics)
+
+
+def test_duplicate_offering_id_in_another_service_directory_fails(repository):
+    target = repository.root / "catalogue/offerings/other-service/test-offering.yaml"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    original = (repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml").read_text(encoding="utf-8")
+    target.write_text(original.replace("inference_service_id: aws-bedrock", "inference_service_id: other-service"), encoding="utf-8")
+    try:
+        findings = _load_state(repository.root).diagnostics
+        assert any("offering identity is duplicated" in d.message for d in findings)
+    finally:
+        target.unlink()
 
 
 def test_supersession_deep_chain_is_iterative(state):

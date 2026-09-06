@@ -697,7 +697,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     files = {path: _page(root, request.source_commit, templates_path, resolver, request, name, title, content, route) for path, (name, title, content, route) in page_specs.items()}
     for model in catalogue["models"]:
         rights_owner = catalogue["vendors"]["vendors"].get(model.get("rights_owner_vendor_id"), {})
-        model_refs = sorted({reference["id"] for reference in model.get("evidence_refs", {}).values()})
+        model_refs = sorted({reference["id"] for record in (model, rights_owner) for reference in record.get("evidence_refs", {}).values()})
         facts = '<dl class="fact-grid"><div><dt>Identifier</dt><dd><code>' + escape(model["id"]) + "</code></dd></div><div><dt>Vendor</dt><dd>" + escape(catalogue["vendors"]["vendors"].get(model.get("vendor_id"), {}).get("name", model.get("vendor_id", ""))) + "</dd></div><div><dt>Context window</dt><dd>" + (f'{model["context_window"]:,}' if model.get("context_window") else "Not stated") + "</dd></div><div><dt>Licence</dt><dd>" + escape(model.get("licensing", "Not stated")) + "</dd></div><div><dt>Capabilities</dt><dd>" + (_tags(model.get("capabilities", [])) or "Not stated") + "</dd></div><div><dt>Modalities</dt><dd>" + (_tags(model.get("modalities", [])) or "Not stated") + "</dd></div></dl>"
         links = "".join('<a class="related-card" href="' + escape(resolver.site("offering", inference_service_id=o["inference_service_id"], offering_id=o["id"]), quote=True) + '"><span><strong>' + escape(o["id"]) + '</strong><small>' + escape(o["inference_service_id"]) + '</small></span><b aria-hidden="true">→</b></a>' for o in offerings_by_model.get(model["id"], [])) or '<p class="empty-state">No approved access is recorded for this model.</p>'
         content = _substitute(templates["model"], {
@@ -718,7 +718,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
             approval = '<section class="coordinate-card"><span class="status-pill status-pill--validation">Validation</span><h2>Validation coordinates</h2><dl><dt>Source</dt><dd><code>' + escape(request.source_commit[:12]) + '</code></dd><dt>Tree</dt><dd><code>' + escape(request.source_tree[:12]) + '</code></dd><dt>Integration</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True) + '"><code>' + escape(request.integration_commit[:12]) + '</code></a></dd></dl><p>Validation is not approval.</p></section>'
         else:
             approval = '<section class="coordinate-card"><span class="status-pill status-pill--synthetic">Synthetic</span><h2>Demo provenance</h2><dl><dt>Source</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.source_commit), quote=True) + '"><code>' + escape(request.source_commit[:12]) + '</code></a></dd><dt>Tree</dt><dd><code>' + escape(request.source_tree[:12]) + '</code></dd></dl><p>Synthetic fixture only, not approved for enterprise use.</p></section>'
-        refs = sorted({reference["id"] for reference in offering.get("evidence_refs", {}).values()})
+        refs = sorted({reference["id"] for record in (offering, operator) for reference in record.get("evidence_refs", {}).values()})
         for route in offering["routes"]:
             binding = route["model_binding"]
             if binding["kind"] == "foundation-model":

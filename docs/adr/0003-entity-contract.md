@@ -10,6 +10,9 @@ YAML linting is a separate style check.
 
 The publication entry point is `schemas/catalogue-output.schema.json`. It
 references the same source schemas; it is not a second set of entity fields.
+Its `x-modelo-entity-profile` identifies entity compatibility. The inventory's
+`contract_version` describes its envelope; `source_commit` pins the actual schema
+bundle. Do not validate an old snapshot against a newer bundle.
 `model-release.schema.json` defines reusable release metadata inside
 `model.schema.json`, not another stored entity. `mac.schema.json` describes a
 proposal, not a model or publication. `docs/contract.yaml` identifies the rules
@@ -93,6 +96,21 @@ existing validator tests cover filename/key correspondence and immutable history
 real files, runs a Git-backed check, and validates and serialises the publication.
 It reports timings rather than asserting a machine-specific runtime SLA.
 The deep-chain regression exercises 5,000 predecessor edges without recursion.
+
+Measured on 2026-09-06 with locked Python 3.12.13 and uv 0.11.33, Ubuntu under
+WSL while other checks ran: 1,667 models, 1,664 offerings, 1,666 evidence records,
+one condition, one vendor and one service (5,000 total). File loading, schema and
+semantic validation took 28.591 s; a Git-backed audit took 47.895 s; a bulk policy
+change to all 1,664 offerings took 92.780 s; publication validation and
+serialisation took 14.512 s for 3,568,875 bytes. These are observed timings, not
+an SLA or a controlled comparison across operating systems. Reproduce with
+`uv run --locked pytest -q -s tests/scale/test_entity_scale.py`.
+
+The tested capacity is this mixture, not any distribution of 5,000 records.
+Existing per-file limits remain 128 KiB and 2,000 nodes. Aggregate vendor and
+service registries share those limits; 5,000 vendors in one registry would fail.
+Do not remove resource bounds or invent a registry sharding system without a
+workload that requires it. This change adds no dependency or deferred shortcut.
 
 Use dictionaries for identity lookups and one iterative walk for supersession.
 Reuse validators within a schema set. Add no runtime dependencies or persistent

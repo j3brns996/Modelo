@@ -69,6 +69,9 @@ entity definitions. `model.schema.json` describes a stored model release;
 `model-release.schema.json` contains its reusable release metadata.
 `mac.schema.json` describes a proposal. Use the schemas from this publication's
 source commit and resolve their logical `$$id` values locally from the bundle.
+The inventory's `contract_version` identifies its publication envelope, not
+entity-shape compatibility. Read `x-modelo-entity-profile` on its schema and use
+the same-source bundle; do not validate a saved inventory against newer schemas.
 
 Accepted source records must pass all four layers: configured path and filename,
 closed JSON Schema, semantic/evidence checks, and Git history/change checks.

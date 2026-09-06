@@ -76,5 +76,6 @@
     }
   },
   "additionalProperties": false,
-  "description": "Publication entry point. Each collection references its canonical source schema; JSON Schema does not validate filenames, foreign keys, evidence truth, history or approval. Run modelo check for source acceptance. Resolve schema IDs locally from the same publication bundle."
+  "description": "Publication entry point. Each collection references its canonical source schema; JSON Schema does not validate filenames, foreign keys, evidence truth, history or approval. Run modelo check for source acceptance. Resolve schema IDs locally from the same publication bundle.",
+  "x-modelo-entity-profile": "0.3.0"
 }

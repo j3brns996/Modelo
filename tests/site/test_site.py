@@ -977,7 +977,10 @@ class FinalSiteTests(unittest.TestCase):
         site = build_final_site(self.request()).output / "site"
         emitted = {path.relative_to(site).as_posix() for path in site.rglob("*") if path.is_file()}
         for page in site.rglob("*.html"):
-            parser = LinkParser(); parser.feed(page.read_text(encoding="utf-8"))
+            html = page.read_text(encoding="utf-8")
+            self.assertIn('role="search" action="/Modelo/catalogue/" method="get"', html)
+            self.assertIn('id="nav-search" name="q" type="search" maxlength="200"', html)
+            parser = LinkParser(); parser.feed(html)
             self.assertTrue(all(parser.tables), page)
             for href, rel in parser.links:
                 if href.startswith("https://"):

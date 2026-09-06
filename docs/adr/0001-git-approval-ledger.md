@@ -72,8 +72,14 @@ conflicts and false revocations in the approval ledger.
 Rejected. Availability cannot establish enterprise Legal, security, policy,
 IAM or workload approval.
 
-## Review and exit
+## System assessment and exit
 
-Review after 90 days. Reconsider the operational store when any two measured
-exit criteria in `SPEC.md` persist for four weeks. Approved release snapshots
-remain in Git even if live state later moves elsewhere.
+Assess system requirements and capacity when accepted changes reach 5-10 per
+working day or a consumer needs an
+API contract. Above 10 per day, reassess capacity promptly. Keep the 90-day
+system assessment as a backstop. This updates the earlier volume assumption and replaces
+the two-criteria/four-week exit rule; see `SPEC.md` for the current decision
+criteria. This is separate from offering and record approval. Assessment can
+retain Git, improve the workflow, or propose a separate
+system change. An API is not added automatically. Approved release snapshots
+remain in Git if operational state later moves elsewhere.

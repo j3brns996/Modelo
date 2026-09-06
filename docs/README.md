@@ -5,6 +5,9 @@ at `/docs/`.
 
 ## Read by question
 
+Start with the [agent quickstart](agent-quickstart.md) for agent-led triage,
+maintenance, and review handoff.
+
 | If you are asking | Read | Kind |
 |---|---|---|
 | What is the executable contract? | [SPEC.md](../SPEC.md), [contract.yaml](contract.yaml) | Normative |

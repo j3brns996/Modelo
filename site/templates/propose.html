@@ -1,21 +1,33 @@
-<header class="page-intro"><p class="eyebrow">Contribute to the catalogue</p><h1>Make a proposal</h1><p class="lede">Share a link if you have one, and tell us what you need. A maintainer or agent prepares the catalogue change.</p></header>
+<header class="page-intro"><p class="eyebrow">Contribute to the catalogue</p><h1>Make a proposal</h1><p class="lede">Describe the business need and intended use. Add known model and access details. An agent can prepare the catalogue change for maintainer review.</p></header>
 <section class="simple-request">
 <form data-model-request data-provider="$provider" data-request-url="$request_intake_url" hidden novalidate>
 $access_test
-<label for="request-reference">Model card or provider <span class="optional">(optional)</span></label>
-<p class="field-help" id="request-reference-help">Paste a link or name the model or provider, if you know it. It is fine to leave this blank.</p>
+<label for="request-reference">Vendor, model, or link <span class="optional">(optional)</span></label>
+<p class="field-help" id="request-reference-help">Name the vendor or model, or add an official link. Leave unknown details blank.</p>
 <input id="request-reference" data-request-reference type="text" maxlength="2048" placeholder="https://… or a model/provider name" aria-describedby="request-reference-help request-reference-error">
 <p id="request-reference-error" class="field-error" data-request-reference-error></p>
-<label for="request-need">What do you need?</label>
-<p class="field-help" id="request-need-help">A short note about what you want to do and who it is for.</p>
+<label for="request-need">Business need</label>
+<p class="field-help" id="request-need-help">Who needs this, what business outcome matters, and why?</p>
 <textarea id="request-need" data-request-need rows="3" maxlength="2048" placeholder="For example: Our support team needs to summarise long customer documents." aria-describedby="request-need-help request-need-error"></textarea>
 <p id="request-need-error" class="field-error" data-request-need-error></p>
+<label for="request-use">Intended use</label>
+<p class="field-help" id="request-use-help">What task will the model perform, with what data, and how will people check or act on the output?</p>
+<textarea id="request-use" data-request-use rows="3" maxlength="2048" placeholder="Summarise support documents; staff check each summary before use." aria-describedby="request-use-help request-use-error"></textarea>
+<p id="request-use-error" class="field-error" data-request-use-error></p>
+<label for="request-deployment">Where and when <span class="optional">(if known)</span></label>
+<p class="field-help" id="request-deployment-help">Service or provider, region, environment, and target date. These help define the proposed offering.</p>
+<textarea id="request-deployment" data-request-deployment rows="2" maxlength="2048" placeholder="For example: Bedrock, eu-west-2, pilot environment, next quarter." aria-describedby="request-deployment-help request-deployment-error"></textarea>
+<p id="request-deployment-error" class="field-error" data-request-deployment-error></p>
+<fieldset class="request-choices" data-request-choice="producer_domicile" tabindex="-1" aria-describedby="producer_domicile-help producer_domicile-error"><legend>Model rights owner domicile <span class="optional">(if known)</span></legend><p class="field-help" id="producer_domicile-help">Tick known jurisdictions for the legal rights owner, not the processing location. Add other countries in the vendor/model field.</p><div><label><input type="checkbox" value="UK"> UK</label><label><input type="checkbox" value="EU"> EU</label><label><input type="checkbox" value="China"> China</label><label><input type="checkbox" value="USA"> USA</label><label><input type="checkbox" value="Other"> Other</label></div><p class="field-error" id="producer_domicile-error" data-request-choice-error></p></fieldset>
+<fieldset class="request-choices" data-request-choice="service_operator" tabindex="-1" aria-describedby="service_operator-help service_operator-error"><legend>Operator or service provider <span class="optional">(if known)</span></legend><p class="field-help" id="service_operator-help">Tick requested or known operators. Name another provider in Where and when.</p><div><label><input type="checkbox" value="AWS"> AWS</label><label><input type="checkbox" value="Azure"> Azure</label><label><input type="checkbox" value="Google Cloud"> Google Cloud</label><label><input type="checkbox" value="Other"> Other</label></div><p class="field-error" id="service_operator-error" data-request-choice-error></p></fieldset>
+<fieldset class="request-choices" data-request-choice="processing_territory" tabindex="-1" aria-describedby="processing_territory-help processing_territory-error"><legend>Data processing territory <span class="optional">(if known)</span></legend><p class="field-help" id="processing_territory-help">Tick requested or known processing locations. These are separate from the rights owner domicile. Add other locations in Where and when.</p><div><label><input type="checkbox" value="UK"> UK</label><label><input type="checkbox" value="EU"> EU</label><label><input type="checkbox" value="China"> China</label><label><input type="checkbox" value="USA"> USA</label><label><input type="checkbox" value="Other"> Other</label></div><p class="field-error" id="processing_territory-error" data-request-choice-error></p></fieldset>
+<p class="field-help">Leave unknown choices unticked. The agent verifies selections; they are not approval.</p>
 <a class="button button--primary" data-request-link href="$request_intake_url" target="_blank" rel="noopener noreferrer">Review request in $provider_label</a>
 <p data-request-status role="status" aria-live="polite" aria-atomic="true"></p>
-<p class="field-help">A fresh tab opens the native issue form. Sign in there if asked, then review and submit. Your draft stays here. A maintainer or agent will identify the records and prepare any catalogue change; this request is not approval.</p>
+<p class="field-help">A fresh tab opens the native issue form. Sign in there if asked, then review and submit. Your draft stays here. The agent identifies the vendor and model, proposes the offering, and flags missing facts. This request is not approval.</p>
 <details><summary>Copy or read the prepared request</summary><label for="request-summary">Prepared request</label><textarea id="request-summary" data-request-summary rows="8" readonly></textarea><button class="button" type="button" data-request-copy>Copy request</button><p data-request-copy-status role="status" aria-live="polite" aria-atomic="true"></p></details>
 </form>
-<noscript><p><a rel="noopener noreferrer" target="_blank" href="$request_intake_url">Open the simple request form in $provider_label</a>. Add an optional model/provider link and a short note about what you need.</p></noscript>
+<noscript><p><a rel="noopener noreferrer" target="_blank" href="$request_intake_url">Open the simple request form in $provider_label</a>. Describe the business need, intended use, and any known vendor, model, location, or timing details.</p></noscript>
 </section>
 <details id="detailed-proposal" class="maintainer-composer"><summary>Preparing a catalogue change? Open the detailed composer</summary>
 <section id="builder" class="composer-section">

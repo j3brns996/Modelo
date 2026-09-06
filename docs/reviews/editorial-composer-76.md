@@ -107,3 +107,43 @@ SVG accessibility structure, native request templates, and the generated-site
 link crawl. These sets overlap. Both JavaScript behavior checks and locked
 offline source/wheel builds passed. The three baseline production governance
 files remain absent; local `modelo check` is not a passing acceptance result.
+
+### Agent handling, system assessment, and request detail
+
+The agent quickstart and portable `modelo-maintain` skill cover triage, evidence
+routing, maintenance, and handoff. Offering/record approval stays separate from
+system NFR and API-contract assessment. The latter starts around 5-10 accepted
+changes per day or a consumer contract requirement; it adds no record approval
+steps and does not automatically add an API or database.
+
+The final intake uses four short answers for vendor/model/link, business need,
+intended use, and where/when. Optional choices cover rights-owner domicile,
+operator, and processing territory. Unknowns stay blank; the agent verifies
+selections. GitHub receives supported text prefills; GitLab receives marked
+choice lists. The detailed MAC composer remains separate.
+
+Shared navigation search uses the existing catalogue query. A browser search
+for `nova` from the overview reached nine matching records. Clear comparison
+resets selections and its URL parameters while retaining search and filters.
+
+The generic skill-creator validator rejected the repository-required
+`compatibility` frontmatter field. The native skill contract checks that field,
+portable references, forbidden commands, and exclusion from the build/wheel;
+those checks passed in the 49-check agent/navigation run. No validator was
+weakened to hide the format difference.
+
+The earlier exact-head CI run passed both protected-base and proposed-code
+checks but failed the final gate because issue 76 was closed. The issue was
+reopened for this ongoing work. Acceptance still requires a successful final
+check at the next exact head.
+
+Browser follow-up: keyboard Clear comparison removed both selected models while
+retaining the `nova` query and nine results. Independent choices of USA domicile,
+AWS operator, and UK processing survived the GitHub URL and Markdown handoff.
+All groups began unticked. At 375 pixels, navigation and choice groups fit the
+document width. [Request choices](../img/modelo-request-choices.jpg).
+
+Latest verification: all 94 locked contract, proposal, template, and site tests
+passed. After the final native-field wording and choice assertions, all 17
+native-template tests passed. Both JavaScript checks passed, including the
+comparison reset and independent request choice transport.

@@ -55,7 +55,7 @@ function proposalErrors(fields, records) {
         || /(^|\n)\s*(?:#{1,6}\s|\/\w|```)|<!--|-->/.test(field.value)) {
       errors[field.name] = "Use plain answers here, without headings, hidden comments or GitLab quick actions.";
     }
-    if (["purpose", "requested_outcome", "reason", "scope_ref", "partition", "region", "source_url", "model_reference", "need"].includes(field.name)) {
+    if (["purpose", "requested_outcome", "reason", "scope_ref", "partition", "region", "source_url", "model_reference", "need", "intended_use", "deployment"].includes(field.name)) {
       const limit = field.name === "purpose" ? 160 : (["scope_ref", "partition", "region"].includes(field.name) ? 256 : 2048);
       if (field.value.length > limit) errors[field.name] = `Keep this answer within ${limit} characters.`;
     }
@@ -89,15 +89,31 @@ function proposalErrors(fields, records) {
   return errors;
 }
 
-function modelRequest(reference, need) {
+const REQUEST_TERRITORIES = ["UK", "EU", "China", "USA", "Other"];
+const REQUEST_CHOICES = [
+  {name: "producer_domicile", label: "Model rights owner domicile", options: REQUEST_TERRITORIES},
+  {name: "service_operator", label: "Operator or service provider", options: ["AWS", "Azure", "Google Cloud", "Other"]},
+  {name: "processing_territory", label: "Data processing territory", options: REQUEST_TERRITORIES},
+];
+
+function modelRequest(reference, need, intendedUse = "", deployment = "", selections = {}) {
   const fields = [
-    {name: "model_reference", label: "Model card or provider", value: reference.trim()},
-    {name: "need", label: "What do you need?", value: need.trim(), required: true},
+    {name: "model_reference", label: "Vendor, model, or link", value: reference.trim()},
+    {name: "need", label: "Business need", value: need.trim(), required: true},
+    {name: "intended_use", label: "Intended use", value: intendedUse.trim(), required: true},
+    {name: "deployment", label: "Where and when", value: deployment.trim()},
   ];
+  for (const choice of REQUEST_CHOICES) fields.push({...choice, value: (selections[choice.name] || []).join(", ")});
+  const errors = proposalErrors(fields, []);
+  for (const choice of REQUEST_CHOICES) {
+    if ((selections[choice.name] || []).some(value => !choice.options.includes(value))) errors[choice.name] = "Choose only the listed options.";
+  }
   const title = `Model request: ${fields[1].value.split("\n")[0] || "Review a model"}`.slice(0, 255);
-  const markdown = `# ${title}\n\nA maintainer or agent will prepare any catalogue change. This request is not approval.\n\n`
-    + fields.map(field => `### ${field.label}\n\n${field.value || "_No response_"}`).join("\n\n") + "\n";
-  return {fields, title, markdown, errors: proposalErrors(fields, [])};
+  const markdown = `# ${title}\n\nAn agent or maintainer will prepare any catalogue change. This request is not approval.\n\n`
+    + fields.map(field => `### ${field.label}\n\n` + (field.options
+      ? field.options.map(option => `- [${field.value.split(", ").includes(option) ? "x" : " "}] ${option}`).join("\n")
+      : field.value || "_No response_")).join("\n\n") + "\n";
+  return {fields, title, markdown, errors};
 }
 
 async function testRepositoryAccess(configured) {
@@ -119,24 +135,36 @@ function initModelRequest() {
     form.dataset.initialized = "true";
     const reference = form.querySelector("[data-request-reference]");
     const need = form.querySelector("[data-request-need]");
+    const intendedUse = form.querySelector("[data-request-use]");
+    const deployment = form.querySelector("[data-request-deployment]");
+    const inputs = {model_reference: reference, need, intended_use: intendedUse, deployment};
+    const choiceGroups = [...form.querySelectorAll("[data-request-choice]")];
+    for (const group of choiceGroups) inputs[group.dataset.requestChoice] = group;
     const link = form.querySelector("[data-request-link]");
     const summary = form.querySelector("[data-request-summary]");
     const status = form.querySelector("[data-request-status]");
     const copyStatus = form.querySelector("[data-request-copy-status]");
     let checked = false;
     function refresh() {
-      const draft = modelRequest(reference.value, need.value);
+      const selections = Object.fromEntries(choiceGroups.map(group => [group.dataset.requestChoice,
+        [...group.querySelectorAll("input:checked")].map(input => input.value)]));
+      const draft = modelRequest(reference.value, need.value, intendedUse.value, deployment.value, selections);
       summary.value = draft.markdown;
       const result = proposalURL(form.dataset.requestUrl, form.dataset.provider, draft.fields, draft.markdown, draft.title);
       const invalid = Object.keys(draft.errors).length > 0;
       link.href = invalid ? form.dataset.requestUrl : result.href;
       link.setAttribute("aria-disabled", String(invalid));
-      for (const [name, input, selector] of [["model_reference", reference, "reference"], ["need", need, "need"]]) {
+      for (const [name, input, selector] of [["model_reference", reference, "reference"], ["need", need, "need"], ["intended_use", intendedUse, "use"], ["deployment", deployment, "deployment"]]) {
         const error = checked ? draft.errors[name] : "";
         input.setAttribute("aria-invalid", String(Boolean(error)));
         form.querySelector(`[data-request-${selector}-error]`).textContent = error || "";
       }
-      status.textContent = invalid ? "Add a short note about what you need before opening the form."
+      for (const group of choiceGroups) {
+        const error = checked ? draft.errors[group.dataset.requestChoice] : "";
+        group.setAttribute("aria-invalid", String(Boolean(error)));
+        group.querySelector("[data-request-choice-error]").textContent = error || "";
+      }
+      status.textContent = invalid ? "Complete the business need and intended use, and resolve any field errors."
         : result.overflow ? "This request is too long to prefill. Copy the prepared request and paste its answers into the native form."
         : "Ready to review in the native issue form. Nothing has been submitted.";
       copyStatus.textContent = "";
@@ -148,7 +176,7 @@ function initModelRequest() {
       const errors = refresh();
       if (Object.keys(errors).length) {
         event.preventDefault();
-        (errors.model_reference ? reference : need).focus();
+        inputs[Object.keys(errors)[0]].focus();
       }
     };
     link.addEventListener("click", check);

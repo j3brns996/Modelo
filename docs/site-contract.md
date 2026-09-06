@@ -312,8 +312,9 @@ focus or assistive-technology behavior; those remain controlled-browser/T10 work
 
 ## Request form and access test
 
-The primary form collects an optional model/provider reference and a required
-short description of the need, each bounded to 2,048 characters. It creates a
+The primary form collects four answers: optional vendor/model/link, required
+business need, required intended use, and optional where/when. Each is bounded
+to 2,048 characters. It creates a
 triage request, not a canonical MAC. `repository.web_routes.request_intake`
 selects the native form. The detailed composer is collapsed by default; an
 explicit operation or contained fragment opens it. Both forms retain copy
@@ -342,3 +343,26 @@ references from database PK/FK constraints. Model artifacts and embedded AI in
 vertical products remain outside the current component catalogue scope.
 Embedded AI still requires organizational risk management; NIST does not grant
 an exemption. Integration work is tracked in issue 78.
+
+The shared navigation includes a labelled GET search form for the existing
+catalogue search. It sends a bounded `q` query to the configured catalogue
+route and adds no browser runtime. It searches models and offerings; it is not
+a full-text documentation index. At narrow widths, the form wraps below the
+navigation links.
+
+The overview separates offering/record approval from system NFR and API-contract
+assessment. The latter concerns performance, availability, security, recovery,
+cost, and consumer interfaces. Its 5-10 accepted changes/day signal adds no
+record approval steps. The agent quickstart links to the portable maintainer
+skill and preserves human approval and exact-head CI requirements.
+
+Optional request checkbox groups capture model rights-owner domicile and data
+processing territory separately (UK, EU, China, USA, Other), plus operator
+(AWS, Azure, Google Cloud, Other). All start unticked. These are unverified
+request details, not approval or new core catalogue facts. GitHub handoff uses
+prefillable text fields for these selections; GitLab Markdown uses marked
+choices. Unknown domicile never supplies a default processing territory.
+
+Clear comparison resets selected models, the comparison dialog, and `compare`
+URL parameters. It preserves search and filters and returns focus to catalogue
+search. The button is available beside comparison controls when a selection exists.

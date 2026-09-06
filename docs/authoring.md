@@ -7,8 +7,14 @@ treat every local input and output path as author-controlled.
 
 ## Request a model review
 
-Use the default proposal form for an optional model-card or provider link and a
-short description of the need. This creates an ordinary request for triage,
+Prefer agent-led triage when an agent is available. Use the
+[agent quickstart](agent-quickstart.md) and portable
+[maintainer skill](../.agents/skills/modelo-maintain/SKILL.md).
+
+Use four short fields: optional vendor/model/link, business need, intended use,
+and where/when if known. Optional choices record the model rights owner's
+domicile, operator, and processing territory separately. Leave unknowns blank. State who needs it, the outcome and reason, the task,
+data and human oversight, and known service, region, environment, or target date. This creates an ordinary request for triage,
 not a MAC. A maintainer or agent prepares the governed change without inventing
 IDs or evidence. The detailed composer remains available for all five operations.
 

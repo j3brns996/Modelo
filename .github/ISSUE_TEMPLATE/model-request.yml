@@ -1,23 +1,67 @@
-name: "Request a model review"
-description: "Share a model/provider link if known and tell us what you need."
-title: "Model request: "
+name: Request a model review
+description: Describe the business need, intended use, and known model or access details.
+title: 'Model request: '
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Share what you know. A maintainer or agent will identify the records and prepare any catalogue change. This request is not approval. Do not include secrets or private commercial terms.
-  - type: input
-    id: model_reference
-    attributes:
-      label: Model card or provider
-      description: Paste a link or name the model or provider, if known. It is fine to leave this blank.
-      placeholder: "https://… or a model/provider name"
-    validations:
-      required: false
-  - type: textarea
-    id: need
-    attributes:
-      label: What do you need?
-      description: A short note about what you want to do and who it is for.
-    validations:
-      required: true
+- type: markdown
+  attributes:
+    value: An agent can identify the vendor and model, propose an offering, and flag
+      missing facts for maintainer review. This request is not approval. Do not include
+      secrets or private commercial terms.
+- type: input
+  id: model_reference
+  attributes:
+    label: Vendor, model, or link
+    description: Name the vendor or model, or add an official link. Leave unknown
+      details blank.
+  validations:
+    required: false
+- type: textarea
+  id: need
+  attributes:
+    label: Business need
+    description: Who needs this, what business outcome matters, and why?
+  validations:
+    required: true
+- type: textarea
+  id: intended_use
+  attributes:
+    label: Intended use
+    description: What task will the model perform, with what data, and how will people
+      check or act on the output?
+  validations:
+    required: true
+- type: textarea
+  id: deployment
+  attributes:
+    label: Where and when
+    description: Service or provider, region, environment, and target date, if known.
+      These help define the proposed offering.
+  validations:
+    required: false
+- type: input
+  id: producer_domicile
+  attributes:
+    label: Model rights owner domicile
+    description: 'Enter known jurisdictions for the legal rights owner, not the processing
+      location. Add other countries in the vendor/model field. Leave unknown choices
+      blank. Allowed values: UK, EU, China, USA, Other.'
+  validations:
+    required: false
+- type: input
+  id: service_operator
+  attributes:
+    label: Operator or service provider
+    description: 'Enter requested or known operators. Name another provider in Where
+      and when. Leave unknown choices blank. Allowed values: AWS, Azure, Google Cloud,
+      Other.'
+  validations:
+    required: false
+- type: input
+  id: processing_territory
+  attributes:
+    label: Data processing territory
+    description: 'Enter requested or known processing locations. These are separate
+      from the rights owner domicile. Add other locations in Where and when. Leave
+      unknown choices blank. Allowed values: UK, EU, China, USA, Other.'
+  validations:
+    required: false

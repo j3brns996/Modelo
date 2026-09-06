@@ -1077,24 +1077,31 @@ candidate, exact-head check, relevant review, merge and target release receipt,
 not separate model and Offering approval loops. Reuse immutable Conditions;
 no new AssuranceProfile or partial-review mechanism is introduced.
 
-## Sustainability review
+## System requirements and capacity assessment
 
-Review the architecture after 90 days. Move live operational state to an event
-or database service, while retaining Git for approved releases, if any two of
-these persist for four weeks:
+Assess system requirements and capacity when accepted catalogue changes reach the 5-10 per
+working day range, or when a consumer needs an API contract. This assessment is
+separate from offering and record approval. Above 10 accepted
+changes per day, reassess review and publication capacity promptly. Keep the
+90-day system assessment as a backstop. These signals trigger assessment, not automatic
+migration. They replace the previous 50-change threshold and four-week wait.
 
-- more than 50 accepted changes per working day;
-- repeated peaks above 10 changes per hour with a sub-hour publication SLA;
-- more than 10% of catalogue changes require conflict resolution;
-- p95 issue-to-publication exceeds one business day while review utilisation is below 70%;
-- p95 validation exceeds five minutes or publication exceeds ten minutes;
-- more than 5% of changes bypass the standard workflow;
-- the same logical identity normally changes more than once per day;
-- consumers require transactional queries, row-level access or live state;
-- the supported baseline clone exceeds 60 seconds because of retained data.
+Measure accepted changes, approval lead time, conflict rate, validation and publication
+latency, and consumer needs. Distinguish review capacity from storage or build
+limits. Do not treat source commit count as accepted catalogue change volume.
 
-Until those conditions exist, adding services would be anticipatory complexity,
-not architecture.
+An API contract defines consumers, data and operations, stable identities,
+versioning, access controls, errors, and service expectations. Check whether
+static catalogue JSON and release snapshots satisfy that contract first.
+A need for a contract does not itself require a new running service.
+Assess nonfunctional requirements (NFRs) separately: performance, availability,
+security, recoverability, and operating cost. Interface behavior is a functional
+contract; NFRs define the quality and service constraints it must meet.
+
+Propose an application API, event service, or operational database only through
+a separate human-reviewed system change with acceptance criteria, ownership,
+and migration plans. Retain accepted release snapshots in Git. The current
+contract still exposes no Modelo application API.
 
 ## Implementation and verification
 
@@ -1130,8 +1137,8 @@ identity remains canonical within Modelo; provider route references and input
 links are not canonical model identities. The catalogue stores metadata and
 evidence, not `.pkl` files, model weights, or inference runtimes.
 
-The primary proposal form collects an optional model/provider reference and a
-short need for triage. It uses `repository.web_routes.request_intake`; it does
+The primary proposal form collects vendor/model/link if known, business need,
+intended use, and where/when if known. These capture 5W+H for agent-led triage. It uses `repository.web_routes.request_intake`; it does
 not generate a MAC. The detailed composer remains available. The GitLab access
 button makes one optional read-only GET to the configured repository GUI URL.
 An observable 200 is not proof of login. Redirects, CORS failures, and timeouts

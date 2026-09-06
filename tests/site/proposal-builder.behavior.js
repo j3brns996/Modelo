@@ -141,11 +141,18 @@ assert.ok(check("add", "candidate_evidence", observation.slice(0,-1)).candidate_
 })().catch(error=>{console.error(error);process.exitCode=1;});
 
 (async () => {
-  const request = modelRequest("", "Summarize customer documents");
+  const request = modelRequest("", "Summarize customer documents", "Staff check summaries of support documents", "Bedrock pilot next quarter", {producer_domicile:["USA"],service_operator:["AWS"],processing_territory:["UK","EU"]});
   assert.deepEqual(request.errors, {});
   assert.equal(request.title, "Model request: Summarize customer documents");
   assert.doesNotMatch(request.markdown, /### (?:Request type|Modelo MAC request type)|subject_identity/);
   assert.ok(modelRequest("", "").errors.need);
+  assert.match(request.markdown, /### Model rights owner domicile[\s\S]*?- \[x\] USA/);
+  assert.equal(request.fields.find(field => field.name === "producer_domicile").value, "USA");
+  assert.equal(request.fields.find(field => field.name === "processing_territory").value, "UK, EU");
+  assert.equal(modelRequest("", "Need", "Use").fields.find(field => field.name === "processing_territory").value, "");
+  assert.ok(modelRequest("", "Need", "Use", "", {producer_domicile:["unlisted"]}).errors.producer_domicile);
+  assert.ok(modelRequest("", "Need a model").errors.intended_use);
+  assert.ok(modelRequest("", "Need", "Use", "x".repeat(2049)).errors.deployment);
   assert.ok(modelRequest("/close", "Need a model").errors.model_reference);
   assert.ok(modelRequest("", "x".repeat(2049)).errors.need);
   for (const provider of ["github", "gitlab"]) {
@@ -153,6 +160,8 @@ assert.ok(check("add", "candidate_evidence", observation.slice(0,-1)).candidate_
     const url = new URL(proposalURL(configured, provider, request.fields, request.markdown, request.title).href);
     assert.equal(url.searchParams.get(provider === "github" ? "title" : "issue[title]"), request.title);
     assert.equal(url.searchParams.get(provider === "github" ? "need" : "issue[description]"), provider === "github" ? request.fields[1].value : request.markdown);
+    if (provider === "github") for (const field of request.fields.filter(field => field.value)) assert.equal(url.searchParams.get(field.name), field.value);
+    else for (const field of request.fields) assert.ok(url.searchParams.get("issue[description]").includes(`### ${field.label}`));
   }
   const nativeFetch = global.fetch;
   try {

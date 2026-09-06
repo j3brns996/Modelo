@@ -536,7 +536,23 @@ site:
     supplementary_controller_is_locked_build_input: false
     t10: [pinned_python_controlled_browser_outside_core_build, functional_explorer_behavior, human_keyboard_and_screen_reader_evidence]
 
+system_requirements_assessment:
+  separate_from_offering_and_record_approval: true
+  additional_record_approval_steps: false
+  nfr_scope: [performance, availability, security, recovery, operating_cost]
+  volume_signal: accepted_catalogue_changes_not_source_commits
+  assessment_range_per_working_day: [5, 10]
+  above_range: promptly_reassess_review_and_publication_capacity
+  alternative_trigger: consumer_need_for_api_contract
+  periodic_backstop_days: 90
+  response: assessment_not_automatic_migration
+  first_option: existing_static_json_and_release_snapshots
+  new_api_or_store: separate_human_reviewed_system_change
+
 authoring:
+  preferred_entry: agent_led_triage
+  agent_quickstart: docs/agent-quickstart.md
+  maintainer_skill: .agents/skills/modelo-maintain/SKILL.md
   guide: docs/authoring.md
   local_inputs_and_outputs: author_controlled_nonaccepting
   issue_form_cards:
@@ -549,7 +565,14 @@ authoring:
       malformed_nonblank: reject
     batch_scope: required_independently_of_candidate_evidence
   simple_request:
-    fields: [optional_model_reference, required_need]
+    fields: [optional_model_reference, required_business_need, required_intended_use, optional_where_and_when]
+    optional_choices:
+      producer_domicile: [UK, EU, China, USA, Other]
+      service_operator: [AWS, Azure, Google Cloud, Other]
+      processing_territory: [UK, EU, China, USA, Other]
+    choices_default: none_selected
+    choice_meaning: requester_supplied_unverified_not_approval
+    domicile_and_processing: distinct_no_automatic_copy
     maximum_field_characters: 2048
     destination: repository.web_routes.request_intake
     output: triage_request_not_mac

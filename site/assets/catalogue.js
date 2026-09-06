@@ -220,6 +220,15 @@ document.addEventListener("alpine:init", () => {
       this.writeUrl();
     },
 
+    clearComparison() {
+      this.comparison = [];
+      this.closeComparison();
+      this.$root.querySelector("[data-comparison-content]").replaceChildren();
+      this.updateComparison();
+      this.writeUrl();
+      this.$root.querySelector("[data-search]").focus();
+    },
+
     updateComparison() {
       for (const button of this.$root.querySelectorAll("[data-compare-toggle]")) {
         const key = button.closest("[data-catalogue-item]").dataset.key;
@@ -231,6 +240,7 @@ document.addEventListener("alpine:init", () => {
       this.$root.querySelector("[data-comparison-tray]").hidden = count === 0;
       this.$root.querySelector("[data-comparison-label]").textContent = `${count} ${count === 1 ? "model" : "models"} selected`;
       for (const button of this.$root.querySelectorAll("[data-open-comparison]")) button.disabled = count < 2;
+      for (const button of this.$root.querySelectorAll("[data-clear-comparison]")) button.hidden = count === 0;
       for (const counter of this.$root.querySelectorAll("[data-comparison-count]")) counter.textContent = String(count);
     },
 

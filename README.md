@@ -5,6 +5,10 @@ AI model catalogue. Models record facts; offerings carry consumption approval.
 Issues start work, while change requests and trusted CI decide it. There is no
 application API; host concerns stay in Git adapters, not core records or schemas.
 
+![Modelo: model availability passes through evidence, conditions, offering, route, and review before approved use](docs/img/modelo-title.png)
+
+Concept illustration. Counts and status indicators are illustrative. Modelo records offering approvals; application owners govern specific uses.
+
 ## Start here
 
 - Live synthetic demo: [j3brns996.github.io/Modelo/](https://j3brns996.github.io/Modelo/)

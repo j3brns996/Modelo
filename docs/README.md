@@ -3,6 +3,10 @@
 This index is for repository contributors. It is not the published site route
 at `/docs/`.
 
+![Modelo: model availability passes through evidence, conditions, offering, route, and review before approved use](img/modelo-title.png)
+
+Concept illustration. Counts and status indicators are illustrative. Modelo records offering approvals; application owners govern specific uses.
+
 ## Read by question
 
 Start with the [agent quickstart](agent-quickstart.md) for agent-led triage,

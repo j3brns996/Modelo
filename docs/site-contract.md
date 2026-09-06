@@ -383,3 +383,20 @@ The file is included in the exact publication inventory and manifest.
 The instructions embed the exact selected host form markup. The deterministic
 proposal ZIP contains the guide, selected host templates, and published schemas.
 GitHub YAML defines native fields; GitLab Markdown defines the description.
+
+## Publication time and backlog
+
+The leading catalogue summary shows the source revision date and time in UTC,
+to the minute, from the explicit source-date epoch. The separate data-check
+date describes the validated snapshot, not the page load or deployment time.
+
+Changes shows four paths per commit and expands the remaining paths with native
+HTML details. It also shows up to four recent open issues from the dated,
+committed `site/content/backlog.json` snapshot. Refresh this file from the Git
+provider when publishing a site update. Status can change after retrieval.
+The snapshot is displayed only for its recorded repository; the live backlog
+link always uses `repository.web_routes.backlog`. Builds remain offline.
+
+Agents in the primary navigation opens the published Markdown guide. Prose
+shares the page gutter and a bounded reading width. Wide diagrams and tables
+scroll within their sections; code examples wrap on narrow screens.

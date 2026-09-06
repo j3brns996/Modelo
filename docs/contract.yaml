@@ -461,9 +461,9 @@ canonical_site_url:
 site:
   contract_config_key: paths.site_contract
   routes_config_key: site.routes
-  data_routes: [catalogue, change_delta, manifest, schemas]
+  data_routes: [catalogue, change_delta, manifest, schemas, proposal_schema_bundle]
   asset_routes: [asset_css, asset_catalogue_js, asset_proposal_js, asset_alpine, asset_third_party_notices]
-  overview: {route: overview, format: static_5wh_with_accessible_svg, includes: [entities, file_keys, git_rationale, review_criteria, artifact_boundary, embedded_ai_scope]}
+  overview: {route: overview, format: static_5wh_with_accessible_svg, includes: [entities, file_keys, git_rationale, review_criteria, artifact_boundary, embedded_ai_scope, er_state_sequence_diagrams, numbered_nist_interpretations]}
   presentation:
     writing_style: microsoft_technical_style_objective_concise_sentence_case
     shell: editorial_reference_catalogue

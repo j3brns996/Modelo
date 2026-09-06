@@ -577,6 +577,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         if (not isinstance(observation, dict)
             or set(observation) != {"model_id", "provider_reference", "service", "region", "mode"}
             or any(not isinstance(value, str) or not value for value in observation.values())
+            or observation["region"] != "eu-west-2"
             or observation["model_id"] not in models_by_id
             or item["source"]["type"] != "official-provider-documentation"):
             raise BuildError("documented UK availability needs a model and official provider source")

@@ -889,7 +889,7 @@ class SchemaFixtureTests(unittest.TestCase):
         )
         self.assertEqual(
             config["publication"]["profiles"]["synthetic"]["as_of"],
-            "2026-09-01",
+            "2026-09-06",
         )
 
     def test_t5_required_inputs_and_commands_align_cross_document(self) -> None:

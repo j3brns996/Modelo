@@ -52,12 +52,12 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             result.stdout,
-            '{"base_path":"/Modelo/","base_url":"https://j3brns996.github.io/Modelo/","synthetic_as_of":"2026-09-01"}\n',
+            '{"base_path":"/Modelo/","base_url":"https://j3brns996.github.io/Modelo/","synthetic_as_of":"2026-09-06"}\n',
         )
         lines = self.run_cli("config", "site", "--format", "lines")
         self.assertEqual(
             lines.stdout,
-            "https://j3brns996.github.io/Modelo/\n/Modelo/\n2026-09-01\n",
+            "https://j3brns996.github.io/Modelo/\n/Modelo/\n2026-09-06\n",
         )
 
     def test_final_build_requires_merge_coordinates_metadata_and_publication_capability(self) -> None:

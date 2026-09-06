@@ -681,13 +681,16 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     for path in schema_paths:
         relative = PurePosixPath(path).relative_to(schemas_root)
         files[(PurePosixPath(resolver.output_path("schemas_data")) / relative).as_posix()] = _blob(root, request.source_commit, path)
+    bundle_entries = {"schemas/" + PurePosixPath(path).relative_to(schemas_root).as_posix(): files[(PurePosixPath(resolver.output_path("schemas_data")) / PurePosixPath(path).relative_to(schemas_root)).as_posix()] for path in schema_paths}
+    bundle_entries.update({"templates/" + name: raw for name, raw in form_templates.items()})
+    bundle_entries["README.md"] = files[resolver.output_path("requester_agent")]
     bundle = io.BytesIO()
     with ZipFile(bundle, "w") as archive:
-        for path in sorted(schema_paths):
-            archive.writestr(ZipInfo("schemas/" + PurePosixPath(path).relative_to(schemas_root).as_posix()), _blob(root, request.source_commit, path))
-        for name, raw in sorted(form_templates.items()):
-            archive.writestr(ZipInfo("templates/" + name), raw)
-        archive.writestr(ZipInfo("README.md"), files[resolver.output_path("requester_agent")])
+        for name, raw in sorted(bundle_entries.items()):
+            entry = ZipInfo(name)  # Fixed epoch and stored bytes keep the bundle reproducible.
+            entry.create_system = 3
+            entry.external_attr = 0o100644 << 16
+            archive.writestr(entry, raw)
     files[resolver.output_path("proposal_schema_bundle_data")] = bundle.getvalue()
     return files
 

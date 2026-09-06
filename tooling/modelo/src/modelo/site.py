@@ -648,8 +648,8 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     files[resolver.output_path("change_delta_data")] = delta_raw
     files[resolver.output_path("human_specification")] = _blob(root, request.source_commit, document["paths"]["human_specification"])
     files[resolver.output_path("machine_contract")] = _blob(root, request.source_commit, document["paths"]["machine_contract"])
-    example_model = catalogue["models"][0] if catalogue["models"] else None
-    example_offering = next((item for item in catalogue["offerings"] if example_model and item["model_id"] == example_model["id"]), None)
+    example_offering = catalogue["offerings"][0] if catalogue["offerings"] else None
+    example_model = next((item for item in catalogue["models"] if example_offering and item["id"] == example_offering["model_id"]), catalogue["models"][0] if catalogue["models"] else None)
     example = {key: catalogue[key] for key in ("contract_version", "source_commit", "source_tree", "as_of", "profile")}
     example.update({"model": example_model, "offering": example_offering})
     adapter = document["repository"]["adapter"]

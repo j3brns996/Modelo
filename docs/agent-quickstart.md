@@ -3,7 +3,17 @@
 Start with the need. Let the agent prepare the records and review material.
 The requester does not need to know Modelo IDs or evidence formats.
 
-## Give the agent a task
+## Request without agent setup
+
+On the proposal page, copy the requester agent guide URL (`/agents/README.md`
+under the configured site base path). Paste it into any coding agent with your
+business need. The plain Markdown includes the published inventory and schemas,
+examples from the same snapshot, and each proposal field's meaning and reason.
+No installed skill, agent configuration, or checkout is needed for intake.
+The agent prepares a native GitHub or GitLab issue form; the human submits it.
+Requester intake does not use the issue API.
+
+## Give a maintainer agent a task
 
 Open a checkout and provide the request link, business need, intended use,
 known vendor/model details, and where/when. Add known rights-owner domicile,

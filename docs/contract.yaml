@@ -564,6 +564,17 @@ authoring:
       blank_compiles_to: []
       malformed_nonblank: reject
     batch_scope: required_independently_of_candidate_evidence
+  requester_agent_guide:
+    route: site.document_routes.requester_agent
+    format: markdown
+    proposal_schema_bundle: site.data_routes.proposal_schema_bundle
+    form_markup: verbatim_selected_host_templates_embedded_and_bundled
+    agent_configuration_required: false
+    intake_checkout_required: false
+    public_data_contract: published_catalogue_and_schemas
+    examples: same_build_inventory_records_with_snapshot_identity
+    field_guidance: meaning_and_reason
+    submission: native_git_provider_issue_form_human_submits_no_api
   simple_request:
     fields: [optional_model_reference, required_business_need, required_intended_use, optional_where_and_when]
     optional_choices:

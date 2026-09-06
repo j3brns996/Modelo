@@ -254,12 +254,13 @@
         },
         "data_routes": {
           "type": "object",
-          "required": ["catalogue", "change_delta", "manifest", "schemas"],
+          "required": ["catalogue", "change_delta", "manifest", "schemas", "proposal_schema_bundle"],
           "properties": {
             "catalogue": { "$ref": "#/$defs/noParameterRoute" },
             "change_delta": { "$ref": "#/$defs/noParameterRoute" },
             "manifest": { "$ref": "#/$defs/noParameterRoute" },
-            "schemas": { "$ref": "#/$defs/noParameterRoute" }
+            "schemas": { "$ref": "#/$defs/noParameterRoute" },
+            "proposal_schema_bundle": { "$ref": "#/$defs/noParameterRoute" }
           },
           "additionalProperties": false
         },
@@ -293,10 +294,11 @@
         },
         "document_routes": {
           "type": "object",
-          "required": ["human_specification", "machine_contract"],
+          "required": ["human_specification", "machine_contract", "requester_agent"],
           "properties": {
             "human_specification": { "$ref": "#/$defs/noParameterRoute" },
-            "machine_contract": { "$ref": "#/$defs/noParameterRoute" }
+            "machine_contract": { "$ref": "#/$defs/noParameterRoute" },
+            "requester_agent": { "$ref": "#/$defs/noParameterRoute" }
           },
           "additionalProperties": false
         },
@@ -388,7 +390,7 @@
           "items": { "enum": ["data/catalogue.json", "data/change-delta.json"] }
         },
         "final_fixed_files": {
-          "type": "array", "minItems": 17, "maxItems": 17, "uniqueItems": true,
+          "type": "array", "minItems": 19, "maxItems": 19, "uniqueItems": true,
           "items": { "$ref": "#/$defs/path" }
         },
         "mac_metadata_ingestion": {

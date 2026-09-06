@@ -252,6 +252,24 @@ def test_release_date_enrichment_and_correction(repo, initial_date, evidenced):
         assert any(d.json_pointer == "/release/released_at" for d in findings), findings
 
 
+@pytest.mark.parametrize("precision", ["named-release", "vendor-version"])
+def test_removing_release_metadata_preserves_effective_identity(repo, precision):
+    model = read(repo, MODEL)
+    model["release"] = {"vendor_label": model["name"], "precision": precision}
+    model["evidence_refs"]["/release/vendor_label"] = deepcopy(model["evidence_refs"]["/name"])
+    write(repo, MODEL, model)
+    base = repo.commit("establish release metadata")
+    del model["release"]
+    del model["evidence_refs"]["/release/vendor_label"]
+    write(repo, MODEL, model)
+    head = repo.commit()
+    findings = check_repository(repo.root, base, head, date(2026, 9, 1))
+    if precision == "named-release":
+        assert not findings, findings
+    else:
+        assert any("release identity or precision" in d.message for d in findings)
+
+
 def test_provider_id_and_arn_cannot_be_cherry_picked(repo):
     from modelo.evidence import evidence_id
     offering = read(repo, OFFERING)

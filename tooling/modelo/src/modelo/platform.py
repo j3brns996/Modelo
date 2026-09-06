@@ -17,7 +17,7 @@ from typing import Any
 
 from modelo.build import BuildError, _git, _layout, _strict_json_bytes, _strict_json_file
 from modelo.change import with_snapshot
-from modelo.config import load_config
+from modelo.config import CONTRACT_VERSION, load_config
 from modelo.receipt import canonical_bytes, publication_digest, sha256_bytes
 from modelo.schemas import SchemaSet
 from modelo.site import ValidationBuildRequest, _committed_yaml_config, build_validation_site
@@ -165,7 +165,7 @@ def run_trusted_check(request: TrustedCheckRequest) -> dict[str, Any]:
     actors_raw = bytes(_git(root, "show", f"{head}:{actors_path}", binary=True))
     lock_raw = bytes(_git(root, "show", f"{head}:uv.lock", binary=True))
     receipt = {
-        "contract_version": "0.1.0", "repository": repository,
+        "contract_version": CONTRACT_VERSION, "repository": repository,
         "change_request": context["change_request"], "base_sha": context["base_sha"],
         "head_sha": head, "head_tree_sha": context["head_tree_sha"],
         "validation_sha": context["validation_sha"],
@@ -252,7 +252,7 @@ def run_trusted_control_check(request: TrustedControlCheckRequest) -> dict[str, 
     trusted_lock = bytes(_git(root, "show", f"{base}:uv.lock", binary=True))
     proposed_lock = bytes(_git(root, "show", f"{head}:uv.lock", binary=True))
     receipt = {
-        "contract_version": "0.1.0", "kind": "control-plane", "repository": repository,
+        "contract_version": CONTRACT_VERSION, "kind": "control-plane", "repository": repository,
         "control_issue": context["control_issue"],
         "control_issue_digest": context["control_issue_digest"],
         "change_request": context["change_request"],

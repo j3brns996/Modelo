@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 from modelo.build import BuildError, _git
 from modelo.guided_intake import GuidedIntakeResult, compile_guided_intake
 from modelo.mac import MacError, extract_adapter_issue_payload
+from modelo.config import CONTRACT_VERSION
 from modelo.platform import _atomic_write, _read_json
 from modelo.receipt import canonical_bytes, sha256_bytes, sort_change_delta
 from modelo.site import _committed_yaml_config
@@ -242,7 +243,7 @@ def prepare_gitlab(
         raise BuildError("GitLab pre-merge adapter currently requires the configured public Pages profile")
     host, _, namespace, name, _ = _gitlab_project_identity(project)
     metadata = {
-        "contract_version": "0.1.0",
+        "contract_version": CONTRACT_VERSION,
         "repository": {"provider": "gitlab", "host": host, "namespace": namespace, "name": name},
         "issue": {"reference": issue_reference, "url": str(issue.get("web_url", "")), "state": "open"},
         "base_sha": base, "head_sha": head, "head_tree_sha": tree,
@@ -250,7 +251,7 @@ def prepare_gitlab(
         "expected_change_delta": sort_change_delta(delta),
     }
     context = {
-        "contract_version": "0.1.0", "repository": metadata["repository"],
+        "contract_version": CONTRACT_VERSION, "repository": metadata["repository"],
         "change_request": str(mr.get("iid") or mr.get("id", "")), "base_sha": base, "head_sha": head,
         "head_tree_sha": tree, "validation_sha": validation_sha,
         "validation_tree_sha": validation_tree, "as_of": as_of.isoformat(),
@@ -290,7 +291,7 @@ def prepare_gitlab_control(
     _require_gitlab_config(protected, project)
     host, _, namespace, name, _ = _gitlab_project_identity(project)
     context = {
-        "contract_version": "0.1.0",
+        "contract_version": CONTRACT_VERSION,
         "repository": {"provider": "gitlab", "host": host, "namespace": namespace, "name": name},
         "control_issue": issue_reference,
         "control_issue_digest": sha256_bytes(str(issue.get("description") or issue.get("body", "")).encode("utf-8")),

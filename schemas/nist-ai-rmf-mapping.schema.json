@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/nist-ai-rmf-mapping.schema.json",
+  "title": "Organisation-defined NIST method-equivalence mapping",
+  "type": "object",
+  "required": [
+    "profile_version",
+    "disclaimer",
+    "assessment_dimensions",
+    "mappings"
+  ],
+  "properties": {
+    "profile_version": {
+      "const": "1.0"
+    },
+    "disclaimer": {
+      "const": "Supports selected NIST AI RMF outcomes; not a certification; not a complete organisational AI-system inventory."
+    },
+    "assessment_dimensions": {
+      "const": [
+        "intent",
+        "scope",
+        "mechanism",
+        "authority",
+        "evidence",
+        "timeliness",
+        "failure_behaviour"
+      ]
+    },
+    "mappings": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "$ref": "#/$defs/mapping"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "texts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/text"
+      }
+    },
+    "level": {
+      "enum": [
+        "N",
+        "S",
+        "P",
+        "D",
+        "O"
+      ]
+    },
+    "mapping": {
+      "type": "object",
+      "required": [
+        "id",
+        "function",
+        "category",
+        "subcategory",
+        "action",
+        "source",
+        "intent",
+        "scope",
+        "mechanism",
+        "authority",
+        "evidence",
+        "timeliness",
+        "failure_behaviour",
+        "artefacts",
+        "limitations",
+        "external_dependencies",
+        "current_level",
+        "target_level",
+        "assessment_criteria",
+        "responsible_role",
+        "review_frequency",
+        "operating_assessments"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "GOVERN-1.6",
+            "GV-1.6-001",
+            "GV-1.6-002",
+            "GV-1.6-003"
+          ]
+        },
+        "function": {
+          "const": "GOVERN"
+        },
+        "category": {
+          "const": "GOVERN 1"
+        },
+        "subcategory": {
+          "const": "GOVERN 1.6"
+        },
+        "action": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "enum": [
+            "https://airc.nist.gov/airmf-resources/airmf/5-sec-core/",
+            "https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.600-1.pdf"
+          ]
+        },
+        "intent": {
+          "$ref": "#/$defs/text"
+        },
+        "scope": {
+          "$ref": "#/$defs/text"
+        },
+        "mechanism": {
+          "$ref": "#/$defs/text"
+        },
+        "authority": {
+          "$ref": "#/$defs/text"
+        },
+        "timeliness": {
+          "$ref": "#/$defs/text"
+        },
+        "failure_behaviour": {
+          "$ref": "#/$defs/text"
+        },
+        "limitations": {
+          "$ref": "#/$defs/text"
+        },
+        "responsible_role": {
+          "$ref": "#/$defs/text"
+        },
+        "review_frequency": {
+          "$ref": "#/$defs/text"
+        },
+        "evidence": {
+          "$ref": "#/$defs/texts"
+        },
+        "artefacts": {
+          "$ref": "#/$defs/texts"
+        },
+        "external_dependencies": {
+          "$ref": "#/$defs/texts"
+        },
+        "assessment_criteria": {
+          "$ref": "#/$defs/texts"
+        },
+        "current_level": {
+          "$ref": "#/$defs/level"
+        },
+        "target_level": {
+          "$ref": "#/$defs/level"
+        },
+        "operating_assessments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "period_start",
+              "period_end",
+              "assessor",
+              "population",
+              "findings",
+              "evidence_refs",
+              "remediation",
+              "independent_review_ref"
+            ],
+            "properties": {
+              "period_start": {
+                "type": "string",
+                "format": "date"
+              },
+              "period_end": {
+                "type": "string",
+                "format": "date"
+              },
+              "assessor": {
+                "$ref": "#/$defs/text"
+              },
+              "population": {
+                "$ref": "#/$defs/text"
+              },
+              "findings": {
+                "$ref": "#/$defs/text"
+              },
+              "remediation": {
+                "$ref": "#/$defs/text"
+              },
+              "independent_review_ref": {
+                "$ref": "#/$defs/text"
+              },
+              "evidence_refs": {
+                "$ref": "#/$defs/texts"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "current_level": {
+                "const": "O"
+              }
+            },
+            "required": [
+              "current_level"
+            ]
+          },
+          "then": {
+            "properties": {
+              "operating_assessments": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

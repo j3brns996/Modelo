@@ -4,6 +4,7 @@ model_id: test-model
 approval_rationale: Approved for synthetic integration testing of the governed catalogue and route presentation.
 routes:
   - id: london-direct
+    selector_type: provider-model-id
     source_region: eu-west-2
     reference: test.model-v1
     model_binding:

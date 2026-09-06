@@ -96,6 +96,11 @@
   "type": "object",
   "required": ["id", "source_region", "reference", "model_binding"],
   "properties": {
+    "selector_type": {
+      "enum": ["provider-model-id", "inference-profile", "floating-alias", "immutable-resource", "immutable-version", "deployment-name", "provisioned-resource"],
+      "description": "Profile 0.2.0 requires explicit classification at semantic validation. Immutable classifications need adapter support; spelling is not proof.",
+      "x-modelo-provenance": "policy"
+    },
     "id": { "$ref": "../common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
     "source_region": {
       "$ref": "../common.schema.json#/$defs/awsRegion",

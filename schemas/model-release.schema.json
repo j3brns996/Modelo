@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelo.invalid/schemas/model-release.schema.json",
+  "title": "ModelRelease metadata (entity acceptance profile 0.2.0)",
+  "$ref": "#/$defs/release",
+  "$defs": {
+    "namespace": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z0-9-]+)*(?![\\s\\S])"
+    },
+    "claim": {
+      "type": "object",
+      "required": [
+        "namespace",
+        "value",
+        "relation",
+        "status"
+      ],
+      "properties": {
+        "namespace": {
+          "$ref": "#/$defs/namespace",
+          "x-modelo-provenance": "internal"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "x-modelo-provenance": "external",
+          "x-modelo-freshness-class": "intrinsic_model_fact"
+        },
+        "relation": {
+          "const": "identifies",
+          "x-modelo-provenance": "policy"
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "vendor-asserted",
+            "provider-mapped",
+            "probable",
+            "conflicting",
+            "unresolved"
+          ],
+          "x-modelo-provenance": "policy"
+        }
+      },
+      "additionalProperties": false
+    },
+    "release": {
+      "type": "object",
+      "required": [
+        "vendor_label",
+        "precision"
+      ],
+      "properties": {
+        "vendor_label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-modelo-provenance": "external",
+          "x-modelo-freshness-class": "intrinsic_model_fact"
+        },
+        "precision": {
+          "enum": [
+            "content-addressed",
+            "immutable-snapshot",
+            "vendor-version",
+            "named-release",
+            "floating-name",
+            "unresolved"
+          ],
+          "x-modelo-provenance": "policy"
+        },
+        "released_at": {
+          "type": "string",
+          "format": "date",
+          "x-modelo-provenance": "external",
+          "x-modelo-freshness-class": "intrinsic_model_fact"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

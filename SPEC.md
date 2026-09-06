@@ -67,7 +67,7 @@ Version `0.1.0` does not:
 `v0.1.0` is the contract/config and receipt-wire family named by this
 specification. Individual payload schemas retain their declared compatible
 versions, such as MAC `schema_version: "0.1"`. `VERSION` and `pyproject.toml`
-currently identify tool release `0.1.1`. Tool releases and wire contracts are
+currently identify tool release `0.2.0`. Tool releases and wire contracts are
 related but not locked together: a compatible tool fix need not rewrite every
 stored wire version, and a wire change is versioned according to its
 compatibility impact.
@@ -83,10 +83,22 @@ silently saying that code wins.
 A canonical, named model release produced by a model vendor or laboratory.
 Its identity is independent of the cloud or API host that serves it.
 
+The physical `model` entity means **ModelRelease**, not a family, deployment,
+floating alias or general marketing category. Internal IDs remain canonical and
+non-reusable. Derived URNs, evidenced external claims, four separate version
+dimensions and migration are specified in
+[ADR 0002](docs/adr/0002-model-release-identity.md). Entity acceptance profile
+0.2.0 tightens AWS binding without changing the 0.1.0 config/receipt wire.
+
 ### Offering
 
 An enterprise-approved inference-service/model relationship. The offering has a stable
 internal ID and contains one or more approved provider routes.
+
+Those routes must be governance-equivalent ways to consume one ModelRelease:
+binding, processing/routing, residency, contracts/data handling, controls,
+Conditions and permitted uses must all be interchangeable for the decision.
+Changing model_id requires a new Offering. Model metadata alone never grants use.
 
 ### Route
 
@@ -503,6 +515,7 @@ approval_rationale: <policy-authored reason this route is approved>
 routes:
   - id: <stable-route-id>
     source_region: <aws-request-region>
+    selector_type: provider-model-id
     reference: <opaque-first-party-reference>
     model_binding:
       kind: foundation-model
@@ -578,6 +591,10 @@ model `arn_pointer`; that ARN's partition and Region equal the destination's
 `GetFoundationModel` evidence source. The reported model and provider names
 equal the canonical model name and governed vendor name. All references are
 explicit; the validator never searches globally for plausible evidence.
+Names are consistency checks only: each destination's provider model ID must
+also match an evidenced namespaced claim on the bound ModelRelease. Direct
+routes require the same identity proof. selector_type is explicit; API identity
+does not prove immutable weights. Profile routes use inference-profile.
 
 ### Dimensional pricing
 
@@ -701,19 +718,27 @@ mask stale or mismatched first-party route-binding evidence.
 
 ### Illustrative AWS configuration
 
-The following contains placeholders, not catalogue facts:
+The following are two separate Offering fragments with placeholders, not catalogue facts:
 
 ```yaml
 inference_service_id: aws-bedrock
 model_id: <canonical-model-id>
 routes:
   - id: london-direct
+    selector_type: provider-model-id
     source_region: eu-west-2
     reference: <bedrock-foundation-model-id>
     model_binding:
       kind: foundation-model
       model_evidence: <explicit-evidence-binding>
+```
+
+```yaml
+inference_service_id: aws-bedrock
+model_id: <canonical-model-id>
+routes:
   - id: eu-cross-region
+    selector_type: inference-profile
     source_region: eu-west-2
     reference: <bedrock-system-inference-profile-id>
     model_binding:
@@ -741,9 +766,8 @@ mode and evidence. Provider adapters define syntax and API mappings. Account,
 project, subscription and resource-group coordinates belong in discovery
 configuration or protected observations, not canonical paths.
 
-GCP and Azure adapter schemas will be added only from captured first-party API
-fixtures. Their differences are documented now; they are not speculated into
-the v0.1.0 core.
+GCP and Azure adapter schemas are structurally reachable, but their semantic
+validators remain fail-closed pending captured first-party fixtures and review.
 
 ## Discovery and MAC workflow
 
@@ -1020,7 +1044,30 @@ The initial explicit contracts are:
 - **Audit:** claim tamper evidence, not WORM immutability.
 - **Exit:** measure when Git stops fitting.
 
-## Sustainability exit criteria
+## NIST inventory component boundary
+
+Modelo supports selected NIST AI RMF inventory outcomes. It does not by itself
+make an organisation NIST compliant and is not the complete organisational
+AI-system inventory. The [method-equivalence profile](docs/assurance/nist-ai-rmf-method-equivalence.md)
+and deterministic mapping use organisation-defined N/S/P/D/O assessments, not
+certification. Current claims are P/P/S/P for GOVERN 1.6 and GV-1.6-001/002/003;
+only the bounded 003 component contribution targets D. This profile rejects O.
+
+M1 is the governed-component-registry target, not proven production operation.
+The [maturity profile](docs/assurance/modelo-maturity-profile.md) separates target,
+local, remote and operating evidence. The [external boundary ADR](docs/adr/0003-ai-inventory-boundary.md)
+defines AIUseBinding and the entity/sequence diagrams. External owners retain
+purpose, accountability, affected parties, data, oversight and lifecycle.
+[Covered-by-parent](docs/assurance/embedded-ai-coverage.md) avoids duplicate
+external inventory entries when all criteria hold; it is not governance exemption.
+
+One existing homogeneous batch-add MAC can introduce a ModelRelease, its first
+Offering and Evidence with Condition references. This means one issue, branch,
+candidate, exact-head check, relevant review, merge and target release receipt,
+not separate model and Offering approval loops. Reuse immutable Conditions;
+no new AssuranceProfile or partial-review mechanism is introduced.
+
+## Sustainability review
 
 Review the architecture after 90 days. Move live operational state to an event
 or database service, while retaining Git for approved releases, if any two of

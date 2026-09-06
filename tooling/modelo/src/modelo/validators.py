@@ -23,6 +23,8 @@ from modelo.evidence import (
 from modelo.freshness import validate_freshness
 from modelo.loader import LoadError, load_yaml_mapping
 from modelo.schemas import SchemaSet
+from modelo.identity import canonical_urn, has_provider_claim, release_precision
+from modelo.change import validate_reserved_identity_history
 
 
 class CheckSystemError(Exception):
@@ -183,8 +185,25 @@ def _load_state(root: Path) -> State:
 
 
 def _reference_checks(state: State) -> None:
+    verified: dict[tuple[str, str], str] = {}
     for identifier, model in state.models.items():
         path = state.model_paths[identifier]
+        if model.get("canonical_urn", canonical_urn("model-release", identifier)) != canonical_urn("model-release", identifier):
+            state.diagnostics.append(_diag("PATH_IDENTITY_MISMATCH", path, "/canonical_urn", "canonical URN differs from internal identity", "Derive the URN from the unchanged internal ID."))
+        if model.get("family_id") == identifier:
+            state.diagnostics.append(_diag("CHANGE_INVALID", path, "/family_id", "family grouping cannot be the release identity", "Use a distinct optional internal family grouping."))
+        supersedes = model.get("supersedes_model_id")
+        if supersedes is not None and (supersedes == identifier or supersedes not in state.models):
+            state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, "/supersedes_model_id", "superseded release must be another retained Model", "Reference an existing different release."))
+        namespaces: dict[str, str] = {}
+        for claim in model.get("identity_claims", []):
+            if claim["status"] != "verified":
+                continue
+            key = (claim["namespace"], claim["value"])
+            if (key in verified and verified[key] != identifier) or (claim["namespace"] in namespaces and namespaces[claim["namespace"]] != claim["value"]):
+                state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, "/identity_claims", "conflicting verified external identity", "Resolve the conflict through evidenced independent review."))
+            verified[key] = identifier
+            namespaces[claim["namespace"]] = claim["value"]
         if model["vendor_id"] not in state.vendors:
             state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, "/vendor_id", "model vendor does not exist", "Add or reference a governed vendor."))
     for identifier, offering in state.offerings.items():
@@ -338,6 +357,19 @@ def _model_evidence(
     )
     if model is None:
         return
+    # Display-name equality is a consistency check, never an identity proof.
+    try:
+        if "id_pointer" in binding:
+            provider_id = resolve_pointer(record["projection"], binding["id_pointer"])
+        else:
+            # AWS-owned foundation model ARN explicitly contains the model ID.
+            provider_id = model_arn.split("::foundation-model/", 1)[1]
+    except (KeyError, IndexError, TypeError, AttributeError):
+        provider_id = None
+    if provider_id is not None and isinstance(model_arn, str) and provider_id != model_arn.split("::foundation-model/", 1)[-1]:
+        state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, binding_pointer, "provider model ID differs from its evidenced ARN identity", "Bind ID and ARN from the same foundation-model observation."))
+    if provider_id is None or not has_provider_claim(model, provider_id):
+        state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, binding_pointer, "provider model ID has no evidenced ModelRelease identity claim", "Bind the exact provider identifier to the Model; display names do not prove identity."))
     vendor = state.vendors.get(model.get("vendor_id"))
     comparisons = (("name_pointer", model.get("name")), ("provider_pointer", vendor.get("name") if vendor else None))
     for field, expected in comparisons:
@@ -354,6 +386,8 @@ def _aws_offering_checks(
 ) -> None:
     model = state.models.get(offering["model_id"])
     semantic_routes: set[tuple[str, str, str]] = set()
+    governance_scopes: set[tuple[str, str]] = set()
+    profile_residency_scopes: set[tuple[str, ...]] = set()
     for index, route in enumerate(offering["routes"]):
         route_pointer = f"/routes/{index}"
         # The offering's resolved service adapter is aws-bedrock, but
@@ -373,6 +407,14 @@ def _aws_offering_checks(
             continue
         source_region = str(route["source_region"])
         binding = route["model_binding"]
+        governance_scopes.add((source_region, str(binding["kind"])))
+        if len(governance_scopes) > 1:
+            state.diagnostics.append(_diag("CHANGE_INVALID", path, route_pointer, "routes differ in material processing or source Region scope", "Use separate Offerings for distinct routing and residency decisions."))
+        expected_selector = "provider-model-id" if binding["kind"] == "foundation-model" else "inference-profile"
+        if route.get("selector_type") != expected_selector:
+            state.diagnostics.append(_diag("CHANGE_INVALID", path, route_pointer + "/selector_type", "missing or unsupported selector classification", "Use provider-model-id or inference-profile; this adapter does not prove immutability or support floating aliases."))
+        if model is not None and release_precision(model) in {"floating-name", "unresolved"}:
+            state.diagnostics.append(_diag("CHANGE_INVALID", path, "/model_id", "Offering cannot consume a floating or unresolved model identity", "Identify the named release before proposing consumption."))
         semantic_key = (source_region, str(binding["kind"]), str(route["reference"]))
         if semantic_key in semantic_routes:
             state.diagnostics.append(_diag(
@@ -534,6 +576,9 @@ def _aws_offering_checks(
                     item.get("modelArn") if isinstance(item, Mapping) else None
                     for item in projected_destinations
                 ]
+                profile_residency_scopes.add(tuple(sorted({scope[1] for value in projected_arns if (scope := _aws_arn_scope(value)) is not None})))
+                if len(profile_residency_scopes) > 1:
+                    state.diagnostics.append(_diag("CHANGE_INVALID", path, route_pointer, "profile routes differ in destination residency scope", "Use separate Offerings for different processing Region sets."))
                 destinations_base = profile["destinations_pointer"]
                 expected_pointers = {
                     f"{destinations_base}/{index}/modelArn"
@@ -640,6 +685,11 @@ def check_repository(root: Path, base: str, head: str, as_of: date) -> tuple[Dia
         ))
     except GitError as exc:
         raise CheckSystemError(str(exc)) from exc
+    try:
+        diagnostics.extend(validate_reserved_identity_history(root, base_commit, changes,
+            head_state.config.paths["models"].as_posix(), head_state.config.paths["offerings"].as_posix()))
+    except GitError as exc:
+        raise CheckSystemError(str(exc)) from exc
     # A modified record may not silently change logical identity even if a path error
     # in the candidate would otherwise obscure the base comparison.
     for status, path in changes:
@@ -650,9 +700,26 @@ def check_repository(root: Path, base: str, head: str, as_of: date) -> tuple[Dia
             new = next(key for key, value in head_state.model_paths.items() if value == path)
             if old != new:
                 diagnostics.append(_diag("CHANGE_INVALID", path, "/id", "change operation altered model identity", "Use an explicit migration rather than changing identity in place."))
+            before, after = base_state.models[old], head_state.models[new]
+            release_changed = before.get("release") != after.get("release") and not (
+                "release" not in before and after.get("release", {}).get("vendor_label") == before["name"]
+                and release_precision(after) == "named-release"
+            )
+            label_changed = before.get("release", {}).get("vendor_label", before["name"]) != after.get("release", {}).get("vendor_label", after["name"])
+            if before["vendor_id"] != after["vendor_id"] or release_precision(before) != release_precision(after) or release_changed or label_changed:
+                diagnostics.append(_diag("CHANGE_INVALID", path, "/release", "change altered release identity or precision", "Create a distinct release; do not silently upgrade precision or reuse an identity."))
+            old_claims = {(claim["namespace"], claim["value"]) for claim in before.get("identity_claims", []) if claim["status"] in {"verified", "vendor-asserted", "provider-mapped"}}
+            new_claims = {(claim["namespace"], claim["value"]) for claim in after.get("identity_claims", []) if claim["status"] in {"verified", "vendor-asserted", "provider-mapped"}}
+            if not old_claims <= new_claims:
+                diagnostics.append(_diag("CHANGE_INVALID", path, "/identity_claims", "change removed or replaced an established release identity claim", "Preserve established identifiers; create a distinct release when the binding changes."))
         if path in base_state.offering_paths.values() and path in head_state.offering_paths.values():
             old = next(key for key, value in base_state.offering_paths.items() if value == path)
             new = next(key for key, value in head_state.offering_paths.items() if value == path)
             if old != new:
                 diagnostics.append(_diag("CHANGE_INVALID", path, "/id", "change operation altered offering identity", "Use atomic add-destination and revoke-source semantics."))
+            if base_state.offerings[old]["model_id"] != head_state.offerings[new]["model_id"]:
+                diagnostics.append(_diag("CHANGE_INVALID", path, "/model_id", "Offering cannot inherit approval for a different ModelRelease", "Add a new Offering and revoke the previous one in a governed move."))
+    for identifier in sorted(base_state.offerings.keys() & head_state.offerings.keys()):
+        if base_state.offerings[identifier]["model_id"] != head_state.offerings[identifier]["model_id"] and base_state.offering_paths[identifier] != head_state.offering_paths[identifier]:
+            diagnostics.append(_diag("CHANGE_INVALID", head_state.offering_paths[identifier], "/model_id", "relocated Offering cannot inherit approval for a different ModelRelease", "Use a new Offering ID when the release changes."))
     return sort_diagnostics(diagnostics)

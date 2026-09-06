@@ -234,7 +234,7 @@ def test_release_date_enrichment_and_correction(repo, initial_date, evidenced):
     if evidenced:
         assert not findings, findings
     else:
-        assert any(d.pointer == "/release/released_at" for d in findings), findings
+        assert any(d.json_pointer == "/release/released_at" for d in findings), findings
 
 
 def test_provider_id_and_arn_cannot_be_cherry_picked(repo):

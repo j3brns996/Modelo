@@ -391,6 +391,7 @@
             }
           ],
           "condition_refs": [],
+          "no_conditions_rationale": "Isolated schema fixture; no additional use conditions.",
           "evidence_refs": {}
         },
         {
@@ -418,6 +419,7 @@
             }
           ],
           "condition_refs": [],
+          "no_conditions_rationale": "Isolated schema fixture; no additional use conditions.",
           "evidence_refs": {}
         }
       ],

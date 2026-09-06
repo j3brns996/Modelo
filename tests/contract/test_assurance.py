@@ -57,7 +57,7 @@ def test_contract_mapping_maturity_and_site_do_not_drift():
     assert contract["approval"]["consumption_granted_only_by_current_offering"] is True
     assert profile["covered_by_parent_is_governance_exemption"] is False
     assert mapping()["disclaimer"] == DISCLAIMER
-    site = (ROOT / "site/content/docs.md").read_text()
+    site = (ROOT / "site/templates/docs.html").read_text()
     for statement in ["Supports selected NIST AI RMF outcomes", "Not a certification", "Not a complete organisational AI-system inventory"]:
         assert statement in site
     maturity = (ROOT / "docs/assurance/modelo-maturity-profile.md").read_text()

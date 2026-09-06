@@ -234,6 +234,30 @@ class FinalSiteTests(unittest.TestCase):
             self.assertIn(claim["value"], model_page)
             self.assertIn("status: " + claim["status"], model_page)
         self.assertIn("Identity claim status is not consumption approval", model_page)
+        guide = (site / "docs/index.html").read_text(encoding="utf-8")
+        home = (site / "index.html").read_text(encoding="utf-8")
+        for anchor in ("interaction-modes", "people", "nist-context", "system-design"):
+            self.assertIn('id="' + anchor + '"', guide)
+        self.assertIn('/Modelo/docs/#interaction-modes', home)
+        self.assertIn('/Modelo/docs/#nist-context', home)
+        for statement in ("No mixed proposals", "Agent approval is currently disabled",
+                          "Not a certification", "Not a complete organisational AI-system inventory",
+                          "Covered-by-parent is not exemption", "T10 remain outstanding"):
+            self.assertIn(statement, guide)
+        self.assertIn("If any coverage criterion fails, a separate external AI-use entry is required", guide)
+        import re
+        from xml.etree import ElementTree
+        diagrams = re.findall(r"<svg\b.*?</svg>", guide, re.S)
+        self.assertEqual(len(diagrams), 2)
+        for raw in diagrams:
+            svg = ElementTree.fromstring(raw)
+            self.assertEqual(svg.attrib["role"], "img")
+            ids = {node.attrib["id"] for node in svg.iter() if "id" in node.attrib}
+            self.assertTrue(set(svg.attrib["aria-labelledby"].split()) <= ids)
+            self.assertIsNotNone(svg.find("{http://www.w3.org/2000/svg}title"))
+            self.assertIsNotNone(svg.find("{http://www.w3.org/2000/svg}desc"))
+            self.assertNotIn("<script", raw)
+            self.assertNotIn("foreignObject", raw)
 
     def test_demo_rejects_wrong_output_and_dirty_tree(self) -> None:
         git(self.root, "checkout", "--detach", self.source)

@@ -2,15 +2,40 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://modelo.invalid/schemas/model.schema.json",
   "title": "Modelo canonical named ModelRelease",
-  "x-modelo-entity-profile": "0.2.0",
+  "x-modelo-entity-profile": "0.3.0",
   "type": "object",
-  "required": ["id", "vendor_id", "name", "evidence_refs"],
+  "required": [
+    "id",
+    "vendor_id",
+    "name",
+    "evidence_refs"
+  ],
   "properties": {
-    "canonical_urn": { "type": "string", "pattern": "^urn:modelo:model-release:[a-z0-9-]+(?![\\s\\S])", "x-modelo-provenance": "internal" },
-    "family_id": { "$ref": "common.schema.json#/$defs/id", "description": "Optional internal grouping, not a canonical release or external family assertion.", "x-modelo-provenance": "internal" },
-    "release": { "$ref": "model-release.schema.json#/$defs/release" },
-    "identity_claims": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "$ref": "model-release.schema.json#/$defs/claim" } },
-    "supersedes_model_id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
+    "canonical_urn": {
+      "type": "string",
+      "pattern": "^urn:modelo:model-release:[a-z0-9-]+(?![\\s\\S])",
+      "x-modelo-provenance": "internal"
+    },
+    "family_id": {
+      "$ref": "common.schema.json#/$defs/id",
+      "description": "Optional internal grouping, not a canonical release or external family assertion.",
+      "x-modelo-provenance": "internal"
+    },
+    "release": {
+      "$ref": "model-release.schema.json#/$defs/release"
+    },
+    "identity_claims": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "model-release.schema.json#/$defs/claim"
+      }
+    },
+    "supersedes_model_id": {
+      "$ref": "common.schema.json#/$defs/id",
+      "x-modelo-provenance": "internal"
+    },
     "id": {
       "$ref": "common.schema.json#/$defs/id",
       "x-modelo-provenance": "internal"
@@ -61,17 +86,39 @@
     },
     "licensing": {
       "type": "string",
-      "enum": ["proprietary", "open-weights", "open-source"],
+      "enum": [
+        "proprietary",
+        "open-weights",
+        "open-source"
+      ],
       "x-modelo-provenance": "external",
-      "x-modelo-freshness-class": "intrinsic_model_fact"
+      "x-modelo-freshness-class": "intrinsic_model_fact",
+      "description": "Display classification only; not a licence identifier or permission to use."
     },
     "lifecycle": {
       "type": "string",
-      "enum": ["active", "legacy", "eol"],
+      "enum": [
+        "active",
+        "legacy",
+        "eol"
+      ],
       "x-modelo-provenance": "external",
       "x-modelo-freshness-class": "intrinsic_model_fact"
     },
-    "evidence_refs": { "$ref": "common.schema.json#/$defs/evidenceRefs" }
+    "evidence_refs": {
+      "$ref": "common.schema.json#/$defs/evidenceRefs"
+    },
+    "rights_owner_vendor_id": {
+      "$ref": "common.schema.json#/$defs/id",
+      "x-modelo-provenance": "internal",
+      "description": "Reviewed reference to the model rights owner in vendors. Producer and rights owner need not be the same. Omission means unknown."
+    },
+    "licence_uri": {
+      "$ref": "common.schema.json#/$defs/httpsUri",
+      "x-modelo-provenance": "external",
+      "x-modelo-freshness-class": "intrinsic_model_fact",
+      "description": "Official licence or usage-terms document. The licensing category alone does not establish permission."
+    }
   },
   "additionalProperties": false
 }

@@ -3,18 +3,40 @@
   "$id": "https://modelo.invalid/schemas/inference-services-registry.schema.json",
   "title": "Modelo inference-service registry",
   "type": "object",
-  "required": ["inference_services"],
+  "required": [
+    "inference_services"
+  ],
   "properties": {
     "inference_services": {
       "type": "object",
       "minProperties": 1,
-      "propertyNames": { "$ref": "common.schema.json#/$defs/id" },
+      "propertyNames": {
+        "$ref": "common.schema.json#/$defs/id"
+      },
       "additionalProperties": {
         "type": "object",
-        "required": ["id", "adapter"],
+        "required": [
+          "id",
+          "adapter"
+        ],
         "properties": {
-          "id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
-          "adapter": { "enum": ["aws-bedrock", "gcp-vertex", "azure-foundry"], "x-modelo-provenance": "internal" }
+          "id": {
+            "$ref": "common.schema.json#/$defs/id",
+            "x-modelo-provenance": "internal"
+          },
+          "adapter": {
+            "enum": [
+              "aws-bedrock",
+              "gcp-vertex",
+              "azure-foundry"
+            ],
+            "x-modelo-provenance": "internal"
+          },
+          "operator_vendor_id": {
+            "$ref": "common.schema.json#/$defs/id",
+            "x-modelo-provenance": "internal",
+            "description": "Reviewed reference to the service-operating organisation in vendors. Omission means unknown, never inferred from adapter."
+          }
         },
         "additionalProperties": false
       }

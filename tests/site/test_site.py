@@ -68,7 +68,7 @@ class FinalSiteTests(unittest.TestCase):
         shutil.copytree(
             ROOT,
             self.root,
-            ignore=shutil.ignore_patterns(".git", "dist", "__pycache__", "*.pyc"),
+            ignore=shutil.ignore_patterns(".git", ".venv", "dist", "__pycache__", "*.pyc"),
         )
         shutil.copytree(
             self.root / "tests/fixtures/build/synthetic", self.root / "catalogue",

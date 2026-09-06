@@ -459,6 +459,23 @@ def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, req
     return (_substitute(base, values, name) + "\n").encode("utf-8")
 
 
+def _organisation_facts(label: str, organisation: Mapping[str, Any]) -> str:
+    fields = ((label, organisation.get("legal_name", "Unknown")),
+              (label + " domicile", organisation.get("domicile", "Unknown")))
+    return '<dl class="fact-grid">' + "".join(
+        "<div><dt>" + label + "</dt><dd>" + escape(value) + "</dd></div>"
+        for label, value in fields) + "</dl>"
+
+
+def _approval_scope(offering: Mapping[str, Any]) -> str:
+    fields = (("Approved use", offering["approved_use"]),
+              ("Accountable team or role", offering["approval_owner"]),
+              ("Review by", offering.get("review_by", "Event-triggered review")))
+    return '<dl class="fact-grid">' + "".join(
+        "<div><dt>" + label + "</dt><dd>" + escape(value) + "</dd></div>"
+        for label, value in fields) + "</dl>"
+
+
 def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, delta_raw: bytes, catalogue: Mapping[str, Any], document: Mapping[str, Any]) -> dict[str, bytes]:
     all_routes = dict(document["site"]["routes"])
     all_routes.update({key + "_data": value for key, value in document["site"]["data_routes"].items()})
@@ -468,6 +485,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     templates_path = document["paths"]["site_templates"]
     templates = {name: _template(root, request.source_commit, templates_path, name) for name in ("home", "catalogue", "model", "offering", "changes", "process", "propose", "docs", "overview", "404")}
     evidence = {item["id"]: item for item in catalogue["evidence"]}
+    condition_index = {(item["id"], item["version"]): item for item in catalogue["conditions"]}
     offerings_by_model: dict[str, list[Mapping[str, Any]]] = {}
     for item in catalogue["offerings"]:
         offerings_by_model.setdefault(item["model_id"], []).append(item)
@@ -678,26 +696,29 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     }
     files = {path: _page(root, request.source_commit, templates_path, resolver, request, name, title, content, route) for path, (name, title, content, route) in page_specs.items()}
     for model in catalogue["models"]:
-        model_refs = sorted({reference["id"] for reference in model.get("evidence_refs", {}).values()})
+        rights_owner = catalogue["vendors"]["vendors"].get(model.get("rights_owner_vendor_id"), {})
+        model_refs = sorted({reference["id"] for record in (model, rights_owner) for reference in record.get("evidence_refs", {}).values()})
         facts = '<dl class="fact-grid"><div><dt>Identifier</dt><dd><code>' + escape(model["id"]) + "</code></dd></div><div><dt>Vendor</dt><dd>" + escape(catalogue["vendors"]["vendors"].get(model.get("vendor_id"), {}).get("name", model.get("vendor_id", ""))) + "</dd></div><div><dt>Context window</dt><dd>" + (f'{model["context_window"]:,}' if model.get("context_window") else "Not stated") + "</dd></div><div><dt>Licence</dt><dd>" + escape(model.get("licensing", "Not stated")) + "</dd></div><div><dt>Capabilities</dt><dd>" + (_tags(model.get("capabilities", [])) or "Not stated") + "</dd></div><div><dt>Modalities</dt><dd>" + (_tags(model.get("modalities", [])) or "Not stated") + "</dd></div></dl>"
         links = "".join('<a class="related-card" href="' + escape(resolver.site("offering", inference_service_id=o["inference_service_id"], offering_id=o["id"]), quote=True) + '"><span><strong>' + escape(o["id"]) + '</strong><small>' + escape(o["inference_service_id"]) + '</small></span><b aria-hidden="true">→</b></a>' for o in offerings_by_model.get(model["id"], [])) or '<p class="empty-state">No approved access is recorded for this model.</p>'
         content = _substitute(templates["model"], {
             "model_name": escape(model.get("name", model["id"])),
             "model_description": escape(model.get("description", "No description published.")),
-            "model_facts": facts + _model_release_facts(model), "offering_links": '<div class="related-grid">' + links + "</div>",
+            "model_facts": facts + _model_release_facts(model) + _organisation_facts("Rights owner", rights_owner) + ('<p><a rel="noopener noreferrer" href="' + escape(model["licence_uri"], quote=True) + '">Licence or usage terms</a></p>' if model.get("licence_uri") else ""), "offering_links": '<div class="related-grid">' + links + "</div>",
             "model_status": '<span class="status-pill status-pill--' + escape(model.get("lifecycle", "unknown"), quote=True) + '">' + escape(model.get("lifecycle", "Unspecified").title()) + "</span>",
             "evidence_summary": '<p class="evidence-count"><strong>' + str(len(model_refs)) + '</strong><span>evidence records</span></p><p>Expand an observation to inspect its retained values, source and retrieval details.</p>' + _supporting_evidence(model_refs, evidence),
         }, "model")
         files[resolver.output_path("model", model_id=model["id"])] = _page(root, request.source_commit, templates_path, resolver, request, "model", model.get("name", model["id"]), content, "model", {"model_id": model["id"]})
     releases_url = str(document["repository"]["web_base"]).rstrip("/") + document["repository"]["web_routes"]["releases"]
     for offering in catalogue["offerings"]:
+        service = catalogue["inference_services"]["inference_services"][offering["inference_service_id"]]
+        operator = catalogue["vendors"]["vendors"].get(service.get("operator_vendor_id"), {})
         if request.kind == "final":
             approval = '<section class="coordinate-card"><span class="status-pill">Approved</span><h2>Approval coordinates</h2><dl><dt>Accepted source</dt><dd><code>' + escape(request.source_commit[:12]) + '</code></dd><dt>Accepted tree</dt><dd><code>' + escape(request.source_tree[:12]) + '</code></dd><dt>Merge</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True) + '"><code>' + escape(request.integration_commit[:12]) + '</code></a></dd></dl><p><a rel="noopener noreferrer" href="' + escape(releases_url, quote=True) + '">Find release receipts</a></p></section>'
         elif request.kind == "validation":
             approval = '<section class="coordinate-card"><span class="status-pill status-pill--validation">Validation</span><h2>Validation coordinates</h2><dl><dt>Source</dt><dd><code>' + escape(request.source_commit[:12]) + '</code></dd><dt>Tree</dt><dd><code>' + escape(request.source_tree[:12]) + '</code></dd><dt>Integration</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True) + '"><code>' + escape(request.integration_commit[:12]) + '</code></a></dd></dl><p>Validation is not approval.</p></section>'
         else:
             approval = '<section class="coordinate-card"><span class="status-pill status-pill--synthetic">Synthetic</span><h2>Demo provenance</h2><dl><dt>Source</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.source_commit), quote=True) + '"><code>' + escape(request.source_commit[:12]) + '</code></a></dd><dt>Tree</dt><dd><code>' + escape(request.source_tree[:12]) + '</code></dd></dl><p>Synthetic fixture only, not approved for enterprise use.</p></section>'
-        refs = sorted({reference["id"] for reference in offering.get("evidence_refs", {}).values()})
+        refs = sorted({reference["id"] for record in (offering, operator) for reference in record.get("evidence_refs", {}).values()})
         for route in offering["routes"]:
             binding = route["model_binding"]
             if binding["kind"] == "foundation-model":
@@ -707,12 +728,12 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
                 refs.extend(item["model_evidence"]["id"] for item in binding["destinations"])
         conditions = []
         for reference in offering.get("condition_refs", []):
-            condition = next(item for item in catalogue["conditions"] if (item["id"], item["version"]) == (reference["id"], reference["version"]))
+            condition = condition_index[(reference["id"], reference["version"])]
             conditions.append('<section><h3>' + escape(condition["title"]) + '</h3><p>'
                 + escape(condition["description"]) + '</p><p class="muted">Owner: '
                 + escape(condition["owner"]) + ' · <code>' + escape(condition["id"])
                 + '@' + str(condition["version"]) + '</code></p></section>')
-        content = _substitute(templates["offering"], {"offering_name": escape(offering["id"]), "approval": approval, "approval_rationale": escape(offering["approval_rationale"]), "route_table": _route_rows(offering, evidence), "pricing_table": _pricing_rows(offering), "conditions_evidence": ("".join(conditions) or '<p>No conditions are recorded.</p>') + '<h3>Supporting evidence</h3><p>Expand an observation to inspect the retained proof.</p>' + _supporting_evidence(refs, evidence)}, "offering")
+        content = _substitute(templates["offering"], {"offering_name": escape(offering["id"]), "approval": approval, "approval_rationale": escape(offering["approval_rationale"]), "approval_scope": _approval_scope(offering) + _organisation_facts("Service operator", operator), "route_table": _route_rows(offering, evidence), "pricing_table": _pricing_rows(offering), "conditions_evidence": ("".join(conditions) or '<p>No additional conditions: ' + escape(offering.get('no_conditions_rationale', 'Not stated')) + '</p>') + '<h3>Supporting evidence</h3><p>Expand an observation to inspect the retained proof.</p>' + _supporting_evidence(refs, evidence)}, "offering")
         path = resolver.output_path("offering", inference_service_id=offering["inference_service_id"], offering_id=offering["id"])
         files[path] = _page(root, request.source_commit, templates_path, resolver, request, "offering", offering["id"], content, "offering", {"inference_service_id": offering["inference_service_id"], "offering_id": offering["id"]})
     files[resolver.output_path("asset_css")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/site.css")

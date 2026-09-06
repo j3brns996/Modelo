@@ -1,6 +1,8 @@
 id: test-offering
 inference_service_id: aws-bedrock
 model_id: test-model
+approval_owner: Modelo test maintainers
+approved_use: Synthetic validation and demonstration only; no business data or production permission.
 approval_rationale: Approved for validator integration testing of the governed offering workflow.
 routes:
   - id: london-direct

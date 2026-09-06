@@ -78,6 +78,13 @@ silently saying that code wins.
 
 ## Core concepts
 
+Canonical acceptance is **configured path and filename + JSON Schema + semantic
+and evidence checks + Git history rules**. The publication entry point is
+`schemas/catalogue-output.schema.json`; it references the source entity schemas.
+See [ADR 0003](docs/adr/0003-entity-contract.md) for keys, bounded approval fields,
+optional legal facts, supported adapters, migration and the 5,000-entity test.
+A schema-valid object alone is not an accepted entity or an approval.
+
 ### Model
 
 A canonical, named model release produced by a model vendor or laboratory.
@@ -88,7 +95,9 @@ floating alias or general marketing category. Internal IDs remain canonical and
 non-reusable. Derived URNs, evidenced external claims, four separate version
 dimensions and migration are specified in
 [ADR 0002](docs/adr/0002-model-release-identity.md). Entity acceptance profile
-0.2.0 tightens AWS binding without changing the 0.1.0 config/receipt wire.
+0.3.0 requires offering approval scope and accountability and closes identity and
+path gaps. This is a breaking entity-shape migration; existing AWS binding rules
+remain in force. The 0.1.0 config/receipt wire is unchanged. See ADR 0003 for migration.
 
 ### Offering
 
@@ -511,6 +520,8 @@ id: <stable-offering-id>
 inference_service_id: aws-bedrock
 model_id: <stable-canonical-model-id>
 approval_rationale: <policy-authored reason this route is approved>
+approval_owner: <accountable internal team or role>
+approved_use: <approved task, data boundary and human oversight>
 routes:
   - id: <stable-route-id>
     source_region: <aws-request-region>

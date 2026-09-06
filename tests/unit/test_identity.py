@@ -89,7 +89,7 @@ def test_verified_identity_cannot_identify_two_releases(repo):
     second["id"] = "different-release"
     second["canonical_urn"] = canonical_urn("model-release", second["id"])
     write(repo, "catalogue/models/different-release.yaml", second)
-    assert any("conflicting verified" in d.message for d in _validate_state(repo.root, date(2026, 9, 1)).diagnostics)
+    assert any("conflicting route-eligible" in d.message for d in _validate_state(repo.root, date(2026, 9, 1)).diagnostics)
 
 
 def test_offering_cannot_inherit_another_release(repo):

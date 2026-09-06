@@ -5,16 +5,31 @@
   "$defs": {
     "conditionRef": {
       "type": "object",
-      "required": ["id", "version"],
+      "required": [
+        "id",
+        "version"
+      ],
       "properties": {
-        "id": { "$ref": "common.schema.json#/$defs/id" },
-        "version": { "type": "integer", "minimum": 1 }
+        "id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        }
       },
       "additionalProperties": false
     },
     "price": {
       "type": "object",
-      "required": ["dimension", "unit", "quantity", "amount", "currency", "route_ids"],
+      "required": [
+        "dimension",
+        "unit",
+        "quantity",
+        "amount",
+        "currency",
+        "route_ids"
+      ],
       "properties": {
         "dimension": {
           "$ref": "common.schema.json#/$defs/id",
@@ -47,46 +62,136 @@
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "$ref": "common.schema.json#/$defs/id" }
+          "items": {
+            "$ref": "common.schema.json#/$defs/id"
+          }
         }
       },
       "additionalProperties": false
     }
   },
   "type": "object",
-  "required": ["id", "inference_service_id", "model_id", "approval_rationale", "routes", "condition_refs", "evidence_refs"],
+  "required": [
+    "id",
+    "inference_service_id",
+    "model_id",
+    "approval_rationale",
+    "routes",
+    "condition_refs",
+    "evidence_refs",
+    "approval_owner",
+    "approved_use"
+  ],
   "properties": {
-    "id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
-    "inference_service_id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
-    "model_id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
+    "id": {
+      "$ref": "common.schema.json#/$defs/id",
+      "x-modelo-provenance": "internal"
+    },
+    "inference_service_id": {
+      "$ref": "common.schema.json#/$defs/id",
+      "x-modelo-provenance": "internal"
+    },
+    "model_id": {
+      "$ref": "common.schema.json#/$defs/id",
+      "x-modelo-provenance": "internal"
+    },
     "approval_rationale": {
       "type": "string",
       "minLength": 20,
       "maxLength": 2048,
       "description": "The enterprise policy reason this specific model consumption path is approved.",
-      "x-modelo-provenance": "policy"
+      "x-modelo-provenance": "policy",
+      "pattern": "\\S"
     },
     "routes": {
       "type": "array",
       "minItems": 1,
       "items": {
         "oneOf": [
-          { "$ref": "providers/aws-bedrock-route.schema.json" },
-          { "$ref": "providers/gcp-vertex.schema.json" },
-          { "$ref": "providers/azure-foundry.schema.json" }
+          {
+            "$ref": "providers/aws-bedrock-route.schema.json"
+          },
+          {
+            "$ref": "providers/gcp-vertex.schema.json"
+          },
+          {
+            "$ref": "providers/azure-foundry.schema.json"
+          }
         ]
       }
     },
     "pricing": {
       "type": "array",
-      "items": { "$ref": "#/$defs/price" }
+      "items": {
+        "$ref": "#/$defs/price"
+      }
     },
     "condition_refs": {
       "type": "array",
       "uniqueItems": true,
-      "items": { "$ref": "#/$defs/conditionRef" }
+      "items": {
+        "$ref": "#/$defs/conditionRef"
+      }
     },
-    "evidence_refs": { "$ref": "common.schema.json#/$defs/evidenceRefs" }
+    "evidence_refs": {
+      "$ref": "common.schema.json#/$defs/evidenceRefs"
+    },
+    "approval_owner": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "\\S",
+      "x-modelo-provenance": "policy",
+      "description": "Accountable internal team or role; not necessarily the Git approver."
+    },
+    "approved_use": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "\\S",
+      "x-modelo-provenance": "policy",
+      "description": "Approved task, data boundary and human oversight. Application-specific approval remains with the external use inventory."
+    },
+    "review_by": {
+      "type": "string",
+      "format": "date",
+      "x-modelo-provenance": "policy",
+      "description": "Optional scheduled offering review deadline, inclusive. Omit for event-triggered review; does not automatically revoke."
+    },
+    "no_conditions_rationale": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "\\S",
+      "x-modelo-provenance": "policy",
+      "description": "Explicit reason no additional conditions are required for the approved scope."
+    }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "condition_refs": {
+            "maxItems": 0
+          }
+        },
+        "required": [
+          "condition_refs"
+        ]
+      },
+      "then": {
+        "required": [
+          "no_conditions_rationale"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "no_conditions_rationale"
+          ]
+        }
+      }
+    }
+  ]
 }

@@ -23,7 +23,7 @@ from modelo.evidence import (
 from modelo.freshness import validate_freshness
 from modelo.loader import LoadError, load_yaml_mapping
 from modelo.schemas import SchemaSet
-from modelo.identity import canonical_urn, has_provider_claim, release_precision
+from modelo.identity import BOUND_STATUSES, canonical_urn, has_provider_claim, release_precision
 from modelo.change import validate_reserved_identity_history
 
 
@@ -77,7 +77,7 @@ def _discover(state: State, key: str) -> tuple[PurePosixPath, ...]:
         # therefore the canonical representation of an empty governed set.
         return ()
     try:
-        return discover_yaml_files(state.config.root, state.config.paths[key])
+        return discover_yaml_files(state.config.root, state.config.paths[key], allow_documents=key == "catalogue")
     except DiscoveryError as exc:
         state.diagnostics.append(exc.diagnostic)
         return ()
@@ -181,6 +181,11 @@ def _load_state(root: Path) -> State:
         if len(parts) != 2 or parts != (identifier, f"{version}.yaml"):
             _identity_mismatch(state, path.as_posix(), "/id", "condition id/version differs from its path")
         state.conditions[(identifier, version)] = document
+    known_registries = set(required) | {config.paths["actors_registry"]}
+    entity_roots = tuple(config.paths[key] for key in ("models", "offerings", "evidence", "conditions"))
+    for path in _discover(state, "catalogue"):
+        if path not in known_registries and not any(path.is_relative_to(parent) for parent in entity_roots):
+            state.diagnostics.append(_diag("PATH_IDENTITY_MISMATCH", path.as_posix(), "", "file has no configured entity schema", "Move the record to its configured entity path; unknown catalogue files are not accepted."))
     return state
 
 
@@ -202,15 +207,43 @@ def _reference_checks(state: State) -> None:
             if claim_key in claim_keys:
                 state.diagnostics.append(_diag("CHANGE_INVALID", path, "/identity_claims", "duplicate identity claim tuple has no single status", "Keep one entry per namespace/value/relation and review its status explicitly."))
             claim_keys.add(claim_key)
-            if claim["status"] != "verified":
+            if claim["status"] not in BOUND_STATUSES:
                 continue
             key = (claim["namespace"], claim["value"])
             if (key in verified and verified[key] != identifier) or (claim["namespace"] in namespaces and namespaces[claim["namespace"]] != claim["value"]):
-                state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, "/identity_claims", "conflicting verified external identity", "Resolve the conflict through evidenced independent review."))
+                state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, "/identity_claims", "conflicting route-eligible external identity", "Resolve the conflict through evidenced independent review."))
             verified[key] = identifier
             namespaces[claim["namespace"]] = claim["value"]
         if model["vendor_id"] not in state.vendors:
             state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, "/vendor_id", "model vendor does not exist", "Add or reference a governed vendor."))
+        owner = model.get("rights_owner_vendor_id")
+        if owner is not None and owner not in state.vendors:
+            state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, "/rights_owner_vendor_id", "model rights owner does not exist", "Reference a governed organisation; do not infer ownership from the producer name."))
+        elif owner is not None and "legal_name" not in state.vendors[owner]:
+            state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, "/rights_owner_vendor_id", "model rights owner has no evidenced legal name", "Establish the legal entity before binding ownership."))
+    # Each release has at most one predecessor. Visit every edge once, without
+    # recursion or a graph dependency, including chains longer than Python's stack.
+    visited: set[str] = set()
+    for start in state.models:
+        chain: dict[str, int] = {}
+        current = start
+        while current in state.models and current not in visited:
+            if current in chain:
+                cycle = list(chain)[chain[current]:]
+                for identifier in cycle:
+                    state.diagnostics.append(_diag("CHANGE_INVALID", state.model_paths[identifier], "/supersedes_model_id", "model supersession contains a cycle", "Use an acyclic release history; supersession never transfers offering approval."))
+                break
+            chain[current] = len(chain)
+            current = state.models[current].get("supersedes_model_id")
+        visited.update(chain)
+    for identifier, service in state.services.items():
+        operator = service.get("operator_vendor_id")
+        if operator is not None and operator not in state.vendors:
+            path = (state.config.paths["governance"] / "inference-services.yaml").as_posix()
+            state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, f"/inference_services/{identifier}/operator_vendor_id", "service operator does not exist", "Reference a governed organisation; an adapter name is not a legal entity."))
+        elif operator is not None and "legal_name" not in state.vendors[operator]:
+            path = (state.config.paths["governance"] / "inference-services.yaml").as_posix()
+            state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, f"/inference_services/{identifier}/operator_vendor_id", "service operator has no evidenced legal name", "Establish the legal entity before binding the operator."))
     for identifier, offering in state.offerings.items():
         path = state.offering_paths[identifier]
         if offering["model_id"] not in state.models:
@@ -651,6 +684,10 @@ def _validate_state(root: Path, as_of: date) -> State:
     _reference_checks(state)
     _evidence_checks(state, as_of)
     _aws_checks(state)
+    for identifier, offering in state.offerings.items():
+        review_by = offering.get("review_by")
+        if review_by is not None and date.fromisoformat(review_by) < as_of:
+            state.diagnostics.append(_diag("CHANGE_INVALID", state.offering_paths[identifier], "/review_by", "offering review is overdue", "Review the offering through a MAC; a failed check does not automatically revoke the published snapshot."))
     return state
 
 
@@ -660,7 +697,7 @@ def check_repository(root: Path, base: str, head: str, as_of: date) -> tuple[Dia
         head_commit = resolve_commit(root, head)
         require_ancestor(root, base_commit, head_commit)
         base_state = with_snapshot(root, base_commit, lambda snapshot: _validate_state(snapshot, as_of))
-        head_state = with_snapshot(root, head_commit, lambda snapshot: _validate_state(snapshot, as_of))
+        head_state = base_state if head_commit == base_commit else with_snapshot(root, head_commit, lambda snapshot: _validate_state(snapshot, as_of))
         changes = changed_paths(
             root,
             base_commit,
@@ -697,12 +734,16 @@ def check_repository(root: Path, base: str, head: str, as_of: date) -> tuple[Dia
         raise CheckSystemError(str(exc)) from exc
     # A modified record may not silently change logical identity even if a path error
     # in the candidate would otherwise obscure the base comparison.
+    base_models_by_path = {path: key for key, path in base_state.model_paths.items()}
+    head_models_by_path = {path: key for key, path in head_state.model_paths.items()}
+    base_offerings_by_path = {path: key for key, path in base_state.offering_paths.items()}
+    head_offerings_by_path = {path: key for key, path in head_state.offering_paths.items()}
     for status, path in changes:
         if status != "M":
             continue
-        if path in base_state.model_paths.values() and path in head_state.model_paths.values():
-            old = next(key for key, value in base_state.model_paths.items() if value == path)
-            new = next(key for key, value in head_state.model_paths.items() if value == path)
+        if path in base_models_by_path and path in head_models_by_path:
+            old = base_models_by_path[path]
+            new = head_models_by_path[path]
             if old != new:
                 diagnostics.append(_diag("CHANGE_INVALID", path, "/id", "change operation altered model identity", "Use an explicit migration rather than changing identity in place."))
             before, after = base_state.models[old], head_state.models[new]
@@ -715,9 +756,9 @@ def check_repository(root: Path, base: str, head: str, as_of: date) -> tuple[Dia
             new_claims = {(claim["namespace"], claim["value"], claim["relation"]) for claim in after.get("identity_claims", [])}
             if not old_claims <= new_claims:
                 diagnostics.append(_diag("CHANGE_INVALID", path, "/identity_claims", "change removed or replaced a retained release identity claim", "Retain claim tuples and evidence; correct their status through governed review."))
-        if path in base_state.offering_paths.values() and path in head_state.offering_paths.values():
-            old = next(key for key, value in base_state.offering_paths.items() if value == path)
-            new = next(key for key, value in head_state.offering_paths.items() if value == path)
+        if path in base_offerings_by_path and path in head_offerings_by_path:
+            old = base_offerings_by_path[path]
+            new = head_offerings_by_path[path]
             if old != new:
                 diagnostics.append(_diag("CHANGE_INVALID", path, "/id", "change operation altered offering identity", "Use atomic add-destination and revoke-source semantics."))
             if base_state.offerings[old]["model_id"] != head_state.offerings[new]["model_id"]:

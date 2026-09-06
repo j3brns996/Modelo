@@ -3,21 +3,63 @@
   "$id": "https://modelo.invalid/schemas/vendors-registry.schema.json",
   "title": "Modelo vendor registry",
   "type": "object",
-  "required": ["vendors"],
+  "required": [
+    "vendors"
+  ],
   "properties": {
     "vendors": {
       "type": "object",
       "minProperties": 1,
-      "propertyNames": { "$ref": "common.schema.json#/$defs/id" },
+      "propertyNames": {
+        "$ref": "common.schema.json#/$defs/id"
+      },
       "additionalProperties": {
         "type": "object",
-        "required": ["id", "name", "evidence_refs"],
+        "required": [
+          "id",
+          "name",
+          "evidence_refs"
+        ],
         "properties": {
-          "id": { "$ref": "common.schema.json#/$defs/id", "x-modelo-provenance": "internal" },
-          "name": { "type": "string", "minLength": 1, "maxLength": 256, "x-modelo-provenance": "external", "x-modelo-freshness-class": "intrinsic_model_fact" },
-          "evidence_refs": { "$ref": "common.schema.json#/$defs/evidenceRefs" }
+          "id": {
+            "$ref": "common.schema.json#/$defs/id",
+            "x-modelo-provenance": "internal"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "x-modelo-provenance": "external",
+            "x-modelo-freshness-class": "intrinsic_model_fact"
+          },
+          "evidence_refs": {
+            "$ref": "common.schema.json#/$defs/evidenceRefs"
+          },
+          "legal_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "\\S",
+            "x-modelo-provenance": "external",
+            "x-modelo-freshness-class": "intrinsic_model_fact",
+            "description": "Evidenced legal entity name. Omit when the record identifies only a brand."
+          },
+          "domicile": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "\\S",
+            "x-modelo-provenance": "external",
+            "x-modelo-freshness-class": "intrinsic_model_fact",
+            "description": "Evidenced country or jurisdiction of legal domicile. Use its published name; intake territory groups are not legal identities."
+          }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "dependentRequired": {
+          "domicile": [
+            "legal_name"
+          ]
+        }
       }
     }
   },

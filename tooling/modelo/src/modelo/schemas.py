@@ -13,6 +13,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 
 from modelo.diagnostics import Diagnostic, Severity
+from modelo.loader import strict_unique_json_pairs
 
 
 RFC3339 = re.compile(
@@ -50,6 +51,8 @@ class SchemaSet:
     def __init__(self, root: Path, schemas_path: PurePosixPath) -> None:
         directory = root.joinpath(*schemas_path.parts)
         self.documents: dict[str, Mapping[str, Any]] = {}
+        identifiers: set[str] = set()
+        self._validators: dict[str, Draft202012Validator] = {}
         registry: Registry[Any] = Registry()
         try:
             paths = sorted(directory.rglob("*.schema.json"))
@@ -61,9 +64,12 @@ class SchemaSet:
             if path.is_symlink() or not path.is_file():
                 raise ValueError(f"schema is not a regular file: {path}")
             try:
-                document = json.loads(path.read_text(encoding="utf-8"))
+                document = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=strict_unique_json_pairs)
                 Draft202012Validator.check_schema(document)
                 identifier = document["$id"]
+                if identifier in identifiers:
+                    raise ValueError(f"duplicate schema $id: {identifier}")
+                identifiers.add(identifier)
                 resource = Resource.from_contents(document)
             except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError) as exc:
                 raise ValueError(f"cannot load schema {path}: {exc}") from exc
@@ -90,6 +96,8 @@ class SchemaSet:
                 yield from SchemaSet._references(child)
 
     def validator(self, name: str) -> Draft202012Validator:
+        if name in self._validators:
+            return self._validators[name]
         try:
             schema = self.documents[name]
         except KeyError as exc:
@@ -125,7 +133,9 @@ class SchemaSet:
             except ValueError:
                 return False
 
-        return Draft202012Validator(schema, registry=self.registry, format_checker=checker)
+        validator = Draft202012Validator(schema, registry=self.registry, format_checker=checker)
+        self._validators[name] = validator
+        return validator
 
     def validate(self, name: str, instance: Any, path: str) -> tuple[Diagnostic, ...]:
         errors = sorted(

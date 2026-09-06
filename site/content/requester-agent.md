@@ -61,6 +61,67 @@ $inventory_example
 Use the example to understand fields and references, not to infer the requester's
 purpose. Fetch the full inventory for validation and matching.
 
+## Canonical contract: path, schema and acceptance
+
+Start with `catalogue-output.schema.json` for the published inventory. Its
+collections reference the canonical source schemas; they are not alternative
+entity definitions. `model.schema.json` describes a stored model release;
+`model-release.schema.json` contains its reusable release metadata.
+`mac.schema.json` describes a proposal. Use the schemas from this publication's
+source commit and resolve their logical `$$id` values locally from the bundle.
+The inventory's `contract_version` identifies its publication envelope, not
+entity-shape compatibility. Read `x-modelo-entity-profile` on its schema and use
+the same-source bundle; do not validate a saved inventory against newer schemas.
+
+Accepted source records must pass all four layers: configured path and filename,
+closed JSON Schema, semantic/evidence checks, and Git history/change checks.
+The workflow contract's `entity_acceptance` block lists the implemented adapters.
+Currently only AWS Bedrock passes semantic acceptance; Azure and Google schemas
+are structural definitions, not implemented adapters. Report checks you cannot
+execute as `not_run`. Never call schema-only validation full acceptance.
+
+| Entity | Configured path pattern | Key |
+|---|---|---|
+| Model | `{paths.models}/{id}.yaml` | `id` |
+| Offering | `{paths.offerings}/{inference_service_id}/{id}.yaml` | Global `id`, not a service/model pair |
+| Evidence | `{paths.evidence}/{id}.yaml` | Content digest |
+| Condition | `{paths.conditions}/{id}/{version}.yaml` | `(id, version)` |
+| Vendor or service | Named governance registry | Registry key equals record `id` |
+| Route | Embedded in offering | `(offering_id, route.id)` |
+
+Paths come from repository configuration. `.yml`, `.YAML`, wrong filenames and
+undeclared YAML record locations fail acceptance. A `family_id` is a grouping
+label, not a foreign key. Derived URNs are not independently assigned IDs.
+Supersession cannot contain a cycle and never transfers an offering's approval.
+
+Keep the business need, requester and requested timing on the linked issue.
+Maintainers turn the assessed use into offering `approved_use` (task, data boundary,
+oversight), `approval_owner` (accountable team or role) and `approval_rationale`.
+Do not copy requester assertions into evidence-backed fields without research.
+Empty conditions require `no_conditions_rationale`; no dummy condition is needed.
+`review_by` is optional and inclusive. An overdue date blocks the next full check
+and publication until reviewed or revoked; existing publication is unchanged.
+Omission means event-triggered offering review, not exemption from review.
+
+For known legal facts, vendor `legal_name` and `domicile` require evidence. Model
+`rights_owner_vendor_id` and service `operator_vendor_id` are reviewed references
+to a vendor with an evidenced legal name. Evidence of a legal name alone does not
+prove ownership or operation; establish the relationship in the change review.
+Unknown legal facts stay absent. Intake territory groups are research hints:
+rights-owner domicile and route processing Regions are different facts. Model
+`licence_uri` points to evidenced terms; `licensing` is only a display category.
+
+Negative examples:
+
+- Valid model JSON in `models/different-id.yaml`: reject the filename mismatch.
+- Two models with the same route-eligible provider identity: resolve the conflict;
+  do not approve another offering to hide it.
+- A supersedes B and B supersedes A: reject the cycle.
+- A brand-only vendor used as a legal rights owner: establish the legal entity first.
+- A UK requester checkbox used as proof of UK processing: research the route.
+- Empty conditions without a decision reason: return for clarification.
+- An Azure route that passes JSON Schema: report semantic acceptance as unsupported.
+
 ## Proposal fields: what and why
 
 | Field | Supply | Why it is needed |

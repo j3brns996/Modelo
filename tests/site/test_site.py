@@ -34,6 +34,7 @@ from modelo.site import (
     _history_html,
     _pricing_rows,
     _route_rows,
+    _supporting_evidence,
     build_demo_site,
     build_final_site,
     build_validation_site,
@@ -110,7 +111,7 @@ class FinalSiteTests(unittest.TestCase):
                 "synthetic",
                 self.source,
                 self.tree,
-                date(2026, 9, 1),
+                date(2026, 9, 6),
                 layout,
             ),
         )
@@ -130,7 +131,7 @@ class FinalSiteTests(unittest.TestCase):
             "base_commit": self.base,
             "source_commit": self.source,
             "source_tree": self.tree,
-            "as_of": "2026-09-01",
+            "as_of": "2026-09-06",
             "source_date_epoch": self.epoch,
             "profile": "synthetic",
             "base_url": None,
@@ -178,7 +179,7 @@ class FinalSiteTests(unittest.TestCase):
             source_tree=self.tree,
             merge_commit=self.merge,
             merge_tree=self.tree,
-            as_of=date(2026, 9, 1),
+            as_of=date(2026, 9, 6),
             source_date_epoch=self.epoch,
             profile="synthetic",
             base_url=base_url or f"https://example.invalid{base_path}",
@@ -191,7 +192,7 @@ class FinalSiteTests(unittest.TestCase):
     def demo_request(self) -> DemoBuildRequest:
         return DemoBuildRequest(
             root=self.root, source_commit=self.source, source_tree=self.tree,
-            as_of=date(2026, 9, 1), source_date_epoch=self.epoch,
+            as_of=date(2026, 9, 6), source_date_epoch=self.epoch,
             base_url="https://example.invalid/Modelo/", base_path="/Modelo/",
             output="dist/pages",
         )
@@ -253,7 +254,7 @@ class FinalSiteTests(unittest.TestCase):
         self.assertEqual(len(diagrams), 2)
         overview = (site / "overview/index.html").read_text(encoding="utf-8")
         overview_diagrams = re.findall(r"<svg\b.*?</svg>", overview, re.S)
-        self.assertEqual(len(overview_diagrams), 2)
+        self.assertEqual(len(overview_diagrams), 3)
         for raw in diagrams + overview_diagrams:
             svg = ElementTree.fromstring(raw)
             self.assertEqual(svg.attrib["role"], "img")
@@ -337,7 +338,7 @@ class FinalSiteTests(unittest.TestCase):
         request = ValidationBuildRequest(
             root=self.root, base_commit=self.base, source_commit=self.source,
             source_tree=self.tree, validation_commit=validation,
-            validation_tree=self.tree, as_of=date(2026, 9, 1),
+            validation_tree=self.tree, as_of=date(2026, 9, 6),
             source_date_epoch=self.epoch, profile="synthetic",
             base_url="https://example.invalid/Modelo/", base_path="/Modelo/",
             output="dist/validation", mac_metadata=self.metadata_path,
@@ -380,7 +381,7 @@ class FinalSiteTests(unittest.TestCase):
             "repository": {"provider": "github", "host": "github.com", "namespace": "j3brns996", "name": "Modelo"},
             "change_request": "29", "base_sha": self.base, "head_sha": self.source,
             "head_tree_sha": self.tree, "validation_sha": validation,
-            "validation_tree_sha": self.tree, "as_of": "2026-09-01",
+            "validation_tree_sha": self.tree, "as_of": "2026-09-06",
             "source_date_epoch": self.epoch, "profile": "synthetic",
             "base_url": "https://j3brns996.github.io/Modelo/", "base_path": "/Modelo/",
             "publication_capability": "public-pages",
@@ -520,7 +521,7 @@ class FinalSiteTests(unittest.TestCase):
         event_path.write_bytes(canonical_bytes(event)); issue_path.write_bytes(canonical_bytes(issue))
         prepare_github(
             root=self.root, event_path=event_path, issue_path=issue_path,
-            validation_sha=validation, validation_tree=self.tree, as_of=date(2026, 9, 1),
+            validation_sha=validation, validation_tree=self.tree, as_of=date(2026, 9, 6),
             metadata_output=prepared_metadata, context_output=prepared_context,
         )
         actual_metadata = json.loads(prepared_metadata.read_text(encoding="utf-8"))
@@ -536,7 +537,7 @@ class FinalSiteTests(unittest.TestCase):
             prepare_github(
                 root=self.root, event_path=event_path, issue_path=issue_path,
                 validation_sha=validation, validation_tree=self.tree,
-                as_of=date(2026, 9, 1), metadata_output=prepared_metadata,
+                as_of=date(2026, 9, 6), metadata_output=prepared_metadata,
                 context_output=prepared_context,
             )
         duplicate_marker = json.loads(json.dumps(event))
@@ -549,7 +550,7 @@ class FinalSiteTests(unittest.TestCase):
             prepare_github(
                 root=self.root, event_path=event_path, issue_path=issue_path,
                 validation_sha=validation, validation_tree=self.tree,
-                as_of=date(2026, 9, 1), metadata_output=prepared_metadata,
+                as_of=date(2026, 9, 6), metadata_output=prepared_metadata,
                 context_output=prepared_context,
             )
 
@@ -586,7 +587,7 @@ class FinalSiteTests(unittest.TestCase):
         prepare_github_control(
             root=self.root, event_path=event_path, issue_path=issue_path,
             validation_sha=validation,
-            validation_tree=tree, as_of=date(2026, 9, 1), context_output=context_path,
+            validation_tree=tree, as_of=date(2026, 9, 6), context_output=context_path,
         )
         git(self.root, "checkout", "--detach", validation)
         output = self.root / "dist/receipts/control-check.json"
@@ -625,7 +626,7 @@ class FinalSiteTests(unittest.TestCase):
         prepare_github_control(
             root=self.root, event_path=event_path, issue_path=issue_path,
             validation_sha=mixed_validation, validation_tree=mixed_tree,
-            as_of=date(2026, 9, 1), context_output=context_path,
+            as_of=date(2026, 9, 6), context_output=context_path,
         )
         git(self.root, "checkout", "--detach", mixed_validation)
         with self.assertRaisesRegex(BuildError, "forbids catalogue paths"):
@@ -776,6 +777,12 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn("Atlas Reasoning", model)
         self.assertIn("128,000", model)
         self.assertIn("Supporting evidence", model)
+        self.assertIn("Retained observation:", model)
+        offering = (site / "offerings/aws-bedrock/test-offering/index.html").read_text(encoding="utf-8")
+        self.assertIn("Synthetic enterprise policy for build tests.", offering)
+        self.assertIn("Test policy owner", offering)
+        self.assertIn("Retained observation:", offering)
+        self.assertIn("Source documentation</a>", offering)
         for contract in ("@media (max-width: 880px)", "@media (max-width: 580px)", ".model-card {", ".fact-grid"):
             self.assertIn(contract, css)
         self.assertIn("textarea[data-proposal-summary]", css)
@@ -784,8 +791,17 @@ class FinalSiteTests(unittest.TestCase):
         site = build_final_site(self.request()).output / "site"
         catalogue = (site / "catalogue/index.html").read_text(encoding="utf-8")
         css = (site / "assets/site.css").read_text(encoding="utf-8")
-        self.assertEqual(catalogue.count("data-model-card"), 22)
-        self.assertIn("23 records", catalogue)
+        self.assertEqual(catalogue.count("data-model-card"), 25)
+        self.assertIn("26 records", catalogue)
+        self.assertRegex(catalogue, r"Source revision <time[^>]+>\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC</time>")
+        self.assertIn('href="/Modelo/agents/README.md">Agents</a>', catalogue)
+        self.assertIn("Documented UK availability", catalogue)
+        self.assertIn("They have no approved offering record here.", catalogue)
+        for name in ("Magistral Small 2509", "Gemma 3 27B PT", "MiniMax M2.5", "eu-west-2"):
+            self.assertIn(name, catalogue)
+        changes = (site / "changes/index.html").read_text(encoding="utf-8")
+        self.assertIn("Request backlog", changes)
+        self.assertIn("Status may have changed.", changes)
         self.assertIn("Compare capabilities and check the recorded ways to use each model.", catalogue)
         self.assertIn("data-catalogue-grid", catalogue)
         self.assertIn("data-catalogue-table", catalogue)
@@ -815,7 +831,7 @@ class FinalSiteTests(unittest.TestCase):
             'data-comparison-tray role="status" aria-live="polite"',
         ):
             self.assertIn(marker, catalogue)
-        self.assertEqual(catalogue.count("data-compare-toggle"), 44)
+        self.assertEqual(catalogue.count("data-compare-toggle"), 50)
         self.assertIn('data-search-max="200"', catalogue)
         self.assertIn('data-compare-max="4"', catalogue)
         self.assertIn('data-view-storage-key="modelo.catalogue.view.v1"', catalogue)
@@ -1036,10 +1052,22 @@ class FinalSiteTests(unittest.TestCase):
             build_final_site(replace(self.request(), profile="private"))
 
     def test_malicious_values_are_inert(self) -> None:
-        rendered = _history_html([{"url": "https://example.invalid/x", "sha": "a" * 40, "date": "2026-09-01", "subject": '<script>alert("x")</script>', "changes": ['add: <img src=x onerror=alert(1)>']}])
+        rendered = _history_html([{"url": "https://example.invalid/x", "sha": "a" * 40, "date": "2026-09-06", "subject": '<script>alert("x")</script>', "changes": ['add: <img src=x onerror=alert(1)>']}])
         self.assertNotIn("<script>", rendered)
         self.assertNotIn("<img", rendered)
         self.assertIn("&lt;script&gt;", rendered)
+        expanded = _history_html([{"url": "https://example.invalid/x", "sha": "a" * 40, "date": "2026-09-06", "subject": "Six paths", "changes": [str(i) for i in range(6)]}])
+        self.assertEqual(expanded.split("<details>")[0].count("<li "), 4)
+        self.assertIn("Show 2 more changed paths", expanded)
+        self.assertEqual(len(re.findall(r"<li\b", expanded)), 6)
+        self.assertNotIn("<ul></ul>", expanded)
+        proof = _supporting_evidence(["example"], {"example": {
+            "source": {"uri": "https://example.invalid/proof"}, "observed_at": "2026-09-06T00:00:00Z",
+            "projection": {"value": "<script>alert(1)</script>"},
+        }})
+        self.assertNotIn("<script>", proof)
+        self.assertIn("&lt;script&gt;", proof)
+        self.assertIn('href="https://example.invalid/proof"', proof)
         site = build_final_site(self.request()).output / "site"
         generated = b"\n".join(path.read_bytes() for path in site.rglob("*") if path.is_file())
         self.assertNotIn(b'<script>alert("history")</script>', generated)
@@ -1049,7 +1077,7 @@ class FinalSiteTests(unittest.TestCase):
         import modelo.site as site_module
         canary = "MODELO_PRIVATE_CANARY"
         with patch.object(site_module, "_history", return_value=[{
-            "sha": "a" * 40, "date": "2026-09-01", "subject": canary,
+            "sha": "a" * 40, "date": "2026-09-06", "subject": canary,
             "changes": ["add: harmless"], "url": "https://example.invalid/commit",
         }]):
             with self.assertRaisesRegex(BuildError, "private leakage"):

@@ -1,0 +1,22 @@
+{
+  "repository": "https://github.com/j3brns996/Modelo",
+  "observed_at": "2026-09-06T20:24:14Z",
+  "items": [
+    {
+      "number": 87,
+      "title": "Improve site readability, examples, diagrams, and backlog navigation"
+    },
+    {
+      "number": 85,
+      "title": "Restore README build input guidance to unblock Pages publication"
+    },
+    {
+      "number": 83,
+      "title": "Make the README action-oriented for people and their agents"
+    },
+    {
+      "number": 81,
+      "title": "Add Modelo concept illustration to repository documentation"
+    }
+  ]
+}

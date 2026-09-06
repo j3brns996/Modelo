@@ -308,6 +308,20 @@ def _evidence_region(evidence: Mapping[str, Mapping[str, Any]], identifier: str)
     return region
 
 
+def _supporting_evidence(identifiers: Iterable[str], evidence: Mapping[str, Mapping[str, Any]]) -> str:
+    items = []
+    for identifier in sorted(set(identifiers)):
+        record = evidence[identifier]
+        source = record["source"]
+        uri = source.get("uri", source.get("documentation_uri", ""))
+        items.append('<details class="retained-evidence"><summary>Retained observation: '
+            + escape(record["observed_at"][:10]) + '</summary><p><a rel="noopener noreferrer" href="'
+            + escape(uri, quote=True) + '">Source documentation</a></p><pre><code>'
+            + escape(json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2))
+            + '</code></pre></details>')
+    return "".join(items) or '<p class="muted">No supporting evidence is recorded.</p>'
+
+
 def _route_rows(offering: Mapping[str, Any], evidence: Mapping[str, Mapping[str, Any]]) -> str:
     rows: list[str] = []
     for route in offering.get("routes", []):
@@ -326,7 +340,7 @@ def _route_rows(offering: Mapping[str, Any], evidence: Mapping[str, Mapping[str,
             (", ".join(map(escape, destinations)) if destinations else '<span class="muted">None</span>') +
             "</td></tr>"
         )
-    return '<table><caption>Callable provider routes</caption><thead><tr><th>Route</th><th>Source Region</th><th>Route type</th><th>Reference</th><th>Destination Regions</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>"
+    return '<table><caption>Callable provider routes</caption><thead><tr><th>Route</th><th>Source region</th><th>Route type</th><th>Reference</th><th>Destination regions</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>"
 
 
 def _pricing_rows(offering: Mapping[str, Any]) -> str:
@@ -372,8 +386,10 @@ def _history(root: Path, merge: str, source_path: str, resolver: _Resolver) -> l
 def _history_html(history: Iterable[Mapping[str, Any]]) -> str:
     items = []
     for entry in history:
-        changes = "".join("<li>" + escape(item) + "</li>" for item in entry["changes"])
-        items.append('<article class="card"><h2><a rel="noopener noreferrer" href="' + escape(entry["url"], quote=True) + '"><code>' + escape(entry["sha"][:12]) + "</code></a></h2><p><time datetime=\"" + escape(entry["date"], quote=True) + '\">' + escape(entry["date"]) + "</time> · " + escape(entry["subject"]) + "</p><ul>" + changes + "</ul></article>")
+        changes = "<ul>" + "".join('<li title="' + escape(item, quote=True) + '">' + escape(item) + "</li>" for item in entry["changes"][:4]) + "</ul>"
+        if len(entry["changes"]) > 4:
+            changes += '<details><summary>Show ' + str(len(entry["changes"]) - 4) + ' more changed paths</summary><ul>' + "".join("<li>" + escape(item) + "</li>" for item in entry["changes"][4:]) + "</ul></details>"
+        items.append('<article class="card"><h2><a rel="noopener noreferrer" href="' + escape(entry["url"], quote=True) + '"><code>' + escape(entry["sha"][:12]) + "</code></a></h2><p><time datetime=\"" + escape(entry["date"], quote=True) + '\">' + escape(entry["date"]) + "</time> · " + escape(entry["subject"]) + "</p>" + changes + "</article>")
     return '<div class="cards">' + "".join(items) + "</div>" if items else '<p class="muted">No catalogue changes are present in first-parent history.</p>'
 
 
@@ -394,6 +410,7 @@ def _navigation(resolver: _Resolver, current: str) -> str:
     labels = (
         ("catalogue", "Catalogue"), ("overview", "How it works"),
         ("changes", "Changes"), ("propose", "Make a proposal"), ("docs", "Field guide"),
+        ("requester_agent", "Agents"),
     )
     return "".join(
         '<a href="' + escape(resolver.site(key), quote=True) + '"'
@@ -460,6 +477,9 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         ("Evidence", len(catalogue["evidence"])), ("Conditions", len(catalogue["conditions"])),
     )
     summary = " · ".join(str(value) + " " + (label.lower().rstrip("s") if value == 1 else label.lower()) for label, value in metrics) + " · Data checked " + request.as_of.isoformat()
+    revision_time = datetime.fromtimestamp(request.source_date_epoch, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    revision = 'Source revision <time datetime="' + datetime.fromtimestamp(request.source_date_epoch, timezone.utc).isoformat() + '">' + revision_time + "</time>"
+    summary += " · " + revision
     home_content = _substitute(templates["home"], {
         "summary": summary,
         "recent_changes": _history_summary_html(history[:3]),
@@ -561,12 +581,40 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
             + '</legend><div class="filter-options">' + options + "</div></fieldset>"
         )
     caption = "Catalogue models and offerings"
+    availability_rows = []
+    models_by_id = {item["id"]: item for item in catalogue["models"]}
+    for item in catalogue["evidence"]:
+        projection = item["projection"]
+        observation = projection.get("ukAvailability") if isinstance(projection, dict) else None
+        if observation is None:
+            continue
+        if (not isinstance(observation, dict)
+            or set(observation) != {"model_id", "provider_reference", "service", "region", "mode"}
+            or any(not isinstance(value, str) or not value for value in observation.values())
+            or observation["region"] != "eu-west-2"
+            or observation["model_id"] not in models_by_id
+            or item["source"]["type"] != "official-provider-documentation"):
+            raise BuildError("documented UK availability needs a model and official provider source")
+        model = models_by_id[observation["model_id"]]
+        availability_rows.append('<tr><td><a href="' + escape(resolver.site("model", model_id=model["id"]), quote=True)
+            + '">' + escape(model["name"]) + '</a></td><td>' + escape(observation["service"])
+            + '</td><td>' + escape(observation["region"]) + '</td><td>' + escape(observation["mode"])
+            + '</td><td><a rel="noopener noreferrer" href="' + escape(item["source"]["uri"], quote=True)
+            + '">Provider model card</a><br><small>Observed ' + escape(item["observed_at"][:10]) + '</small></td></tr>')
+    availability_html = ('<section class="content-band"><h2>Documented UK availability</h2>'
+        '<p>These provider offerings are documented in the London region (eu-west-2). They have no approved offering record here. '
+        'A maintainer must gather the required provider evidence and complete the approval workflow before recording approved access.</p>'
+        '<div class="table-scroll"><table><caption>Provider availability observations</caption><thead><tr><th>Model</th><th>Service</th><th>Region</th><th>Mode</th><th>Evidence</th></tr></thead><tbody>'
+        + "".join(availability_rows) + '</tbody></table></div></section>') if availability_rows else ""
     enhancement = document["site"]["progressive_enhancement"]
     catalogue_content = _substitute(templates["catalogue"], {
         "basic_filter_controls": '<div class="filter-groups">' + "".join(controls["basic"]) + "</div>",
         "advanced_filter_controls": '<div class="filter-groups">' + "".join(controls["advanced"]) + "</div>",
         "search_max_length": str(enhancement["search_max_length"]),
         "comparison_max_models": str(enhancement["comparison_max_models"]),
+        "revision": revision,
+        "documented_availability": availability_html,
+        "as_of": request.as_of.isoformat(),
         "view_storage_key": escape(enhancement["view_storage_key"], quote=True),
         "default_view": escape(enhancement["default_view"], quote=True),
         "record_count": str(len(catalogue["models"]) + len(catalogue["offerings"])),
@@ -575,7 +623,26 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         "catalogue_cards": '<div class="model-grid" data-catalogue-grid>' + "".join(cards) + '</div>',
         "catalogue_rows": '<table data-catalogue-table><caption>' + caption + '</caption><thead><tr><th>Kind</th><th>Name</th><th>Owner/service</th><th>Signals</th><th>Action</th></tr></thead><tbody data-catalogue-body>' + "".join(rows) + "</tbody></table>",
     }, "catalogue")
-    history_content = _substitute(templates["changes"], {"history": _history_html(history)}, "changes")
+    backlog = json.loads(_blob(root, request.source_commit, document["paths"]["site_content"] + "/backlog.json"))
+    if (not isinstance(backlog, dict) or set(backlog) != {"repository", "observed_at", "items"}
+        or not isinstance(backlog["repository"], str)
+        or not isinstance(backlog["items"], list) or len(backlog["items"]) > 4
+        or not isinstance(backlog["observed_at"], str)
+        or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", backlog["observed_at"])):
+        raise BuildError("backlog snapshot must contain a UTC retrieval time and at most four issues")
+    try:
+        datetime.strptime(backlog["observed_at"], "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as exc:
+        raise BuildError("backlog snapshot has an invalid retrieval time") from exc
+    backlog_rows = []
+    for item in backlog["items"]:
+        if (not isinstance(item, dict) or set(item) != {"number", "title"} or type(item["number"]) is not int
+            or item["number"] < 1 or not isinstance(item["title"], str) or not 1 <= len(item["title"]) <= 256):
+            raise BuildError("backlog issue needs a positive number and bounded title")
+        if backlog["repository"].rstrip("/") == str(document["repository"]["web_base"]).rstrip("/"):
+            backlog_rows.append('<li><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("issue", issue_number=str(item["number"])), quote=True) + '">#' + str(item["number"]) + " " + escape(item["title"]) + "</a></li>")
+    backlog_html = '<p class="muted">Open when retrieved at ' + escape(backlog["observed_at"].replace("T", " ").replace("Z", " UTC")) + '. Status may have changed.</p><ul>' + "".join(backlog_rows) + "</ul>" if backlog_rows else '<p class="muted">No snapshot is available for this repository.</p>'
+    history_content = _substitute(templates["changes"], {"history": _history_html(history), "backlog": backlog_html, "backlog_url": escape(resolver.repository_url("backlog"), quote=True)}, "changes")
     content_path = document["paths"]["site_content"]
     process_content = _substitute(templates["process"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/process.md"))}, "process")
     intake = document["repository"]["web_routes"]["mac_intake"]
@@ -619,7 +686,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
             "model_description": escape(model.get("description", "No description published.")),
             "model_facts": facts + _model_release_facts(model), "offering_links": '<div class="related-grid">' + links + "</div>",
             "model_status": '<span class="status-pill status-pill--' + escape(model.get("lifecycle", "unknown"), quote=True) + '">' + escape(model.get("lifecycle", "Unspecified").title()) + "</span>",
-            "evidence_summary": '<p class="evidence-count"><strong>' + str(len(model_refs)) + '</strong><span>bound fact references</span></p><p>Every externally sourced field links to a content-addressed evidence projection.</p><div class="evidence-ids">' + (_tags(model_refs) or "None") + "</div>",
+            "evidence_summary": '<p class="evidence-count"><strong>' + str(len(model_refs)) + '</strong><span>evidence records</span></p><p>Expand an observation to inspect its retained values, source and retrieval details.</p>' + _supporting_evidence(model_refs, evidence),
         }, "model")
         files[resolver.output_path("model", model_id=model["id"])] = _page(root, request.source_commit, templates_path, resolver, request, "model", model.get("name", model["id"]), content, "model", {"model_id": model["id"]})
     releases_url = str(document["repository"]["web_base"]).rstrip("/") + document["repository"]["web_routes"]["releases"]
@@ -631,8 +698,21 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         else:
             approval = '<section class="coordinate-card"><span class="status-pill status-pill--synthetic">Synthetic</span><h2>Demo provenance</h2><dl><dt>Source</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.source_commit), quote=True) + '"><code>' + escape(request.source_commit[:12]) + '</code></a></dd><dt>Tree</dt><dd><code>' + escape(request.source_tree[:12]) + '</code></dd></dl><p>Synthetic fixture only, not approved for enterprise use.</p></section>'
         refs = sorted({reference["id"] for reference in offering.get("evidence_refs", {}).values()})
-        conditions = [f'{item["id"]}@{item["version"]}' for item in offering.get("condition_refs", [])]
-        content = _substitute(templates["offering"], {"offering_name": escape(offering["id"]), "approval": approval, "approval_rationale": escape(offering["approval_rationale"]), "route_table": _route_rows(offering, evidence), "pricing_table": _pricing_rows(offering), "conditions_evidence": '<dl class="fact-grid"><div><dt>Conditions</dt><dd>' + (_tags(conditions) or "None") + '</dd></div><div><dt>Evidence</dt><dd>' + (_tags(refs) or "None") + "</dd></div></dl>"}, "offering")
+        for route in offering["routes"]:
+            binding = route["model_binding"]
+            if binding["kind"] == "foundation-model":
+                refs.append(binding["model_evidence"]["id"])
+            else:
+                refs.append(binding["profile_evidence"]["id"])
+                refs.extend(item["model_evidence"]["id"] for item in binding["destinations"])
+        conditions = []
+        for reference in offering.get("condition_refs", []):
+            condition = next(item for item in catalogue["conditions"] if (item["id"], item["version"]) == (reference["id"], reference["version"]))
+            conditions.append('<section><h3>' + escape(condition["title"]) + '</h3><p>'
+                + escape(condition["description"]) + '</p><p class="muted">Owner: '
+                + escape(condition["owner"]) + ' · <code>' + escape(condition["id"])
+                + '@' + str(condition["version"]) + '</code></p></section>')
+        content = _substitute(templates["offering"], {"offering_name": escape(offering["id"]), "approval": approval, "approval_rationale": escape(offering["approval_rationale"]), "route_table": _route_rows(offering, evidence), "pricing_table": _pricing_rows(offering), "conditions_evidence": ("".join(conditions) or '<p>No conditions are recorded.</p>') + '<h3>Supporting evidence</h3><p>Expand an observation to inspect the retained proof.</p>' + _supporting_evidence(refs, evidence)}, "offering")
         path = resolver.output_path("offering", inference_service_id=offering["inference_service_id"], offering_id=offering["id"])
         files[path] = _page(root, request.source_commit, templates_path, resolver, request, "offering", offering["id"], content, "offering", {"inference_service_id": offering["inference_service_id"], "offering_id": offering["id"]})
     files[resolver.output_path("asset_css")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/site.css")

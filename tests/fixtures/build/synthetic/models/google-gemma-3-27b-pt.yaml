@@ -1,0 +1,20 @@
+id: google-gemma-3-27b-pt
+vendor_id: google
+name: Gemma 3 27B PT
+description: Multimodal model in the Gemma 3 family.
+modalities:
+- image
+- text
+evidence_refs:
+  /name:
+    id: sha256-e98b509854a9fb719d1033274a3a393e792ad72f25e741c27b3fd86e402708b4
+    projection_pointer: /modelName
+  /description:
+    id: sha256-e98b509854a9fb719d1033274a3a393e792ad72f25e741c27b3fd86e402708b4
+    projection_pointer: /description
+  /modalities/0:
+    id: sha256-e98b509854a9fb719d1033274a3a393e792ad72f25e741c27b3fd86e402708b4
+    projection_pointer: /modalities/0
+  /modalities/1:
+    id: sha256-e98b509854a9fb719d1033274a3a393e792ad72f25e741c27b3fd86e402708b4
+    projection_pointer: /modalities/1

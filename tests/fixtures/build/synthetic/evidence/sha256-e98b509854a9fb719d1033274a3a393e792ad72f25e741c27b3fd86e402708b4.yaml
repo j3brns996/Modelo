@@ -1,0 +1,25 @@
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-google-gemma-3-27b-pt.html
+retrieved_by: manual
+observed_at: '2026-09-06T20:29:48Z'
+scope:
+  catalogue: synthetic-demo
+  purpose: uk-provider-availability
+  retrieval: complete public model-card HTML
+  raw_response_sha256: b1183d8baea6b46c63883544a37184734e837c573550e318cc938438749b4877
+projection:
+  modelName: Gemma 3 27B PT
+  providerName: Google
+  description: Multimodal model in the Gemma 3 family.
+  modalities:
+  - image
+  - text
+  ukAvailability:
+    model_id: google-gemma-3-27b-pt
+    provider_reference: google.gemma-3-27b-it
+    service: Amazon Bedrock
+    region: eu-west-2
+    mode: In-Region
+visibility: public
+id: sha256-e98b509854a9fb719d1033274a3a393e792ad72f25e741c27b3fd86e402708b4

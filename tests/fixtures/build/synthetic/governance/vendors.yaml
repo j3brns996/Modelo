@@ -27,3 +27,24 @@ vendors:
       /name:
         id: sha256-1777adbbf1b254fa4a7a4b048845efefea9ad27b9021ae390a6d70976a72899e
         projection_pointer: /providerName
+  mistral-ai:
+    id: mistral-ai
+    name: Mistral AI
+    evidence_refs:
+      /name:
+        id: sha256-04448d1f15f38ffdfb77dea89e5d0e02f6053ce2fdae86d1f5228a35b386eecc
+        projection_pointer: /providerName
+  google:
+    id: google
+    name: Google
+    evidence_refs:
+      /name:
+        id: sha256-e98b509854a9fb719d1033274a3a393e792ad72f25e741c27b3fd86e402708b4
+        projection_pointer: /providerName
+  minimax:
+    id: minimax
+    name: MiniMax
+    evidence_refs:
+      /name:
+        id: sha256-200a308808dc6c2c621a116ea3b37c0db26923e6cff10625df86af862a23a08d
+        projection_pointer: /providerName

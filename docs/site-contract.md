@@ -42,10 +42,12 @@ except itself. T8 supplies trusted provider metadata and creates the detached
 check receipt; only post-merge publication may create the final receipt.
 
 The separate `demo` build projects only the configured synthetic fixture. The
-fixture contains 22 models: two fully synthetic integration records and 20
+fixture contains 25 models: two fully synthetic integration records and 23
 official-documentation observations used to exercise realistic catalogue
 density. Documentation presence is not approval, and no route, price, licence
-or regional availability is inferred for those 20 observations. Its
+or regional availability is inferred. Three observations retain explicit AWS
+documentation for in-region London availability. These are provider availability
+observations, not approved offering records. Its
 explicit `as_of` must equal that profile's configured fixture snapshot date; it
 never substitutes the workflow wall-clock date. It
 does not ingest MAC metadata, has no merge coordinate, emits an empty change
@@ -381,3 +383,26 @@ The file is included in the exact publication inventory and manifest.
 The instructions embed the exact selected host form markup. The deterministic
 proposal ZIP contains the guide, selected host templates, and published schemas.
 GitHub YAML defines native fields; GitLab Markdown defines the description.
+
+## Publication time and backlog
+
+The leading catalogue summary shows the source revision date and time in UTC,
+to the minute, from the explicit source-date epoch. The separate data-check
+date describes the validated snapshot, not the page load or deployment time.
+
+Changes shows four paths per commit and expands the remaining paths with native
+HTML details. It also shows up to four recent open issues from the dated,
+committed `site/content/backlog.json` snapshot. Refresh this file from the Git
+provider when publishing a site update. Status can change after retrieval.
+The snapshot is displayed only for its recorded repository; the live backlog
+link always uses `repository.web_routes.backlog`. Builds remain offline.
+
+Agents in the primary navigation opens the published Markdown guide. Prose
+shares the page gutter and a bounded reading width. Wide diagrams and tables
+scroll within their sections; code examples wrap on narrow screens.
+
+Offering pages display each referenced condition's title, text, owner, ID and
+version. Model and offering pages let readers expand the retained public
+evidence envelope and follow its source documentation. Offering evidence
+includes route bindings and profile destinations. This uses the same validated
+publication projection as the inventory; it does not retrieve new proof.

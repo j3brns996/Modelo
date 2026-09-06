@@ -1,0 +1,24 @@
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-minimax-minimax-m2-5.html
+retrieved_by: manual
+observed_at: '2026-09-06T20:29:48Z'
+scope:
+  catalogue: synthetic-demo
+  purpose: uk-provider-availability
+  retrieval: complete public model-card HTML
+  raw_response_sha256: 579bc905dffcc950dc3ef16241580ac64b362f385f53c48fb34f7e79ea62bfa2
+projection:
+  modelName: MiniMax M2.5
+  providerName: MiniMax
+  description: Model for reasoning and multi-step agent tasks.
+  modalities:
+  - text
+  ukAvailability:
+    model_id: minimax-m2-5
+    provider_reference: minimax.minimax-m2.5
+    service: Amazon Bedrock
+    region: eu-west-2
+    mode: In-Region
+visibility: public
+id: sha256-200a308808dc6c2c621a116ea3b37c0db26923e6cff10625df86af862a23a08d

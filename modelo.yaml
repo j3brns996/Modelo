@@ -19,6 +19,7 @@ repository:
     tag: /releases/tag/{tag_name}
     release: /releases/tag/{tag_name}
     releases: /releases
+    backlog: /issues
     request_intake: /issues/new?template=model-request.yml
     mac_intake:
       add: /issues/new?template=mac-add.yml
@@ -156,7 +157,7 @@ publication:
   profiles:
     synthetic:
       source: tests/fixtures/build/synthetic
-      as_of: "2026-09-01"
+      as_of: "2026-09-06"
       delivery: pages
       visibility: public
       production_catalogue: false

@@ -1,0 +1,25 @@
+source:
+  type: official-provider-documentation
+  uri: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-mistral-ai-magistral-small-2509.html
+retrieved_by: manual
+observed_at: '2026-09-06T20:29:48Z'
+scope:
+  catalogue: synthetic-demo
+  purpose: uk-provider-availability
+  retrieval: complete public model-card HTML
+  raw_response_sha256: c9badd7510e915bd239536067e797a21d1f06c8530532ec60c006805e5b32330
+projection:
+  modelName: Magistral Small 2509
+  providerName: Mistral AI
+  description: Reasoning model for mathematical, coding, and logic tasks.
+  modalities:
+  - image
+  - text
+  ukAvailability:
+    model_id: mistral-magistral-small-2509
+    provider_reference: mistral.magistral-small-2509
+    service: Amazon Bedrock
+    region: eu-west-2
+    mode: In-Region
+visibility: public
+id: sha256-04448d1f15f38ffdfb77dea89e5d0e02f6053ce2fdae86d1f5228a35b386eecc

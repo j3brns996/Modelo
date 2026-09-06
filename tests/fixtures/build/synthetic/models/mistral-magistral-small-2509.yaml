@@ -1,0 +1,20 @@
+id: mistral-magistral-small-2509
+vendor_id: mistral-ai
+name: Magistral Small 2509
+description: Reasoning model for mathematical, coding, and logic tasks.
+modalities:
+- image
+- text
+evidence_refs:
+  /name:
+    id: sha256-04448d1f15f38ffdfb77dea89e5d0e02f6053ce2fdae86d1f5228a35b386eecc
+    projection_pointer: /modelName
+  /description:
+    id: sha256-04448d1f15f38ffdfb77dea89e5d0e02f6053ce2fdae86d1f5228a35b386eecc
+    projection_pointer: /description
+  /modalities/0:
+    id: sha256-04448d1f15f38ffdfb77dea89e5d0e02f6053ce2fdae86d1f5228a35b386eecc
+    projection_pointer: /modalities/0
+  /modalities/1:
+    id: sha256-04448d1f15f38ffdfb77dea89e5d0e02f6053ce2fdae86d1f5228a35b386eecc
+    projection_pointer: /modalities/1

@@ -94,7 +94,7 @@
         "web_base": { "$ref": "common.schema.json#/$defs/httpsUri" },
         "web_routes": {
           "type": "object",
-          "required": ["issue", "change_request", "commit", "tag", "release", "releases", "request_intake", "mac_intake"],
+          "required": ["issue", "change_request", "commit", "tag", "release", "releases", "backlog", "request_intake", "mac_intake"],
           "properties": {
             "issue": { "$ref": "#/$defs/issueRoute" },
             "change_request": { "$ref": "#/$defs/changeRequestRoute" },
@@ -102,6 +102,7 @@
             "tag": { "$ref": "#/$defs/tagRoute" },
             "release": { "$ref": "#/$defs/tagRoute" },
             "releases": { "$ref": "#/$defs/noParameterRoute" },
+            "backlog": { "$ref": "#/$defs/noParameterRoute" },
             "request_intake": { "$ref": "#/$defs/noParameterRoute" },
             "mac_intake": {
               "type": "object",

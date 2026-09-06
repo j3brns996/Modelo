@@ -66,7 +66,7 @@ class BuildTests(unittest.TestCase):
         values = {
             "root": self.repository.root, "kind": "candidate",
             "base_commit": self.repository.base, "source_commit": self.head,
-            "source_tree": self.tree, "as_of": date(2026, 9, 1),
+            "source_tree": self.tree, "as_of": date(2026, 9, 6),
             "source_date_epoch": self.epoch, "mac_metadata": self.metadata_path,
             "profile": "synthetic", "base_url": None, "base_path": "/Modelo/",
             "output": "dist/candidate",
@@ -347,7 +347,7 @@ class BuildTests(unittest.TestCase):
             sys.executable, "-m", "modelo", "--root", str(self.repository.root), "build",
             "--kind", "candidate", "--base-commit", self.repository.base,
             "--source-commit", self.head, "--source-tree", self.tree,
-            "--as-of", "2026-09-01", "--source-date-epoch", str(self.epoch),
+            "--as-of", "2026-09-06", "--source-date-epoch", str(self.epoch),
             "--mac-metadata", str(self.metadata_path), "--profile", "synthetic",
             "--no-base-url", "--base-path", "/Modelo/", "--output", "dist/candidate",
         ]
@@ -691,7 +691,7 @@ class BuildTests(unittest.TestCase):
         metadata.write_bytes(canonical_bytes(envelope))
         result = build_candidate(BuildRequest(
             root=repository.root, kind="candidate", base_commit=base, source_commit=head,
-            source_tree=tree, as_of=date(2026, 9, 1), source_date_epoch=epoch,
+            source_tree=tree, as_of=date(2026, 9, 6), source_date_epoch=epoch,
             mac_metadata=metadata, profile="synthetic", base_url=None,
             base_path="/Modelo/", output="dist/candidate",
         ))

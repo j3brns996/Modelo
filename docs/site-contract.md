@@ -42,10 +42,12 @@ except itself. T8 supplies trusted provider metadata and creates the detached
 check receipt; only post-merge publication may create the final receipt.
 
 The separate `demo` build projects only the configured synthetic fixture. The
-fixture contains 22 models: two fully synthetic integration records and 20
+fixture contains 25 models: two fully synthetic integration records and 23
 official-documentation observations used to exercise realistic catalogue
 density. Documentation presence is not approval, and no route, price, licence
-or regional availability is inferred for those 20 observations. Its
+or regional availability is inferred. Three observations retain explicit AWS
+documentation for in-region London availability. These are provider availability
+observations, not approved offering records. Its
 explicit `as_of` must equal that profile's configured fixture snapshot date; it
 never substitutes the workflow wall-clock date. It
 does not ingest MAC metadata, has no merge coordinate, emits an empty change

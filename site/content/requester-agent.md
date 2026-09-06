@@ -5,6 +5,36 @@ configuration, installed skill, or repository checkout is required for intake.
 Follow the requester's authority. This guide does not grant permission to submit,
 approve, merge, or change cloud resources.
 
+## Execution rules
+
+Input: this URL, the requester's business need and intended use, and any known
+model/provider reference. Output: an inventory finding, a proposal draft,
+validation results, and a native issue-form URL. Never submit the form.
+
+Apply these decisions in order:
+
+1. If the business need or intended use is missing, ask for it. Continue only
+   independent research. Do not invent business facts.
+2. Fetch and validate the published inventory. If unavailable or invalid, return
+   `inventory_unverified`; do not conclude that a record is absent.
+3. If the profile is `synthetic`, label every match as a demonstration. Do not
+   use it as evidence of enterprise permission.
+4. Resolve evidenced model identity, offering, vendor, service, and conditions.
+   If an existing offering fits, return `existing_match` with IDs and remaining
+   use-specific decisions. Do not create a duplicate catalogue request.
+5. If no existing offering fits, research the gap. Return `change_needed` only
+   when evidence supports that conclusion; otherwise return `needs_information`.
+6. If a vendor or service key is missing, prepare its prerequisite add form.
+   Do not propose an offering with unresolved references. If the route adapter
+   is unsupported, identify the engineering prerequisite for the maintainer.
+7. Choose the native template using the configured Git host and operation.
+   Validate its required fields and bounds. Return the populated form URL and
+   readable draft. The requester reviews and submits.
+
+These result labels describe the research outcome, not canonical MAC fields.
+For each check, report `passed`, `failed`, or `not_run`, with the actual reason.
+Return unresolved facts as `unknown`. Do not replace those states with a guess.
+
 ## Published inputs
 
 - Configured Git host: **$git_host**. Use the matching method below; do not infer it from a custom hostname.
@@ -175,13 +205,9 @@ a schema-valid MAC. For a complete MAC, validate the neutral payload against
 cross-record references against the candidate inventory. Never validate a MAC
 against `catalogue-output.schema.json` or claim that schema checks prove approval.
 
-Record authors, after issue submission, use a checkout of the configured repository and its pinned
-Python/uv tools. Read its `AGENTS.md`, `modelo.yaml`, contract, and relevant schemas.
-No agent-specific configuration or skill installation is required. The existing
-`uv run --locked modelo dev mac-init` command validates a local neutral payload
-and computes its request and intent keys; it does not submit an issue. Run narrow
-checks, then `uv run --locked modelo check --base <base-sha> --head <head-sha> --as-of <YYYY-MM-DD>`
-on the committed candidate. Report failures and missing prerequisites honestly.
+Requester intake ends at the native form. Record authors run the repository's
+schema, semantic, and exact-head checks after issue submission. Do not claim
+those checks passed while preparing a browser-form request.
 
 ## 5. Handle a missing provider and submit
 

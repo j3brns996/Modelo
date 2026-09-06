@@ -1,0 +1,67 @@
+name: Request a model review
+description: Describe the business need, intended use, and known model or access details.
+title: 'Model request: '
+body:
+- type: markdown
+  attributes:
+    value: An agent can identify the vendor and model, propose an offering, and flag
+      missing facts for maintainer review. This request is not approval. Do not include
+      secrets or private commercial terms.
+- type: input
+  id: model_reference
+  attributes:
+    label: Vendor, model, or link
+    description: Name the vendor or model, or add an official link. Leave unknown
+      details blank.
+  validations:
+    required: false
+- type: textarea
+  id: need
+  attributes:
+    label: Business need
+    description: Who needs this, what business outcome matters, and why?
+  validations:
+    required: true
+- type: textarea
+  id: intended_use
+  attributes:
+    label: Intended use
+    description: What task will the model perform, with what data, and how will people
+      check or act on the output?
+  validations:
+    required: true
+- type: textarea
+  id: deployment
+  attributes:
+    label: Where and when
+    description: Service or provider, region, environment, and target date, if known.
+      These help define the proposed offering.
+  validations:
+    required: false
+- type: input
+  id: producer_domicile
+  attributes:
+    label: Model rights owner domicile
+    description: 'Enter known jurisdictions for the legal rights owner, not the processing
+      location. Add other countries in the vendor/model field. Leave unknown choices
+      blank. Allowed values: UK, EU, China, USA, Other.'
+  validations:
+    required: false
+- type: input
+  id: service_operator
+  attributes:
+    label: Operator or service provider
+    description: 'Enter requested or known operators. Name another provider in Where
+      and when. Leave unknown choices blank. Allowed values: AWS, Azure, Google Cloud,
+      Other.'
+  validations:
+    required: false
+- type: input
+  id: processing_territory
+  attributes:
+    label: Data processing territory
+    description: 'Enter requested or known processing locations. These are separate
+      from the rights owner domicile. Add other locations in Where and when. Leave
+      unknown choices blank. Allowed values: UK, EU, China, USA, Other.'
+  validations:
+    required: false

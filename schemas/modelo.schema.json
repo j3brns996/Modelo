@@ -94,7 +94,7 @@
         "web_base": { "$ref": "common.schema.json#/$defs/httpsUri" },
         "web_routes": {
           "type": "object",
-          "required": ["issue", "change_request", "commit", "tag", "release", "releases", "mac_intake"],
+          "required": ["issue", "change_request", "commit", "tag", "release", "releases", "request_intake", "mac_intake"],
           "properties": {
             "issue": { "$ref": "#/$defs/issueRoute" },
             "change_request": { "$ref": "#/$defs/changeRequestRoute" },
@@ -102,6 +102,7 @@
             "tag": { "$ref": "#/$defs/tagRoute" },
             "release": { "$ref": "#/$defs/tagRoute" },
             "releases": { "$ref": "#/$defs/noParameterRoute" },
+            "request_intake": { "$ref": "#/$defs/noParameterRoute" },
             "mac_intake": {
               "type": "object",
               "required": ["add", "change", "revoke", "move", "batch"],
@@ -228,18 +229,15 @@
         "base_path": { "type": "string", "pattern": "^/(?!/)(?!.*//)(?!.*%)(?!.*\\.\\.)(?!.*(?:/\\./|/\\.(?![\\s\\S])))(?!.*[\\u0000-\\u001f\\u007f])(?:[A-Za-z0-9._~-]+/)*(?![\\s\\S])" },
         "fonts": {
           "type": "object",
-          "required": ["families", "stylesheet_url", "style_origin", "file_origin"],
+          "required": ["families"],
           "properties": {
-            "families": { "type": "array", "prefixItems": [{ "const": "Inter" }, { "const": "JetBrains Mono" }], "items": false },
-            "stylesheet_url": { "const": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" },
-            "style_origin": { "const": "https://fonts.googleapis.com" },
-            "file_origin": { "const": "https://fonts.gstatic.com" }
+            "families": { "const": ["Georgia", "system-ui", "ui-monospace"] }
           },
           "additionalProperties": false
         },
         "routes": {
           "type": "object",
-          "required": ["home", "catalogue", "model", "offering", "changes", "process", "propose", "docs", "not_found"],
+          "required": ["home", "catalogue", "model", "offering", "changes", "process", "propose", "docs", "overview", "not_found"],
           "properties": {
             "home": { "$ref": "#/$defs/noParameterRoute" },
             "catalogue": { "$ref": "#/$defs/noParameterRoute" },
@@ -249,6 +247,7 @@
             "process": { "$ref": "#/$defs/noParameterRoute" },
             "propose": { "$ref": "#/$defs/noParameterRoute" },
             "docs": { "$ref": "#/$defs/noParameterRoute" },
+            "overview": { "$ref": "#/$defs/noParameterRoute" },
             "not_found": { "$ref": "#/$defs/noParameterRoute" }
           },
           "additionalProperties": false
@@ -288,7 +287,7 @@
             "search_max_length": { "const": 200 },
             "comparison_max_models": { "const": 4 },
             "view_storage_key": { "const": "modelo.catalogue.view.v1" },
-            "default_view": { "const": "grid" }
+            "default_view": { "const": "table" }
           },
           "additionalProperties": false
         },
@@ -389,7 +388,7 @@
           "items": { "enum": ["data/catalogue.json", "data/change-delta.json"] }
         },
         "final_fixed_files": {
-          "type": "array", "minItems": 16, "maxItems": 16, "uniqueItems": true,
+          "type": "array", "minItems": 17, "maxItems": 17, "uniqueItems": true,
           "items": { "$ref": "#/$defs/path" }
         },
         "mac_metadata_ingestion": {

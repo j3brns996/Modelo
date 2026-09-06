@@ -29,7 +29,7 @@ CLI_SOURCE = ROOT / "tooling/modelo/src/modelo/cli.py"
 MODELO_CONFIG = ROOT / "modelo.yaml"
 README_SCREENSHOTS = {
     "docs/img/modelo-home.png": ("home", "navigation", "synthetic", "status", "catalogue"),
-    "docs/img/modelo-catalogue.png": ("catalogue", "filters", "model", "result", "cards"),
+    "docs/img/modelo-catalogue.png": ("catalogue", "filters", "model", "result", "table"),
 }
 
 
@@ -336,6 +336,7 @@ def test_authoring_contract_bounds_proposal_and_keeps_optional_observations_stri
     assert "no_partial_user_fields" in prefill["overflow_url"]
     assert "full_human_issue_field_summary" in prefill["overflow_fallback"]
     assert browser["accessible_status"] == {
+        "validation_outcome": "independent_polite_atomic_live_region",
         "url_outcome": "independent_polite_atomic_live_region",
         "clipboard_outcome": "independent_polite_atomic_live_region",
     }

@@ -5,11 +5,12 @@ AI model catalogue. Models record facts; offerings carry consumption approval.
 Issues start work, while change requests and trusted CI decide it. There is no
 application API; host concerns stay in Git adapters, not core records or schemas.
 
-## Start Here
+## Start here
 
 - Live synthetic demo: [j3brns996.github.io/Modelo/](https://j3brns996.github.io/Modelo/)
 - Guided issue chooser: [Open a Modelo MAC request](https://github.com/j3brns996/Modelo/issues/new/choose)
   for add, change, revoke, move or batch requests.
+- Agent workflow: [Quickstart](docs/agent-quickstart.md) and [maintainer skill](.agents/skills/modelo-maintain/SKILL.md).
 - Repository rules and contracts: [SPEC.md](SPEC.md) and [docs/contract.yaml](docs/contract.yaml)
 
 Demo records are synthetic, not enterprise approval. Catalogue work starts in
@@ -22,9 +23,9 @@ contain no production data.
 
 ![Modelo synthetic-demo home showing navigation, synthetic status and catalogue totals](docs/img/modelo-home.png)
 
-![Modelo synthetic catalogue showing filters and model result cards](docs/img/modelo-catalogue.png)
+![Modelo synthetic catalogue showing filters and model result table](docs/img/modelo-catalogue.png)
 
-## Why Facts And Approval Are Separate
+## Why facts and approval are separate
 
 A model describes a named release; it does not permit enterprise use. An
 offering is the approval unit, joining it to provider routes, policy rationale
@@ -32,7 +33,7 @@ and evidenced conditions. Provider availability, documentation and demos are
 observations, not approval. Enterprise use follows the approved offering and
 route.
 
-## Current Status
+## Current status
 
 T8 pre-merge CI, T9 and the public synthetic Pages demo are implemented.
 Production post-merge release and receipt automation and the T10 remote gate
@@ -41,20 +42,20 @@ disabled. The site demonstrates static publication, not launch completion.
 
 Do not add real production catalogue data before T10 passes remotely.
 
-## Choose Your Path
+## Choose your path
 
 | If you want to... | Start here |
 |---|---|
 | Browse the live site | [Synthetic demo](https://j3brns996.github.io/Modelo/) |
 | Start a proposed change | [Guided issue chooser](https://github.com/j3brns996/Modelo/issues/new/choose) |
-| Draft an add or change | [Interactive proposal helper](https://j3brns996.github.io/Modelo/propose/#builder) |
+| Prepare a detailed MAC | [Interactive proposal helper](https://j3brns996.github.io/Modelo/propose/#builder) |
 | Use the local authoring commands | [Authoring guide](docs/authoring.md) |
 | Learn how to contribute safely | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Read the docs index | [docs/README.md](docs/README.md) |
 | Understand the product rules | [SPEC.md](SPEC.md) |
 | Inspect the machine contract | [docs/contract.yaml](docs/contract.yaml) |
 
-## How A Change Is Decided
+## How a change is decided
 
 A proposal starts with a linked issue and continues on a one-writer topic
 branch. The change request binds its operation to the reviewed base, head and
@@ -63,7 +64,7 @@ results cannot accept it. Catalogue facts need admissible evidence. Human
 CODEOWNER approval remains required for control and documentation paths. A new
 commit invalidates earlier checks and reviews.
 
-## Five-Minute Setup
+## Five-minute setup
 
 ```bash
 uv sync --locked
@@ -85,7 +86,7 @@ remain authoritative.
 Work from a clean worktree after reading repository rules and relevant schemas.
 Run narrow tests before local CI. Never commit generated `dist/` output.
 
-## Four Planes
+## Four planes
 
 | Plane | Location | Purpose |
 |---|---|---|

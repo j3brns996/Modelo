@@ -384,9 +384,8 @@ The site progressively enhances its complete server-rendered catalogue with the
 exact locally vendored `@alpinejs/csp==3.16.3` runtime. The standard Alpine build
 is forbidden because its expression evaluation conflicts with Modelo's CSP;
 CDN, npm and `npx` application-runtime acquisition are also forbidden. The
-presentation may load only the configured Inter and JetBrains Mono styles/fonts
-from the exact CSP-allowlisted Google Fonts origins; font responses are never
-catalogue or build inputs. The published Alpine
+presentation uses locally available Georgia, system-ui and ui-monospace fonts.
+Remote fonts are forbidden. The published Alpine
 and bundled Vue reactivity MIT notices and runtime digest are part of the
 deterministic fixed inventory.
 Enhancement supplies bounded search, multi-select facets, deterministic sorting,
@@ -394,7 +393,7 @@ result counts, table/grid views, allowlisted shareable URL state and comparison
 of two to four canonical models. Comparison never treats an offering as a model,
 never invents facts and uses only safe DOM construction and `textContent`.
 Only table/grid preference is eligible for local storage; an explicit URL value
-wins and unavailable storage falls back to the configured grid view. The
+wins and unavailable storage falls back to the configured table view. The
 catalogue route alone loads `catalogue.js` and the vendored Alpine CSP runtime.
 The propose route loads only its dedicated vanilla `proposal.js`; every other
 route has no browser runtime.
@@ -793,9 +792,14 @@ digest is bound into the change request and release receipt.
 
 The proposal page keeps five static, no-JavaScript cards whose destinations are
 the configured operation-specific intake URLs. Its interactive helper covers
-add and change only. It produces a non-canonical summary of human issue fields,
-not a neutral MAC payload; revoke, move and batch use their static cards. After
-an issue exists, the trusted default-branch GitHub compiler derives a stable
+all five operations, with shared field explanations and adjacent lookups from
+the validated publication only. It preserves answers when switching operations
+and validates applicable fields before handoff. It produces non-canonical human
+issue fields, not a neutral MAC payload. GitLab receives a bounded Markdown
+description through native browser navigation; GitHub receives native form
+fields. Both leave human attestations unchecked and retain a complete copy
+fallback when the final encoded URL exceeds 7,000 characters. After an issue
+exists, the configured trusted adapter compiler derives a stable
 UUIDv5 from the issue coordinate and computes the dedupe key, idempotency key
 and payload digest.
 
@@ -1073,24 +1077,31 @@ candidate, exact-head check, relevant review, merge and target release receipt,
 not separate model and Offering approval loops. Reuse immutable Conditions;
 no new AssuranceProfile or partial-review mechanism is introduced.
 
-## Sustainability review
+## System requirements and capacity assessment
 
-Review the architecture after 90 days. Move live operational state to an event
-or database service, while retaining Git for approved releases, if any two of
-these persist for four weeks:
+Assess system requirements and capacity when accepted catalogue changes reach the 5-10 per
+working day range, or when a consumer needs an API contract. This assessment is
+separate from offering and record approval. Above 10 accepted
+changes per day, reassess review and publication capacity promptly. Keep the
+90-day system assessment as a backstop. These signals trigger assessment, not automatic
+migration. They replace the previous 50-change threshold and four-week wait.
 
-- more than 50 accepted changes per working day;
-- repeated peaks above 10 changes per hour with a sub-hour publication SLA;
-- more than 10% of catalogue changes require conflict resolution;
-- p95 issue-to-publication exceeds one business day while review utilisation is below 70%;
-- p95 validation exceeds five minutes or publication exceeds ten minutes;
-- more than 5% of changes bypass the standard workflow;
-- the same logical identity normally changes more than once per day;
-- consumers require transactional queries, row-level access or live state;
-- the supported baseline clone exceeds 60 seconds because of retained data.
+Measure accepted changes, approval lead time, conflict rate, validation and publication
+latency, and consumer needs. Distinguish review capacity from storage or build
+limits. Do not treat source commit count as accepted catalogue change volume.
 
-Until those conditions exist, adding services would be anticipatory complexity,
-not architecture.
+An API contract defines consumers, data and operations, stable identities,
+versioning, access controls, errors, and service expectations. Check whether
+static catalogue JSON and release snapshots satisfy that contract first.
+A need for a contract does not itself require a new running service.
+Assess nonfunctional requirements (NFRs) separately: performance, availability,
+security, recoverability, and operating cost. Interface behavior is a functional
+contract; NFRs define the quality and service constraints it must meet.
+
+Propose an application API, event service, or operational database only through
+a separate human-reviewed system change with acceptance criteria, ownership,
+and migration plans. Retain accepted release snapshots in Git. The current
+contract still exposes no Modelo application API.
 
 ## Implementation and verification
 
@@ -1116,3 +1127,24 @@ Skills. Production post-merge release/receipt automation and the T10 remote
 sentinel, release/restore rehearsal and host enforcement remain required
 evidence. Production
 catalogue launch remains blocked and agent approval is disabled.
+
+## Reader overview and request entry
+
+The configured `overview` route explains the system using 5W+H, a static ER
+diagram, and a review flow. IDs and references are file-level relationships
+validated by Modelo, not database-enforced PK/FK constraints. Internal model
+identity remains canonical within Modelo; provider route references and input
+links are not canonical model identities. The catalogue stores metadata and
+evidence, not `.pkl` files, model weights, or inference runtimes.
+
+The primary proposal form collects vendor/model/link if known, business need,
+intended use, and where/when if known. These capture 5W+H for agent-led triage. It uses `repository.web_routes.request_intake`; it does
+not generate a MAC. The detailed composer remains available. The GitLab access
+button makes one optional read-only GET to the configured repository GUI URL.
+An observable 200 is not proof of login. Redirects, CORS failures, and timeouts
+remain indeterminate. Native forms enforce authentication and submission.
+
+Embedded AI in vertical products is outside the current component catalogue
+scope. The external AI-use inventory remains responsible for it. This is not
+an exclusion from NIST risk management. Issue 78 tracks coverage criteria and
+external inventory integration after T10.

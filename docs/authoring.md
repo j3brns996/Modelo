@@ -5,13 +5,38 @@ they do not open a linked issue, retrieve provider facts, approve a record or
 produce trusted CI evidence. Start governed work from a linked MAC issue and
 treat every local input and output path as author-controlled.
 
+## Request a model review
+
+Prefer agent-led triage when an agent is available. Use the
+[agent quickstart](agent-quickstart.md) and portable
+[maintainer skill](../.agents/skills/modelo-maintain/SKILL.md).
+
+Use four short fields: optional vendor/model/link, business need, intended use,
+and where/when if known. Optional choices record the model rights owner's
+domicile, operator, and processing territory separately. Leave unknowns blank. State who needs it, the outcome and reason, the task,
+data and human oversight, and known service, region, environment, or target date. This creates an ordinary request for triage,
+not a MAC. A maintainer or agent prepares the governed change without inventing
+IDs or evidence. The detailed composer remains available for all five operations.
+
+`repository.web_routes.request_intake` configures the native request form in
+`modelo.yaml`. GitHub uses `/issues/new?template=model-request.yml`. For GitLab
+18.1 EE, configure the installed GUI route, such as
+`/-/issues/new?issuable_template=Model-Request`. The form opens in a fresh tab;
+GitLab handles sign-in and submission. The draft stays in the original tab.
+
+The optional **Test GitLab access** button sends one read-only GET to the
+configured `repository.web_base` GUI URL. It reports an observable HTTP status,
+not authentication or issue-creation permission. Redirects, timeouts, and CORS
+failures report that access could not be verified. This check never blocks
+submission. It uses no API endpoint, token, proxy, or Modelo service.
+
 ## Choose an intake path
 
 The published `/propose/` page has five static cards—add, change, revoke, move
 and batch—whose destinations come from `repository.web_routes.mac_intake` in
 `modelo.yaml`. Those links remain usable without JavaScript.
 
-With JavaScript enabled, the same page can prepare an add or change draft and
+With JavaScript enabled, the same page can prepare an add, change, revoke, move or batch draft and
 prefill the configured form for that operation. The displayed issue-field
 summary is only a convenience: it has no `request_id`, keys or payload digest
 and is not the canonical MAC payload. After submission, trusted default-branch
@@ -20,8 +45,22 @@ for GitHub or `modelo platform gitlab-intake` for GitLab. It derives a stable
 UUIDv5 from the issue coordinate and computes the dedupe key, idempotency key
 and payload digest.
 
-Use the static card for revoke, move or batch because those operations require
-shapes that the interactive draft does not compose.
+Adjacent lookup boxes find exact IDs in this publication. Choose a record
+explicitly; for additions, check existing records before choosing an unused ID.
+Changing the operation preserves your answers and shows only applicable fields.
+The native forms share the field explanations and retain unchecked attestations.
+The GitHub title is prepared from the operation and subject ID. Choices made in
+Modelo dropdowns arrive as prefilled text fields in GitHub, because native
+GitHub dropdowns do not reliably accept URL prefills. Each field lists the
+allowed values; the trusted compiler validates them. GitLab receives the same
+selected values in its Markdown description.
+
+GitLab 18.1 EE uses the configured native issue-creation route (normally
+`/-/issues/new`) with URL-encoded title and Markdown description. No access token
+or browser API call is involved. A default template may be appended: keep one
+copy of each answer heading. Long drafts retain the complete copyable text and
+open the untouched configured form. Verify the route and template behavior on
+the installed instance before rollout.
 
 For every operation, complete the governed Git-provider issue intake rather
 than treating a local draft as a request. The browser helper prepares issue

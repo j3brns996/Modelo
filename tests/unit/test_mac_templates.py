@@ -13,6 +13,7 @@ from modelo.mac import (
     MAX_BODY_BYTES,
     extract_adapter_issue_payload,
     payload_digest,
+    render_adapter_issue_body,
     with_computed_keys,
     validate_payload,
 )
@@ -23,6 +24,31 @@ OPERATIONS = {"add", "change", "revoke", "move", "batch"}
 
 
 class MacTemplateTests(unittest.TestCase):
+    def test_simple_request_is_triage_not_mac(self) -> None:
+        github = yaml.safe_load((ROOT / ".github/ISSUE_TEMPLATE/model-request.yml").read_text(encoding="utf-8"))
+        fields = [item for item in github["body"] if item["type"] != "markdown"]
+        self.assertEqual([item["id"] for item in fields], ["model_reference", "need", "intended_use", "deployment", "producer_domicile", "service_operator", "processing_territory"])
+        self.assertEqual([item["validations"]["required"] for item in fields], [False, True, True, False, False, False, False])
+        gitlab = (ROOT / ".gitlab/issue_templates/Model-Request.md").read_text(encoding="utf-8")
+        self.assertEqual(re.findall(r"^### (.+)$", gitlab, re.M), [item["attributes"]["label"] for item in fields])
+        html = (ROOT / "site/templates/propose.html").read_text(encoding="utf-8")
+        groups = {
+            "producer_domicile": ["UK", "EU", "China", "USA", "Other"],
+            "service_operator": ["AWS", "Azure", "Google Cloud", "Other"],
+            "processing_territory": ["UK", "EU", "China", "USA", "Other"],
+        }
+        for name, options in groups.items():
+            group = re.search(r'<fieldset[^>]*data-request-choice="' + name + r'".*?</fieldset>', html, re.S).group()
+            self.assertEqual(re.findall(r'<input type="checkbox" value="([^"]+)"', group), options)
+            self.assertNotRegex(group, r'<input[^>]*\bchecked\b')
+            native = next(field for field in fields if field["id"] == name)
+            self.assertFalse(native["validations"]["required"])
+            self.assertTrue(all(option in native["attributes"]["description"] for option in options))
+        for body in (json.dumps(github), gitlab):
+            self.assertNotIn("Modelo MAC request type", body)
+            self.assertNotIn("modelo:mac", body)
+
+
     def fixtures(self) -> dict[str, dict[str, object]]:
         return {
             path.stem: json.loads(path.read_text(encoding="utf-8"))
@@ -30,12 +56,8 @@ class MacTemplateTests(unittest.TestCase):
         }
 
     def fill_gitlab_template(self, operation: str, payload: dict[str, object]) -> str:
-        path = ROOT / f".gitlab/issue_templates/MAC-{operation.title()}.md"
-        text = path.read_text(encoding="utf-8")
-        pretty = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
-        text, count = re.subn(r"(?ms)```json\n[\s\S]*?\n```", f"```json\n{pretty}\n```", text)
-        self.assertEqual(count, 1)
-        return text.replace("Neutral payload digest: `sha256-...`", f"Neutral payload digest: `{payload_digest(payload)}`")
+        # Retain coverage of the supported legacy neutral JSON transport.
+        return render_adapter_issue_body(payload, "gitlab")
 
     def test_schema_is_draft_2020_12_and_closed(self) -> None:
         schema = json.loads((ROOT / "schemas/mac.schema.json").read_text(encoding="utf-8"))
@@ -86,8 +108,8 @@ class MacTemplateTests(unittest.TestCase):
                 self.assertNotIn("mac_payload", {item["id"] for item in fields})
                 self.assertNotIn("payload_digest", {item["id"] for item in fields})
                 request_type = next(item for item in fields if item["id"] == "request_type")
-                self.assertEqual(request_type["type"], "dropdown")
-                self.assertEqual(request_type["attributes"]["options"], [operation])
+                self.assertEqual(request_type["type"], "input")
+                self.assertEqual(request_type["attributes"]["value"], operation)
                 self.assertTrue(request_type["validations"]["required"])
                 for required in ("purpose", "requested_outcome", "reason", "acceptance"):
                     self.assertIn(required, {item["id"] for item in fields})
@@ -225,13 +247,13 @@ class MacTemplateTests(unittest.TestCase):
             operation = path.stem.removeprefix("MAC-").lower()
             text = path.read_text(encoding="utf-8")
             with self.subTest(operation=operation):
-                self.assertIn(f'"operation": "{operation}"', text)
-                self.assertIn("```json", text)
-                self.assertIn("Neutral payload digest: `sha256-...`", text)
+                self.assertIn(f"### Request type\n\n{operation}", text)
+                self.assertIn("## Field guide", text)
+                self.assertIn("### Before submitting", text)
                 self.assertNotIn("/label", text)
                 self.assertNotIn("curl ", text)
 
-    def test_actual_filled_gitlab_templates_round_trip(self) -> None:
+    def test_legacy_gitlab_transport_round_trip(self) -> None:
         for operation, payload in self.fixtures().items():
             body = self.fill_gitlab_template(operation, payload)
             with self.subTest(operation=operation):
@@ -243,7 +265,7 @@ class MacTemplateTests(unittest.TestCase):
                     MAX_ADAPTER_OVERHEAD_BYTES,
                 )
 
-    def test_near_limit_payload_round_trips_through_actual_templates(self) -> None:
+    def test_near_limit_payload_round_trips_through_legacy_transport(self) -> None:
         payload = self.fixtures()["add"]
         payload["acceptance"] = [f"criterion-{index}-" + "a" * 1_960 for index in range(25)]
         payload["candidate_evidence"] = [
@@ -285,7 +307,7 @@ class MacTemplateTests(unittest.TestCase):
             ("plain", True),
             ("two words", True),
             ("internal\u00a0space", True),
-            ("Unicode café", True),
+            ("Unicode cafÃƒÂ©", True),
             (" leading", False),
             ("trailing ", False),
             ("\u00a0leading-nbsp", False),
@@ -332,7 +354,7 @@ class MacTemplateTests(unittest.TestCase):
             ("https://example.invalid./path", False),
             ("https:///missing-host", False),
             ("https://example.invalid/a path", False),
-            ("https://example.invalid/café", False),
+            ("https://example.invalid/cafÃƒÂ©", False),
             ("https://example.invalid/line\nbreak", False),
             ("https://example.invalid/" + "a" * 2_024, True),
             ("https://example.invalid/" + "a" * 2_025, False),

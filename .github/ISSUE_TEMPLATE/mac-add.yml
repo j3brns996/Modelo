@@ -11,35 +11,27 @@ body:
 
         **What happens next:** Modelo validates these answers and adds the canonical JSON and fingerprints to the issue. You do not need to calculate them.
 
-  - type: dropdown
+  - type: input
     id: request_type
     attributes:
       label: "Modelo MAC request type"
-      description: "Fixed by this form."
-      options:
-        - "add"
-      default: 0
+      description: "Choose what should happen. Nothing is submitted until you review the native issue form. Allowed values: `add`."
+      value: "add"
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: subject_kind
     attributes:
       label: "Subject type"
-      description: "What governed record is changing?"
-      options:
-        - "model"
-        - "offering"
-        - "evidence"
-        - "vendor"
-        - "inference-service"
-        - "condition"
+      description: "A model describes capabilities. An offering records approved access. Evidence supports facts; conditions describe rules for use. Revoke batches support offerings only. Allowed values: `model`, `offering`, `evidence`, `vendor`, `inference-service`, `condition`."
+      value: "model"
     validations:
       required: true
   - type: input
     id: subject_identity
     attributes:
       label: "Subject identity"
-      description: "Use the stable lowercase Modelo identity, not a display name or mutable provider alias."
+      description: "The stable ID of the record. For an update, choose an existing record. For an addition, choose a new lowercase ID; check for an existing match first. [Look up records](https://j3brns996.github.io/Modelo/propose/?operation=add#lookup-requested_outcome)."
       placeholder: "example-model-v1"
     validations:
       required: true
@@ -47,7 +39,7 @@ body:
     id: purpose
     attributes:
       label: "Purpose"
-      description: "In one short sentence, what business or governance need does this request serve?"
+      description: "In one sentence, what do you need? For example: provide a reviewed model for document summarisation."
       placeholder: "Example: Register a governed vendor before its models or offerings are proposed"
     validations:
       required: true
@@ -55,7 +47,7 @@ body:
     id: requested_outcome
     attributes:
       label: "Requested outcome"
-      description: "Describe the catalogue state that should be true when this work is complete."
+      description: "Describe what should be true when the request is complete. Use the lookup to reference models, services or exact condition versions. [Look up records](https://j3brns996.github.io/Modelo/propose/?operation=add#lookup-requested_outcome)."
       placeholder: "Example: Create the vendor record acme-ai; leave model and offering approval unchanged."
     validations:
       required: true
@@ -63,7 +55,7 @@ body:
     id: reason
     attributes:
       label: "Why is this needed?"
-      description: "Give the reviewer the decision context. Explain why the current catalogue state is insufficient."
+      description: "Explain who needs this and why the current catalogue is insufficient."
       placeholder: "Example: The vendor must exist as a governed identity before related records can reference it."
     validations:
       required: true
@@ -71,7 +63,7 @@ body:
     id: candidate_evidence
     attributes:
       label: "Supporting observations"
-      description: "Optional. One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. These are candidate sources, not approval."
+      description: "Optional. One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. Use the evidence lookup for retained observations, or enter the exact values from a new observation. [Look up records](https://j3brns996.github.io/Modelo/propose/?operation=add#lookup-requested_outcome)."
       placeholder: "https://docs.example.com/model | 2026-09-02T08:00:00Z | sha256-0123…"
     validations:
       required: false
@@ -79,7 +71,7 @@ body:
     id: acceptance
     attributes:
       label: "Acceptance checks"
-      description: "One observable completion check per line. State what a reviewer or CI can verify."
+      description: "One check per line, up to 25. For example: the named model and its evidence agree."
       placeholder: |
         The new record has the requested stable identity at its canonical path.
         The record and referenced evidence pass Modelo validation.

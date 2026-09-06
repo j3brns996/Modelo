@@ -25,10 +25,9 @@ its signed npm package; its runtime SHA-256 is
 The standard expression-evaluating Alpine build is forbidden by the site CSP.
 The Alpine and bundled Vue reactivity MIT notices are one publication member
 linked from every footer. Remote application scripts remain forbidden. The
-presentation loads Inter and JetBrains Mono only from the configured Google
-Fonts stylesheet/file origins, both explicitly admitted by CSP. Font responses
-are optional presentation resources, never generator inputs. No Node, npm or
-`npx` command is required.
+presentation uses locally available Georgia, system-ui and ui-monospace fonts.
+No font service or remote asset request is required. No Node, npm or `npx`
+command is required for the locked build.
 
 T5 supplies one validated canonical catalogue projection and canonical change
 delta. Its candidate is exactly `data/catalogue.json`,
@@ -76,8 +75,9 @@ tests; JSON Schema validates the wire shape but does not derive this inventory.
 | `offering` | `/offerings/{inference_service_id}/{offering_id}/` | Policy-authored approval rationale, routes, price, conditions, evidence, approval coordinates and protected release/receipt discovery link; no embedded receipt claim |
 | `changes` | `/changes/` | Add/change/revoke history from local Git first-parent deltas |
 | `process` | `/process/` | MAC, CI, approval and evidence rules |
-| `propose` | `/propose/` | Five static links to configured add/change/revoke/move/batch intake, plus an optional add/change issue-field draft |
+| `propose` | `/propose/` | Five static links to configured add/change/revoke/move/batch intake, plus a guided draft for all five operations |
 | `docs` | `/docs/` | Specification, contract, schemas and clone commands |
+| `overview` | `/overview/` | 5W+H, entity relationships, file keys, Git rationale, review criteria, and scope |
 | `not_found` | `/404.html` | Recovery navigation |
 
 One route resolver owns every internal URL and Git receipt link. Its inputs are
@@ -98,7 +98,7 @@ allowlisted URL parameters so a view is shareable; unknown values are ignored.
 Facet values are ORed within a facet and ANDed across facets.
 Only table/grid view preference is stored locally under the configured key.
 An explicit valid URL `view` value takes precedence, and unavailable or invalid
-storage falls back to the configured grid view without breaking the explorer.
+storage falls back to the configured table view without breaking the explorer.
 The catalogue route alone loads `catalogue.js` followed by the vendored Alpine
 CSP runtime. The propose route alone loads the independent vanilla
 `proposal.js`; it does not load Alpine or catalogue logic. Every other route
@@ -106,7 +106,7 @@ contains no browser runtime.
 
 The propose route's five operation cards always resolve from
 `repository.web_routes.mac_intake` and work without JavaScript. Its optional
-interactive draft covers add and change only and directs each draft to that
+interactive draft covers all five operations and directs each draft to that
 operation's configured intake URL. The displayed issue-field summary is
 non-canonical convenience output: it has no request UUID, keys or digest and is
 never MAC metadata. The complete final percent-encoded `URL.href`, including
@@ -117,22 +117,49 @@ and the complete fields are appended. On overflow the destination remains the
 untouched configured intake URL: no partial user fields are applied, and the
 full displayed summary remains available for manual entry.
 
-URL-building and clipboard-copy outcomes use separate status nodes. Each is an
+Validation, URL-building and clipboard-copy outcomes use separate status nodes. Each is an
 atomic polite live region (`aria-live="polite"`, `aria-atomic="true"`), so one
 action cannot overwrite or conceal the assistive-technology result of the
-other. Revoke, move and batch continue through their static cards. Trusted
+other. All operations also retain their static cards. Trusted
 default-branch intake tooling creates and validates the canonical payload after
 a Git-provider issue exists.
 
-The shared shell supplies sticky grouped navigation, source/publication
-affordances, a synthetic-status rail and structured footer. Home leads users
-through purpose, trust posture, catalogue counts, observation-to-publication
-flow and next actions. Grid is the catalogue default and uses purpose-built
-model-card markup rather than restyling table rows; the complete model/offering
-table remains available.
-Model and offering pages use the same fact, evidence, coordinate and related
-record components. At narrow widths, navigation scrolls safely, split layouts
-stack and the grid collapses without losing semantic table fallback.
+The shared shell uses warm paper, dark ink, restrained teal, system serif
+headings and sans-serif controls. It has no remote fonts, gradients or blur.
+Navigation, a single synthetic notice and the footer are shared across routes.
+Home leads with search, followed by a compact publication summary and a reading
+guide. The catalogue defaults to a table; model cards remain an explicit choice.
+Search and facet changes update visibility without repeatedly reordering nodes.
+Detail pages put approved access and its conditions before supporting evidence.
+At narrow widths, navigation wraps and the composer and lookups stack.
+
+`site/content/proposal-fields.json` supplies field labels, explanations, options
+and applicability. Native GitHub forms and GitLab Markdown templates retain the
+same explanations, checked by tests. Lookups next to prescribed fields use only
+the validated publication projection. Selection is explicit; new identities are
+never inferred from names, and an absent lookup match does not prove availability.
+Switching operations preserves values while excluding inapplicable answers.
+Invalid drafts display field errors and cannot open a prefilled form.
+
+GitHub handoff includes an explicit `title`, derived from the operation and
+first subject ID (bounded to 255 characters), plus each native text field by
+its existing ID. Composer dropdown choices are carried as text values. The
+GitHub templates use prefillable text controls for these prescribed choices,
+show their allowed values and default to the first listed choice (or the fixed
+operation). The trusted compiler still rejects values outside its enums.
+Native GitHub dropdown URL values are not relied upon: live testing with both
+option names and numeric indices left them unselected after hydration.
+Human attestation checkboxes remain unchecked.
+
+GitLab handoff is ordinary browser navigation, using `issue[title]`,
+`issue[description]` and `issue[issue_type]=issue`. It requires no browser API
+token or CORS integration. GitLab 18.1 EE documents `/-/issues/new`; use the exact
+configured route and verify alternatives such as `/-/work_items/new` on the
+installed instance. Named template parameters are removed when supplying the
+full description. On 18.1 a default template can still be appended: the human
+must retain one set of answer headings. Attestations remain unchecked.
+Authenticated submission and default-template behavior require deployment tests;
+local transport tests do not establish that the target instance is ready.
 
 Comparison accepts two to four canonical models only. It never compares an
 offering as if it were a model and never infers facts: identifier, vendor,
@@ -282,3 +309,60 @@ checks search/facet composition, sort/visibility, URL round-trip, URL-over-local
 view precedence, storage failure and comparison bounds without npm, `npx` or a
 DOM package. It is not part of `uv` acceptance and does not claim browser layout,
 focus or assistive-technology behavior; those remain controlled-browser/T10 work.
+
+## Request form and access test
+
+The primary form collects four answers: optional vendor/model/link, required
+business need, required intended use, and optional where/when. Each is bounded
+to 2,048 characters. It creates a
+triage request, not a canonical MAC. `repository.web_routes.request_intake`
+selects the native form. The detailed composer is collapsed by default; an
+explicit operation or contained fragment opens it. Both forms retain copy
+fallbacks and open native forms in a fresh tab.
+
+Only the GitLab proposal page offers a user-triggered GUI repository GET.
+Its CSP permits connections to the configured repository origin and self.
+No other route gains a remote connection source. The test uses session cookies
+where browser policy permits, does not follow redirects, and times out after
+ten seconds. It reports HTTP status or an indeterminate result; it does not
+infer authentication from 200 or gate submission. Cross-origin responses need
+GitLab CORS support. The build itself remains offline.
+
+## Writing and diagrams
+
+Apply the [Microsoft Writing Style Guide](https://learn.microsoft.com/en-us/style-guide/top-10-tips-style-voice)
+to authored prose, field help, captions, and diagram labels. Lead with the fact
+or action. Use short sentences, active voice, sentence case, and consistent
+entity names. Keep claims objective. Preserve schema keys, protocol headings,
+source quotations, and historical records exactly where their meaning depends
+on the original text.
+
+The overview uses static SVG with accessible titles, descriptions, captions,
+and adjacent text. Its ER diagram distinguishes file identities and validated
+references from database PK/FK constraints. Model artifacts and embedded AI in
+vertical products remain outside the current component catalogue scope.
+Embedded AI still requires organizational risk management; NIST does not grant
+an exemption. Integration work is tracked in issue 78.
+
+The shared navigation includes a labelled GET search form for the existing
+catalogue search. It sends a bounded `q` query to the configured catalogue
+route and adds no browser runtime. It searches models and offerings; it is not
+a full-text documentation index. At narrow widths, the form wraps below the
+navigation links.
+
+The overview separates offering/record approval from system NFR and API-contract
+assessment. The latter concerns performance, availability, security, recovery,
+cost, and consumer interfaces. Its 5-10 accepted changes/day signal adds no
+record approval steps. The agent quickstart links to the portable maintainer
+skill and preserves human approval and exact-head CI requirements.
+
+Optional request checkbox groups capture model rights-owner domicile and data
+processing territory separately (UK, EU, China, USA, Other), plus operator
+(AWS, Azure, Google Cloud, Other). All start unticked. These are unverified
+request details, not approval or new core catalogue facts. GitHub handoff uses
+prefillable text fields for these selections; GitLab Markdown uses marked
+choices. Unknown domicile never supplies a default processing territory.
+
+Clear comparison resets selected models, the comparison dialog, and `compare`
+URL parameters. It preserves search and filters and returns focus to catalogue
+search. The button is available beside comparison controls when a selection exists.

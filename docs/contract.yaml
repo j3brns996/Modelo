@@ -426,6 +426,7 @@ build:
     - data/catalogue.json
     - data/change-delta.json
     - docs/index.html
+    - overview/index.html
     - docs/SPEC.md
     - docs/contract.yaml
     - index.html
@@ -462,15 +463,15 @@ site:
   routes_config_key: site.routes
   data_routes: [catalogue, change_delta, manifest, schemas]
   asset_routes: [asset_css, asset_catalogue_js, asset_proposal_js, asset_alpine, asset_third_party_notices]
+  overview: {route: overview, format: static_5wh_with_accessible_svg, includes: [entities, file_keys, git_rationale, review_criteria, artifact_boundary, embedded_ai_scope]}
   presentation:
-    shell: responsive_product_catalogue
-    references: [symphonic_information_architecture, local_model_filter_prototype]
-    font_families: [Inter, JetBrains Mono]
-    font_stylesheet_origin: https://fonts.googleapis.com
-    font_file_origin: https://fonts.gstatic.com
+    writing_style: microsoft_technical_style_objective_concise_sentence_case
+    shell: editorial_reference_catalogue
+    font_families: [Georgia, system-ui, ui-monospace]
+    remote_fonts: forbidden
     remote_scripts: forbidden
-    home_journey: [purpose, primary_actions, trust_posture, catalogue_metrics, governance_flow, recent_changes, next_actions]
-    catalogue_default_view: grid
+    home_journey: [purpose, search, publication_summary, reading_guide, recent_changes, oversight]
+    catalogue_default_view: table
     catalogue_grid: dedicated_model_cards_not_table_row_restyling
     entity_components: [status, facts, evidence_posture, approval_rationale, approval_coordinates, related_records]
     responsive_breakpoints: [880px, 580px]
@@ -482,7 +483,7 @@ site:
     search_max_length: 200
     comparison_max_models: 4
     view_storage_key: modelo.catalogue.view.v1
-    default_view: grid
+    default_view: table
     local_persistence: table_or_grid_view_only_url_value_takes_precedence_storage_failure_falls_back_to_configured_default
     licence: MIT
     bundled_dependency: "@vue/reactivity==3.5.41"
@@ -496,7 +497,7 @@ site:
       propose: [assets/proposal.js]
       all_other_routes: []
     proposal_runtime: dedicated_vanilla_javascript_no_alpine
-    proposal_supported_interactive_operations: [add, change]
+    proposal_supported_interactive_operations: [add, change, revoke, move, batch]
     proposal_all_operation_static_cards: [add, change, revoke, move, batch]
     proposal_intake_url_source: repository.web_routes.mac_intake
     proposal_output: noncanonical_human_issue_field_summary
@@ -535,7 +536,23 @@ site:
     supplementary_controller_is_locked_build_input: false
     t10: [pinned_python_controlled_browser_outside_core_build, functional_explorer_behavior, human_keyboard_and_screen_reader_evidence]
 
+system_requirements_assessment:
+  separate_from_offering_and_record_approval: true
+  additional_record_approval_steps: false
+  nfr_scope: [performance, availability, security, recovery, operating_cost]
+  volume_signal: accepted_catalogue_changes_not_source_commits
+  assessment_range_per_working_day: [5, 10]
+  above_range: promptly_reassess_review_and_publication_capacity
+  alternative_trigger: consumer_need_for_api_contract
+  periodic_backstop_days: 90
+  response: assessment_not_automatic_migration
+  first_option: existing_static_json_and_release_snapshots
+  new_api_or_store: separate_human_reviewed_system_change
+
 authoring:
+  preferred_entry: agent_led_triage
+  agent_quickstart: docs/agent-quickstart.md
+  maintainer_skill: .agents/skills/modelo-maintain/SKILL.md
   guide: docs/authoring.md
   local_inputs_and_outputs: author_controlled_nonaccepting
   issue_form_cards:
@@ -547,11 +564,35 @@ authoring:
       blank_compiles_to: []
       malformed_nonblank: reject
     batch_scope: required_independently_of_candidate_evidence
+  simple_request:
+    fields: [optional_model_reference, required_business_need, required_intended_use, optional_where_and_when]
+    optional_choices:
+      producer_domicile: [UK, EU, China, USA, Other]
+      service_operator: [AWS, Azure, Google Cloud, Other]
+      processing_territory: [UK, EU, China, USA, Other]
+    choices_default: none_selected
+    choice_meaning: requester_supplied_unverified_not_approval
+    domicile_and_processing: distinct_no_automatic_copy
+    maximum_field_characters: 2048
+    destination: repository.web_routes.request_intake
+    output: triage_request_not_mac
+    detailed_composer_default: collapsed
+    navigation: fresh_tab_native_provider_form
+    gitlab_access_test: user_triggered_gui_get_to_repository_web_base
+    access_result: observable_http_status_or_indeterminate_never_authentication_proof
+    access_test_blocks_submission: false
+    access_timeout_seconds: 10
+    browser_connect_source: self_and_configured_repository_origin_on_gitlab_propose_only
   browser_draft:
-    operations: [add, change]
+    operations: [add, change, revoke, move, batch]
+    field_definitions: site/content/proposal-fields.json
+    lookup_source: validated_publication_projection_only
     output: human_issue_field_summary_not_neutral_mac_payload
     omitted_trusted_values: [request_id, dedupe_key, idempotency_key, payload_digest]
     authority: convenience_only
+    title: operation_and_first_subject_identity_bounded_to_255_characters
+    github_choice_transport: native_text_fields_with_allowed_values_and_defaults
+    github_choice_validation: trusted_compiler_enums_unchanged
     url_prefill:
       maximum_final_encoded_href_characters: 7000
       measurement: final_percent_encoded_url_href
@@ -560,6 +601,7 @@ authoring:
       overflow_fallback: retained_full_human_issue_field_summary_for_manual_entry
       rationale: conservative_headroom_below_common_8_kib_infrastructure_limits
     accessible_status:
+      validation_outcome: independent_polite_atomic_live_region
       url_outcome: independent_polite_atomic_live_region
       clipboard_outcome: independent_polite_atomic_live_region
   github_intake:

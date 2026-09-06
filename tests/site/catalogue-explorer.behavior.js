@@ -165,6 +165,15 @@ function record(index, { key, name, kind, search, facets = {} }) {
   assert.equal(alpha.element.hidden, false);
   assert.equal(result.textContent, "Showing 1 of 1 model");
   assert.equal(explorer.$root.dataset.view, "grid");
+  explorer.query = "no match";
+  explorer.apply(false);
+  assert.deepEqual(grid.children, [alpha.element], "search must not append/sort existing nodes again");
+  assert.equal(alpha.element.hidden, true);
+  explorer.view = "table";
+  explorer.query = "";
+  explorer.apply(false);
+  assert.deepEqual(body.children, [alpha.element, beta.element]);
+  assert.equal(result.textContent, "Showing 2 of 2 records");
 }
 
 // URL state is bounded, repeatable and preserves parameters it does not own.
@@ -211,4 +220,37 @@ function record(index, { key, name, kind, search, facets = {} }) {
   assert.equal(label.textContent, "4-model comparison limit reached");
 }
 
+// Clearing comparison removes selections and URL values but retains search and filters.
+{
+  const explorer = component();
+  explorer.query = "nova";
+  explorer.filters = {vendor:["amazon"]};
+  explorer.filterButtons = [{dataset:{filter:"vendor"}}];
+  explorer.comparison = ["model:a", "model:b"];
+  const tray = new FakeElement(), label = new FakeElement(), count = new FakeElement();
+  const open = new FakeElement(), clear = new FakeElement(), content = new FakeElement();
+  content.append(new FakeElement());
+  const search = {focus(){this.focused=true;}};
+  const dialog = {open:true, close(){this.open=false;}};
+  const selected = new FakeElement(); selected.closest=()=>({dataset:{key:"model:a"}});
+  explorer.$root = {
+    querySelector(selector){return {"[data-comparison-tray]":tray,"[data-comparison-label]":label,
+      "[data-comparison-content]":content,"[data-comparison-dialog]":dialog,"[data-search]":search}[selector];},
+    querySelectorAll(selector){return {"[data-compare-toggle]":[selected],"[data-open-comparison]":[open],
+      "[data-clear-comparison]":[clear],"[data-comparison-count]":[count]}[selector] || [];},
+  };
+  explorer.clearComparison();
+  assert.deepEqual(explorer.comparison, []);
+  assert.equal(window.location.searchParams.has("compare"), false);
+  assert.equal(window.location.searchParams.get("q"), "nova");
+  assert.deepEqual(window.location.searchParams.getAll("vendor"), ["amazon"]);
+  assert.equal(selected.getAttribute("aria-pressed"), "false");
+  assert.equal(open.disabled, true);
+  assert.equal(clear.hidden, true);
+  assert.equal(tray.hidden, true);
+  assert.equal(count.textContent, "0");
+  assert.equal(dialog.open, false);
+  assert.equal(content.children.length, 0);
+  assert.equal(search.focused, true);
+}
 console.log("catalogue explorer behavior: passed");

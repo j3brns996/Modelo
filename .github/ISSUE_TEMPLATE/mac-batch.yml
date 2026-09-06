@@ -11,46 +11,35 @@ body:
 
         **What happens next:** Modelo validates these answers and adds the canonical JSON and fingerprints to the issue. You do not need to calculate them.
 
-  - type: dropdown
+  - type: input
     id: request_type
     attributes:
       label: "Modelo MAC request type"
-      description: "Fixed by this form."
-      options:
-        - "batch"
-      default: 0
+      description: "Choose what should happen. Nothing is submitted until you review the native issue form. Allowed values: `batch`."
+      value: "batch"
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: item_operation
     attributes:
       label: "Batch change type"
-      description: "Every subject in this batch will use this operation."
-      options:
-        - "add"
-        - "change"
-        - "revoke"
+      description: "Every subject in this batch will use this operation. Allowed values: `add`, `change`, `revoke`."
+      value: "add"
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: subject_kind
     attributes:
       label: "Subject type"
-      description: "Every subject in this batch must have this type. Revoke batches support offerings only."
-      options:
-        - "model"
-        - "offering"
-        - "evidence"
-        - "vendor"
-        - "inference-service"
-        - "condition"
+      description: "A model describes capabilities. An offering records approved access. Evidence supports facts; conditions describe rules for use. Revoke batches support offerings only. Allowed values: `model`, `offering`, `evidence`, `vendor`, `inference-service`, `condition`."
+      value: "model"
     validations:
       required: true
   - type: textarea
     id: subject_identities
     attributes:
       label: "Subject identities"
-      description: "One stable lowercase Modelo identity per line; maximum 25."
+      description: "One stable lowercase ID per line, up to 25. Every record uses the same type and operation. Use the lookup to add existing records. [Look up records](https://j3brns996.github.io/Modelo/propose/?operation=batch#lookup-requested_outcome)."
       placeholder: |
         bedrock-model-a
         bedrock-model-b
@@ -60,7 +49,7 @@ body:
     id: purpose
     attributes:
       label: "Purpose"
-      description: "In one short sentence, what business or governance need does this request serve?"
+      description: "In one sentence, what do you need? For example: provide a reviewed model for document summarisation."
       placeholder: "Example: Apply one bounded provider observation to a related set of offerings"
     validations:
       required: true
@@ -68,7 +57,7 @@ body:
     id: requested_outcome
     attributes:
       label: "Requested outcome"
-      description: "Describe the catalogue state that should be true when this work is complete."
+      description: "Describe what should be true when the request is complete. Use the lookup to reference models, services or exact condition versions. [Look up records](https://j3brns996.github.io/Modelo/propose/?operation=batch#lookup-requested_outcome)."
       placeholder: "Example: Apply the selected operation to every listed subject; make no other catalogue changes."
     validations:
       required: true
@@ -76,18 +65,16 @@ body:
     id: reason
     attributes:
       label: "Why is this needed?"
-      description: "Give the reviewer the decision context. Explain why the current catalogue state is insufficient."
+      description: "Explain who needs this and why the current catalogue is insufficient."
       placeholder: "Example: The subjects share one authoritative source, observation scope and inference service, so one reviewable batch is appropriate."
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: source_type
     attributes:
       label: "Evidence source type"
-      description: "How was the bounded observation obtained?"
-      options:
-        - "first-party-read-api"
-        - "official-documentation"
+      description: "How was the bounded observation obtained? Allowed values: `first-party-read-api`, `official-documentation`."
+      value: "first-party-read-api"
     validations:
       required: true
   - type: input
@@ -106,15 +93,12 @@ body:
       placeholder: "production-scope"
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: partition
     attributes:
       label: "Provider partition"
-      description: "Provider partition for the observation scope."
-      options:
-        - "aws"
-        - "aws-cn"
-        - "aws-us-gov"
+      description: "Provider partition for the observation scope. Allowed values: `aws`, `aws-cn`, `aws-us-gov`."
+      value: "aws"
     validations:
       required: true
   - type: input
@@ -129,7 +113,7 @@ body:
     id: inference_service
     attributes:
       label: "Inference service"
-      description: "Stable governed service identity."
+      description: "Choose the governed service for this batch, such as AWS Bedrock. [Look up records](https://j3brns996.github.io/Modelo/propose/?operation=batch#lookup-requested_outcome)."
       placeholder: "aws-bedrock"
     validations:
       required: true
@@ -137,7 +121,7 @@ body:
     id: candidate_evidence
     attributes:
       label: "Supporting observations"
-      description: "Optional. One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. These are candidate sources, not approval."
+      description: "Optional. One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. Use the evidence lookup for retained observations, or enter the exact values from a new observation. [Look up records](https://j3brns996.github.io/Modelo/propose/?operation=batch#lookup-requested_outcome)."
       placeholder: "https://docs.example.com/model | 2026-09-02T08:00:00Z | sha256-0123…"
     validations:
       required: false
@@ -145,7 +129,7 @@ body:
     id: acceptance
     attributes:
       label: "Acceptance checks"
-      description: "One observable completion check per line. State what a reviewer or CI can verify."
+      description: "One check per line, up to 25. For example: the named model and its evidence agree."
       placeholder: |
         Every listed subject has the selected operation and no subject outside the list changes.
         Every item uses the declared source, scope and inference service and passes Modelo validation.

@@ -60,7 +60,7 @@ The build is split logically, not into services:
 | T6-UX2 | Responsive product shell, guided landing journey, card-first explorer, structured entity/reference components, allowlisted font CDN and richer content-addressed synthetic facts | T6-UX, public synthetic demo | Shared-shell/static gates, complete facets, comparison/context behavior, CSP font allowlist, deterministic rebuilds and desktop/mobile visual QA pass |
 | T7 | `tooling/modelo/src/modelo/mac.py`, MAC schema/examples, GitHub/GitLab issue and change-request template directories, MAC tests | T1, T0 | Adapter fixtures round-trip to identical canonical MAC objects |
 | T8 | `tooling/modelo/src/modelo/{platform,local_ci}.py`, `.github/workflows/`, fail-closed `paths.gitlab_ci` capability probe, and `tests/contract/platform/` | T4, T6, T7 | Correlate every trusted provider input with the receipt; share fixed advisory/local gates through protected tooling; run protected-base and proposed-head control verification in parallel; skipped/failed/stale or drifted checks fail closed |
-| T9 | `.agents/skills/{modelo-change,modelo-review,modelo-discover}/` and static skill lint | T7, T8 | Skill commands and paths resolve; no skill is a build/runtime input |
+| T9 | `.agents/skills/{modelo-change,modelo-review,modelo-discover,modelo-maintain}/` and static skill lint | T7, T8 | Skill commands and paths resolve; no skill is a build/runtime input |
 | T10 | Remote `modelo platform capabilities`, synthetic Pages deployment, release and mirror-restore rehearsal | T1–T9 | Protection/capability report, exact artefact deployment, verified receipt and restore log |
 
 T2, T3 and T7 may run concurrently because the table gives them disjoint paths.
@@ -227,3 +227,11 @@ cannot substitute for host controls.
 | Static site and platform templates | Synthetic Pages demo and functional explorer are live; the product-quality site experience v2 was delivered in the closed issue #37 history; production final publication remains T10 evidence |
 | Local authoring conveniences | Neutral MAC and evidence-envelope drafting plus configured proposal links are implemented; outputs remain author-controlled and non-accepting |
 | Production catalogue launch | Blocked through T10 |
+
+## Backlog: embedded AI in vertical products
+
+[Issue 78](https://github.com/j3brns996/Modelo/issues/78) tracks external inventory
+coverage and links for embedded AI. Owner: j3brns. Target: post-T10 scope review
+by 2026-12-05. Completion requires reviewed coverage criteria, a minimal reference
+contract, and tests for known, unknown, stale, and revoked bindings. Modelo does
+not acquire an application inventory. NIST scope is not an exemption from review.

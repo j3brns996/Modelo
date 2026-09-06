@@ -16,7 +16,7 @@ from modelo.build import _layout
 
 ROOT = Path(__file__).resolve().parents[3]
 SKILLS = ROOT / ".agents/skills"
-NAMES = {"modelo-change", "modelo-review", "modelo-discover"}
+NAMES = {"modelo-change", "modelo-review", "modelo-discover", "modelo-maintain"}
 HEADINGS = {
     "## Authority",
     "## Use and do not use",

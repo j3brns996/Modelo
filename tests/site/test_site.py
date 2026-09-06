@@ -824,7 +824,7 @@ class FinalSiteTests(unittest.TestCase):
             'data-comparison-tray role="status" aria-live="polite"',
         ):
             self.assertIn(marker, catalogue)
-        self.assertEqual(catalogue.count("data-compare-toggle"), 44)
+        self.assertEqual(catalogue.count("data-compare-toggle"), 50)
         self.assertIn('data-search-max="200"', catalogue)
         self.assertIn('data-compare-max="4"', catalogue)
         self.assertIn('data-view-storage-key="modelo.catalogue.view.v1"', catalogue)

@@ -84,6 +84,10 @@ Run narrow tests first. Local CI is advisory; `modelo/check` remains the accepta
 gate. Never commit generated `dist/` output. Keep system performance and capacity
 assessment separate from offering and record approval.
 
+For site builds, `--base-commit` identifies the baseline; `--source-commit` and
+`--source-tree` bind output to reviewed source. Use the configured build command
+in `modelo.yaml`.
+
 Configuration owns repository paths, site and issue routes, publication profiles,
 GitHub or GitLab adapter selection, and toolchain pins. JSON schemas define record
 shapes. The Python validator enforces cross-record, evidence, and change semantics.

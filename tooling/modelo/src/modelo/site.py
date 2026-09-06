@@ -19,7 +19,7 @@ from modelo.build import (
     _walk_regular_tree, rebuild_candidate_inputs, recover_candidate,
 )
 from modelo.change import with_snapshot
-from modelo.config import load_config
+from modelo.config import CONTRACT_VERSION, load_config
 from modelo.receipt import canonical_bytes, publication_digest, sha256_bytes
 from modelo.schemas import SchemaSet
 from modelo.identity import canonical_urn, release_precision
@@ -808,7 +808,7 @@ def _build_site(request: _SiteBuildRequest) -> FinalBuildResult:
         raise BuildError("synthetic publication contains a private leakage canary")
     entries = {path: _entry(data, path) for path, data in files.items()}
     manifest: dict[str, Any] = {
-        "contract_version": "0.1.0", "kind": request.kind, "base_commit": base,
+        "contract_version": CONTRACT_VERSION, "kind": request.kind, "base_commit": base,
         "source_commit": source, "source_tree": request.source_tree,
         "as_of": request.as_of.isoformat(), "source_date_epoch": request.source_date_epoch,
         "profile": request.profile, "base_url": request.base_url, "base_path": request.base_path,

@@ -44,6 +44,16 @@ class LoadError(Exception):
         self.diagnostic = diagnostic
 
 
+def strict_unique_json_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Object pairs hook that rejects duplicate keys in JSON documents."""
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key {key!r}")
+        result[key] = value
+    return result
+
+
 class _RestrictedLoader(yaml.SafeLoader):
     pass
 

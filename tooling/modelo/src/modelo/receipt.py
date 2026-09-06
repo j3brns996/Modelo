@@ -9,9 +9,14 @@ from __future__ import annotations
 
 from copy import deepcopy
 import hashlib
+import re
 from typing import Any, Iterable, Mapping
 
 from modelo.evidence import canonical_json
+
+
+SHA256_PREFIX_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
+SHA256_DASH_PATTERN = re.compile(r"^sha256-[0-9a-f]{64}$")
 
 
 def canonical_bytes(value: Any) -> bytes:

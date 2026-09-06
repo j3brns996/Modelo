@@ -21,9 +21,9 @@ from typing import Any, Mapping
 from urllib.parse import urlsplit
 
 from modelo.change import GitError, changed_paths, require_ancestor, resolve_commit, with_snapshot
-from modelo.config import ConfigError, load_config
+from modelo.config import CONTRACT_VERSION, ConfigError, load_config
 from modelo.evidence import canonical_json
-from modelo.loader import load_yaml_mapping
+from modelo.loader import load_yaml_mapping, strict_unique_json_pairs
 from modelo.mac import MacError, validate_payload
 from modelo.receipt import (
     canonical_bytes,
@@ -566,7 +566,7 @@ def _projection_from_snapshot(snapshot: Path, profile: str, source_commit: str, 
         first = state.diagnostics[0]
         raise BuildError(f"selected publication projection is invalid: {first.code} {first.path}{first.json_pointer}")
     projection = catalogue_projection(
-        contract_version="0.1.0", source_commit=source_commit, source_tree=source_tree,
+        contract_version=CONTRACT_VERSION, source_commit=source_commit, source_tree=source_tree,
         as_of=as_of.isoformat(), profile=profile, models=state.models.values(),
         offerings=state.offerings.values(), evidence=state.evidence.values(),
         conditions=state.conditions.values(), vendors={"vendors": state.vendors},
@@ -1254,7 +1254,7 @@ def _build_candidate(request: BuildRequest) -> BuildResult:
     delta_data = change_delta_bytes(expected)
     files = {layout.catalogue_path.as_posix(): catalogue_data, layout.change_delta_path.as_posix(): delta_data}
     manifest = {
-        "contract_version": "0.1.0", "kind": "candidate", "base_commit": base, "source_commit": head,
+        "contract_version": CONTRACT_VERSION, "kind": "candidate", "base_commit": base, "source_commit": head,
         "source_tree": actual_tree, "as_of": request.as_of.isoformat(),
         "source_date_epoch": request.source_date_epoch, "profile": request.profile,
         "base_url": request.base_url, "base_path": request.base_path,

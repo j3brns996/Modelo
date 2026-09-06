@@ -31,7 +31,8 @@ PAYLOAD_START = "<!-- modelo:mac-payload:start -->"
 PAYLOAD_END = "<!-- modelo:mac-payload:end -->"
 INTAKE_START = "<!-- modelo:intake-generated-start -->"
 INTAKE_END = "<!-- modelo:intake-generated-end -->"
-_HASH_PATTERN = re.compile(r"^sha256-[0-9a-f]{64}$")
+from modelo.loader import strict_unique_json_pairs
+from modelo.receipt import SHA256_DASH_PATTERN
 _IDENTITY_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9._:/@+-]*[a-z0-9])?$")
 _HOST_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
 _HTTPS_PATTERN = re.compile(
@@ -65,12 +66,10 @@ class MacError(ValueError):
 
 
 def _object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise MacError(f"duplicate JSON key {key!r}")
-        result[key] = value
-    return result
+    try:
+        return strict_unique_json_pairs(pairs)
+    except ValueError as exc:
+        raise MacError(str(exc)) from exc
 
 
 def _measure(value: Any) -> tuple[int, int]:
@@ -141,7 +140,7 @@ def _https(value: Any, name: str) -> str:
 
 def _hash(value: Any, name: str) -> str:
     text = _text(value, name, maximum=71)
-    if not _HASH_PATTERN.fullmatch(text):
+    if not SHA256_DASH_PATTERN.fullmatch(text):
         raise MacError(f"{name} must be a lowercase sha256 digest")
     return text
 

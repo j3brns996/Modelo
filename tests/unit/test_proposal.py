@@ -52,7 +52,13 @@ def test_guides_and_provider_forms_share_fields_and_round_trip_all_operations():
                 continue
             attrs = entry["attributes"]
             name = "request_type" if entry["id"] == "request_type" else _FIELD_LABELS[attrs["label"]]
-            assert attrs["description"].startswith(next(field["help"] for field in FIELDS if field["name"] == name))
+            definition = next(field for field in FIELDS if field["name"] == name)
+            assert attrs["description"].startswith(definition["help"])
+            if definition["type"] == "dropdown":
+                assert entry["type"] == "input", "GitHub URL transport must use prefillable text controls"
+                assert attrs["value"] == (operation if name == "request_type" else definition["options"][0])
+                for choice in ([operation] if name == "request_type" else definition["options"]):
+                    assert "`" + choice + "`" in attrs["description"]
 
 
 def test_lookup_uses_only_supplied_publication_records_and_preserves_condition_versions():

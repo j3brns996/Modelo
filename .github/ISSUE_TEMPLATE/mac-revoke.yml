@@ -11,14 +11,12 @@ body:
 
         **What happens next:** Modelo validates these answers and adds the canonical JSON and fingerprints to the issue. You do not need to calculate them.
 
-  - type: dropdown
+  - type: input
     id: request_type
     attributes:
       label: "Modelo MAC request type"
-      description: "Choose what should happen. Nothing is submitted until you review the native issue form."
-      options:
-        - "revoke"
-      default: 0
+      description: "Choose what should happen. Nothing is submitted until you review the native issue form. Allowed values: `revoke`."
+      value: "revoke"
     validations:
       required: true
   - type: input

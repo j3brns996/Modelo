@@ -83,8 +83,8 @@ class MacTemplateTests(unittest.TestCase):
                 self.assertNotIn("mac_payload", {item["id"] for item in fields})
                 self.assertNotIn("payload_digest", {item["id"] for item in fields})
                 request_type = next(item for item in fields if item["id"] == "request_type")
-                self.assertEqual(request_type["type"], "dropdown")
-                self.assertEqual(request_type["attributes"]["options"], [operation])
+                self.assertEqual(request_type["type"], "input")
+                self.assertEqual(request_type["attributes"]["value"], operation)
                 self.assertTrue(request_type["validations"]["required"])
                 for required in ("purpose", "requested_outcome", "reason", "acceptance"):
                     self.assertIn(required, {item["id"] for item in fields})

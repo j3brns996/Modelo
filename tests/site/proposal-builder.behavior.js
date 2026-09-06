@@ -25,6 +25,9 @@ for (const operation of ["add", "change", "revoke", "move", "batch"]) {
   const github = new URL(proposalURL(gh, "github", fields, markdown).href);
   assert.equal(github.searchParams.get("template"), "mac-add.yml");
   assert.equal(github.searchParams.get("kept"), "yes");
+  assert.equal(github.searchParams.get("title"), proposalTitle(fields));
+  for (const field of fields.filter(f=>f.type==="dropdown")) assert.equal(github.searchParams.get(field.name),field.value);
+  assert.ok(markdown.startsWith("# " + proposalTitle(fields) + "\n"));
   assert.equal(github.searchParams.get("subject_identity"), operation === "revoke" ? "old-offering" : (operation === "add" || operation === "change" ? "new-model" : null));
   const result = proposalURL(gl, "gitlab", fields, markdown);
   assert.equal(result.overflow, false, `${operation} short draft should fit`);
@@ -32,6 +35,7 @@ for (const operation of ["add", "change", "revoke", "move", "batch"]) {
   assert.equal(gitlab.pathname, "/group/project/-/issues/new");
   assert.equal(gitlab.searchParams.get("issue[description]"), markdown);
   assert.equal(gitlab.searchParams.get("issue[issue_type]"), "issue");
+  assert.equal(gitlab.searchParams.get("issue[title]"), proposalTitle(fields));
   assert.equal(gitlab.searchParams.get("kept"), "yes");
   assert.equal(gitlab.searchParams.has("issuable_template"), false);
   assert.equal(gitlab.searchParams.has("description_template"), false);
@@ -69,4 +73,69 @@ const observation = "https://example.invalid/docs | 2026-09-01T09:00:00Z | sha25
 assert.equal(check("add", "candidate_evidence", observation).candidate_evidence, undefined);
 assert.ok(check("add", "candidate_evidence", observation.replace("09-01", "02-30")).candidate_evidence);
 assert.ok(check("add", "candidate_evidence", observation.slice(0,-1)).candidate_evidence);
-console.log("proposal builder transport and validation: passed");
+// Exercise controller-only outcomes that depend on the browser environment.
+(async () => {
+  const controls = new Map();
+  const listeners = new Map();
+  const status = () => ({textContent:"",value:"",setAttribute(name,value){this[name]=value;}});
+  const summary = {...status(), focus(){this.focused=true;}, select(){this.selected=true;}};
+  const link = {...status(), addEventListener(name,fn){listeners.set("link:"+name,fn);}};
+  const button = {addEventListener(name,fn){listeners.set("copy:"+name,fn);}};
+  const urlStatus=status(), copyStatus=status(), validation=status();
+  const groups = definitions.map(definition => {
+    const input={value:definition.name==="request_type" ? "add" : values[definition.name],
+      dataset:{field:definition.name,required:String(definition.required)},
+      setAttribute(name,value){this[name]=value;}, focus(){this.focused=true;},matches(){return true;}};
+    controls.set(definition.name,input);
+    const error=status();
+    return {dataset:{operations:definition.operations.join(" ")},querySelector(selector){
+      return {"[data-field]":input,"label":{childNodes:[{textContent:definition.label}]},
+        ".field-help":{textContent:definition.help},"[data-error]":error}[selector];
+    }};
+  });
+  const form={dataset:{records:"[]",provider:"github"},hidden:true,
+    querySelectorAll(selector){return selector==="[data-operations]" ? groups : [];},
+    querySelector(selector){
+      const name=selector.match(/^\[data-field="(.+)"\]$/);
+      if(name) return controls.get(name[1]);
+      return {"[data-proposal-summary]":summary,"[data-proposal-issue-link]":link,
+        "[data-proposal-url-status]":urlStatus,"[data-proposal-copy-status]":copyStatus,
+        "[data-proposal-validation]":validation,"[data-operation-help]":status(),
+        "[data-copy-summary]":button}[selector];
+    },getAttribute(){return gh;}, addEventListener(name,fn){listeners.set(name,fn);}};
+  global.document={querySelectorAll(){return [form];},getElementById(){return null;}};
+  global.window={location:new URL("https://example.invalid/propose/?operation=move")};
+  Object.defineProperty(global,"navigator",{value:{clipboard:{}},configurable:true});
+  initProposalBuilder();
+  assert.equal(form.hidden,false);
+  assert.equal(controls.get("request_type").value,"move");
+  assert.equal(controls.get("subject_identity").disabled,true);
+  assert.equal(controls.get("source_identity").disabled,false);
+  controls.get("request_type").value="change";
+  listeners.get("change")({target:controls.get("request_type")});
+  assert.equal(controls.get("subject_identity").value,"new-model");
+  assert.equal(controls.get("source_identity").disabled,true);
+  assert.doesNotMatch(summary.value,/### Current offering identity/);
+  let resolve;
+  navigator.clipboard.writeText=()=>new Promise(done=>{resolve=done;});
+  const pending=listeners.get("copy:click")();
+  assert.equal(copyStatus.textContent,"");
+  resolve(); await pending;
+  assert.match(copyStatus.textContent,/Draft copied/);
+  const previousURLStatus=urlStatus.textContent;
+  for(const clipboard of [{writeText:async()=>{throw new Error("denied");}},undefined]) {
+    navigator.clipboard=clipboard; summary.selected=false;
+    await listeners.get("copy:click")();
+    assert.equal(summary.selected,true);
+    assert.equal(summary.focused,true);
+    assert.equal(copyStatus.textContent,"Select and copy the draft manually.");
+    assert.equal(urlStatus.textContent,previousURLStatus);
+  }
+  controls.get("subject_identity").value="Bad Identity";
+  let prevented=false;
+  listeners.get("link:click")({preventDefault(){prevented=true;}});
+  assert.equal(prevented,true);
+  assert.equal(link["aria-disabled"],"true");
+  assert.equal(controls.get("subject_identity").focused,true);
+  console.log("proposal builder transport, validation and controller: passed");
+})().catch(error=>{console.error(error);process.exitCode=1;});

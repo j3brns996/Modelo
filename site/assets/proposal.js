@@ -9,9 +9,15 @@ const PROPOSAL_OPERATIONS = {
   batch: "Make up to 25 related changes. Every record must share the operation, source, observation scope and service.",
 };
 
+function proposalTitle(fields) {
+  const operation = fields.find(field => field.name === "request_type").value;
+  const identity = fields.find(field => ["subject_identity", "offering_identity", "source_identity", "subject_identities"].includes(field.name));
+  return `${operation[0].toUpperCase()}${operation.slice(1)}: ${identity?.value.split("\n")[0] || "Catalogue proposal"}`.slice(0, 255);
+}
+
 function proposalMarkdown(fields) {
   const guide = fields.filter(field => field.help).map(field => `**${field.label}:** ${field.help}`).join("\n\n");
-  return (guide ? `## Field guide\n\n${guide}\n\n## Your answers\n\n` : "") + fields.map(field => `### ${field.label}\n\n${field.value || "_No response_"}`).join("\n\n")
+  return `# ${proposalTitle(fields)}\n\n` + (guide ? `## Field guide\n\n${guide}\n\n## Your answers\n\n` : "") + fields.map(field => `### ${field.label}\n\n${field.value || "_No response_"}`).join("\n\n")
     + "\n\n### Before submitting\n\n- [ ] I checked for existing records and requests.\n"
     + "- [ ] I have not included credentials, tokens or private commercial terms.\n"
     + "- [ ] I understand that this request is not approval.\n";
@@ -22,12 +28,11 @@ function proposalURL(configured, provider, fields, markdown) {
   if (provider === "gitlab") {
     url.searchParams.delete("issuable_template");
     url.searchParams.delete("description_template");
-    const operation = fields.find(field => field.name === "request_type").value;
-    const identity = fields.find(field => ["subject_identity", "offering_identity", "source_identity", "subject_identities"].includes(field.name));
-    url.searchParams.set("issue[title]", `${operation}: ${identity?.value.split("\n")[0] || "Catalogue proposal"}`);
+    url.searchParams.set("issue[title]", proposalTitle(fields));
     url.searchParams.set("issue[description]", markdown);
     url.searchParams.set("issue[issue_type]", "issue");
   } else if (provider === "github") {
+    url.searchParams.set("title", proposalTitle(fields));
     for (const field of fields) {
       const name = field.name === "offering_identity" ? "subject_identity" : field.name;
       field.value ? url.searchParams.set(name, field.value) : url.searchParams.delete(name);
@@ -148,7 +153,7 @@ function initProposalBuilder() {
       issueLink.href = Object.keys(errors).length ? configured : result.href;
       issueLink.setAttribute("aria-disabled", String(Boolean(Object.keys(errors).length)));
       urlStatus.textContent = Object.keys(errors).length ? "Complete the required fields and resolve errors before opening your draft."
-        : result.overflow ? ("This draft is too long to prefill safely. Copy the full draft below and open the issue form. " + (form.dataset.provider === "gitlab" ? "Paste it into the description, replacing any template answers." : "Copy the answers into the matching form fields."))
+        : result.overflow ? ("This draft is too long to prefill safely. Copy the full draft below and open the issue form. " + (form.dataset.provider === "gitlab" ? "Paste it into the description, replacing any template answers." : "Copy the title and answers into the matching form fields."))
         : "Your draft is ready. Review the prefilled issue form before submitting.";
       if (form.dataset.provider === "gitlab") urlStatus.textContent += " GitLab 18.1 may append a default template: keep one copy of each answer section.";
       copyStatus.textContent = "";

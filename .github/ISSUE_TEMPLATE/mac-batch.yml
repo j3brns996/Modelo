@@ -11,39 +11,28 @@ body:
 
         **What happens next:** Modelo validates these answers and adds the canonical JSON and fingerprints to the issue. You do not need to calculate them.
 
-  - type: dropdown
+  - type: input
     id: request_type
     attributes:
       label: "Modelo MAC request type"
-      description: "Choose what should happen. Nothing is submitted until you review the native issue form."
-      options:
-        - "batch"
-      default: 0
+      description: "Choose what should happen. Nothing is submitted until you review the native issue form. Allowed values: `batch`."
+      value: "batch"
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: item_operation
     attributes:
       label: "Batch change type"
-      description: "Every subject in this batch will use this operation."
-      options:
-        - "add"
-        - "change"
-        - "revoke"
+      description: "Every subject in this batch will use this operation. Allowed values: `add`, `change`, `revoke`."
+      value: "add"
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: subject_kind
     attributes:
       label: "Subject type"
-      description: "A model describes capabilities. An offering records approved access. Evidence supports facts; conditions describe rules for use. Revoke batches support offerings only."
-      options:
-        - "model"
-        - "offering"
-        - "evidence"
-        - "vendor"
-        - "inference-service"
-        - "condition"
+      description: "A model describes capabilities. An offering records approved access. Evidence supports facts; conditions describe rules for use. Revoke batches support offerings only. Allowed values: `model`, `offering`, `evidence`, `vendor`, `inference-service`, `condition`."
+      value: "model"
     validations:
       required: true
   - type: textarea
@@ -80,14 +69,12 @@ body:
       placeholder: "Example: The subjects share one authoritative source, observation scope and inference service, so one reviewable batch is appropriate."
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: source_type
     attributes:
       label: "Evidence source type"
-      description: "How was the bounded observation obtained?"
-      options:
-        - "first-party-read-api"
-        - "official-documentation"
+      description: "How was the bounded observation obtained? Allowed values: `first-party-read-api`, `official-documentation`."
+      value: "first-party-read-api"
     validations:
       required: true
   - type: input
@@ -106,15 +93,12 @@ body:
       placeholder: "production-scope"
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: partition
     attributes:
       label: "Provider partition"
-      description: "Provider partition for the observation scope."
-      options:
-        - "aws"
-        - "aws-cn"
-        - "aws-us-gov"
+      description: "Provider partition for the observation scope. Allowed values: `aws`, `aws-cn`, `aws-us-gov`."
+      value: "aws"
     validations:
       required: true
   - type: input

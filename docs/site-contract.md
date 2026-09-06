@@ -140,6 +140,16 @@ never inferred from names, and an absent lookup match does not prove availabilit
 Switching operations preserves values while excluding inapplicable answers.
 Invalid drafts display field errors and cannot open a prefilled form.
 
+GitHub handoff includes an explicit `title`, derived from the operation and
+first subject ID (bounded to 255 characters), plus each native text field by
+its existing ID. Composer dropdown choices are carried as text values. The
+GitHub templates use prefillable text controls for these prescribed choices,
+show their allowed values and default to the first listed choice (or the fixed
+operation). The trusted compiler still rejects values outside its enums.
+Native GitHub dropdown URL values are not relied upon: live testing with both
+option names and numeric indices left them unselected after hydration.
+Human attestation checkboxes remain unchecked.
+
 GitLab handoff is ordinary browser navigation, using `issue[title]`,
 `issue[description]` and `issue[issue_type]=issue`. It requires no browser API
 token or CORS integration. GitLab 18.1 EE documents `/-/issues/new`; use the exact

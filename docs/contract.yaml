@@ -552,6 +552,9 @@ authoring:
     output: human_issue_field_summary_not_neutral_mac_payload
     omitted_trusted_values: [request_id, dedupe_key, idempotency_key, payload_digest]
     authority: convenience_only
+    title: operation_and_first_subject_identity_bounded_to_255_characters
+    github_choice_transport: native_text_fields_with_allowed_values_and_defaults
+    github_choice_validation: trusted_compiler_enums_unchanged
     url_prefill:
       maximum_final_encoded_href_characters: 7000
       measurement: final_percent_encoded_url_href

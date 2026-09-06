@@ -11,28 +11,20 @@ body:
 
         **What happens next:** Modelo validates these answers and adds the canonical JSON and fingerprints to the issue. You do not need to calculate them.
 
-  - type: dropdown
+  - type: input
     id: request_type
     attributes:
       label: "Modelo MAC request type"
-      description: "Choose what should happen. Nothing is submitted until you review the native issue form."
-      options:
-        - "change"
-      default: 0
+      description: "Choose what should happen. Nothing is submitted until you review the native issue form. Allowed values: `change`."
+      value: "change"
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: subject_kind
     attributes:
       label: "Subject type"
-      description: "A model describes capabilities. An offering records approved access. Evidence supports facts; conditions describe rules for use. Revoke batches support offerings only."
-      options:
-        - "model"
-        - "offering"
-        - "evidence"
-        - "vendor"
-        - "inference-service"
-        - "condition"
+      description: "A model describes capabilities. An offering records approved access. Evidence supports facts; conditions describe rules for use. Revoke batches support offerings only. Allowed values: `model`, `offering`, `evidence`, `vendor`, `inference-service`, `condition`."
+      value: "model"
     validations:
       required: true
   - type: input

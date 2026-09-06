@@ -24,6 +24,11 @@ Adjacent lookup boxes find exact IDs in this publication. Choose a record
 explicitly; for additions, check existing records before choosing an unused ID.
 Changing the operation preserves your answers and shows only applicable fields.
 The native forms share the field explanations and retain unchecked attestations.
+The GitHub title is prepared from the operation and subject ID. Choices made in
+Modelo dropdowns arrive as prefilled text fields in GitHub, because native
+GitHub dropdowns do not reliably accept URL prefills. Each field lists the
+allowed values; the trusted compiler validates them. GitLab receives the same
+selected values in its Markdown description.
 
 GitLab 18.1 EE uses the configured native issue-creation route (normally
 `/-/issues/new`) with URL-encoded title and Markdown description. No access token

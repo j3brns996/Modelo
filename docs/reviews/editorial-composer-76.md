@@ -41,9 +41,31 @@ To repeat: build both revisions with the synthetic profile, serve them locally, 
 ### Browser and automated checks
 
 - Desktop and mobile layouts inspected; mobile document width equals its scroll width. Lookup controls stack below fields. Invalid IDs show an inline explanation, and Tab moves from the ID field to its adjacent lookup.
-- Existing-model selection, preserved values after switching change/move, batch fields, validation, a complete GitHub URL and nine-model Nova search verified. No provider form was submitted.
+- Existing-model selection, preserved values after switching change/move, operation-aware deep links, batch fields, validation and nine-model Nova search verified. GitLab short-draft title/Markdown prefill, unchanged long-draft destination and clipboard copy were also checked in the local browser fixture. No provider form was submitted.
 - Screenshots: [home](../img/modelo-home.png), [catalogue](../img/modelo-catalogue.png), [mobile proposal validation](../img/modelo-proposal-mobile.png). These are synthetic previews, not approval or T10 evidence.
-- First Linux run: 406 passed; two old page-copy assertions failed. The assertions were updated to check the new catalogue introduction and the explicit synthetic/non-approval notice. Affected checks are being rerun.
+- Linux: all 76 affected tests passed after updating the catalogue introduction and synthetic-notice assertions. The earlier broader unit/contract/site run passed 406 tests; its only two failures were those obsolete page-copy assertions.
 - Both JavaScript behavior checks pass. The offline source and wheel package builds pass with locked uv/Python.
 
 GitLab 18.1 EE instance access has not been supplied, so authenticated native-form submission and default-template interaction cannot be certified locally. The [GitLab 18.1 source documentation](https://gitlab.com/gitlab-org/gitlab/-/blob/v18.1.0-ee/doc/user/project/issues/create_issues.md) documents the native issue route and description prefill. Deployment validation must check its default-template append behavior. Trusted CI for the final PR head remains the acceptance arbiter.
+
+### GitHub native-form follow-up
+
+The user reported a missing title and unselected dropdowns. Live testing in the
+actual GitHub issue form confirmed that an explicit `title` prefilled correctly,
+and text fields prefilled after hydration, while dropdowns ended at `None` with
+both option-name and index parameters. Even the fixed operation default did not
+survive hydration reliably. A correct encoded URL alone had not proved this
+native-form behavior; the original verification was insufficient here.
+
+The URL builder now sends an explicit, bounded title for both providers. The
+five GitHub templates retain their field IDs and parser headings, but prescribed
+choices use text inputs with defaults and allowed values in their guidance.
+Modelo retains dropdowns; the selected values pass through the supported native
+text-prefill mechanism. Enum validation remains in the trusted compiler.
+Controller tests cover value retention, invalid-draft blocking, clipboard denial
+and missing clipboard support, in addition to provider URLs and the exact URL
+limit. GitHub serves templates from the default branch, so the amended template
+itself cannot be certified in the live native GUI before human review and merge.
+
+GitHub documents [title and text-field URL prefills](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/creating-an-issue#creating-an-issue-from-a-url-query)
+and [text-input default values](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema#input).

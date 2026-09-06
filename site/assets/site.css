@@ -220,6 +220,23 @@ th { color: var(--muted); font-size: .72rem; letter-spacing: .04em; text-transfo
 .prose-card { max-width: 900px; margin-bottom: 5rem; }
 .prose-card h2 { margin-top: 2rem; }
 .prose-card p, .prose-card li { color: var(--ink-soft); }
+.guide-nav { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.25rem; }
+.guide-nav a { color: var(--accent-strong); text-underline-offset: .2em; }
+.field-guide section[id] { scroll-margin-top: 6rem; padding-bottom: 1.5rem; }
+.guide-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: 1rem; }
+.guide-cards section { padding: 1rem; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.guide-cards h3 { margin-top: 0; }
+.guide-roles dt { font-weight: 700; margin-top: 1rem; }
+.guide-roles dd { margin: .25rem 0 0; color: var(--ink-soft); }
+.guide-figure { margin: 1.5rem 0; padding: .75rem; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.guide-figure svg { display: block; width: 100%; max-width: 480px; height: auto; margin: auto; }
+.guide-figure figcaption { color: var(--ink-soft); font-size: .95rem; margin-top: .75rem; }
+.guide-box rect, rect.guide-box { fill: var(--surface-soft); stroke: var(--line-strong); }
+.guide-boundary { fill: var(--accent-soft); stroke: var(--accent); }
+.guide-arrow { fill: none; stroke: var(--accent-strong); stroke-width: 2; }
+.guide-label { fill: var(--ink); text-anchor: middle; font-size: 16px; font-weight: 600; }
+.guide-label .guide-small { font-size: 14px; font-weight: 400; }
+.guide-notices { padding: 1rem 1rem 1rem 2rem; border-left: 4px solid var(--accent); background: var(--accent-soft); }
 .clone-command { margin-top: 1rem; padding: 1rem; border-radius: 10px; background: var(--ink); color: white; }
 .clone-command span, .clone-command code { display: block; }
 .clone-command span { margin-bottom: .35rem; color: #94a3b8; font-size: .7rem; text-transform: uppercase; }

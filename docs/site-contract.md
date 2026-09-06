@@ -155,6 +155,15 @@ separate rows, and pricing remains associated by route ID.
 
 ## Publication profiles
 
+The existing documentation route also serves a plain-language field guide to
+browse/discover/MAC/system-change modes and accountable roles. Home links directly
+to the interaction and NIST sections using the configured docs route. Two inline
+SVGs have accessible names, descriptions and adjacent prose; they require no
+JavaScript or external rendering service. The NIST summary retains the published
+P/P/S/P mapping, M1 target and non-certification/incomplete-inventory limitations.
+Material for MkDocs could be a separately integrated design subsite, but is not a
+dependency or a second publication pipeline in this change.
+
 Model detail pages display the derived internal ModelRelease URN, effective label,
 precision, optional date and namespaced identity claims with their statuses.
 An omitted release object is labelled as the implicit Modelo named-release

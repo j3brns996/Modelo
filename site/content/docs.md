@@ -8,19 +8,6 @@ For proposal drafting, start with the [interactive helper](/Modelo/propose/#buil
 
 The browser helper and `modelo dev` commands prepare drafts. They do not approve a change, establish evidence admissibility or replace the linked issue and trusted compiler.
 
-## Assurance: NIST AI RMF
-
-Supports selected NIST AI RMF outcomes
-
-Not a certification
-
-Not a complete organisational AI-system inventory
-
-Modelo supplies governed ModelRelease, Offering, route, evidence and Condition
-components. An external inventory owns AI uses, purposes, owners and human
-oversight. Embedded AI may be covered-by-parent; this is not exemption from
-governance. M1 is the governed component registry target, not demonstrated
-production operation. Production release automation and T10 remain outstanding.
-
-See the repository's docs/eli21.md and docs/assurance/nist-ai-rmf-mapping.yaml
-for the explanation, mapping, proposed assessment criteria and limitations.
+The field guide above summarises docs/eli21.md, the inventory-boundary ADR and
+docs/assurance/nist-ai-rmf-mapping.yaml. Those reviewed documents retain the
+detailed assessment criteria, source references and limitations.

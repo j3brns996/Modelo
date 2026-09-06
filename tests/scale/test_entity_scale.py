@@ -87,11 +87,12 @@ def test_5000_mixed_entities_through_files_history_and_projection():
         timings["bulk_offering_change_check_seconds"] = round(perf_counter() - start, 3)
         start = perf_counter()
         projection = catalogue_projection(contract_version="0.1.0", source_commit=head,
-            source_tree=repo.git("rev-parse", "HEAD^{tree}").strip(), as_of="2026-09-01", profile="synthetic",
+            source_tree=repo.git("rev-parse", f"{head}^{{tree}}").strip(), as_of="2026-09-01", profile="synthetic",
             models=state.models.values(), offerings=state.offerings.values(), evidence=state.evidence.values(),
             conditions=state.conditions.values(), vendors={"vendors": state.vendors},
             inference_services={"inference_services": state.services}, freshness={"classes_days": state.thresholds})
         assert not state.schemas.validate("catalogue-output.schema.json", projection, "catalogue.json")
+        assert projection["source_tree"] != repo.git("rev-parse", "HEAD^{tree}").strip()
         raw = canonical_bytes(projection)
         timings["projection_schema_and_serialisation_seconds"] = round(perf_counter() - start, 3)
         print(json.dumps({"counts": counts, "publication_bytes": len(raw), **timings}), flush=True)

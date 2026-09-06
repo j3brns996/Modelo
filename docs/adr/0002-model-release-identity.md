@@ -22,6 +22,19 @@ a reviewed classification; absent metadata retains only the existing
 named-release baseline. Do not infer weights, version immutability or dates.
 Floating/unresolved descriptions cannot support consumption.
 
+The effective vendor label, vendor identity and precision define the immutable
+release identity. `released_at` is maintainable external metadata: evidence-backed
+additions and corrections, or withdrawal of an unsupported optional date, do not
+create a new release. Existing evidence envelopes remain immutable.
+
+All accepted claim tuples (namespace/value/relation), including initially probable
+or unresolved assertions, are retained. Correction changes status or appends an
+assertion rather than deleting or replacing a tuple. Reordering is allowed with
+correct evidence pointers. Downgrading the only eligible binding claim requires
+dependent Offerings to be revoked first under the existing MAC workflow; this
+does not introduce heterogeneous revoke/change batches. Head-state validation
+rejects remaining Offerings without an eligible evidenced binding.
+
 `identity_claims` uses namespace/value/relation/status. Values require the same
 canonical evidence equality and freshness as other model facts. Status is a
 reviewed assertion, not an automated confidence score. Probable, conflicting

@@ -1046,6 +1046,12 @@ The initial explicit contracts are:
 
 ## NIST inventory component boundary
 
+ModelRelease maintenance retains accepted identity claim tuples while allowing
+reviewed status changes. Claims that become conflicting, probable or unresolved
+cannot support remaining Offerings. Release dates are evidenced, maintainable
+metadata, not immutable identity; effective vendor label, vendor ID and precision
+remain fixed. No maintenance change rewrites accepted evidence envelopes.
+
 Modelo supports selected NIST AI RMF inventory outcomes. It does not by itself
 make an organisation NIST compliant and is not the complete organisational
 AI-system inventory. The [method-equivalence profile](docs/assurance/nist-ai-rmf-method-equivalence.md)

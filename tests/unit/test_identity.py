@@ -155,6 +155,88 @@ def test_legacy_named_release_label_cannot_change(repo):
     assert any("release identity or precision" in d.message for d in check_repository(repo.root, repo.base, head, date(2026, 9, 1)))
 
 
+@pytest.mark.parametrize("status", ["conflicting", "probable", "unresolved"])
+@pytest.mark.parametrize("revoke", [False, True])
+def test_claim_status_transition_requires_no_dependent_offering(repo, status, revoke):
+    base = repo.base
+    if revoke:
+        (repo.root / OFFERING).unlink()
+        base = repo.commit("revoke dependent offering before claim change")
+    model = read(repo, MODEL)
+    model["identity_claims"][0]["status"] = status
+    write(repo, MODEL, model)
+    head = repo.commit()
+    findings = check_repository(repo.root, base, head, date(2026, 9, 1))
+    if revoke:
+        assert not findings, findings
+    else:
+        assert any("no evidenced ModelRelease identity claim" in d.message for d in findings)
+
+
+@pytest.mark.parametrize("mutation", ["delete", "replace"])
+def test_downgraded_claim_cannot_be_erased_in_a_later_change(repo, mutation):
+    model = read(repo, MODEL)
+    model["identity_claims"][0]["status"] = "conflicting"
+    write(repo, MODEL, model)
+    (repo.root / OFFERING).unlink()
+    base = repo.commit("record disputed claim and revoke consumption")
+    if mutation == "delete":
+        del model["identity_claims"]
+        del model["evidence_refs"]["/identity_claims/0/value"]
+    else:
+        model["identity_claims"][0]["namespace"] = "other.namespace"
+    write(repo, MODEL, model)
+    head = repo.commit()
+    assert any("identity claim" in d.message for d in check_repository(repo.root, base, head, date(2026, 9, 1)))
+
+
+def test_claim_addition_and_reordering_preserve_fact_links(repo):
+    model = read(repo, MODEL)
+    extra = deepcopy(model["identity_claims"][0])
+    extra["namespace"] = "synthetic.other-identity"
+    extra["status"] = "probable"
+    model["identity_claims"].insert(0, extra)
+    model["evidence_refs"]["/identity_claims/1/value"] = deepcopy(model["evidence_refs"]["/identity_claims/0/value"])
+    write(repo, MODEL, model)
+    head = repo.commit()
+    assert not check_repository(repo.root, repo.base, head, date(2026, 9, 1))
+
+
+@pytest.mark.parametrize("initial_date", [None, "2026-07-01"])
+@pytest.mark.parametrize("evidenced", [False, True, "withdraw"])
+def test_release_date_enrichment_and_correction(repo, initial_date, evidenced):
+    from modelo.evidence import evidence_id
+    model = read(repo, MODEL)
+    model["release"] = {"vendor_label": model["name"], "precision": "named-release"}
+    model["evidence_refs"]["/release/vendor_label"] = deepcopy(model["evidence_refs"]["/name"])
+
+    def set_date(value):
+        record = read(repo, f"catalogue/evidence/{model['evidence_refs']['/name']['id']}.yaml")
+        record["projection"]["releasedAt"] = value
+        record["id"] = evidence_id(record)
+        write(repo, f"catalogue/evidence/{record['id']}.yaml", record)
+        model["release"]["released_at"] = value
+        model["evidence_refs"]["/release/released_at"] = {"id": record["id"], "projection_pointer": "/releasedAt"}
+
+    if initial_date:
+        set_date(initial_date)
+    write(repo, MODEL, model)
+    base = repo.commit("establish named release metadata")
+    set_date("2026-08-01")
+    if evidenced == "withdraw":
+        del model["release"]["released_at"]
+        del model["evidence_refs"]["/release/released_at"]
+    elif not evidenced:
+        del model["evidence_refs"]["/release/released_at"]
+    write(repo, MODEL, model)
+    head = repo.commit()
+    findings = check_repository(repo.root, base, head, date(2026, 9, 1))
+    if evidenced:
+        assert not findings, findings
+    else:
+        assert any(d.pointer == "/release/released_at" for d in findings), findings
+
+
 def test_provider_id_and_arn_cannot_be_cherry_picked(repo):
     from modelo.evidence import evidence_id
     offering = read(repo, OFFERING)

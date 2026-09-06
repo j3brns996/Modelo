@@ -701,17 +701,15 @@ def check_repository(root: Path, base: str, head: str, as_of: date) -> tuple[Dia
             if old != new:
                 diagnostics.append(_diag("CHANGE_INVALID", path, "/id", "change operation altered model identity", "Use an explicit migration rather than changing identity in place."))
             before, after = base_state.models[old], head_state.models[new]
-            release_changed = before.get("release") != after.get("release") and not (
-                "release" not in before and after.get("release", {}).get("vendor_label") == before["name"]
-                and release_precision(after) == "named-release"
-            )
             label_changed = before.get("release", {}).get("vendor_label", before["name"]) != after.get("release", {}).get("vendor_label", after["name"])
-            if before["vendor_id"] != after["vendor_id"] or release_precision(before) != release_precision(after) or release_changed or label_changed:
+            if before["vendor_id"] != after["vendor_id"] or release_precision(before) != release_precision(after) or label_changed:
                 diagnostics.append(_diag("CHANGE_INVALID", path, "/release", "change altered release identity or precision", "Create a distinct release; do not silently upgrade precision or reuse an identity."))
-            old_claims = {(claim["namespace"], claim["value"]) for claim in before.get("identity_claims", []) if claim["status"] in {"verified", "vendor-asserted", "provider-mapped"}}
-            new_claims = {(claim["namespace"], claim["value"]) for claim in after.get("identity_claims", []) if claim["status"] in {"verified", "vendor-asserted", "provider-mapped"}}
+            # Retain assertions even when disputed; status is maintained by MAC,
+            # while route checks still require an eligible evidenced claim.
+            old_claims = {(claim["namespace"], claim["value"], claim["relation"]) for claim in before.get("identity_claims", [])}
+            new_claims = {(claim["namespace"], claim["value"], claim["relation"]) for claim in after.get("identity_claims", [])}
             if not old_claims <= new_claims:
-                diagnostics.append(_diag("CHANGE_INVALID", path, "/identity_claims", "change removed or replaced an established release identity claim", "Preserve established identifiers; create a distinct release when the binding changes."))
+                diagnostics.append(_diag("CHANGE_INVALID", path, "/identity_claims", "change removed or replaced a retained release identity claim", "Retain claim tuples and evidence; correct their status through governed review."))
         if path in base_state.offering_paths.values() and path in head_state.offering_paths.values():
             old = next(key for key, value in base_state.offering_paths.items() if value == path)
             new = next(key for key, value in head_state.offering_paths.items() if value == path)

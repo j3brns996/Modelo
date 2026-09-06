@@ -74,3 +74,17 @@ Rollback is a reviewed code/schema/fixture revert before adopting the profile;
 after adoption, review each consumer and preserve accepted evidence/history.
 Owner: j3brns. Target: issue #70 draft PR. Tests and independent findings must
 be recorded before claiming completion; production launch is not this issue.
+
+## Adversarial follow-up: record maintenance
+
+Scope: validator transitions, synthetic tests and aligned contract documentation.
+No operational records, schema shape, workflow adapter or approval changes.
+Permit reviewed status transitions while retaining every accepted claim tuple;
+keep route eligibility fail-closed. Permit evidenced date enrichment/correction
+and optional date withdrawal while freezing actual release identity.
+Tests exercise full base/head validation for revoke-then-downgrade, active-route
+rejection, downgrade-then-delete/replacement rejection, evidence failures and
+date maintenance. Review also checks claim addition/reordering and unchanged
+identity-substitution protections. Run focused tests, locked full local CI,
+deterministic demo comparison and trusted remote exact-head CI; loop on findings.
+Rollback is a reviewed revert of this system-only follow-up.

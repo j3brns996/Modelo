@@ -4,6 +4,11 @@ Model means a canonical named ModelRelease. Existing internal IDs remain
 canonical; optional canonical_urn must equal the derived namespace and ID.
 Release metadata and identity claims are defined in model-release.schema.json.
 External leaf values use ordinary evidence_refs with exact projection equality.
+Accepted claim tuples (namespace/value/relation) remain present regardless of
+status; review may change status or append claims, but not erase prior assertions.
+An ineligible claim cannot support a remaining Offering. Release dates may be
+added, corrected with evidence, or withdrawn; effective release label, vendor
+identity and precision remain fixed.
 There is no required universal external identity, family registry or AI-use entity.
 
 AWS route selector_type is structurally additive but mandatory in semantic

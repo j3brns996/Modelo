@@ -107,7 +107,7 @@ def test_offering_cannot_inherit_another_release(repo):
 def test_release_precision_cannot_silently_change(repo):
     model = read(repo, MODEL)
     model["release"] = {"vendor_label": model["name"], "precision": "immutable-snapshot"}
-    model["evidence_refs"]["/release/vendor_label"] = model["evidence_refs"]["/name"]
+    model["evidence_refs"]["/release/vendor_label"] = deepcopy(model["evidence_refs"]["/name"])
     write(repo, MODEL, model)
     head = repo.commit()
     assert any("release identity or precision" in d.message for d in check_repository(repo.root, repo.base, head, date(2026, 9, 1)))

@@ -6,6 +6,7 @@ Release metadata and identity claims are defined in model-release.schema.json.
 External leaf values use ordinary evidence_refs with exact projection equality.
 Accepted claim tuples (namespace/value/relation) remain present regardless of
 status; review may change status or append claims, but not erase prior assertions.
+Each tuple has exactly one status; duplicate tuples are rejected semantically.
 An ineligible claim cannot support a remaining Offering. Release dates may be
 added, corrected with evidence, or withdrawn; effective release label, vendor
 identity and precision remain fixed.

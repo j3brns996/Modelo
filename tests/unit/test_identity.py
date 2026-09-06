@@ -202,6 +202,21 @@ def test_claim_addition_and_reordering_preserve_fact_links(repo):
     assert not check_repository(repo.root, repo.base, head, date(2026, 9, 1))
 
 
+@pytest.mark.parametrize("status", ["conflicting", "probable", "unresolved", "verified"])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_duplicate_claim_tuple_cannot_have_multiple_statuses(repo, status, reverse):
+    model = read(repo, MODEL)
+    extra = deepcopy(model["identity_claims"][0])
+    extra["status"] = status
+    model["identity_claims"].append(extra)
+    if reverse:
+        model["identity_claims"].reverse()
+    model["evidence_refs"]["/identity_claims/1/value"] = deepcopy(model["evidence_refs"]["/identity_claims/0/value"])
+    write(repo, MODEL, model)
+    head = repo.commit()
+    assert any("duplicate identity claim tuple" in d.message for d in check_repository(repo.root, repo.base, head, date(2026, 9, 1)))
+
+
 @pytest.mark.parametrize("initial_date", [None, "2026-07-01"])
 @pytest.mark.parametrize("evidenced", [False, True, "withdraw"])
 def test_release_date_enrichment_and_correction(repo, initial_date, evidenced):

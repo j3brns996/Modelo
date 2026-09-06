@@ -30,7 +30,8 @@ create a new release. Existing evidence envelopes remain immutable.
 All accepted claim tuples (namespace/value/relation), including initially probable
 or unresolved assertions, are retained. Correction changes status or appends an
 assertion rather than deleting or replacing a tuple. Reordering is allowed with
-correct evidence pointers. Downgrading the only eligible binding claim requires
+correct evidence pointers. Duplicate tuples are rejected regardless of status so
+an eligible duplicate cannot mask a disputed assertion. Downgrading the only eligible binding claim requires
 dependent Offerings to be revoked first under the existing MAC workflow; this
 does not introduce heterogeneous revoke/change batches. Head-state validation
 rejects remaining Offerings without an eligible evidenced binding.

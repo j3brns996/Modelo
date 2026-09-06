@@ -196,7 +196,12 @@ def _reference_checks(state: State) -> None:
         if supersedes is not None and (supersedes == identifier or supersedes not in state.models):
             state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, "/supersedes_model_id", "superseded release must be another retained Model", "Reference an existing different release."))
         namespaces: dict[str, str] = {}
+        claim_keys: set[tuple[str, str, str]] = set()
         for claim in model.get("identity_claims", []):
+            claim_key = (claim["namespace"], claim["value"], claim["relation"])
+            if claim_key in claim_keys:
+                state.diagnostics.append(_diag("CHANGE_INVALID", path, "/identity_claims", "duplicate identity claim tuple has no single status", "Keep one entry per namespace/value/relation and review its status explicitly."))
+            claim_keys.add(claim_key)
             if claim["status"] != "verified":
                 continue
             key = (claim["namespace"], claim["value"])

@@ -35,6 +35,7 @@ entities:
     canonical_urn: "urn:modelo:model-release:{id}"
     external_identity: optional_namespaced_evidenced_claims
     identity_claim_lifecycle: retain_namespace_value_relation_allow_reviewed_status_changes
+    identity_claim_uniqueness: namespace_value_relation_regardless_status
     release_date_lifecycle: evidenced_metadata_not_immutable_identity
     path: "{paths.models}/{model_id}.yaml"
     meaning: canonical_named_model_release

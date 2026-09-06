@@ -297,7 +297,7 @@ versioning:
   tool_release_version_sources: [VERSION, pyproject.toml]
   current_tool_release: "0.2.0"
   entity_acceptance_profile: "0.3.0"
-  entity_profile_compatibility: additive_shape_breaking_aws_consumption_validation
+  entity_profile_compatibility: breaking_offering_approval_scope_with_existing_aws_binding_rules
   current_wire_contract: "0.1.0"
   wire_contract_version_sources: [contract.version, config_version, schema_version_fields]
   individual_payload_schema_versions_remain_declared_values: true

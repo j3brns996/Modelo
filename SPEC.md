@@ -95,7 +95,9 @@ floating alias or general marketing category. Internal IDs remain canonical and
 non-reusable. Derived URNs, evidenced external claims, four separate version
 dimensions and migration are specified in
 [ADR 0002](docs/adr/0002-model-release-identity.md). Entity acceptance profile
-0.3.0 tightens AWS binding without changing the 0.1.0 config/receipt wire.
+0.3.0 requires offering approval scope and accountability and closes identity and
+path gaps. This is a breaking entity-shape migration; existing AWS binding rules
+remain in force. The 0.1.0 config/receipt wire is unchanged. See ADR 0003 for migration.
 
 ### Offering
 

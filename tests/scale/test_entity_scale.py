@@ -76,6 +76,15 @@ def test_5000_mixed_entities_through_files_history_and_projection():
         start = perf_counter()
         assert not check_repository(repo.root, head, head, date(2026, 9, 1))
         timings["full_git_check_seconds"] = round(perf_counter() - start, 3)
+        # Exercise the changed-path index with a real bulk policy update, not
+        # only the base=head scheduled-audit shortcut.
+        for identifier, access in state.offerings.items():
+            changed = dict(access, approval_rationale="Updated synthetic capacity-test policy; no production permission.")
+            write(state.offering_paths[identifier], changed)
+        changed_head = repo.commit("bulk synthetic offering policy update")
+        start = perf_counter()
+        assert not check_repository(repo.root, head, changed_head, date(2026, 9, 1))
+        timings["bulk_offering_change_check_seconds"] = round(perf_counter() - start, 3)
         start = perf_counter()
         projection = catalogue_projection(contract_version="0.1.0", source_commit=head,
             source_tree=repo.git("rev-parse", "HEAD^{tree}").strip(), as_of="2026-09-01", profile="synthetic",

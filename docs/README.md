@@ -28,7 +28,7 @@ at `/docs/`.
   covered-by-parent policy, not exemption from governance.
 - [Identity ADR](adr/0002-model-release-identity.md) and
   [inventory boundary/diagrams](adr/0003-ai-inventory-boundary.md).
-- [Schema guide](../schemas/README.md) and
+- [Schema guide](schema-guide.md) and
   [implementation plan](reviews/nist-rmf-implementation-plan.md).
 
 - Normative files define the rules the repository currently follows.

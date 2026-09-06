@@ -10,7 +10,7 @@ AWS route selector_type is structurally additive but mandatory in semantic
 acceptance. Only provider-model-id and inference-profile are currently supported.
 Every explicit binding must match a Model's evidenced provider-ID claim.
 Offering remains the only consumption unit, and cannot change model_id in place.
-See [migration and compatibility ADR](../docs/adr/0002-model-release-identity.md).
+See [migration and compatibility ADR](adr/0002-model-release-identity.md).
 
 Config, MAC and receipt wire families remain unchanged. Tightened entity
 acceptance is versioned separately from tool releases and enterprise Conditions.

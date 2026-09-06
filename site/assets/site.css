@@ -1,5 +1,5 @@
 /* Editorial reference: local typography, clear rules, no decorative runtime. */
-:root { color-scheme: light; --ink: #202925; --ink-soft: #38433d; --muted: #59665e; --bg: #faf9f5; --surface: #fffefa; --surface-soft: #eeefe7; --line: #d8dcd2; --line-strong: #a9b4a9; --accent: #176c58; --accent-strong: #115341; --accent-soft: #e9f1e9; --focus: #995108; --max: 76rem; --column-gap: var(--column-gap); --reading: 70ch; }
+:root { color-scheme: light; --ink: #202925; --ink-soft: #38433d; --muted: #59665e; --bg: #faf9f5; --surface: #fffefa; --surface-soft: #eeefe7; --line: #d8dcd2; --line-strong: #a9b4a9; --accent: #176c58; --accent-strong: #115341; --accent-soft: #e9f1e9; --focus: #995108; --max: 76rem; --column-gap: 2rem; --reading: 70ch; }
 * { box-sizing: border-box; }
 html { background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, sans-serif; }
 body { margin: 0; min-width: 320px; }
@@ -8,6 +8,7 @@ a:hover { text-decoration-thickness: 2px; }
 button, input, select, textarea { font: inherit; }
 button, summary { cursor: pointer; }
 code, pre { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { white-space: pre-wrap; }
 [hidden], [x-cloak] { display: none !important; }
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
@@ -214,7 +215,7 @@ details p { max-width: 65ch; }
 .maintainer-composer { border-top: 1px solid var(--line); margin-top: 2rem; padding-top: .7rem; }
 
 .entity-diagram { margin: 1.5rem 0; }
-.diagram-scroll { overflow-x: auto; }
+.diagram-scroll, .table-scroll { overflow-x: auto; }
 .entity-diagram svg { display: block; width: 100%; min-width: 760px; }
 .entity-diagram figcaption { color: var(--muted); font-size: .9rem; }
 

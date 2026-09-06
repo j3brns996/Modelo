@@ -34,6 +34,7 @@ from modelo.site import (
     _history_html,
     _pricing_rows,
     _route_rows,
+    _supporting_evidence,
     build_demo_site,
     build_final_site,
     build_validation_site,
@@ -776,6 +777,12 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn("Atlas Reasoning", model)
         self.assertIn("128,000", model)
         self.assertIn("Supporting evidence", model)
+        self.assertIn("Retained observation:", model)
+        offering = (site / "offerings/aws-bedrock/test-offering/index.html").read_text(encoding="utf-8")
+        self.assertIn("Synthetic enterprise policy for build tests.", offering)
+        self.assertIn("Test policy owner", offering)
+        self.assertIn("Retained observation:", offering)
+        self.assertIn("Source documentation</a>", offering)
         for contract in ("@media (max-width: 880px)", "@media (max-width: 580px)", ".model-card {", ".fact-grid"):
             self.assertIn(contract, css)
         self.assertIn("textarea[data-proposal-summary]", css)
@@ -1054,6 +1061,13 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn("Show 2 more changed paths", expanded)
         self.assertEqual(len(re.findall(r"<li\b", expanded)), 6)
         self.assertNotIn("<ul></ul>", expanded)
+        proof = _supporting_evidence(["example"], {"example": {
+            "source": {"uri": "https://example.invalid/proof"}, "observed_at": "2026-09-06T00:00:00Z",
+            "projection": {"value": "<script>alert(1)</script>"},
+        }})
+        self.assertNotIn("<script>", proof)
+        self.assertIn("&lt;script&gt;", proof)
+        self.assertIn('href="https://example.invalid/proof"', proof)
         site = build_final_site(self.request()).output / "site"
         generated = b"\n".join(path.read_bytes() for path in site.rglob("*") if path.is_file())
         self.assertNotIn(b'<script>alert("history")</script>', generated)

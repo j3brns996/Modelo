@@ -400,3 +400,9 @@ link always uses `repository.web_routes.backlog`. Builds remain offline.
 Agents in the primary navigation opens the published Markdown guide. Prose
 shares the page gutter and a bounded reading width. Wide diagrams and tables
 scroll within their sections; code examples wrap on narrow screens.
+
+Offering pages display each referenced condition's title, text, owner, ID and
+version. Model and offering pages let readers expand the retained public
+evidence envelope and follow its source documentation. Offering evidence
+includes route bindings and profile destinations. This uses the same validated
+publication projection as the inventory; it does not retrieve new proof.

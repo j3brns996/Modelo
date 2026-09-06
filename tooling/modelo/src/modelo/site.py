@@ -308,6 +308,20 @@ def _evidence_region(evidence: Mapping[str, Mapping[str, Any]], identifier: str)
     return region
 
 
+def _supporting_evidence(identifiers: Iterable[str], evidence: Mapping[str, Mapping[str, Any]]) -> str:
+    items = []
+    for identifier in sorted(set(identifiers)):
+        record = evidence[identifier]
+        source = record["source"]
+        uri = source.get("uri", source.get("documentation_uri", ""))
+        items.append('<details class="retained-evidence"><summary>Retained observation: '
+            + escape(record["observed_at"][:10]) + '</summary><p><a rel="noopener noreferrer" href="'
+            + escape(uri, quote=True) + '">Source documentation</a></p><pre><code>'
+            + escape(json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2))
+            + '</code></pre></details>')
+    return "".join(items) or '<p class="muted">No supporting evidence is recorded.</p>'
+
+
 def _route_rows(offering: Mapping[str, Any], evidence: Mapping[str, Mapping[str, Any]]) -> str:
     rows: list[str] = []
     for route in offering.get("routes", []):
@@ -672,7 +686,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
             "model_description": escape(model.get("description", "No description published.")),
             "model_facts": facts + _model_release_facts(model), "offering_links": '<div class="related-grid">' + links + "</div>",
             "model_status": '<span class="status-pill status-pill--' + escape(model.get("lifecycle", "unknown"), quote=True) + '">' + escape(model.get("lifecycle", "Unspecified").title()) + "</span>",
-            "evidence_summary": '<p class="evidence-count"><strong>' + str(len(model_refs)) + '</strong><span>bound fact references</span></p><p>Every externally sourced field links to a content-addressed evidence projection.</p><div class="evidence-ids">' + (_tags(model_refs) or "None") + "</div>",
+            "evidence_summary": '<p class="evidence-count"><strong>' + str(len(model_refs)) + '</strong><span>evidence records</span></p><p>Expand an observation to inspect its retained values, source and retrieval details.</p>' + _supporting_evidence(model_refs, evidence),
         }, "model")
         files[resolver.output_path("model", model_id=model["id"])] = _page(root, request.source_commit, templates_path, resolver, request, "model", model.get("name", model["id"]), content, "model", {"model_id": model["id"]})
     releases_url = str(document["repository"]["web_base"]).rstrip("/") + document["repository"]["web_routes"]["releases"]
@@ -684,8 +698,21 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         else:
             approval = '<section class="coordinate-card"><span class="status-pill status-pill--synthetic">Synthetic</span><h2>Demo provenance</h2><dl><dt>Source</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.source_commit), quote=True) + '"><code>' + escape(request.source_commit[:12]) + '</code></a></dd><dt>Tree</dt><dd><code>' + escape(request.source_tree[:12]) + '</code></dd></dl><p>Synthetic fixture only, not approved for enterprise use.</p></section>'
         refs = sorted({reference["id"] for reference in offering.get("evidence_refs", {}).values()})
-        conditions = [f'{item["id"]}@{item["version"]}' for item in offering.get("condition_refs", [])]
-        content = _substitute(templates["offering"], {"offering_name": escape(offering["id"]), "approval": approval, "approval_rationale": escape(offering["approval_rationale"]), "route_table": _route_rows(offering, evidence), "pricing_table": _pricing_rows(offering), "conditions_evidence": '<dl class="fact-grid"><div><dt>Conditions</dt><dd>' + (_tags(conditions) or "None") + '</dd></div><div><dt>Evidence</dt><dd>' + (_tags(refs) or "None") + "</dd></div></dl>"}, "offering")
+        for route in offering["routes"]:
+            binding = route["model_binding"]
+            if binding["kind"] == "foundation-model":
+                refs.append(binding["model_evidence"]["id"])
+            else:
+                refs.append(binding["profile_evidence"]["id"])
+                refs.extend(item["model_evidence"]["id"] for item in binding["destinations"])
+        conditions = []
+        for reference in offering.get("condition_refs", []):
+            condition = next(item for item in catalogue["conditions"] if (item["id"], item["version"]) == (reference["id"], reference["version"]))
+            conditions.append('<section><h3>' + escape(condition["title"]) + '</h3><p>'
+                + escape(condition["description"]) + '</p><p class="muted">Owner: '
+                + escape(condition["owner"]) + ' · <code>' + escape(condition["id"])
+                + '@' + str(condition["version"]) + '</code></p></section>')
+        content = _substitute(templates["offering"], {"offering_name": escape(offering["id"]), "approval": approval, "approval_rationale": escape(offering["approval_rationale"]), "route_table": _route_rows(offering, evidence), "pricing_table": _pricing_rows(offering), "conditions_evidence": ("".join(conditions) or '<p>No conditions are recorded.</p>') + '<h3>Supporting evidence</h3><p>Expand an observation to inspect the retained proof.</p>' + _supporting_evidence(refs, evidence)}, "offering")
         path = resolver.output_path("offering", inference_service_id=offering["inference_service_id"], offering_id=offering["id"])
         files[path] = _page(root, request.source_commit, templates_path, resolver, request, "offering", offering["id"], content, "offering", {"inference_service_id": offering["inference_service_id"], "offering_id": offering["id"]})
     files[resolver.output_path("asset_css")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/site.css")

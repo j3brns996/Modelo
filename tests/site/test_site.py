@@ -244,6 +244,7 @@ class FinalSiteTests(unittest.TestCase):
                           "Not a certification", "Not a complete organisational AI-system inventory",
                           "Covered-by-parent is not exemption", "T10 remain outstanding"):
             self.assertIn(statement, guide)
+        self.assertIn("If any coverage criterion fails, a separate external AI-use entry is required", guide)
         import re
         from xml.etree import ElementTree
         diagrams = re.findall(r"<svg\b.*?</svg>", guide, re.S)

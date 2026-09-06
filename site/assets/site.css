@@ -223,7 +223,8 @@ th { color: var(--muted); font-size: .72rem; letter-spacing: .04em; text-transfo
 .guide-nav { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.25rem; }
 .guide-nav a { color: var(--accent-strong); text-underline-offset: .2em; }
 .field-guide section[id] { scroll-margin-top: 6rem; padding-bottom: 1.5rem; }
-.guide-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: 1rem; }
+.guide-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+@media (max-width: 600px) { .guide-cards { grid-template-columns: 1fr; } }
 .guide-cards section { padding: 1rem; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
 .guide-cards h3 { margin-top: 0; }
 .guide-roles dt { font-weight: 700; margin-top: 1rem; }

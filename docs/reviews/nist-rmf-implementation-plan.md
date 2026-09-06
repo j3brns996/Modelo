@@ -88,3 +88,15 @@ date maintenance. Review also checks claim addition/reordering and unchanged
 identity-substitution protections. Run focused tests, locked full local CI,
 deterministic demo comparison and trusted remote exact-head CI; loop on findings.
 Rollback is a reviewed revert of this system-only follow-up.
+
+## Consumer-reference closure
+
+Repair migration tuple matching, then render existing identity metadata through
+the current model detail layout. Tests cover all six pre-existing claim statuses,
+duplicate rejection, retained evidence, idempotency, escaped HTML, missing values
+and full demo HTML/JSON agreement. Update the existing AWS guide and schema ledger
+with links to the schema guide/ADR rather than creating another specification.
+No schema shape changes, operational records, new styles or generated assets.
+Repeat independent review, locked acceptance, deterministic builds and exact-head
+CI after fixes. Scope cleanup means consolidating PR documentation references;
+unrelated user worktrees, files and history are preserved.

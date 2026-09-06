@@ -222,6 +222,18 @@ class FinalSiteTests(unittest.TestCase):
         offering = (site / "offerings/aws-bedrock/test-offering/index.html").read_text(encoding="utf-8")
         self.assertIn("Demo provenance", offering)
         self.assertIn("not approved for enterprise use", offering)
+        model_page = (site / "models/test-model/index.html").read_text(encoding="utf-8")
+        catalogue = json.loads((site / "data/catalogue.json").read_text(encoding="utf-8"))
+        model = next(item for item in catalogue["models"] if item["id"] == "test-model")
+        self.assertIn(model["canonical_urn"], model_page)
+        self.assertIn("implicit Modelo baseline", model_page)
+        self.assertIn("Release date", model_page)
+        self.assertIn("Not stated", model_page)
+        for claim in model["identity_claims"]:
+            self.assertIn(claim["namespace"], model_page)
+            self.assertIn(claim["value"], model_page)
+            self.assertIn("status: " + claim["status"], model_page)
+        self.assertIn("Identity claim status is not consumption approval", model_page)
 
     def test_demo_rejects_wrong_output_and_dirty_tree(self) -> None:
         git(self.root, "checkout", "--detach", self.source)

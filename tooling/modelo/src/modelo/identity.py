@@ -60,9 +60,15 @@ def migrate_bound_model(
     result["canonical_urn"] = canonical_urn("model-release", str(model["id"]))
     claim = dict(namespace=AWS_MODEL_NAMESPACE, value=value, relation="identifies", status="provider-mapped")
     claims = result.setdefault("identity_claims", [])
-    if claim not in claims:
-        claims.append(claim)
-    index = claims.index(claim)
+    keys = [(item["namespace"], item["value"], item["relation"]) for item in claims]
+    if len(keys) != len(set(keys)):
+        raise ValueError("migration cannot resolve duplicate identity claim tuples")
+    key = (claim["namespace"], claim["value"], claim["relation"])
+    if key in keys:
+        # Migration is not a status review or an evidence refresh. Preserve both.
+        return result
+    index = len(claims)
+    claims.append(claim)
     result["evidence_refs"][f"/identity_claims/{index}/value"] = {
         "id": evidence["id"], "projection_pointer": id_pointer,
     }

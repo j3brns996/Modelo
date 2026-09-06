@@ -155,6 +155,13 @@ separate rows, and pricing remains associated by route ID.
 
 ## Publication profiles
 
+Model detail pages display the derived internal ModelRelease URN, effective label,
+precision, optional date and namespaced identity claims with their statuses.
+An omitted release object is labelled as the implicit Modelo named-release
+baseline; absent dates and claims are not invented. All values are escaped text.
+Claim status is not Offering approval. Machine-readable publication preserves
+source identity fields and evidence pointers without adding presentation defaults.
+
 v0.1 permits two profiles only:
 
 - `synthetic`: public Pages built solely from the configured demo fixture,

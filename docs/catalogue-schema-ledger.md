@@ -1,6 +1,6 @@
 # Catalogue schema ledger
 
-Seven JSON Schemas under `schemas/` govern every row Modelo will publish:
+The entity schemas under `schemas/` govern the catalogue records Modelo publishes:
 Vendor, Model, Inference Service, Offering, its embedded Route, Condition and
 the terminal Evidence envelope. Every id — key or foreign key alike — matches
 `common.schema.json#/$defs/id` (`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$`, ≤128
@@ -19,6 +19,9 @@ erDiagram
         string id PK "kebab-case"
         string vendor_id FK "resolves to a vendor id"
         string name "1 to 256 chars, required"
+        string canonical_urn "optional derived internal ModelRelease URN"
+        object release "optional evidenced label/date and reviewed precision"
+        array identity_claims "evidenced namespaced assertions with reviewed status"
         string licensing "enum proprietary, open-weights, open-source"
         string lifecycle "enum active, legacy, eol"
         int context_window "integer, minimum 1, optional"
@@ -36,6 +39,7 @@ erDiagram
     ROUTE {
         string id PK "scoped to the owning offering only"
         string reference "provider-shaped reference matching bound kind"
+        string selector_type "AWS semantic acceptance requires explicit selector kind"
     }
     CONDITION {
         string id PK "kebab-case"
@@ -95,6 +99,12 @@ entity's facts trace back to it through `evidence_refs`.
 | Evidence | `visibility` | | enum: `internal` · `public` |
 
 ## What the diagram can't show
+
+Model means a named ModelRelease. The additional identity fields, including
+optional family grouping and supersession references, are defined in
+`model.schema.json` and `model-release.schema.json`; see the
+[schema guide](schema-guide.md) for identity maintenance, evidence requirements
+and selector rules. This ledger is an overview, not a second schema definition.
 
 **`evidence_refs` is a map, not a column.** Its keys are JSON Pointers into
 the owning record, naming which field is backed; each value is

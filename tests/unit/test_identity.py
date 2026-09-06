@@ -147,6 +147,54 @@ def test_one_batch_add_contains_model_offering_evidence():
     validate_payload(payload)
 
 
+@pytest.mark.parametrize("status", ["verified", "vendor-asserted", "provider-mapped", "probable", "conflicting", "unresolved"])
+def test_migration_preserves_existing_claim_status_and_evidence(repo, status):
+    model = read(repo, MODEL)
+    model["identity_claims"][0]["status"] = status
+    record = read(repo, f"catalogue/evidence/{model['evidence_refs']['/name']['id']}.yaml")
+    before = deepcopy(model)
+    result = migrate_bound_model(model, record, id_pointer="/modelId", reviewed_model_id=model["id"])
+    assert result == before
+    assert model == before
+    assert migrate_bound_model(result, record, id_pointer="/modelId", reviewed_model_id=model["id"]) == result
+
+
+def test_migration_refuses_ambiguous_duplicate_claims(repo):
+    model = read(repo, MODEL)
+    other = deepcopy(model["identity_claims"][0])
+    other["status"] = "conflicting"
+    model["identity_claims"].append(other)
+    record = read(repo, f"catalogue/evidence/{model['evidence_refs']['/name']['id']}.yaml")
+    with pytest.raises(ValueError, match="duplicate identity claim tuples"):
+        migrate_bound_model(model, record, id_pointer="/modelId", reviewed_model_id=model["id"])
+
+
+def test_release_fields_survive_projection_and_render_as_escaped_text():
+    from modelo.receipt import _normalise_model
+    from modelo.site import _model_release_facts
+    model = {"id": "test", "name": "Test", "canonical_urn": canonical_urn("model-release", "test"),
+             "release": {"vendor_label": '<script>alert("label")</script>', "precision": "vendor-version", "released_at": "2026-08-01"},
+             "identity_claims": [{"namespace": "vendor.model", "value": '<a href="https://invalid">value</a>', "relation": "identifies", "status": "conflicting"}]}
+    projected = _normalise_model(model)
+    assert projected == model
+    rendered = _model_release_facts(projected)
+    assert "2026-08-01" in rendered and "vendor-version" in rendered
+    assert "implicit Modelo baseline" not in rendered
+    assert "status: conflicting" in rendered
+    assert "&lt;script&gt;" in rendered and "&lt;a href=" in rendered
+    assert "<script>" not in rendered and '<a href=' not in rendered
+    assert "Internal ModelRelease URN" in rendered
+
+
+def test_release_rendering_does_not_invent_external_claims():
+    from modelo.site import _model_release_facts
+    rendered = _model_release_facts({"id": "test", "name": "Test"})
+    assert "urn:modelo:model-release:test" in rendered
+    assert "named-release (implicit Modelo baseline)" in rendered
+    assert "Not stated" in rendered
+    assert "status:" not in rendered
+
+
 def test_legacy_named_release_label_cannot_change(repo):
     model = read(repo, MODEL)
     model["name"] = "Different Release"

@@ -17,6 +17,9 @@ acceptance. Only provider-model-id and inference-profile are currently supported
 Every explicit binding must match a Model's evidenced provider-ID claim.
 Offering remains the only consumption unit, and cannot change model_id in place.
 See [migration and compatibility ADR](adr/0002-model-release-identity.md).
+Migration matches existing claim tuples without changing their status or evidence;
+ambiguous duplicates fail rather than being silently resolved. Evidence refresh
+and status review remain explicit governed changes, not migration side effects.
 
 Config, MAC and receipt wire families remain unchanged. Tightened entity
 acceptance is versioned separately from tool releases and enterprise Conditions.

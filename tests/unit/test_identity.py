@@ -198,3 +198,55 @@ def test_model_id_cannot_be_reintroduced_after_historical_removal(repo):
     write(repo, MODEL, model)
     head = repo.commit("reuse model")
     assert any("reserved in accepted history" in d.message for d in check_repository(repo.root, removed, head, date(2026, 9, 1)))
+
+
+def test_relocated_offering_still_cannot_change_release(repo):
+    registry_path = "catalogue/governance/inference-services.yaml"
+    registry = read(repo, registry_path)
+    registry["inference_services"]["bedrock-alias"] = {"id": "bedrock-alias", "adapter": "aws-bedrock"}
+    write(repo, registry_path, registry)
+    model = read(repo, MODEL)
+    model["id"] = "second-model"
+    model["canonical_urn"] = canonical_urn("model-release", model["id"])
+    write(repo, "catalogue/models/second-model.yaml", model)
+    offering = read(repo, OFFERING)
+    offering["model_id"] = model["id"]
+    offering["inference_service_id"] = "bedrock-alias"
+    target = "catalogue/offerings/bedrock-alias/test-offering.yaml"
+    (repo.root / target).parent.mkdir()
+    write(repo, target, offering)
+    (repo.root / OFFERING).unlink()
+    head = repo.commit()
+    assert any("relocated Offering" in d.message for d in check_repository(repo.root, repo.base, head, date(2026, 9, 1)))
+
+
+@pytest.mark.parametrize("second_region,expected_error", [("eu-west-2", False), ("eu-west-1", True)])
+def test_profile_routes_must_share_destination_residency(repo, second_region, expected_error):
+    from modelo.evidence import evidence_id
+    from modelo.validators import _load_state, _aws_offering_checks
+    state = _load_state(repo.root)
+    offering = deepcopy(state.offerings["test-offering"])
+    original_binding = offering["routes"][0]["model_binding"]["model_evidence"]
+    source = state.evidence[original_binding["id"]]
+    offering["routes"] = []
+    offering["evidence_refs"] = {}
+    for index, region in enumerate(["eu-west-2", second_region]):
+        model_record = deepcopy(source)
+        model_record["source"]["region"] = region
+        model_record["scope"]["region"] = region
+        arn = f"arn:aws:bedrock:{region}::foundation-model/test.model-v1"
+        model_record["projection"]["modelArn"] = arn
+        model_record["id"] = evidence_id(model_record)
+        state.evidence[model_record["id"]] = model_record
+        reference = f"eu.test.profile-{index}"
+        profile = {"source": {"type": "first-party-read-api", "provider": "aws", "service": "bedrock", "operation": "GetInferenceProfile", "partition": "aws", "region": "eu-west-2"}, "projection": {"profileId": reference, "type": "SYSTEM_DEFINED", "status": "ACTIVE", "models": [{"modelArn": arn}]}}
+        profile["id"] = evidence_id(profile)
+        state.evidence[profile["id"]] = profile
+        binding = deepcopy(original_binding)
+        binding["id"] = model_record["id"]
+        offering["routes"].append({"id": f"profile-{index}", "source_region": "eu-west-2", "selector_type": "inference-profile", "reference": reference, "model_binding": {"kind": "system-inference-profile", "profile_evidence": {"id": profile["id"], "projection_pointer": "/profileId", "type_pointer": "/type", "status_pointer": "/status", "destinations_pointer": "/models"}, "destinations": [{"destination_pointer": "/models/0/modelArn", "model_evidence": binding}]}})
+        offering["evidence_refs"][f"/routes/{index}/reference"] = {"id": profile["id"], "projection_pointer": "/profileId"}
+    _aws_offering_checks(state, offering, OFFERING)
+    assert bool(state.diagnostics) == expected_error, state.diagnostics
+    if expected_error:
+        assert all("destination residency scope" in d.message for d in state.diagnostics)

@@ -35,6 +35,9 @@ duplicate coordinate fields. The enclosing Offering's model_id is the single
 binding target. Each direct model ID and every profile destination must match
 an evidenced Model identity claim in `aws.bedrock.foundation-model`.
 The relation is serves-release; eligible claims explicitly record their status.
+Existing same-release relocation between inference-service aliases remains
+supported; this is not a semantic release move. Changing the release requires
+a new Offering ID even when the path also changes.
 
 The example selector enum omitted an honest category for existing observations:
 `provider-model-id` reports a provider identifier **without asserting immutable

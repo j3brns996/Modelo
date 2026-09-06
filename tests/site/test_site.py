@@ -1050,9 +1050,9 @@ class FinalSiteTests(unittest.TestCase):
         self.assertNotIn("<img", rendered)
         self.assertIn("&lt;script&gt;", rendered)
         expanded = _history_html([{"url": "https://example.invalid/x", "sha": "a" * 40, "date": "2026-09-06", "subject": "Six paths", "changes": [str(i) for i in range(6)]}])
-        self.assertEqual(expanded.split("<details>")[0].count("<li>"), 4)
+        self.assertEqual(expanded.split("<details>")[0].count("<li "), 4)
         self.assertIn("Show 2 more changed paths", expanded)
-        self.assertEqual(expanded.count("<li>"), 6)
+        self.assertEqual(len(re.findall(r"<li\b", expanded)), 6)
         self.assertNotIn("<ul></ul>", expanded)
         site = build_final_site(self.request()).output / "site"
         generated = b"\n".join(path.read_bytes() for path in site.rglob("*") if path.is_file())

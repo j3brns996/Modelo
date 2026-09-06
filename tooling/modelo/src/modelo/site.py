@@ -372,7 +372,7 @@ def _history(root: Path, merge: str, source_path: str, resolver: _Resolver) -> l
 def _history_html(history: Iterable[Mapping[str, Any]]) -> str:
     items = []
     for entry in history:
-        changes = "<ul>" + "".join("<li>" + escape(item) + "</li>" for item in entry["changes"][:4]) + "</ul>"
+        changes = "<ul>" + "".join('<li title="' + escape(item, quote=True) + '">' + escape(item) + "</li>" for item in entry["changes"][:4]) + "</ul>"
         if len(entry["changes"]) > 4:
             changes += '<details><summary>Show ' + str(len(entry["changes"]) - 4) + ' more changed paths</summary><ul>' + "".join("<li>" + escape(item) + "</li>" for item in entry["changes"][4:]) + "</ul></details>"
         items.append('<article class="card"><h2><a rel="noopener noreferrer" href="' + escape(entry["url"], quote=True) + '"><code>' + escape(entry["sha"][:12]) + "</code></a></h2><p><time datetime=\"" + escape(entry["date"], quote=True) + '\">' + escape(entry["date"]) + "</time> · " + escape(entry["subject"]) + "</p>" + changes + "</article>")

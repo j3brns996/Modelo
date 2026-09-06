@@ -246,6 +246,7 @@ details p { max-width: 65ch; }
 .simple-request form { max-width: 48rem; }
 .timeline article > p { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .timeline li { overflow-wrap: anywhere; }
+.timeline article > ul > li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .timeline details { margin-bottom: 1rem; }
 .site-nav { gap: .85rem; }
 .classic-diagram { margin: 1.5rem 0; }

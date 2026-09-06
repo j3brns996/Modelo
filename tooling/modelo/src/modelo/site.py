@@ -625,7 +625,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
             or item["number"] < 1 or not isinstance(item["title"], str) or not 1 <= len(item["title"]) <= 256):
             raise BuildError("backlog issue needs a positive number and bounded title")
         if backlog["repository"].rstrip("/") == str(document["repository"]["web_base"]).rstrip("/"):
-            backlog_rows.append('<li><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("issue", issue_number=item["number"]), quote=True) + '">#' + str(item["number"]) + " " + escape(item["title"]) + "</a></li>")
+            backlog_rows.append('<li><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("issue", issue_number=str(item["number"])), quote=True) + '">#' + str(item["number"]) + " " + escape(item["title"]) + "</a></li>")
     backlog_html = '<p class="muted">Open when retrieved at ' + escape(backlog["observed_at"].replace("T", " ").replace("Z", " UTC")) + '. Status may have changed.</p><ul>' + "".join(backlog_rows) + "</ul>" if backlog_rows else '<p class="muted">No snapshot is available for this repository.</p>'
     history_content = _substitute(templates["changes"], {"history": _history_html(history), "backlog": backlog_html, "backlog_url": escape(resolver.repository_url("backlog"), quote=True)}, "changes")
     content_path = document["paths"]["site_content"]

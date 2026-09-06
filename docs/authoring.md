@@ -11,7 +11,7 @@ The published `/propose/` page has five static cards—add, change, revoke, move
 and batch—whose destinations come from `repository.web_routes.mac_intake` in
 `modelo.yaml`. Those links remain usable without JavaScript.
 
-With JavaScript enabled, the same page can prepare an add or change draft and
+With JavaScript enabled, the same page can prepare an add, change, revoke, move or batch draft and
 prefill the configured form for that operation. The displayed issue-field
 summary is only a convenience: it has no `request_id`, keys or payload digest
 and is not the canonical MAC payload. After submission, trusted default-branch
@@ -20,8 +20,17 @@ for GitHub or `modelo platform gitlab-intake` for GitLab. It derives a stable
 UUIDv5 from the issue coordinate and computes the dedupe key, idempotency key
 and payload digest.
 
-Use the static card for revoke, move or batch because those operations require
-shapes that the interactive draft does not compose.
+Adjacent lookup boxes find exact IDs in this publication. Choose a record
+explicitly; for additions, check existing records before choosing an unused ID.
+Changing the operation preserves your answers and shows only applicable fields.
+The native forms share the field explanations and retain unchecked attestations.
+
+GitLab 18.1 EE uses the configured native issue-creation route (normally
+`/-/issues/new`) with URL-encoded title and Markdown description. No access token
+or browser API call is involved. A default template may be appended: keep one
+copy of each answer heading. Long drafts retain the complete copyable text and
+open the untouched configured form. Verify the route and template behavior on
+the installed instance before rollout.
 
 For every operation, complete the governed Git-provider issue intake rather
 than treating a local draft as a request. The browser helper prepares issue

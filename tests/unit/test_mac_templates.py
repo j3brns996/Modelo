@@ -13,6 +13,7 @@ from modelo.mac import (
     MAX_BODY_BYTES,
     extract_adapter_issue_payload,
     payload_digest,
+    render_adapter_issue_body,
     with_computed_keys,
     validate_payload,
 )
@@ -30,12 +31,8 @@ class MacTemplateTests(unittest.TestCase):
         }
 
     def fill_gitlab_template(self, operation: str, payload: dict[str, object]) -> str:
-        path = ROOT / f".gitlab/issue_templates/MAC-{operation.title()}.md"
-        text = path.read_text(encoding="utf-8")
-        pretty = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
-        text, count = re.subn(r"(?ms)```json\n[\s\S]*?\n```", f"```json\n{pretty}\n```", text)
-        self.assertEqual(count, 1)
-        return text.replace("Neutral payload digest: `sha256-...`", f"Neutral payload digest: `{payload_digest(payload)}`")
+        # Retain coverage of the supported legacy neutral JSON transport.
+        return render_adapter_issue_body(payload, "gitlab")
 
     def test_schema_is_draft_2020_12_and_closed(self) -> None:
         schema = json.loads((ROOT / "schemas/mac.schema.json").read_text(encoding="utf-8"))
@@ -225,13 +222,13 @@ class MacTemplateTests(unittest.TestCase):
             operation = path.stem.removeprefix("MAC-").lower()
             text = path.read_text(encoding="utf-8")
             with self.subTest(operation=operation):
-                self.assertIn(f'"operation": "{operation}"', text)
-                self.assertIn("```json", text)
-                self.assertIn("Neutral payload digest: `sha256-...`", text)
+                self.assertIn(f"### Request type\n\n{operation}", text)
+                self.assertIn("## Field guide", text)
+                self.assertIn("### Before submitting", text)
                 self.assertNotIn("/label", text)
                 self.assertNotIn("curl ", text)
 
-    def test_actual_filled_gitlab_templates_round_trip(self) -> None:
+    def test_legacy_gitlab_transport_round_trip(self) -> None:
         for operation, payload in self.fixtures().items():
             body = self.fill_gitlab_template(operation, payload)
             with self.subTest(operation=operation):
@@ -243,7 +240,7 @@ class MacTemplateTests(unittest.TestCase):
                     MAX_ADAPTER_OVERHEAD_BYTES,
                 )
 
-    def test_near_limit_payload_round_trips_through_actual_templates(self) -> None:
+    def test_near_limit_payload_round_trips_through_legacy_transport(self) -> None:
         payload = self.fixtures()["add"]
         payload["acceptance"] = [f"criterion-{index}-" + "a" * 1_960 for index in range(25)]
         payload["candidate_evidence"] = [

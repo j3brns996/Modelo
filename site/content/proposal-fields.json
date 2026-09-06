@@ -1,0 +1,267 @@
+[
+  {
+    "name": "request_type",
+    "label": "Request type",
+    "help": "Choose what should happen. Nothing is submitted until you review the native issue form.",
+    "placeholder": "",
+    "type": "dropdown",
+    "required": true,
+    "operations": [
+      "add",
+      "change",
+      "revoke",
+      "move",
+      "batch"
+    ],
+    "options": [
+      "add",
+      "change",
+      "revoke",
+      "move",
+      "batch"
+    ]
+  },
+  {
+    "name": "item_operation",
+    "label": "Batch change type",
+    "help": "Every subject in this batch will use this operation.",
+    "placeholder": "",
+    "type": "dropdown",
+    "required": true,
+    "operations": [
+      "batch"
+    ],
+    "options": [
+      "add",
+      "change",
+      "revoke"
+    ]
+  },
+  {
+    "name": "subject_kind",
+    "label": "Subject type",
+    "help": "A model describes capabilities. An offering records approved access. Evidence supports facts; conditions describe rules for use. Revoke batches support offerings only.",
+    "placeholder": "",
+    "type": "dropdown",
+    "required": true,
+    "operations": [
+      "add",
+      "change",
+      "batch"
+    ],
+    "options": [
+      "model",
+      "offering",
+      "evidence",
+      "vendor",
+      "inference-service",
+      "condition"
+    ]
+  },
+  {
+    "name": "subject_identity",
+    "label": "Subject identity",
+    "help": "The stable ID of the record. For an update, choose an existing record. For an addition, choose a new lowercase ID; check for an existing match first.",
+    "placeholder": "example-model-v1",
+    "type": "input",
+    "required": true,
+    "operations": [
+      "add",
+      "change"
+    ]
+  },
+  {
+    "name": "offering_identity",
+    "label": "Offering identity",
+    "help": "Choose the existing offering whose access should be withdrawn. This does not delete its history.",
+    "placeholder": "bedrock-example-model",
+    "type": "input",
+    "required": true,
+    "operations": [
+      "revoke"
+    ]
+  },
+  {
+    "name": "source_identity",
+    "label": "Current offering identity",
+    "help": "Choose the existing offering being replaced.",
+    "placeholder": "bedrock-example-old",
+    "type": "input",
+    "required": true,
+    "operations": [
+      "move"
+    ]
+  },
+  {
+    "name": "destination_identity",
+    "label": "Replacement offering identity",
+    "help": "Choose a new offering ID. The current offering will be withdrawn in the same request.",
+    "placeholder": "bedrock-example-new",
+    "type": "input",
+    "required": true,
+    "operations": [
+      "move"
+    ]
+  },
+  {
+    "name": "subject_identities",
+    "label": "Subject identities",
+    "help": "One stable lowercase ID per line, up to 25. Every record uses the same type and operation. Use the lookup to add existing records.",
+    "placeholder": "bedrock-model-a\nbedrock-model-b\n",
+    "type": "textarea",
+    "required": true,
+    "operations": [
+      "batch"
+    ]
+  },
+  {
+    "name": "purpose",
+    "label": "Purpose",
+    "help": "In one sentence, what do you need? For example: provide a reviewed model for document summarisation.",
+    "placeholder": "Example: Register a governed vendor before its models or offerings are proposed",
+    "type": "input",
+    "required": true,
+    "operations": [
+      "add",
+      "change",
+      "revoke",
+      "move",
+      "batch"
+    ]
+  },
+  {
+    "name": "requested_outcome",
+    "label": "Requested outcome",
+    "help": "Describe what should be true when the request is complete. Use the lookup to reference models, services or exact condition versions.",
+    "placeholder": "Example: Create the vendor record acme-ai; leave model and offering approval unchanged.",
+    "type": "textarea",
+    "required": true,
+    "operations": [
+      "add",
+      "change",
+      "revoke",
+      "move",
+      "batch"
+    ]
+  },
+  {
+    "name": "reason",
+    "label": "Why is this needed?",
+    "help": "Explain who needs this and why the current catalogue is insufficient.",
+    "placeholder": "Example: The vendor must exist as a governed identity before related records can reference it.",
+    "type": "textarea",
+    "required": true,
+    "operations": [
+      "add",
+      "change",
+      "revoke",
+      "move",
+      "batch"
+    ]
+  },
+  {
+    "name": "source_type",
+    "label": "Evidence source type",
+    "help": "How was the bounded observation obtained?",
+    "placeholder": "",
+    "type": "dropdown",
+    "required": true,
+    "operations": [
+      "batch"
+    ],
+    "options": [
+      "first-party-read-api",
+      "official-documentation"
+    ]
+  },
+  {
+    "name": "source_url",
+    "label": "Evidence source URL",
+    "help": "Official HTTPS source for the batch observation.",
+    "placeholder": "https://bedrock.us-east-1.amazonaws.com/foundation-models",
+    "type": "input",
+    "required": true,
+    "operations": [
+      "batch"
+    ]
+  },
+  {
+    "name": "scope_ref",
+    "label": "Opaque scope reference",
+    "help": "A non-secret internal scope label. Never enter an account ID.",
+    "placeholder": "production-scope",
+    "type": "input",
+    "required": true,
+    "operations": [
+      "batch"
+    ]
+  },
+  {
+    "name": "partition",
+    "label": "Provider partition",
+    "help": "Provider partition for the observation scope.",
+    "placeholder": "",
+    "type": "dropdown",
+    "required": true,
+    "operations": [
+      "batch"
+    ],
+    "options": [
+      "aws",
+      "aws-cn",
+      "aws-us-gov"
+    ]
+  },
+  {
+    "name": "region",
+    "label": "Source region",
+    "help": "Region in which the read observation was made.",
+    "placeholder": "us-east-1",
+    "type": "input",
+    "required": true,
+    "operations": [
+      "batch"
+    ]
+  },
+  {
+    "name": "inference_service",
+    "label": "Inference service",
+    "help": "Choose the governed service for this batch, such as AWS Bedrock.",
+    "placeholder": "aws-bedrock",
+    "type": "input",
+    "required": true,
+    "operations": [
+      "batch"
+    ]
+  },
+  {
+    "name": "candidate_evidence",
+    "label": "Supporting observations",
+    "help": "Optional. One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. Use the evidence lookup for retained observations, or enter the exact values from a new observation.",
+    "placeholder": "https://docs.example.com/model | 2026-09-02T08:00:00Z | sha256-0123…",
+    "type": "textarea",
+    "required": false,
+    "operations": [
+      "add",
+      "change",
+      "revoke",
+      "move",
+      "batch"
+    ]
+  },
+  {
+    "name": "acceptance",
+    "label": "Acceptance checks",
+    "help": "One check per line, up to 25. For example: the named model and its evidence agree.",
+    "placeholder": "The new record has the requested stable identity at its canonical path.\nThe record and referenced evidence pass Modelo validation.\n",
+    "type": "textarea",
+    "required": true,
+    "operations": [
+      "add",
+      "change",
+      "revoke",
+      "move",
+      "batch"
+    ]
+  }
+]

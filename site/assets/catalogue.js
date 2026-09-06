@@ -156,14 +156,17 @@ document.addEventListener("alpine:init", () => {
       const body = this.$root.querySelector("[data-catalogue-body]");
       const grid = this.$root.querySelector("[data-catalogue-grid]");
       const items = this.view === "grid" ? this.cards : this.rows;
-      const ordered = [...items].sort((left, right) => this.compareRows(left, right));
+      const sortKey = `${this.view}:${this.sort}`;
+      const reorder = this.sortedFor !== sortKey;
+      const ordered = reorder ? [...items].sort((left, right) => this.compareRows(left, right)) : items;
       let visible = 0;
       for (const item of this.rows) item.element.hidden = this.view === "table" ? !this.matches(item) : false;
       for (const item of this.cards) item.element.hidden = this.view === "grid" ? !this.matches(item) : false;
       for (const row of ordered) {
         if (!row.element.hidden) visible += 1;
-        (this.view === "grid" ? grid : body).append(row.element);
+        if (reorder) (this.view === "grid" ? grid : body).append(row.element);
       }
+      this.sortedFor = sortKey;
       const total = items.length;
       const noun = this.view === "grid" ? (total === 1 ? "model" : "models") : (total === 1 ? "record" : "records");
       this.$root.querySelector("[data-result-count]").textContent = `Showing ${visible} of ${total} ${noun}`;

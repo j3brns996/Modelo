@@ -384,9 +384,8 @@ The site progressively enhances its complete server-rendered catalogue with the
 exact locally vendored `@alpinejs/csp==3.16.3` runtime. The standard Alpine build
 is forbidden because its expression evaluation conflicts with Modelo's CSP;
 CDN, npm and `npx` application-runtime acquisition are also forbidden. The
-presentation may load only the configured Inter and JetBrains Mono styles/fonts
-from the exact CSP-allowlisted Google Fonts origins; font responses are never
-catalogue or build inputs. The published Alpine
+presentation uses locally available Georgia, system-ui and ui-monospace fonts.
+Remote fonts are forbidden. The published Alpine
 and bundled Vue reactivity MIT notices and runtime digest are part of the
 deterministic fixed inventory.
 Enhancement supplies bounded search, multi-select facets, deterministic sorting,
@@ -394,7 +393,7 @@ result counts, table/grid views, allowlisted shareable URL state and comparison
 of two to four canonical models. Comparison never treats an offering as a model,
 never invents facts and uses only safe DOM construction and `textContent`.
 Only table/grid preference is eligible for local storage; an explicit URL value
-wins and unavailable storage falls back to the configured grid view. The
+wins and unavailable storage falls back to the configured table view. The
 catalogue route alone loads `catalogue.js` and the vendored Alpine CSP runtime.
 The propose route loads only its dedicated vanilla `proposal.js`; every other
 route has no browser runtime.
@@ -793,9 +792,14 @@ digest is bound into the change request and release receipt.
 
 The proposal page keeps five static, no-JavaScript cards whose destinations are
 the configured operation-specific intake URLs. Its interactive helper covers
-add and change only. It produces a non-canonical summary of human issue fields,
-not a neutral MAC payload; revoke, move and batch use their static cards. After
-an issue exists, the trusted default-branch GitHub compiler derives a stable
+all five operations, with shared field explanations and adjacent lookups from
+the validated publication only. It preserves answers when switching operations
+and validates applicable fields before handoff. It produces non-canonical human
+issue fields, not a neutral MAC payload. GitLab receives a bounded Markdown
+description through native browser navigation; GitHub receives native form
+fields. Both leave human attestations unchecked and retain a complete copy
+fallback when the final encoded URL exceeds 7,000 characters. After an issue
+exists, the configured trusted adapter compiler derives a stable
 UUIDv5 from the issue coordinate and computes the dedupe key, idempotency key
 and payload digest.
 

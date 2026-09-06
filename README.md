@@ -22,7 +22,7 @@ contain no production data.
 
 ![Modelo synthetic-demo home showing navigation, synthetic status and catalogue totals](docs/img/modelo-home.png)
 
-![Modelo synthetic catalogue showing filters and model result cards](docs/img/modelo-catalogue.png)
+![Modelo synthetic catalogue showing filters and model result table](docs/img/modelo-catalogue.png)
 
 ## Why Facts And Approval Are Separate
 

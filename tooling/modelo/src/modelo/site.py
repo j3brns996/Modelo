@@ -23,6 +23,7 @@ from modelo.config import CONTRACT_VERSION, load_config
 from modelo.receipt import canonical_bytes, publication_digest, sha256_bytes
 from modelo.schemas import SchemaSet
 from modelo.identity import canonical_urn, release_precision
+from modelo.proposal import OPERATIONS, lookup_records, render_fields
 
 
 _ID = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
@@ -388,8 +389,8 @@ def _history_summary_html(history: Iterable[Mapping[str, Any]]) -> str:
 
 def _navigation(resolver: _Resolver, current: str) -> str:
     labels = (
-        ("catalogue", "Explore"), ("process", "Governance"),
-        ("changes", "Changes"), ("propose", "Contribute"), ("docs", "Reference"),
+        ("catalogue", "Catalogue"), ("process", "How it works"),
+        ("changes", "Changes"), ("propose", "Make a proposal"), ("docs", "Field guide"),
     )
     return "".join(
         '<a href="' + escape(resolver.site(key), quote=True) + '"'
@@ -400,19 +401,10 @@ def _navigation(resolver: _Resolver, current: str) -> str:
 
 def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, request: _SiteBuildRequest, name: str, title: str, content: str, route: str, route_values: Mapping[str, str] | None = None) -> bytes:
     base = _template(root, source, templates_path, "base")
-    try:
-        font_stylesheet = str(resolver.fonts["stylesheet_url"])
-        font_style_origin = str(resolver.fonts["style_origin"])
-        font_file_origin = str(resolver.fonts["file_origin"])
-    except KeyError as exc:
-        raise BuildError("configured site font contract is incomplete") from exc
     values = {
         "canonical_url": escape(resolver.canonical(route, **dict(route_values or {})), quote=True),
         "asset_css_url": escape(resolver.site("asset_css"), quote=True),
         "asset_third_party_notices_url": escape(resolver.site("asset_third_party_notices"), quote=True),
-        "font_stylesheet_url": escape(font_stylesheet, quote=True),
-        "font_style_origin": escape(font_style_origin, quote=True),
-        "font_file_origin": escape(font_file_origin, quote=True),
         "scripts": (
             '<script src="' + escape(resolver.site("asset_catalogue_js"), quote=True) + '" defer></script>\n  '
             '<script src="' + escape(resolver.site("asset_alpine"), quote=True) + '" defer></script>'
@@ -429,8 +421,8 @@ def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, req
         "repository_url": escape(str(resolver.repository["web_base"]), quote=True),
         "source_commit_url": escape(resolver.repository_url("commit", commit_sha=request.source_commit), quote=True),
         "status_banner": (
-            '<aside class="status-banner" role="status"><span class="status-banner__dot" aria-hidden="true"></span><strong>Synthetic demo.</strong>'
-            "<span>This is test data, not an approved enterprise catalogue.</span></aside>"
+            '<aside class="status-banner" role="status"><strong>Demonstration catalogue</strong>'
+            "<span>— synthetic data, not enterprise approval.</span></aside>"
             if request.kind == "demo" else ""
         ),
         "integration_label": (
@@ -461,13 +453,9 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         ("Models", len(catalogue["models"])), ("Offerings", len(catalogue["offerings"])),
         ("Evidence", len(catalogue["evidence"])), ("Conditions", len(catalogue["conditions"])),
     )
-    summary = '<div class="console-grid">' + "".join(
-        '<div><span>' + label + '</span><strong>' + str(value) + "</strong></div>"
-        for label, value in metrics
-    ) + "</div><div class=\"console-foot\"><span>profile</span><code>" + escape(request.profile) + "</code><span>as_of</span><code>" + request.as_of.isoformat() + "</code></div>"
-    governance_flow = '<ol class="governance-flow"><li><span>01</span><strong>Find the facts</strong><p>Read the provider source and record when and where the facts were seen.</p></li><li><span>02</span><strong>Keep the proof</strong><p>Link each published claim to a fixed, content-addressed evidence record.</p></li><li><span>03</span><strong>Make a decision</strong><p>Review the proposed change and explain why the offering should be approved.</p></li><li><span>04</span><strong>Publish exactly</strong><p>Build the reviewed Git revision once and publish those exact files.</p></li></ol>'
+    summary = " · ".join(str(value) + " " + (label.lower().rstrip("s") if value == 1 else label.lower()) for label, value in metrics) + " · Data checked " + request.as_of.isoformat()
     home_content = _substitute(templates["home"], {
-        "summary": summary, "governance_flow": governance_flow,
+        "summary": summary,
         "recent_changes": _history_summary_html(history[:3]),
         "catalogue_url": escape(resolver.site("catalogue"), quote=True),
         "process_url": escape(resolver.site("process"), quote=True),
@@ -504,8 +492,8 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         })
         rows.append(
             '<tr class="catalogue-row catalogue-row--model" data-catalogue-row data-catalogue-item' + attrs + '><td class="catalogue-kind" data-label="Kind"><span>Model</span></td><td class="catalogue-primary" data-label="Name"><a href="'
-            + escape(model_url, quote=True) + '">' + escape(model_name) + '</a><code>' + escape(model["id"]) + '</code></td><td class="catalogue-owner" data-label="Vendor">'
-            + escape(model.get("vendor_id", "")) + '</td><td class="catalogue-signals" data-label="Capabilities">'
+            + escape(model_url, quote=True) + '">' + escape(model_name) + '</a><span class="muted">' + ('Access recorded' if model_offerings else 'No approved access recorded') + '</span></td><td class="catalogue-owner" data-label="Vendor">'
+            + escape(catalogue["vendors"]["vendors"].get(model.get("vendor_id"), {}).get("name", model.get("vendor_id", ""))) + '</td><td class="catalogue-signals" data-label="Capabilities">'
             + _tags(model.get("capabilities", []))
             + ('<span class="context-stat"><small>Context</small><strong>' + f'{model["context_window"]:,}' + "</strong></span>" if model.get("context_window") else "")
             + '</td><td class="catalogue-action" data-label="Action"><button class="button button--small" type="button" data-compare-toggle '
@@ -515,7 +503,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         offering_summary = (
             '<span class="model-card__availability model-card__availability--approved">' + str(len(model_offerings))
             + (' approved offering' if len(model_offerings) == 1 else ' approved offerings') + '</span>' + _tags(services)
-            if model_offerings else '<span class="model-card__availability">No approved offering</span>'
+            if model_offerings else '<span class="model-card__availability">No approved access recorded</span>'
         )
         facts = []
         if model.get("context_window"):
@@ -527,7 +515,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         cards.append(
             '<article class="model-card" data-model-card data-catalogue-card data-catalogue-item' + attrs + '>'
             + '<div class="model-card__heading"><span class="model-card__mark" aria-hidden="true">' + escape(initials) + '</span><div><p>'
-            + escape(model.get("vendor_id", "")) + '</p><h2><a href="' + escape(model_url, quote=True) + '">' + escape(model_name) + '</a></h2></div>'
+            + escape(catalogue["vendors"]["vendors"].get(model.get("vendor_id"), {}).get("name", model.get("vendor_id", ""))) + '</p><h2><a href="' + escape(model_url, quote=True) + '">' + escape(model_name) + '</a></h2></div>'
             + '<button class="model-card__save" type="button" aria-label="Compare ' + escape(model_name, quote=True) + '" data-compare-toggle x-on:click="toggleComparison" aria-pressed="false" hidden>Compare</button></div>'
             + '<p class="model-card__description">' + escape(model.get("description", "No description has been published for this model.")) + '</p>'
             + '<div class="model-card__tags">' + _tags(model.get("capabilities", [])) + _tags(model.get("modalities", [])) + '</div>'
@@ -540,7 +528,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         rows.append('<tr class="catalogue-row catalogue-row--offering" data-catalogue-row data-catalogue-item' + attrs + '><td class="catalogue-kind" data-label="Kind"><span>Offering</span></td><td class="catalogue-primary" data-label="Name"><a href="' + escape(resolver.site("offering", inference_service_id=offering["inference_service_id"], offering_id=offering["id"]), quote=True) + '">' + escape(offering["id"]) + '</a><code>' + escape(offering["model_id"]) + '</code></td><td class="catalogue-owner" data-label="Service">' + escape(offering["inference_service_id"]) + '</td><td class="catalogue-signals" data-label="Source regions">' + _tags(route["source_region"] for route in offering["routes"]) + '</td><td class="catalogue-action" data-label="Action"><span class="muted">View route →</span></td></tr>')
     filter_fields = (
         ("kind", "Type", "basic"), ("vendor", "Vendor", "basic"),
-        ("service", "Service", "basic"), ("source-region", "Source Region", "basic"),
+        ("service", "Service", "advanced"), ("source-region", "Source Region", "advanced"),
         ("capability", "Capability", "basic"), ("route-type", "Route type", "advanced"),
         ("modality", "Modality", "advanced"), ("licence", "Licence", "advanced"),
         ("lifecycle", "Lifecycle", "advanced"), ("condition", "Condition", "advanced"),
@@ -559,7 +547,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
             '<button class="filter-chip" type="button" data-filter="' + key
             + '" data-filter-label="' + escape(label, quote=True) + '" data-value="'
             + escape(value, quote=True) + '" aria-pressed="false" x-on:click="toggleFilter">'
-            + escape(value.replace("-", " ").title() if key == "kind" else value) + "</button>"
+            + escape((catalogue["vendors"]["vendors"].get(value, {}).get("name", value) if key == "vendor" else catalogue["inference_services"]["inference_services"].get(value, {}).get("name", value) if key == "service" else value.replace("-", " ").title())) + "</button>"
             for value in present
         )
         controls[group].append(
@@ -567,10 +555,6 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
             + '</legend><div class="filter-options">' + options + "</div></fieldset>"
         )
     caption = "Catalogue models and offerings"
-    catalogue_note = (
-        '<strong>Documentation-backed examples.</strong> These 22 models demonstrate the catalogue experience. They are observations, not enterprise approvals; only an offering grants permission to consume a model.'
-        if request.kind == "demo" else '<strong>Current governed catalogue.</strong> Model facts describe what exists. An approved offering explains whether and how the organisation may use it.'
-    )
     enhancement = document["site"]["progressive_enhancement"]
     catalogue_content = _substitute(templates["catalogue"], {
         "basic_filter_controls": '<div class="filter-groups">' + "".join(controls["basic"]) + "</div>",
@@ -579,8 +563,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         "comparison_max_models": str(enhancement["comparison_max_models"]),
         "view_storage_key": escape(enhancement["view_storage_key"], quote=True),
         "default_view": escape(enhancement["default_view"], quote=True),
-        "model_count": str(len(catalogue["models"])),
-        "catalogue_note": catalogue_note,
+        "record_count": str(len(catalogue["models"]) + len(catalogue["offerings"])),
         "table_view_pressed": "true" if enhancement["default_view"] == "table" else "false",
         "grid_view_pressed": "true" if enhancement["default_view"] == "grid" else "false",
         "catalogue_cards": '<div class="model-grid" data-catalogue-grid>' + "".join(cards) + '</div>',
@@ -590,13 +573,18 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     content_path = document["paths"]["site_content"]
     process_content = _substitute(templates["process"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/process.md"))}, "process")
     intake = document["repository"]["web_routes"]["mac_intake"]
-    intake_links = "".join('<a class="intake-card" rel="noopener noreferrer" href="' + escape(str(document["repository"]["web_base"]).rstrip("/") + intake[key], quote=True) + '"><span>' + escape(key.title()) + '</span><small>Open governed request</small><b aria-hidden="true">→</b></a>' for key in ("add", "change", "revoke", "move", "batch"))
+    intake_links = "".join('<a class="intake-card" rel="noopener noreferrer" href="' + escape(str(document["repository"]["web_base"]).rstrip("/") + intake[key], quote=True) + '"><span>' + escape(OPERATIONS[key]) + '</span><small>Open issue form</small><b aria-hidden="true">→</b></a>' for key in OPERATIONS)
     web_base_url = str(document["repository"]["web_base"]).rstrip("/")
     propose_content = _substitute(templates["propose"], {
         "body": _markdown(_blob(root, request.source_commit, content_path + "/propose.md")),
         "intake_links": intake_links,
         "intake_add_url": escape(web_base_url + intake["add"], quote=True),
-        "intake_change_url": escape(web_base_url + intake["change"], quote=True),
+        "intake_attributes": " ".join('data-intake-' + key + '="' + escape(web_base_url + intake[key], quote=True) + '"' for key in OPERATIONS),
+        "provider": escape(document["repository"]["adapter"], quote=True),
+        "provider_label": "GitLab" if document["repository"]["adapter"] == "gitlab" else "GitHub",
+        "lookup_notice": "These are synthetic examples, not enterprise approvals." if request.profile == "synthetic" else "",
+        "lookup_records": escape(json.dumps(lookup_records(catalogue), ensure_ascii=False, separators=(",", ":")), quote=True),
+        "proposal_fields": render_fields(json.loads(_blob(root, request.source_commit, content_path + "/proposal-fields.json"))),
     }, "propose")
     docs_links = '<div class="reference-grid"><a href="' + escape(resolver.site("human_specification"), quote=True) + '"><strong>Human specification</strong><span>Rationale and invariants</span></a><a href="' + escape(resolver.site("machine_contract"), quote=True) + '"><strong>Machine contract</strong><span>Compact executable context</span></a><a href="' + escape(resolver.site("schemas_data") + "model.schema.json", quote=True) + '"><strong>Model schema</strong><span>Canonical model shape</span></a><a href="' + escape(resolver.site("schemas_data") + "offering.schema.json", quote=True) + '"><strong>Offering schema</strong><span>Consumption approval shape</span></a></div><div class="clone-command"><span>Clean clone</span><code>git clone ' + escape(str(document["repository"]["web_base"]) + ".git") + "</code></div>"
     docs_content = _substitute(templates["docs"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/docs.md")), "documentation_links": docs_links}, "docs")
@@ -613,8 +601,8 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     files = {path: _page(root, request.source_commit, templates_path, resolver, request, name, title, content, route) for path, (name, title, content, route) in page_specs.items()}
     for model in catalogue["models"]:
         model_refs = sorted({reference["id"] for reference in model.get("evidence_refs", {}).values()})
-        facts = '<dl class="fact-grid"><div><dt>Identifier</dt><dd><code>' + escape(model["id"]) + "</code></dd></div><div><dt>Vendor</dt><dd>" + escape(model.get("vendor_id", "")) + "</dd></div><div><dt>Context window</dt><dd>" + (f'{model["context_window"]:,}' if model.get("context_window") else "Not stated") + "</dd></div><div><dt>Licence</dt><dd>" + escape(model.get("licensing", "Not stated")) + "</dd></div><div><dt>Capabilities</dt><dd>" + (_tags(model.get("capabilities", [])) or "Not stated") + "</dd></div><div><dt>Modalities</dt><dd>" + (_tags(model.get("modalities", [])) or "Not stated") + "</dd></div></dl>"
-        links = "".join('<a class="related-card" href="' + escape(resolver.site("offering", inference_service_id=o["inference_service_id"], offering_id=o["id"]), quote=True) + '"><span><strong>' + escape(o["id"]) + '</strong><small>' + escape(o["inference_service_id"]) + '</small></span><b aria-hidden="true">→</b></a>' for o in offerings_by_model.get(model["id"], [])) or '<p class="empty-state">No approved offering is published for this model.</p>'
+        facts = '<dl class="fact-grid"><div><dt>Identifier</dt><dd><code>' + escape(model["id"]) + "</code></dd></div><div><dt>Vendor</dt><dd>" + escape(catalogue["vendors"]["vendors"].get(model.get("vendor_id"), {}).get("name", model.get("vendor_id", ""))) + "</dd></div><div><dt>Context window</dt><dd>" + (f'{model["context_window"]:,}' if model.get("context_window") else "Not stated") + "</dd></div><div><dt>Licence</dt><dd>" + escape(model.get("licensing", "Not stated")) + "</dd></div><div><dt>Capabilities</dt><dd>" + (_tags(model.get("capabilities", [])) or "Not stated") + "</dd></div><div><dt>Modalities</dt><dd>" + (_tags(model.get("modalities", [])) or "Not stated") + "</dd></div></dl>"
+        links = "".join('<a class="related-card" href="' + escape(resolver.site("offering", inference_service_id=o["inference_service_id"], offering_id=o["id"]), quote=True) + '"><span><strong>' + escape(o["id"]) + '</strong><small>' + escape(o["inference_service_id"]) + '</small></span><b aria-hidden="true">→</b></a>' for o in offerings_by_model.get(model["id"], [])) or '<p class="empty-state">No approved access is recorded for this model.</p>'
         content = _substitute(templates["model"], {
             "model_name": escape(model.get("name", model["id"])),
             "model_description": escape(model.get("description", "No description published.")),

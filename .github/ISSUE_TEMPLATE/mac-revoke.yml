@@ -15,7 +15,7 @@ body:
     id: request_type
     attributes:
       label: "Modelo MAC request type"
-      description: "Fixed by this form."
+      description: "Choose what should happen. Nothing is submitted until you review the native issue form."
       options:
         - "revoke"
       default: 0
@@ -25,7 +25,7 @@ body:
     id: subject_identity
     attributes:
       label: "Offering identity"
-      description: "Enter the stable identity of the offering whose approval should end."
+      description: "Choose the existing offering whose access should be withdrawn. This does not delete its history. [Look up records](https://j3brns996.github.io/Modelo/propose/?operation=revoke#lookup-requested_outcome)."
       placeholder: "bedrock-example-model"
     validations:
       required: true
@@ -33,7 +33,7 @@ body:
     id: purpose
     attributes:
       label: "Purpose"
-      description: "In one short sentence, what business or governance need does this request serve?"
+      description: "In one sentence, what do you need? For example: provide a reviewed model for document summarisation."
       placeholder: "Example: End enterprise approval for a retired inference route"
     validations:
       required: true
@@ -41,7 +41,7 @@ body:
     id: requested_outcome
     attributes:
       label: "Requested outcome"
-      description: "Describe the catalogue state that should be true when this work is complete."
+      description: "Describe what should be true when the request is complete. Use the lookup to reference models, services or exact condition versions. [Look up records](https://j3brns996.github.io/Modelo/propose/?operation=revoke#lookup-requested_outcome)."
       placeholder: "Example: Remove the current offering so its route is no longer enterprise-approved."
     validations:
       required: true
@@ -49,7 +49,7 @@ body:
     id: reason
     attributes:
       label: "Why is this needed?"
-      description: "Give the reviewer the decision context. Explain why the current catalogue state is insufficient."
+      description: "Explain who needs this and why the current catalogue is insufficient."
       placeholder: "Example: Governance has ended approval after a planned service retirement; this is not inferred from a missing discovery result."
     validations:
       required: true
@@ -57,7 +57,7 @@ body:
     id: candidate_evidence
     attributes:
       label: "Supporting observations"
-      description: "Optional. One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. These are candidate sources, not approval."
+      description: "Optional. One observation per line: official HTTPS URL | RFC 3339 UTC time | sha256- digest. Use the evidence lookup for retained observations, or enter the exact values from a new observation. [Look up records](https://j3brns996.github.io/Modelo/propose/?operation=revoke#lookup-requested_outcome)."
       placeholder: "https://docs.example.com/model | 2026-09-02T08:00:00Z | sha256-0123…"
     validations:
       required: false
@@ -65,7 +65,7 @@ body:
     id: acceptance
     attributes:
       label: "Acceptance checks"
-      description: "One observable completion check per line. State what a reviewer or CI can verify."
+      description: "One check per line, up to 25. For example: the named model and its evidence agree."
       placeholder: |
         The offering is absent from the current catalogue.
         The change delta records one revoke and no unrelated catalogue changes.

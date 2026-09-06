@@ -463,14 +463,12 @@ site:
   data_routes: [catalogue, change_delta, manifest, schemas]
   asset_routes: [asset_css, asset_catalogue_js, asset_proposal_js, asset_alpine, asset_third_party_notices]
   presentation:
-    shell: responsive_product_catalogue
-    references: [symphonic_information_architecture, local_model_filter_prototype]
-    font_families: [Inter, JetBrains Mono]
-    font_stylesheet_origin: https://fonts.googleapis.com
-    font_file_origin: https://fonts.gstatic.com
+    shell: editorial_reference_catalogue
+    font_families: [Georgia, system-ui, ui-monospace]
+    remote_fonts: forbidden
     remote_scripts: forbidden
-    home_journey: [purpose, primary_actions, trust_posture, catalogue_metrics, governance_flow, recent_changes, next_actions]
-    catalogue_default_view: grid
+    home_journey: [purpose, search, publication_summary, reading_guide, recent_changes, oversight]
+    catalogue_default_view: table
     catalogue_grid: dedicated_model_cards_not_table_row_restyling
     entity_components: [status, facts, evidence_posture, approval_rationale, approval_coordinates, related_records]
     responsive_breakpoints: [880px, 580px]
@@ -482,7 +480,7 @@ site:
     search_max_length: 200
     comparison_max_models: 4
     view_storage_key: modelo.catalogue.view.v1
-    default_view: grid
+    default_view: table
     local_persistence: table_or_grid_view_only_url_value_takes_precedence_storage_failure_falls_back_to_configured_default
     licence: MIT
     bundled_dependency: "@vue/reactivity==3.5.41"
@@ -496,7 +494,7 @@ site:
       propose: [assets/proposal.js]
       all_other_routes: []
     proposal_runtime: dedicated_vanilla_javascript_no_alpine
-    proposal_supported_interactive_operations: [add, change]
+    proposal_supported_interactive_operations: [add, change, revoke, move, batch]
     proposal_all_operation_static_cards: [add, change, revoke, move, batch]
     proposal_intake_url_source: repository.web_routes.mac_intake
     proposal_output: noncanonical_human_issue_field_summary
@@ -548,7 +546,9 @@ authoring:
       malformed_nonblank: reject
     batch_scope: required_independently_of_candidate_evidence
   browser_draft:
-    operations: [add, change]
+    operations: [add, change, revoke, move, batch]
+    field_definitions: site/content/proposal-fields.json
+    lookup_source: validated_publication_projection_only
     output: human_issue_field_summary_not_neutral_mac_payload
     omitted_trusted_values: [request_id, dedupe_key, idempotency_key, payload_digest]
     authority: convenience_only
@@ -560,6 +560,7 @@ authoring:
       overflow_fallback: retained_full_human_issue_field_summary_for_manual_entry
       rationale: conservative_headroom_below_common_8_kib_infrastructure_limits
     accessible_status:
+      validation_outcome: independent_polite_atomic_live_region
       url_outcome: independent_polite_atomic_live_region
       clipboard_outcome: independent_polite_atomic_live_region
   github_intake:

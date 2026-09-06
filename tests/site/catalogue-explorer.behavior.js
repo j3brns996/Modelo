@@ -165,6 +165,15 @@ function record(index, { key, name, kind, search, facets = {} }) {
   assert.equal(alpha.element.hidden, false);
   assert.equal(result.textContent, "Showing 1 of 1 model");
   assert.equal(explorer.$root.dataset.view, "grid");
+  explorer.query = "no match";
+  explorer.apply(false);
+  assert.deepEqual(grid.children, [alpha.element], "search must not append/sort existing nodes again");
+  assert.equal(alpha.element.hidden, true);
+  explorer.view = "table";
+  explorer.query = "";
+  explorer.apply(false);
+  assert.deepEqual(body.children, [alpha.element, beta.element]);
+  assert.equal(result.textContent, "Showing 2 of 2 records");
 }
 
 // URL state is bounded, repeatable and preserves parameters it does not own.

@@ -864,6 +864,30 @@ class FinalSiteTests(unittest.TestCase):
         self.assertNotIn("<script", overview)
         self.assertIn("/Modelo/docs/SPEC.md", docs)
         self.assertIn("/Modelo/docs/contract.yaml", docs)
+        guide = (site / "agents/README.md").read_text(encoding="utf-8")
+        inventory = json.loads((site / "data/catalogue.json").read_text(encoding="utf-8"))
+        example = json.loads(re.search(r"```json\n(.*?)\n```", guide, re.S).group(1))
+        self.assertEqual(example["source_commit"], inventory["source_commit"])
+        self.assertEqual(example["profile"], inventory["profile"])
+        self.assertIn(example["model"], inventory["models"])
+        self.assertIn(example["offering"], inventory["offerings"])
+        self.assertEqual(example["offering"]["model_id"], example["model"]["id"])
+        self.assertIn("/Modelo/data/catalogue.json", guide)
+        self.assertIn("/Modelo/data/schemas/mac.schema.json", guide)
+        self.assertNotIn("$inventory", guide)
+        self.assertIn("Why it is needed", guide)
+        self.assertIn("Do not use\nan issue API", guide)
+        from zipfile import ZipFile
+        with ZipFile(site / "data/proposal-schema.zip") as bundle:
+            self.assertEqual(bundle.read("README.md").decode("utf-8"), guide)
+            for name in ("model-request.yml", "mac-add.yml", "mac-change.yml", "mac-revoke.yml", "mac-move.yml", "mac-batch.yml"):
+                raw = (self.root / ".github/ISSUE_TEMPLATE" / name).read_bytes()
+                self.assertEqual(bundle.read("templates/" + name), raw)
+                self.assertIn(raw.decode("utf-8"), guide)
+            for schema in (site / "data/schemas").rglob("*.json"):
+                self.assertEqual(bundle.read("schemas/" + schema.relative_to(site / "data/schemas").as_posix()), schema.read_bytes())
+        self.assertIn("/Modelo/agents/README.md", overview)
+        self.assertIn("/Modelo/agents/README.md", (site / "propose/index.html").read_text(encoding="utf-8"))
         home = (site / "index.html").read_text(encoding="utf-8")
         self.assertIn(f'href="https://github.com/j3brns996/Modelo/commit/{self.source}"', home)
         self.assertIn(f'href="https://github.com/j3brns996/Modelo/commit/{self.merge}"', home)
@@ -1060,8 +1084,8 @@ class FinalSiteTests(unittest.TestCase):
             "asset_alpine": "/assets/vendor/alpine-csp-3.16.3.min.js",
             "asset_third_party_notices": "/assets/vendor/THIRD-PARTY-NOTICES.md",
             "catalogue_data": "/data/catalogue.json", "change_delta_data": "/data/change-delta.json",
-            "manifest_data": "/data/manifest.json", "schemas_data": "/data/schemas/",
-            "human_specification": "/docs/SPEC.md", "machine_contract": "/docs/contract.yaml",
+            "manifest_data": "/data/manifest.json", "schemas_data": "/data/schemas/", "proposal_schema_bundle_data": "/data/proposal-schema.zip",
+            "human_specification": "/docs/SPEC.md", "machine_contract": "/docs/contract.yaml", "requester_agent": "/agents/README.md",
         }
         for base_url, base_path in (("https://example.invalid/", "/"), ("https://example.invalid/group/project/", "/group/project/")):
             resolver = _Resolver(base_url, base_path, routes, {"web_base": "https://gitlab.com/group/project", "web_routes": {"commit": "/-/commit/{commit_sha}"}})

@@ -366,3 +366,18 @@ choices. Unknown domicile never supplies a default processing territory.
 Clear comparison resets selected models, the comparison dialog, and `compare`
 URL parameters. It preserves search and filters and returns focus to catalogue
 search. The button is available beside comparison controls when a selection exists.
+
+## Requester agent entry point
+
+`site.document_routes.requester_agent` publishes plain Markdown at
+`/agents/README.md`, linked from the proposal and overview pages. It needs no
+agent configuration, installed skill, or checkout for intake. The public data
+contract is the published catalogue object and its schemas. The guide embeds
+a model and matching offering from the same build with snapshot identity,
+explains what each request field means and why it is needed, and routes missing
+vendor/service prerequisites to governed issue forms. The requester reviews
+and submits the native Git-provider form; the guide does not use issue APIs.
+The file is included in the exact publication inventory and manifest.
+The instructions embed the exact selected host form markup. The deterministic
+proposal ZIP contains the guide, selected host templates, and published schemas.
+GitHub YAML defines native fields; GitLab Markdown defines the description.

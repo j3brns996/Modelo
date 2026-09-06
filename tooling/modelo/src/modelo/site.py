@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from html import escape
 import hashlib
+import io
+from zipfile import ZipFile, ZipInfo
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -159,6 +161,7 @@ def _entry(data: bytes, path: str = "") -> dict[str, Any]:
     media = {
         ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
         ".js": "text/javascript; charset=utf-8", ".json": "application/json; charset=utf-8",
+        ".zip": "application/zip",
         ".md": "text/markdown; charset=utf-8", ".yaml": "application/yaml; charset=utf-8",
     }.get(suffix, "application/json; charset=utf-8")
     return {"sha256": sha256_bytes(data), "size": len(data), "media_type": media}
@@ -182,7 +185,7 @@ class _Resolver:
         expected_files = {
             "not_found", "asset_css", "asset_catalogue_js", "asset_proposal_js", "asset_alpine",
             "asset_third_party_notices", "catalogue_data", "change_delta_data",
-            "manifest_data", "schemas_data", "human_specification", "machine_contract",
+            "proposal_schema_bundle_data", "manifest_data", "schemas_data", "human_specification", "machine_contract", "requester_agent",
         }
         if set(self.site_routes) != expected_directories | expected_files:
             raise BuildError("configured site route inventory is incomplete or contains extras")
@@ -584,6 +587,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         "intake_add_url": escape(web_base_url + intake["add"], quote=True),
         "access_test": ('<button type="button" class="button" data-test-access="' + escape(web_base_url, quote=True) + '">Test GitLab access</button><p data-access-status role="status" aria-live="polite" aria-atomic="true"></p><p class="field-help"><a target="_blank" rel="noopener noreferrer" href="' + escape(web_base_url, quote=True) + '">Open GitLab repository</a> to check access or sign in. This optional test does not submit your draft.</p>') if document["repository"]["adapter"] == "gitlab" else "",
         "request_intake_url": escape(resolver.repository_url("request_intake"), quote=True),
+        "requester_agent_url": escape(resolver.site("requester_agent"), quote=True),
         "intake_attributes": " ".join('data-intake-' + key + '="' + escape(web_base_url + intake[key], quote=True) + '"' for key in OPERATIONS),
         "provider": escape(document["repository"]["adapter"], quote=True),
         "provider_label": "GitLab" if document["repository"]["adapter"] == "gitlab" else "GitHub",
@@ -593,7 +597,7 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     }, "propose")
     docs_links = '<div class="reference-grid"><a href="' + escape(resolver.site("human_specification"), quote=True) + '"><strong>Human specification</strong><span>Rationale and invariants</span></a><a href="' + escape(resolver.site("machine_contract"), quote=True) + '"><strong>Machine contract</strong><span>Compact executable context</span></a><a href="' + escape(resolver.site("schemas_data") + "model.schema.json", quote=True) + '"><strong>Model schema</strong><span>Canonical model shape</span></a><a href="' + escape(resolver.site("schemas_data") + "offering.schema.json", quote=True) + '"><strong>Offering schema</strong><span>Consumption approval shape</span></a></div><div class="clone-command"><span>Clean clone</span><code>git clone ' + escape(str(document["repository"]["web_base"]) + ".git") + "</code></div>"
     docs_content = _substitute(templates["docs"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/docs.md")), "documentation_links": docs_links, "overview_url": escape(resolver.site("overview"), quote=True)}, "docs")
-    overview_content = _substitute(templates["overview"], {"propose_url": escape(resolver.site("propose"), quote=True), "spec_url": escape(resolver.site("human_specification"), quote=True), "docs_url": escape(resolver.site("docs"), quote=True)}, "overview")
+    overview_content = _substitute(templates["overview"], {"propose_url": escape(resolver.site("propose"), quote=True), "spec_url": escape(resolver.site("human_specification"), quote=True), "docs_url": escape(resolver.site("docs"), quote=True), "requester_agent_url": escape(resolver.site("requester_agent"), quote=True)}, "overview")
     not_found_content = _substitute(templates["404"], {"home_url": escape(resolver.site("home"), quote=True)}, "404")
     page_specs = {
         resolver.output_path("home"): ("home", "Modelo", home_content, "home"),
@@ -644,6 +648,32 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     files[resolver.output_path("change_delta_data")] = delta_raw
     files[resolver.output_path("human_specification")] = _blob(root, request.source_commit, document["paths"]["human_specification"])
     files[resolver.output_path("machine_contract")] = _blob(root, request.source_commit, document["paths"]["machine_contract"])
+    example_model = catalogue["models"][0] if catalogue["models"] else None
+    example_offering = next((item for item in catalogue["offerings"] if example_model and item["model_id"] == example_model["id"]), None)
+    example = {key: catalogue[key] for key in ("contract_version", "source_commit", "source_tree", "as_of", "profile")}
+    example.update({"model": example_model, "offering": example_offering})
+    adapter = document["repository"]["adapter"]
+    template_root = document["paths"][adapter + "_adapter"] + ("/ISSUE_TEMPLATE" if adapter == "github" else "/issue_templates")
+    template_names = (["model-request.yml"] + ["mac-" + key + ".yml" for key in OPERATIONS]) if adapter == "github" else (["Model-Request.md"] + ["MAC-" + key.title() + ".md" for key in OPERATIONS])
+    form_templates = {name: _blob(root, request.source_commit, template_root + "/" + name) for name in template_names}
+    guide = Template(_blob(root, request.source_commit, content_path + "/requester-agent.md").decode("utf-8"))
+    files[resolver.output_path("requester_agent")] = _substitute(guide, {
+        "inventory_url": resolver.site("catalogue_data"),
+        "bundle_url": resolver.site("proposal_schema_bundle_data"),
+        "git_host": adapter,
+        "form_markup": "\n\n".join("### " + name + "\n\n~~~~" + ("yaml" if adapter == "github" else "markdown") + "\n" + raw.decode("utf-8") + "\n~~~~" for name, raw in form_templates.items()),
+        "schemas_url": resolver.site("schemas_data").rstrip("/"),
+        "contract_url": resolver.site("machine_contract"),
+        "propose_url": resolver.site("propose"),
+        "request_url": resolver.repository_url("request_intake"),
+        "add_url": web_base_url + intake["add"],
+        "repository_url": web_base_url,
+        "inventory_example": json.dumps(example, ensure_ascii=False, indent=2),
+        "example_model_id": example_model["id"] if example_model else "No example model available",
+        "example_offering_id": example_offering["id"] if example_offering else "No matching example offering available",
+        "example_source_commit": catalogue["source_commit"],
+        "example_profile": catalogue["profile"],
+    }, "requester-agent").encode("utf-8")
     schemas_root = document["paths"]["schemas"]
     schema_paths = str(_git(root, "ls-tree", "-r", "--name-only", request.source_commit, "--", schemas_root)).splitlines()
     if not schema_paths or any(not path.endswith(".json") for path in schema_paths):
@@ -651,6 +681,14 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     for path in schema_paths:
         relative = PurePosixPath(path).relative_to(schemas_root)
         files[(PurePosixPath(resolver.output_path("schemas_data")) / relative).as_posix()] = _blob(root, request.source_commit, path)
+    bundle = io.BytesIO()
+    with ZipFile(bundle, "w") as archive:
+        for path in sorted(schema_paths):
+            archive.writestr(ZipInfo("schemas/" + PurePosixPath(path).relative_to(schemas_root).as_posix()), _blob(root, request.source_commit, path))
+        for name, raw in sorted(form_templates.items()):
+            archive.writestr(ZipInfo("templates/" + name), raw)
+        archive.writestr(ZipInfo("README.md"), files[resolver.output_path("requester_agent")])
+    files[resolver.output_path("proposal_schema_bundle_data")] = bundle.getvalue()
     return files
 
 

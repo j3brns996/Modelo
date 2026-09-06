@@ -126,6 +126,7 @@ site:
     change_delta: /data/change-delta.json
     manifest: /data/manifest.json
     schemas: /data/schemas/
+    proposal_schema_bundle: /data/proposal-schema.zip
   asset_routes:
     asset_css: /assets/site.css
     asset_catalogue_js: /assets/catalogue.js
@@ -145,6 +146,7 @@ site:
   document_routes:
     human_specification: /docs/SPEC.md
     machine_contract: /docs/contract.yaml
+    requester_agent: /agents/README.md
   urls_resolved_from_config_only: true
   effective_base_url_and_path_are_receipt_inputs: true
   ci_requires_explicit_base_url: true
@@ -207,6 +209,8 @@ build:
     - data/change-delta.json
     - docs/SPEC.md
     - docs/contract.yaml
+    - agents/README.md
+    - data/proposal-schema.zip
   mac_metadata_ingestion:
     cli_value: explicit_file_path
     file_type: regular_non_symlink

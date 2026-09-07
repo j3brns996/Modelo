@@ -37,7 +37,7 @@ present. GitLab's checked-in job is deliberately fail-closed until a protected
 pipeline policy or equivalent is configured and rehearsed.
 
 Gate C remains mandatory: create `j3brns996/Modelo-rehearsal` from the exact
-bootstrap tree, override only the globally owned repository and Pages
+accepted implementation tree, override only the globally owned repository and Pages
 coordinates in `modelo.yaml`, and use it for sentinel records and destructive
 protection tests. Run one factual synthetic condition-add MAC through issue,
 PR, exact-head check, independent approval and squash merge. Retain
@@ -53,8 +53,63 @@ If no second eligible identity exists, stop: do not lower the approval rule.
 
 ## Remaining production launch gates
 
-Production launch remains blocked until a further human-approved PR implements
-and tests all of the following. The public synthetic demo workflow does not
+### Release and recovery commands
+
+Run `uv run --locked modelo platform capabilities` to inspect GitHub ruleset
+enforcement. A failing probe prevents release. The 7 September 2026 observation
+found missing independent approval controls, a required trusted check and tag
+protection. This probe does not establish T10 completion or configure controls.
+
+The governed release workflow accepts a merged MAC PR number, its latest
+successful pre-merge synchronize run ID, and a `catalogue-YYYYMMDD.N` tag.
+It fetches the accepted PR head and merge, verifies provider checks and an
+independent exact-head CODEOWNER approval, builds once, and verifies uploaded
+assets. Synthetic releases can publish to Pages. Private releases require a
+private repository and remain restricted release assets.
+
+Configure `MODELO_RELEASE_TOKEN` with access to this repository only: Contents
+write; Administration, Actions, Checks and Pull requests read. The workflow does
+not expose this credential to the quality step. Existing matching release bytes
+are reusable; different bytes are rejected. Host administrators still control
+remote asset deletion. The workflow does not claim immutable host storage.
+
+From a clean, pushed checkout with pinned Linux Python and uv, export locally:
+
+```sh
+uv run --locked modelo dev recovery-export --output /safe/path/modelo-recovery.zip
+```
+
+Keep the returned SHA-256 separately. Restore into a new local directory:
+
+```sh
+uv run --locked modelo dev recovery-restore \
+  --bundle /safe/path/modelo-recovery.zip --sha256 sha256:EXPECTED_DIGEST \
+  --output /safe/path/restored-modelo
+```
+
+The export includes a fresh remote Git mirror, host metadata, available trusted
+CI artifacts, release assets, locked Python wheels and pinned UBS source. Missing
+or expired historical CI artifacts are recorded explicitly. Published catalogue
+releases must retain their durable receipts. An archive cannot recover evidence
+already deleted by the host.
+
+Restoration verifies the archive, Git objects, Python pin and locked wheel bytes,
+then installs locally without dependency resolution or package downloads. Use
+the restored environment's `modelo-local-ci lint --root .../worktree
+--ubs-source .../ubs` to run lint and UBS from those files. System prerequisites
+remain Linux, the pinned Python and uv, Git, Bash, jq, ripgrep and timeout.
+Run an offline publication rebuild and receipt comparison before accepting the
+recovery rehearsal; successful installation alone is insufficient.
+
+Local recovery does not recreate GitLab issues, reviews or protections. The
+approved isolated GitLab target is `https://gitlab.com/julianburns/modelo` under
+`julianburns`; verify it is still empty before pushing restored branches and tags.
+Retain archived GitHub host metadata and record GitLab capability differences.
+The GitHub reviewer identity is `j3brns`. The repository licence remains undecided
+at the owner's instruction.
+
+Production launch remains blocked until the accepted implementation is remotely
+rehearsed and all of the following are verified. The public synthetic demo workflow does not
 satisfy these production items:
 
 - consume the accepted exact-head check receipt after merge;

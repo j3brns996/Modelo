@@ -1,0 +1,118 @@
+name: Modelo governed release
+
+on:
+  workflow_dispatch:
+    inputs:
+      change_request:
+        description: Merged MAC pull request number
+        required: true
+        type: string
+      run_id:
+        description: Successful pre-merge synchronize run for the accepted head
+        required: true
+        type: string
+      release:
+        description: Protected catalogue-YYYYMMDD.N release name
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  pages: read
+
+concurrency:
+  group: modelo-governed-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      profile: ${{ steps.publish.outputs.profile }}
+    steps:
+      - name: Install pinned uv and Python
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d  # v10.0.0
+        with:
+          version: 0.11.33
+          python-version: 3.12.13
+          enable-cache: false
+      - name: Fetch accepted merge from protected default-branch history
+        env:
+          GH_TOKEN: ${{ secrets.MODELO_RELEASE_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          SOURCE_REF: ${{ github.ref }}
+          CHANGE_REQUEST: ${{ inputs.change_request }}
+        run: |
+          set -euo pipefail
+          test -n "${GH_TOKEN}" || { echo 'Configure the scoped MODELO_RELEASE_TOKEN release credential.' >&2; exit 1; }
+          test "${SOURCE_REF}" = "refs/heads/${DEFAULT_BRANCH}"
+          [[ "${CHANGE_REQUEST}" =~ ^[1-9][0-9]*$ ]]
+          merge="$(gh api "repos/${REPOSITORY}/pulls/${CHANGE_REQUEST}" --jq '.merge_commit_sha')"
+          head="$(gh api "repos/${REPOSITORY}/pulls/${CHANGE_REQUEST}" --jq '.head.sha')"
+          [[ "${merge}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${head}" =~ ^[0-9a-f]{40}$ ]]
+          git init source
+          git -C source remote add origin "https://github.com/${REPOSITORY}.git"
+          auth="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 -w0)"
+          git -C source -c http.extraheader="AUTHORIZATION: basic ${auth}" \
+            fetch --no-tags origin "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}" \
+              "+refs/pull/${CHANGE_REQUEST}/head:refs/modelo/accepted-head"
+          unset auth GH_TOKEN
+          test "$(git -C source rev-parse refs/modelo/accepted-head)" = "${head}"
+          git -C source merge-base --is-ancestor "${merge}" "refs/remotes/origin/${DEFAULT_BRANCH}"
+          git -C source checkout --detach "${merge}"
+      - name: Run locked local quality tools
+        run: |
+          set -euo pipefail
+          uv sync --project source --locked
+          (cd source && uv run --locked modelo-local-ci lint)
+      - name: Verify acceptance, build once and publish exact release assets
+        id: publish
+        env:
+          GH_TOKEN: ${{ secrets.MODELO_RELEASE_TOKEN }}
+          CHANGE_REQUEST: ${{ inputs.change_request }}
+          RUN_ID: ${{ inputs.run_id }}
+          RELEASE: ${{ inputs.release }}
+        run: |
+          set -euo pipefail
+          uv run --project source --locked modelo --root source platform github-release \
+            --change-request "${CHANGE_REQUEST}" --run-id "${RUN_ID}" --release "${RELEASE}" --publish
+          profile="$(jq -r '.profile' source/dist/receipts/release.json)"
+          echo "profile=${profile}" >> "${GITHUB_OUTPUT}"
+      - name: Configure synthetic Pages
+        if: steps.publish.outputs.profile == 'synthetic'
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b  # v5
+      - name: Archive verified synthetic site without rebuilding
+        if: steps.publish.outputs.profile == 'synthetic'
+        run: |
+          set -euo pipefail
+          tar --directory source/dist/final/site --create --file "${RUNNER_TEMP}/artifact.tar" .
+      - name: Upload exact synthetic site
+        if: steps.publish.outputs.profile == 'synthetic'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 0
+
+  pages:
+    needs: release
+    if: needs.release.outputs.profile == 'synthetic'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy verified synthetic release without rebuilding
+        id: deploy
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e  # v4

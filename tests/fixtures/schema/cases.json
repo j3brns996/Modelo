@@ -741,7 +741,7 @@
             "gates": { "lock": "success", "schema": "success", "tests": "success", "package": "success", "validation_site": "success" }
           },
           "mac_issue": "19",
-          "change_request": "2",
+          "change_request": "20",
           "change_delta": [
             { "operation": "add", "path": "catalogue/models/test-model.yaml", "after": "sha256:9999999999999999999999999999999999999999999999999999999999999999" }
           ],

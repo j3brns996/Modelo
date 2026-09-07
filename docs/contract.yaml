@@ -4,9 +4,9 @@ contract:
   name: modelo
   version: "0.1.0"
   status: t8_premerge_t9_synthetic_pages_demo_and_functional_explorer_implemented_production_launch_slice_pending
-  implemented_slices: [T1, T2, T3, T4, T5, T6, T6-UX, T7, T7-UX, T8-premerge, T9, synthetic-pages-demo]
+  implemented_slices: [T1, T2, T3, T4, T5, T6, T6-UX, T7, T7-UX, T8-premerge, T8-postmerge-production-release-and-receipt, local-recovery, T9, synthetic-pages-demo]
   accepted_pre_t8_head: "8694053c3366e162e0da6991ad08729aa8c95ad5"
-  unimplemented_slices: [T8-postmerge-production-release-and-receipt, T10-remote-evidence]
+  unimplemented_slices: [T10-remote-evidence]
   executable_config: modelo.yaml
   implementation_plan_config_key: paths.implementation_plan
   drift_is_error: true
@@ -775,7 +775,9 @@ platform:
   host_switch_changes_core_records: false
   platform_receipt_assembly: modelo platform check
   remote_capability_check: modelo platform capabilities
-  remote_capability_check_status: t10_unimplemented
+  remote_capability_check_status: github_rulesets_implemented_remote_t10_pending
+  github_release_command: modelo platform github-release
+  github_release_acceptance: latest_premerge_trusted_branch_run_and_independent_exact_head_codeowner_approval
   missing_required_capability: fail_closed
   private_pages_missing: restricted_artifact_not_public_pages
   merge_queue_or_train: deferred_until_candidate_tree_contract
@@ -790,6 +792,12 @@ recovery:
   git_mirror_alone_is_complete_operational_backup: false
   bundle_requires: [git_mirror, host_metadata_export, control_manifest, releases_and_receipts, locked_dependency_archive]
   restore_rehearsal_required: true
+  export_command: modelo dev recovery-export --output PATH
+  restore_command: modelo dev recovery-restore --bundle PATH --sha256 DIGEST --output PATH
+  restore_scope: local_git_host_metadata_locked_python_wheels_and_pinned_ubs
+  expired_nonrelease_ci_artifacts: explicitly_record_unavailable_history
+  published_catalogue_release_receipts: required_durable_assets
+  gitlab_host_objects_and_controls: separate_remote_rehearsal
 
 agents:
   canonical_rules_config_key: paths.agent_rules

@@ -396,7 +396,7 @@ def test_site_authoring_prose_explains_bounded_interactive_scope() -> None:
     assert "mac payload" in proposal and "not a mac payload" in proposal
 
 
-def test_agents_distinguishes_public_demo_from_absent_production_publication() -> None:
+def test_agents_distinguishes_implemented_release_from_pending_remote_acceptance() -> None:
     text = _read(AGENTS)
     lowered = text.lower()
     assert "synthetic" in lowered
@@ -404,7 +404,8 @@ def test_agents_distinguishes_public_demo_from_absent_production_publication() -
     assert "demo" in lowered
     assert "production" in lowered
     assert "post-merge" in lowered
-    assert any(token in lowered for token in ("remain absent", "remains absent", "absent"))
+    assert "automation are implemented" in lowered
+    assert "remote t10 acceptance remains pending" in lowered
 
 
 def test_agents_limits_read_only_cli_rule_to_cloud_providers() -> None:

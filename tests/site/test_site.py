@@ -506,6 +506,57 @@ class FinalSiteTests(unittest.TestCase):
         self.assertEqual(receipt["ci"]["head_sha"], self.source)
         self.assertEqual(receipt["ci"]["workflow_sha"], self.base)
         self.assertEqual(output.read_bytes(), canonical_bytes(receipt))
+        from dataclasses import replace
+
+        from modelo.platform import ReleaseRequest, build_release
+
+        squash = git(
+            self.root, "commit-tree", self.tree, "-p", self.base, "-m", "squash accepted MAC"
+        )
+        git(self.root, "checkout", "--detach", squash)
+        release_request = ReleaseRequest(
+            root=self.root,
+            accepted_check=output,
+            accepted_check_digest=sha256_bytes(canonical_bytes(receipt)),
+            approval={
+                "reviewer_platform_identity": "independent-reviewer",
+                "reviewer_kind": "human",
+                "approved_head_sha": self.source,
+                "approval_timestamp": "2026-09-06T12:00:00Z",
+                "actors_registry_digest": receipt["actors_registry_digest"],
+                "independence_and_eligibility_result": "eligible-independent",
+                "provider_approval_and_check_reference": "https://github.com/j3brns996/Modelo/pull/28#pullrequestreview-1",
+            },
+            merge_commit=squash,
+            release="catalogue-20260906.1",
+            mac_metadata=self.metadata_path,
+            publication_capability="public-pages",
+        )
+        # Provider eligibility is tested in the host adapter. Here it is trusted
+        # fixture input; exercise actual receipt/build continuity and refusal.
+        for changed, error in (
+            (replace(release_request, accepted_check_digest="sha256:" + "0" * 64), "digest"),
+            (replace(release_request, merge_commit=self.merge), "accepted base"),
+            (
+                replace(
+                    release_request,
+                    approval=release_request.approval | {"approved_head_sha": self.base},
+                ),
+                "approval-head",
+            ),
+        ):
+            with self.subTest(error=error), self.assertRaisesRegex(BuildError, error):
+                build_release(changed)
+            self.assertFalse((self.root / "dist/receipts/release.json").exists())
+        released = build_release(release_request)
+        self.assertEqual(released["artifacts"]["catalogue"], receipt["artifacts"]["catalogue"])
+        self.assertEqual(released["merge_sha"], squash)
+        self.assertEqual(
+            (self.root / "dist/receipts/release.json").read_bytes(), canonical_bytes(released)
+        )
+        with self.assertRaisesRegex(BuildError, "already exists"):
+            build_release(release_request)
+        git(self.root, "checkout", "--detach", validation)
         bad = dict(context)
         bad["workflow_sha"] = self.source
         external.write_bytes(canonical_bytes(bad))

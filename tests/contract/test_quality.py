@@ -4,7 +4,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
-from modelo.quality import check, scan, scanner_environment, validate_scan
+from modelo.quality import UBS_REVISION, check, scan, scanner_environment, validate_scan
 
 
 def test_repository_quality_tools_execute(capsys):
@@ -24,8 +24,12 @@ def test_ubs_detects_harmless_unexecuted_bug_samples_and_accepts_corrections(tmp
         javascript.write_text(
             "eval(location.hash);\n" if bad else "const answer = 42;\n", newline="\n"
         )
-        report = scan(tmp_path)
+        report = scan(tmp_path, Path.home() / ".cache/modelo" / f"ubs-{UBS_REVISION}")
         assert (report["totals"]["critical"] > 0) == bad
+    missing = tmp_path / "missing-ubs"
+    with pytest.raises(ValueError, match="cannot be downloaded"):
+        scan(tmp_path, missing)
+    assert not missing.exists()
 
 
 def test_scan_rejects_no_scan_partial_duplicate_and_invalid_summaries():

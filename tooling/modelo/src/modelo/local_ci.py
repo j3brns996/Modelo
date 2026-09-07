@@ -199,6 +199,9 @@ def _parser() -> argparse.ArgumentParser:
     verify_command = commands.add_parser("verify", help="run the fixed test and package gates")
     lint = commands.add_parser("lint", help="run locked lint and the required UBS scan")
     lint.add_argument("--root", type=Path, default=Path.cwd())
+    lint.add_argument(
+        "--ubs-source", type=Path, help="use this pinned local UBS checkout without downloading"
+    )
     local = commands.add_parser("run", help="run a non-accepting local preflight")
     for command in (classify, local):
         command.add_argument("--root", type=Path, default=Path.cwd())
@@ -219,7 +222,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif arguments.command == "lint":
             from modelo.quality import check
 
-            check(arguments.root)
+            check(arguments.root, arguments.ubs_source)
         elif arguments.command == "verify":
             verify(arguments.root, arguments.jobs)
         else:

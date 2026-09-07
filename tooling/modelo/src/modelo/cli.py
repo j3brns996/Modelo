@@ -136,6 +136,18 @@ def _parser() -> argparse.ArgumentParser:
         "platform", help="run a trusted Git-provider adapter operation"
     )
     platform_subparsers = platform.add_subparsers(dest="platform_command", required=True)
+    platform_subparsers.add_parser("capabilities", help="read GitHub release control capabilities")
+    release = platform_subparsers.add_parser(
+        "github-release", help="verify GitHub acceptance and build a detached release"
+    )
+    release.add_argument("--change-request", type=int, required=True)
+    release.add_argument("--run-id", type=int, required=True)
+    release.add_argument("--release", required=True)
+    release.add_argument(
+        "--publish",
+        action="store_true",
+        help="upload verified assets and publish the protected GitHub release",
+    )
     platform_check = platform_subparsers.add_parser(
         "check", help="assemble an exact-head check receipt"
     )
@@ -217,6 +229,16 @@ def _parser() -> argparse.ArgumentParser:
 
     dev = subparsers.add_parser("dev", help="developer and authoring suite utilities")
     dev_subparsers = dev.add_subparsers(dest="dev_command", required=True)
+    recovery_export = dev_subparsers.add_parser(
+        "recovery-export", help="export Git, host evidence, release assets and locked wheels"
+    )
+    recovery_export.add_argument("--output", type=Path, required=True)
+    recovery_restore = dev_subparsers.add_parser(
+        "recovery-restore", help="verify and restore an offline recovery bundle locally"
+    )
+    recovery_restore.add_argument("--bundle", type=Path, required=True)
+    recovery_restore.add_argument("--sha256", required=True)
+    recovery_restore.add_argument("--output", type=Path, required=True)
 
     evidence_create = dev_subparsers.add_parser(
         "evidence-create", help="create a schema-valid local evidence record"
@@ -281,6 +303,23 @@ def main(argv: Sequence[str] | None = None) -> int:
                     print(_render_text(diagnostic))
             return 1
         return 0
+    if arguments.command == "dev" and arguments.dev_command in {
+        "recovery-export",
+        "recovery-restore",
+    }:
+        import subprocess
+
+        from modelo.recovery import export_recovery, restore_recovery
+
+        try:
+            if arguments.dev_command == "recovery-export":
+                result = export_recovery(arguments.root, arguments.output)
+            else:
+                result = restore_recovery(arguments.bundle, arguments.sha256, arguments.output)
+            print(json.dumps(result, sort_keys=True, indent=2))
+            return 0
+        except (BuildError, ConfigError, OSError, ValueError, subprocess.SubprocessError) as exc:
+            parser.exit(2, f"modelo: recovery failed: {exc}\n")
     if arguments.command == "recover":
         try:
             recover_candidate(arguments.root.resolve())
@@ -314,6 +353,29 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         except (ConfigError, KeyError, TypeError) as exc:
             parser.exit(2, f"modelo: {exc}\n")
+    if arguments.command == "platform" and arguments.platform_command in {
+        "capabilities",
+        "github-release",
+    }:
+        from modelo.github_release import github_capabilities, prepare_release, publish_release
+
+        try:
+            if arguments.platform_command == "capabilities":
+                result = github_capabilities(arguments.root.resolve())
+                print(json.dumps(result, sort_keys=True, indent=2))
+                return 0 if result["capable"] else 1
+            result = prepare_release(
+                arguments.root.resolve(),
+                arguments.change_request,
+                arguments.run_id,
+                arguments.release,
+            )
+            if arguments.publish:
+                publish_release(arguments.root.resolve(), result)
+            print(json.dumps(result, sort_keys=True, indent=2))
+            return 0
+        except (BuildError, ConfigError, KeyError, TypeError, ValueError) as exc:
+            parser.exit(2, f"modelo: release verification failed: {exc}\n")
     if arguments.command == "platform" and arguments.platform_command == "check":
         try:
             run_trusted_check(

@@ -465,39 +465,9 @@ def _release_correlation_errors(
     check: dict[str, Any], release: dict[str, Any], trusted: dict[str, Any]
 ) -> set[str]:
     errors = _trusted_check_correlation_errors(check, trusted)
-    pairs = {
-        "repository": (check["repository"], release["repository"]),
-        "base": (check["base_sha"], release["base_sha"]),
-        "source": (check["head_sha"], release["source_sha"]),
-        "ci-head": (check["head_sha"], release["ci"]["head_sha"]),
-        "approval-head": (check["head_sha"], release["approval"]["approved_head_sha"]),
-        "head-tree": (check["head_tree_sha"], release["head_tree_sha"]),
-        "merge-tree": (release["head_tree_sha"], release["merge_tree_sha"]),
-        "as-of": (check["as_of"], release["as_of"]),
-        "epoch": (check["source_date_epoch"], release["source_date_epoch"]),
-        "profile": (check["profile"], release["profile"]),
-        "base-url": (check["base_url"], release["base_url"]),
-        "base-path": (check["base_path"], release["base_path"]),
-        "delta": (check["change_delta"], release["change_delta"]),
-        "catalogue": (check["artifacts"]["catalogue"], release["artifacts"]["catalogue"]),
-        "tool": (check["tool_digest"], release["tool_digest"]),
-        "lock": (check["lock_digest"], release["lock_digest"]),
-        "actors": (check["actors_registry_digest"], release["approval"]["actors_registry_digest"]),
-        "ci-provider": (check["ci"]["provider"], release["ci"]["provider"]),
-        "workflow": (check["ci"]["workflow_identity"], release["ci"]["workflow_identity"]),
-        "workflow-sha": (check["ci"]["workflow_sha"], release["ci"]["workflow_sha"]),
-        "workflow-gates": (check["ci"]["gates"], release["ci"]["gates"]),
-        "ci-run": (check["ci"]["run_id"], release["ci"]["run_id"]),
-        "ci-check": (check["ci"]["check"], release["ci"]["check"]),
-        "ci-result": (check["ci"]["result"], release["ci"]["result"]),
-    }
-    errors.update(name for name, values in pairs.items() if values[0] != values[1])
-    expected_digest = "sha256:" + hashlib.sha256(_canonical_receipt_bytes(check)).hexdigest()
-    if release["accepted_check_receipt_digest"] != expected_digest:
-        errors.add("check-digest")
-    for name in ("publication", "manifest"):
-        if check["artifacts"][name]["path"] != release["artifacts"][name]["path"]:
-            errors.add(f"{name}-path")
+    from modelo.receipt import release_correlation_errors
+
+    errors.update(release_correlation_errors(check, release))
     return errors
 
 

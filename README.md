@@ -9,7 +9,6 @@ approval. Pre-merge checks, demo publication, release, and recovery automation
 work. Remote T10 acceptance remains outstanding.
 Do not add real production catalogue data before T10 passes remotely.
 Agent approval is disabled.
-
 ![Modelo: model availability passes through evidence, conditions, offering, route, and review before approved use](docs/img/modelo-title.png)
 
 Concept illustration. Counts and status indicators are illustrative.
@@ -28,7 +27,7 @@ Concept illustration. Counts and status indicators are illustrative.
 
 Give any coding agent the [requester guide URL](https://j3brns996.github.io/Modelo/agents/README.md)
 and your business need. No checkout, installed skill, or agent configuration
-is required. Use this prompt:
+is required:
 
 ```text
 Read https://j3brns996.github.io/Modelo/agents/README.md.
@@ -39,16 +38,13 @@ Return the findings, unknowns, checks run, and a prefilled native issue-form URL
 Do not submit the form or use an issue API.
 ```
 
-The guide includes worked and negative examples, reasons for each field,
-host-specific instructions, exact form markup, and a proposal schema bundle.
-Keep unknown facts explicit. Supply known deployment details, rights-owner
-domicile, operator, and processing territory separately. A missing vendor or
-service needs a prerequisite proposal before an offering can reference it.
+The guide includes examples and the proposal schema. Keep unknown facts explicit;
+record vendor, domicile, operator, and processing territory separately.
 
 Review the prepared answers, consider each human attestation, and submit through
 your normal GitHub or GitLab login. The request starts triage; it grants no
 approval.
-For a complete catalogue proposal, use the [detailed composer](https://j3brns996.github.io/Modelo/propose/#builder).
+Use the [detailed composer](https://j3brns996.github.io/Modelo/propose/#builder) for a complete proposal.
 
 ## Author and review records
 
@@ -74,6 +70,16 @@ Trusted CI must pass for the exact current head. Missing, stale, skipped, or
 failed checks cannot accept it. A new commit invalidates prior checks and
 approval. Local helpers prepare drafts; the linked issue and trusted compiler
 remain authoritative.
+
+**How staleness is detected:** CI records the pull request's base SHA and head
+SHA. It accepts only a check for the current head. A new commit changes that
+SHA, so CI and review must run again.
+
+```mermaid
+flowchart LR
+  A[Request] --> B[Topic branch] --> C[Current commit] --> D[Trusted CI] --> E[Independent review] --> F[Authorised merge]
+  C -. new commit .-> D
+```
 
 ## Maintain the repository
 

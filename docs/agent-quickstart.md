@@ -65,6 +65,10 @@ results, and trusted CI reference in the change request. A local pass does not
 replace successful trusted CI for the exact head. A new commit requires new
 checks and review. Do not add production catalogue records before remote T10.
 
+CI identifies the exact head by its commit SHA. It records the base and head
+SHAs and accepts only a result for the current head. If a branch changes, the
+head SHA changes and the checks and review must run again.
+
 ## Assess system requirements and capacity
 
 Start a system assessment when accepted changes reach 5-10 per working day,

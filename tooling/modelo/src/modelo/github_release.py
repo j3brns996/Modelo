@@ -14,7 +14,7 @@ from urllib.parse import quote
 
 from modelo.build import BuildError, _git, _strict_json_bytes, _walk_regular_tree
 from modelo.config import load_config
-from modelo.loader import load_yaml_mapping
+from modelo.loader import load_yaml_mapping, strict_unique_json_pairs
 from modelo.platform import ReleaseRequest, _atomic_write, build_release
 from modelo.receipt import canonical_bytes, publication_digest, sha256_bytes
 
@@ -34,7 +34,10 @@ def _response(endpoint: str, *, allow_missing: bool = False, octet_stream: bool 
         raise BuildError("GitHub read request could not complete") from exc
     if allow_missing and result.returncode:
         try:
-            if json.loads(result.stdout).get("status") == "404":
+            if (
+                json.loads(result.stdout, object_pairs_hook=strict_unique_json_pairs).get("status")
+                == "404"
+            ):
                 return b"null"
         except (ValueError, AttributeError):
             pass
@@ -48,7 +51,7 @@ def _api(endpoint: str, *, allow_missing: bool = False) -> Any:
     if len(raw) > 8_388_608:
         raise BuildError("GitHub JSON response exceeded its response limit")
     try:
-        return json.loads(raw)
+        return json.loads(raw, object_pairs_hook=strict_unique_json_pairs)
     except (ValueError, UnicodeError) as exc:
         raise BuildError("GitHub response is not JSON") from exc
 
@@ -437,7 +440,7 @@ def _write_api(endpoint: str, body: dict[str, Any], method: str = "POST") -> Any
     if result.returncode:
         raise BuildError("GitHub write request failed; inspect remote state before retry")
     try:
-        return json.loads(result.stdout)
+        return json.loads(result.stdout, object_pairs_hook=strict_unique_json_pairs)
     except (ValueError, UnicodeError) as exc:
         raise BuildError("GitHub write response is not JSON") from exc
 

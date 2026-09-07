@@ -68,6 +68,20 @@ Git environment for a working tree and keep line endings controlled by
 `.gitattributes`. Native Windows remains suitable for editing and lightweight
 Ruff or yamllint checks.
 
+Before pushing a maintenance change, run the affected tests, then the complete
+local verifier from the checkout root:
+
+```bash
+uv run --locked modelo-local-ci verify --jobs 3
+```
+
+This syncs locked dependencies, runs every Python test (including Ruff,
+yamllint and UBS checks), and builds the package offline. CI and Pages use the
+same runner. Three processes split the test inventory without skipping tests.
+Use `--jobs 1` on a memory-constrained machine. Both settings require all tests
+and the package build to pass. A standalone `modelo-local-ci lint` gives faster
+feedback while editing; it does not replace complete verification.
+
 Run narrow tests first. Include the issue, diff, base/head/tree SHAs, test
 results, and trusted CI reference in the change request. A local pass does not
 replace successful trusted CI for the exact head. A new commit requires new

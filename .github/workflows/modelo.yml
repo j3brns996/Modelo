@@ -103,7 +103,7 @@ jobs:
 
       - name: Verify proposed code with protected runner
         if: needs.classify.outputs.kind == 'control-plane'
-        run: uv run --project runner --locked modelo-local-ci verify --root proposed --jobs 1
+        run: uv run --project runner --locked modelo-local-ci verify --root proposed --jobs 3
 
   trusted-base:
     name: Protected-base tests
@@ -134,7 +134,7 @@ jobs:
           git -C trusted checkout --detach FETCH_HEAD
 
       - name: Verify protected base
-        run: uv run --project trusted --locked modelo-local-ci verify --root trusted --jobs 1
+        run: uv run --project trusted --locked modelo-local-ci verify --root trusted --jobs 3
 
   trusted-check:
     name: modelo/check

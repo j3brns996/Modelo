@@ -68,9 +68,9 @@ def test_github_trusted_workflow_is_pinned_read_only_and_node_free() -> None:
     assert proposed.count("if: needs.classify.outputs.kind == 'control-plane'") >= 3
     trusted_base = raw.split("  trusted-base:", 1)[1].split("  trusted-check:", 1)[0]
     assert "needs: classify" in trusted_base
-    assert "modelo-local-ci verify --root trusted --jobs 1" in trusted_base
+    assert "modelo-local-ci verify --root trusted --jobs 3" in trusted_base
     assert "HEAD_SHA" not in trusted_base and "proposed" not in trusted_base
-    assert "modelo-local-ci verify --root proposed --jobs 1" in proposed
+    assert "modelo-local-ci verify --root proposed --jobs 3" in proposed
     assert "--project runner" in proposed
     assert "pytest -q" not in raw and "uv build --offline" not in raw
     final = raw.split("  trusted-check:", 1)[1]

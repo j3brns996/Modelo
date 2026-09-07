@@ -30,6 +30,7 @@ def test_pages_workflow_is_pinned_python_only_and_builds_once() -> None:
     assert "compression-level: 0" in raw
     assert "needs: build" in raw
     assert "Deploy without rebuilding" in raw
+    assert "modelo-local-ci verify --root source --jobs 3" in raw
 
 
 def test_pages_workflow_can_only_publish_the_synthetic_demo() -> None:

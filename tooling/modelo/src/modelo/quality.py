@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -25,7 +26,12 @@ def command(arguments: list[str], root: Path, *, timeout: int = 120) -> str:
 
 def validate_scan(report: dict, expected: dict[str, int], returncode: int) -> None:
     """Reject failed, empty, incomplete or inconsistent scan summaries."""
-    if returncode not in (0, 1) or report.get("error"):
+    if (
+        returncode not in (0, 1)
+        or report.get("error")
+        or report.get("failed_modules")
+        or report.get("status") not in (None, "ok")
+    ):
         raise ValueError("UBS scanner failed; this is not a completed findings report")
     scanners = report.get("scanners", [])
     if len(scanners) != len(expected):
@@ -33,6 +39,12 @@ def validate_scan(report: dict, expected: dict[str, int], returncode: int) -> No
     counts = {}
     totals = dict.fromkeys(("files", "critical", "warning", "info"), 0)
     for scanner in scanners:
+        if (
+            scanner.get("error")
+            or scanner.get("module_error")
+            or scanner.get("status") not in (None, "ok")
+        ):
+            raise ValueError("UBS reported a failed or partial language scanner")
         language = scanner.get("language")
         if language not in expected or language in counts:
             raise ValueError("UBS reported an unexpected or duplicate language")
@@ -52,7 +64,24 @@ def validate_scan(report: dict, expected: dict[str, int], returncode: int) -> No
         raise ValueError("UBS returned failure without reported findings")
 
 
+def scanner_environment() -> dict[str, str]:
+    """Do not inherit skip settings, shell startup files or unpinned analyzers."""
+    return {
+        "PATH": os.environ["PATH"],
+        "HOME": str(Path.home()),
+        "LANG": "C.UTF-8",
+        "ENABLE_UV_TOOLS": "0",
+        "UBS_NO_AUTO_UPDATE": "1",
+        "UBS_ALLOW_NO_SCAN": "0",
+    }
+
+
 def scan(root: Path) -> dict:
+    output = root / "dist/quality"
+    output.mkdir(parents=True, exist_ok=True)
+    for name in ("ubs.json", "source.json"):
+        (output / name).write_text('{"error":"not_completed"}\n', encoding="utf-8")
+    (output / "ubs.log").write_text("Scan started; completion not established.\n", encoding="utf-8")
     if sys.platform != "linux":
         raise ValueError("Full quality checks require Linux or WSL, as does trusted CI")
     for name in ("bash", "git", "jq", "rg", "timeout", "ast-grep"):
@@ -89,46 +118,56 @@ def scan(root: Path) -> dict:
         if not os.access(cache / "modules" / name, os.X_OK):
             raise ValueError(f"Pinned UBS module is unavailable: {name}")
     files = {
-        "python": sorted((root / "tooling/modelo/src/modelo").rglob("*.py")),
+        "python": sorted((root / "tooling/modelo/src/modelo").rglob("*.py"))
+        + sorted((root / "tooling/modelo/scripts").rglob("*.py")),
         "js": sorted((root / "site/assets").glob("*.js")),
     }
-    output = root / "dist/quality"
-    output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="modelo-quality-") as temporary:
         source = Path(temporary)
+        scanned_bytes = {}
         for paths in files.values():
             for path in paths:
                 target = source / path.relative_to(root)
                 target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(path, target)
-        environment = dict(
-            os.environ, ENABLE_UV_TOOLS="0", UBS_NO_AUTO_UPDATE="1", UBS_ALLOW_NO_SCAN="0"
-        )
-        result = subprocess.run(
-            [
-                "bash",
-                str(cache / "ubs"),
-                "--ci",
-                "--no-auto-update",
-                "--only=python,js",
-                "--format=json",
-                "--fail-on-warning",
-                str(source),
-            ],
-            cwd=root,
-            env=environment,
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=300,
-        )
+                data = path.read_bytes()
+                target.write_bytes(data)
+                scanned_bytes[path.relative_to(root).as_posix()] = hashlib.sha256(data).hexdigest()
+        try:
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(cache / "ubs"),
+                    "--ci",
+                    "--no-auto-update",
+                    "--only=python,js",
+                    "--format=json",
+                    "--fail-on-warning",
+                    str(source),
+                ],
+                cwd=root,
+                env=scanner_environment(),
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=300,
+            )
+        except subprocess.TimeoutExpired as exc:
+            diagnostics = exc.stderr or b""
+            if isinstance(diagnostics, bytes):
+                diagnostics = diagnostics.decode("utf-8", "replace")
+            (output / "ubs.log").write_text("UBS timed out.\n" + diagnostics, encoding="utf-8")
+            raise
         (output / "ubs.json").write_text(result.stdout, encoding="utf-8")
         (output / "ubs.log").write_text(result.stderr, encoding="utf-8")
         (output / "source.json").write_text(
             json.dumps(
                 {
                     "ubs_revision": UBS_REVISION,
+                    "source_commit": command(["git", "rev-parse", "HEAD"], root).strip()
+                    if (root / ".git").exists()
+                    else None,
                     "exit_code": result.returncode,
+                    "file_sha256": scanned_bytes,
                     "files": {
                         key: [path.relative_to(root).as_posix() for path in paths]
                         for key, paths in files.items()

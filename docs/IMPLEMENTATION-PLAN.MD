@@ -142,6 +142,7 @@ required and document the actual supported execution environment.
 | 2026-09-07 | Local verification | 21 documentation tests pass; 11 workflow/site/timeout tests pass on Linux; 4 actual quality-tool and bad/corrected-input tests pass on Linux. Windows broader baseline has old system uv and lacks O_NOFOLLOW, so full verification uses locked Ubuntu/WSL. |
 | 2026-09-07 | UBS disposition | Initial 24 Python/2 JS scan returned 19 critical and 162 warning heuristic counts. Independent category/source review found static-template, public-digest, denylist-key and configured-URL false positives; Path division and exact bool/int checks remain correct. Missing local subprocess deadlines were corrected in shared helpers with error-propagation tests. Raw reports remain visible; not a clean-scan claim. |
 | 2026-09-07 | Toolchain pins | Ruff 0.16.6, yamllint 1.38.0, ast-grep 0.40.1 and Linux ripgrep 15.1.0 are locked. UBS source is pinned at 0af10c926d6fbb14a1f589326d75c03f610207f0. System Bash/Git/jq/coreutils are prerequisites. No hooks or agent configuration changed. |
+| 2026-09-07 | Independent integration findings | Review of e49ea9 found ambient scan-reduction settings, missing remote report retention, stale failure reports and omitted migration script. Corrections use a controlled scanner environment, failed-run markers, explicit error checks, full first-party scope and read-only exact-head artifact workflow. New regression checks pass locally; final remote acceptance remains pending. |
 
 ## Specification coverage and retained boundaries
 
@@ -154,7 +155,7 @@ required and document the actual supported execution environment.
 | Proposals | MAC schemas, mac-contract.md, selected-host templates | Retain payload/head correlation; retire unsupported cross-issue reservation promise; existing round-trip/idempotency/stale-base tests |
 | Publication | catalogue-output/build-manifest schemas, site-contract.md | Retain same-source bundle and manifest; output/link/CSP/fixture tests |
 | Receipts and trust | Check/control/release receipts and trusted contexts | Retain approval/source/artifact bindings and existing negative fixtures; no production orchestration claim |
-| Host workflows | Three GitHub workflows, GitLab pipeline | Protected runner retained; inactive GitLab script is executed by a negative test; remote settings still need T10 |
+| Host workflows | Trusted check, issue intake, synthetic Pages and quality-report workflows; GitLab pipeline | Protected runner retained; quality artifacts are untrusted review evidence; inactive GitLab script is executed by a negative test; remote settings still need T10 |
 | Toolchain | pyproject.toml, uv.lock, Python pin, gitattributes | Real tools run in the shared test inventory; bad/corrected controls; no machine-level Ruff inheritance |
 | Decisions and explanations | All ADRs, schema guide, entity ledger, ELI21 | Remove duplicate field table; distinguish offering policy from external application-use context; preserve existing decision URLs |
 | Operating status | This plan, launch-runbook.md, maturity profile | Distinguish engineering completion, synthetic evidence and production launch; retain launch gates |

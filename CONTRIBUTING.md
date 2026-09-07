@@ -57,6 +57,12 @@ review. They are not automatically waived or described as clean. Resolve real
 defects and explain false positives in the PR; never weaken sound code to
 satisfy a heuristic. See [the decision](docs/adr/0004-v1-simplification.md).
 
+UBS scans the package, migration scripts and first-party JavaScript. Test
+fixtures and vendored JavaScript are outside this heuristic scope; separate
+tests and vendor-integrity checks cover them. The read-only quality workflow
+uploads raw reports, source commit and scanned-file digests under the tested
+head. These are untrusted review artifacts, never inputs to the trusted receipt.
+
 The complete Python test inventory includes this same quality entry point and
 real failing/corrected input checks, so the protected CI runner executes the
 local tools rather than merely checking configuration text. Raw reports can be
@@ -79,7 +85,7 @@ uv run --locked modelo-local-ci run \
 - Read [docs/authoring.md](docs/authoring.md) before using the browser or CLI
   drafting helpers.
 - The static proposal chooser covers add, change, revoke, move and batch. The
-  interactive helper is intentionally limited to add and change.
+  interactive helper covers the same five operations.
 - `modelo dev evidence-create` and `modelo dev mac-init` print a draft to
   standard output by default. Use `--output` only when you explicitly want a
   local file.

@@ -8,6 +8,25 @@ import yaml
 ROOT = Path(__file__).resolve().parents[3]
 
 
+def test_quality_reports_are_untrusted_exact_head_artifacts_with_no_write_credentials():
+    raw = (ROOT / ".github/workflows/quality.yml").read_text(encoding="utf-8")
+    workflow = yaml.safe_load(raw)
+    assert "pull_request" in workflow[True]
+    assert "pull_request_target" not in workflow[True]
+    assert workflow["permissions"] == {"contents": "read"}
+    steps = workflow["jobs"]["quality"]["steps"]
+    assert steps[0]["with"]["persist-credentials"] is False
+    assert "github.event.pull_request.head.sha" in steps[0]["with"]["ref"]
+    assert any(step.get("run") == "uv run --locked modelo-local-ci lint" for step in steps)
+    upload = steps[-1]
+    assert upload["if"] == "always()"
+    assert upload["with"]["path"] == "dist/quality/"
+    assert "github.event.pull_request.head.sha" in upload["with"]["name"]
+    assert all(
+        re.fullmatch(r"[^@]+@[0-9a-f]{40}", step["uses"]) for step in steps if "uses" in step
+    )
+
+
 def test_github_trusted_workflow_is_pinned_read_only_and_node_free() -> None:
     path = ROOT / ".github/workflows/modelo.yml"
     raw = path.read_text(encoding="utf-8")

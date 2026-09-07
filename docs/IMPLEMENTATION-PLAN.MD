@@ -123,8 +123,8 @@ required and document the actual supported execution environment.
 - Distinguish a computed idempotency key from cross-request reservation; test
   the actual boundary. Clarify which stages belong to modelo check, local
   verification and trusted remote acceptance.
-- Do not represent the absent capabilities command or incomplete GitLab
-  publication pipeline as an available operational control.
+- Distinguish the GitHub capabilities probe from remote enforcement; do not
+  represent the incomplete GitLab publication pipeline as an operational control.
 - Retain evidence hashes and detached receipts unless a concrete replacement
   preserves their approval/source/artifact binding. Native artifact metadata
   alone does not prove business approval.
@@ -191,14 +191,14 @@ claim a 1.0 release before those gates pass.
 | Package | Change radius | Required proof | Status |
 |---|---|---|---|
 | W9: accepted release | Existing platform/receipt code, trusted evidence artifact, GitHub adapter, CLI and tests | Real receipt correlation, accepted metadata retention, independent provider review, exact squash parent/tree and private delivery enforcement | In progress |
-| W10: publication | GitHub release workflow, existing final builder and release assets | Build once; verify exact uploaded bytes and protected tag; reject collisions and incomplete retries | Pending W9 |
-| W11: recovery | Git and provider exports, dependency archive, recovery verification and runbook | Checksummed complete export; offline restore; reject unsafe archives and missing evidence | Pending W10 |
-| W12: remote T10 | Isolated GitHub/GitLab rehearsal, reviewer identity, accessibility and licence evidence | Real positive and negative host tests; no fabricated approvals or launch claims | External inputs requested; implementation proceeds independently |
+| W10: publication | GitHub release workflow, existing final builder and release assets | Build once; verify exact uploaded bytes and protected tag; reject collisions and incomplete retries | Implemented in PR #94; remote acceptance pending |
+| W11: recovery | Git and provider exports, dependency archive, recovery verification and runbook | Checksummed export with explicit historical gaps; offline restore; reject unsafe archives and missing durable release evidence | Implemented in PR #94; live export and offline proof in progress |
+| W12: remote T10 | Isolated GitHub/GitLab rehearsal, reviewer identity, accessibility and licence evidence | Real positive and negative host tests; no fabricated approvals or launch claims | Identities and empty GitLab target supplied; licence deliberately undecided; host controls and rehearsal pending |
 
-Read-only CTO review identified that release correlations currently exist only
-in test helpers, trusted artifacts omit accepted MAC metadata, and the GitHub
-pre-merge adapter accepts only the public profile. Fix these roots using the
-existing schemas and final builder. A supplied eligibility label is not proof
+Read-only CTO review found release correlations only in test helpers, omitted
+accepted MAC metadata and a pre-merge adapter limited to the public profile.
+PR #94 addresses these roots using the existing schemas and final builder.
+A supplied eligibility label is not proof
 of provider approval. Public-repository artifacts are not private delivery.
 
 ## Specification coverage and retained boundaries
@@ -470,6 +470,21 @@ The GitHub capability probe currently rejects the live host configuration:
 independent approval controls, the required trusted check and protected release
 tags are missing. No host protection setting has been changed. Release automation
 also requires a scoped credential and actual independent human approval.
+
+PR [#94](https://github.com/j3brns996/Modelo/pull/94) contains the working delivery.
+The native Linux quality run at `752760354363af10b12d662c49eb169eee255c29`
+passed Ruff, formatting, yamllint and UBS execution. UBS scanned 30 files and
+reported 28 critical, 183 warning and 594 informational matches. Independent
+review found the nine added critical matches compare public content digests,
+not secret authenticators. New warnings concern strict JSON boolean checks,
+guarded JSON parsing and `pathlib` joins. No actionable defect was established
+by those added classes; this is a reviewed findings report, not a clean scan.
+
+The direct `modelo check` invocation at `9077993` reports missing production
+`freshness.yaml`, `inference-services.yaml` and `vendors.yaml`. The same invocation
+at baseline `bf853cd` reports the same three failures. Do not create production
+data or weaken checks to make this control-plane work pass. Trusted control-plane
+CI, schema fixtures and synthetic publication tests provide its acceptance path.
 
 | Gate | Status |
 |---|---|

@@ -6,6 +6,29 @@ from modelo.github_adapter import github_publication_capability
 from modelo.github_release import accepted_files, approved_review, capability_failures
 
 
+def test_release_workflow_preserves_acceptance_and_credential_boundaries():
+    from pathlib import Path
+
+    import yaml
+
+    root = Path(__file__).parents[2]
+    workflow = yaml.safe_load((root / ".github/workflows/release.yml").read_text())
+    assert workflow["permissions"]["contents"] == "read"
+    assert workflow["permissions"]["pages"] == "read"
+    steps = workflow["jobs"]["release"]["steps"]
+    fetch = next(step for step in steps if "Fetch accepted merge" in step["name"])
+    assert "refs/pull/${CHANGE_REQUEST}/head:refs/modelo/accepted-head" in fetch["run"]
+    assert "rev-parse refs/modelo/accepted-head)" in fetch["run"]
+    lint = next(step for step in steps if "local quality" in step["name"])
+    assert "env" not in lint and "secrets." not in lint["run"]
+    publish = next(step for step in steps if step.get("id") == "publish")
+    assert "--publish" in publish["run"]
+    assert workflow["jobs"]["pages"]["if"] == "needs.release.outputs.profile == 'synthetic'"
+    intake = (root / ".github/workflows/modelo.yml").read_text()
+    assert "validation/dist/receipts/push.json" in intake
+    assert "sender: .sender.login" in intake
+
+
 def test_private_delivery_never_downgrades_to_public_artifacts():
     config = {
         "publication": {

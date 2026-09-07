@@ -1,4 +1,5 @@
 import io
+import struct
 import zipfile
 
 import pytest
@@ -70,6 +71,12 @@ def test_recovery_checks_complete_inventory_bytes_and_paths(tmp_path):
     assert verify_recovery(path, digest)["source_sha"] == "a" * 40
     with pytest.raises(BuildError, match="checksum differs"):
         verify_recovery(path, "sha256:" + "0" * 64)
+    inflated = bytearray(path.read_bytes())
+    central = inflated.index(b"PK\x01\x02")
+    struct.pack_into("<I", inflated, central + 24, 2_147_483_649)
+    path.write_bytes(inflated)
+    with pytest.raises(BuildError, match="oversized"):
+        verify_recovery(path, sha256_bytes(bytes(inflated)))
     for name in ("../escape", "/absolute", "C:/outside", "bad\\path"):
         path, digest = write(files | {name: b"unsafe"})
         with pytest.raises(BuildError, match="unsafe"):
@@ -86,6 +93,9 @@ def test_recovery_checks_complete_inventory_bytes_and_paths(tmp_path):
             verify_recovery(path, digest)
     path, digest = write(files, {"source_sha": "--output=outside"})
     with pytest.raises(BuildError, match="identity is invalid"):
+        verify_recovery(path, digest)
+    path, digest = write(files, {"version": True})
+    with pytest.raises(BuildError, match="unsupported shape"):
         verify_recovery(path, digest)
     path, digest = write(files, {"files": {}})
     with pytest.raises(BuildError, match="inventory differs"):

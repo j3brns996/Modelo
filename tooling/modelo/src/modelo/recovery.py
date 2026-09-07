@@ -304,6 +304,7 @@ def verify_recovery(bundle: Path, expected_digest: str) -> dict:
                     "lock_digest",
                     "files",
                 }
+                or type(manifest["version"]) is not int
                 or manifest["version"] != 1
             ):
                 raise BuildError("recovery manifest has an unsupported shape")
@@ -329,7 +330,11 @@ def verify_recovery(bundle: Path, expected_digest: str) -> dict:
                 raise BuildError("recovery bundle lacks required components")
             for name, entry in files.items():
                 data = archive.read(name)
-                if entry != {"sha256": sha256_bytes(data), "size": len(data)}:
+                if (
+                    not isinstance(entry, dict)
+                    or type(entry.get("size")) is not int
+                    or entry != {"sha256": sha256_bytes(data), "size": len(data)}
+                ):
                     raise BuildError("recovery file checksum differs: " + name)
             return manifest
     except (OSError, KeyError, ValueError, zipfile.BadZipFile) as exc:

@@ -140,6 +140,27 @@ def _require_github_config(configured: dict[str, Any], repository: dict[str, Any
         raise BuildError("GitHub repository identity differs from modelo.yaml")
 
 
+def github_publication_capability(configured: dict[str, Any], repository: dict[str, Any]) -> str:
+    profile = configured["publication"]["active_profile"]
+    selected = configured["publication"]["profiles"][profile]
+    if (
+        profile == "synthetic"
+        and selected["delivery"] == "pages"
+        and selected["visibility"] == "public"
+    ):
+        return "public-pages"
+    if (
+        profile == "private"
+        and selected["visibility"] == "private"
+        and selected["delivery"] == "restricted_artifact_or_capability_checked_pages"
+        and repository.get("private") is True
+    ):
+        return "restricted-artifact"
+    raise BuildError(
+        "GitHub publication requires synthetic Pages or a private repository for restricted artifacts"
+    )
+
+
 def prepare_github(
     *,
     root: Path,
@@ -203,11 +224,7 @@ def prepare_github(
     configured = _committed_yaml_config(root, head, "modelo.yaml")
     _require_github_config(configured, repository)
     profile = configured["publication"]["active_profile"]
-    profile_config = configured["publication"]["profiles"][profile]
-    if profile_config["delivery"] != "pages" or profile_config["visibility"] != "public":
-        raise BuildError(
-            "GitHub pre-merge adapter currently requires the configured public Pages profile"
-        )
+    publication_capability = github_publication_capability(configured, repository)
     owner, name = str(repository["full_name"]).split("/", 1)
     metadata = {
         "contract_version": CONTRACT_VERSION,
@@ -243,7 +260,7 @@ def prepare_github(
         "profile": profile,
         "base_url": configured["site"]["base_url"],
         "base_path": configured["site"]["base_path"],
-        "publication_capability": "public-pages",
+        "publication_capability": publication_capability,
         "workflow_identity": f"{repository['full_name']}/{configured['paths']['github_adapter']}/workflows/modelo.yml@{configured['project']['default_branch']}",
         "workflow_sha": base,
         "run_id": str(__import__("os").environ.get("GITHUB_RUN_ID", "local")),

@@ -76,7 +76,7 @@ def scanner_environment() -> dict[str, str]:
     }
 
 
-def scan(root: Path) -> dict:
+def scan(root: Path, ubs_source: Path | None = None) -> dict:
     output = root / "dist/quality"
     output.mkdir(parents=True, exist_ok=True)
     for name in ("ubs.json", "source.json"):
@@ -92,8 +92,14 @@ def scan(root: Path) -> dict:
             raise ValueError(f"Remove {name} from PATH; it overrides pinned UBS modules")
     if command(["ast-grep", "--version"], root).strip() != "ast-grep 0.40.1":
         raise ValueError("ast-grep must come from the locked environment (0.40.1)")
-    cache = Path.home() / ".cache" / "modelo" / f"ubs-{UBS_REVISION}"
+    cache = (
+        ubs_source.resolve()
+        if ubs_source is not None
+        else Path.home() / ".cache" / "modelo" / f"ubs-{UBS_REVISION}"
+    )
     if not cache.exists():
+        if ubs_source is not None:
+            raise ValueError("Explicit UBS source is missing; offline source cannot be downloaded")
         cache.parent.mkdir(parents=True, exist_ok=True)
         command(
             [
@@ -183,7 +189,7 @@ def scan(root: Path) -> dict:
     return report
 
 
-def check(root: Path) -> None:
+def check(root: Path, ubs_source: Path | None = None) -> None:
     root = root.resolve()
     for arguments in (
         [sys.executable, "-m", "ruff", "check", "--config", "pyproject.toml", "tooling", "tests"],
@@ -201,7 +207,7 @@ def check(root: Path) -> None:
         [sys.executable, "-m", "yamllint", "--strict", "."],
     ):
         print(command(arguments, root), end="")
-    report = scan(root)
+    report = scan(root, ubs_source)
     print(f"UBS completed: {report['totals']}. Review raw findings in dist/quality/ubs.json.")
 
 

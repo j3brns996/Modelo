@@ -256,7 +256,7 @@ platform:
   identities:
     control_plane_owner:
       github: j3brns
-      gitlab: null
+      gitlab: julianburns
   required_capabilities:
     protected_default_branch: true
     direct_push: false

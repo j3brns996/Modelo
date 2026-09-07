@@ -227,6 +227,9 @@ jobs:
           uv run --project trusted --locked modelo --root validation platform check \
             --context "${RUNNER_TEMP}/context.json" --mac-metadata "${RUNNER_TEMP}/mac.json" \
             --output "${GITHUB_WORKSPACE}/validation/dist/receipts/check.json"
+          cp "${RUNNER_TEMP}/mac.json" validation/dist/receipts/mac.json
+          jq -c '{action, head_sha: .pull_request.head.sha, sender: .sender.login}' \
+            "${EVENT_PATH}" > validation/dist/receipts/push.json
 
       - name: Build exact-head control-plane receipt
         if: needs.classify.outputs.kind == 'control-plane'
@@ -259,6 +262,8 @@ jobs:
           name: modelo-check-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: |
             validation/dist/receipts/check.json
+            validation/dist/receipts/mac.json
+            validation/dist/receipts/push.json
             validation/dist/receipts/control-check.json
             validation/dist/validation/site
           if-no-files-found: error

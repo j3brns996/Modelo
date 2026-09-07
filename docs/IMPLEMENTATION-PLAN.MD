@@ -1,9 +1,10 @@
 # Modelo v1 implementation plan and execution log
 
 Engineering issue: [#91](https://github.com/j3brns996/Modelo/issues/91).
-Working branch: `v1-simplification`, initially based on PR #90 at `ae5962a`.
-Status: implementation complete; [PR #92](https://github.com/j3brns996/Modelo/pull/92)
-tracks independent review and current-head CI/merge acceptance. This is the execution plan;
+Implementation branch: `v1-simplification`, initially based on PR #90 at `ae5962a`.
+Status: scoped engineering work verified and merged in
+[PR #92](https://github.com/j3brns996/Modelo/pull/92); synthetic demo deployed.
+The final acceptance evidence is recorded below. This is the execution plan;
 the bootstrap record below is historical evidence, not a second work queue.
 
 Completion here means the scoped v1 engineering work is verified and merged.
@@ -70,13 +71,13 @@ until remote T10 passes. A blocked host approval remains an external blocker.
 |---|---|---|---|---|
 | W0: authority and plan | Instructions, this plan, configuration path and documentation links | None | Conflict dispositions; exact-case links resolve | Implemented; focused docs checks pass |
 | W1: baseline | Main and PR #90 state, existing tests, schemas, CLI and publication flow | W0 | Baseline failures distinguished from regressions; source commit recorded | Recorded |
-| W2: architecture | All specifications, config contracts, schemas, agent rules and workflow claims | W1 | Every document assessed; findings classified retain/clarify/consolidate/remove/implement/decision | Coverage recorded below; final integrated tests pending |
+| W2: architecture | All specifications, config contracts, schemas, agent rules and workflow claims | W1 | Every document assessed; findings classified retain/clarify/consolidate/remove/implement/decision | Coverage recorded below; integrated checks pass |
 | W3: canonical contract | Schema guide, entity ledger, decision links, source schemas and published bundle | W2 | Keys/paths/profile agree; negative filename/reference/history tests; no entity additions | Implemented and reviewed |
-| W4: quality tools | pyproject.toml, uv.lock, local_ci.py, CI, lint configuration and contributor commands | W1 | Pinned yamllint, Ruff and UBS run locally and remotely; real failure and clean controls; incomplete summaries rejected | Local Linux tool and control tests pass; remote pending |
+| W4: quality tools | pyproject.toml, uv.lock, local_ci.py, CI, lint configuration and contributor commands | W1 | Pinned yamllint, Ruff and UBS run locally and remotely; real failure and clean controls; incomplete summaries rejected | Local Linux and exact-head CI checks pass; raw UBS findings reviewed |
 | W5: workflow | Git-host adapters, MAC documentation, CI acceptance and request templates | W2 | Stale head, invalid input, failed/missing checks and unsupported host activation rejected | Implemented and reviewed |
 | W6: publication | Build/receipt code, configuration, security/site contracts and launch runbook | W2, W5 | Named purpose for retained mechanisms; failure tests before any removal; no false production-readiness claim | Retain existing guarantees; no justified replacement |
 | W7: documentation | README, docs index, schema guide, site templates, published agent/form/schema artifacts | W3-W6 | Commands, links, positive/negative examples and nondefault base paths exercised | Implemented; focused tests pass |
-| W8: integration | Full tests, 5,000-entity workload, package/site builds and independent reviews | W3-W7 | Results tied to exact commit; trusted CI; no blocking findings | Local evidence below; final acceptance in PR #92 |
+| W8: integration | Full tests, 5,000-entity workload, package/site builds and independent reviews | W3-W7 | Results tied to exact commit; trusted CI; no blocking findings | Accepted and merged in PR #92; evidence below |
 
 Deliver small PRs by dependency: plan/contract reconciliation; blocking quality
 toolchain; workflow/publication corrections and final integration. Adjust the
@@ -146,6 +147,59 @@ required and document the actual supported execution environment.
 | 2026-09-07 | Independent integration findings | Review of e49ea9 found ambient scan-reduction settings, missing remote report retention, stale failure reports and omitted migration script. Corrections use a controlled scanner environment, failed-run markers, explicit error checks, full first-party scope and read-only exact-head artifact workflow. New regression checks pass locally; final remote acceptance remains pending. |
 | 2026-09-07 | Local full suite and regression | At e49ea9, 444 tests passed including the 5,000-entity case; one shallow-history test mocked the removed site subprocess import. Its corrected shared-helper mock and typed BuildError assertion pass. The locked offline package build also passes. This is not a claim that the initial full run was green. |
 | 2026-09-07 | Corrected quality integration | At 2bbd574, 21 Linux quality/workflow/timeout checks pass. Both independent reviewers report no remaining source-review blockers. CI quality run 34069247195 succeeds and retains raw evidence. All 28 file hashes match Git objects at that commit; 19 critical/155 warning heuristic counts remain reviewed false positives, not suppressed findings. |
+
+## Final acceptance for PR #92
+
+The following evidence applies to PR #92, not to later documentation commits:
+
+- Reviewed head: `8bb60e7a9ac51bf9ae179de9c020b2f4526b0453`.
+- Accepted tree: `4bc7cdc1229671a9aab0cdd91dafb4624378cc63`.
+- Squash merge: `bf853cd4fc53dd8fc6796d053d87139d68aadb24`; its tree equals
+  the accepted tree.
+- [Trusted CI run 34069507510](https://github.com/j3brns996/Modelo/actions/runs/34069507510)
+  passed 448 proposed-code tests, 438 protected-base tests and both package
+  builds. The `modelo/check` receipt binds issue #91, PR #92, the reviewed head
+  and accepted tree; all required gates report success.
+- [Quality run 34069490805](https://github.com/j3brns996/Modelo/actions/runs/34069490805)
+  ran the pinned tools. The 28 scanned-file hashes and source commit match the
+  reviewed Git objects. UBS reported 19 critical, 155 warning and 569 information
+  heuristic findings. Independent review found no remaining source blockers;
+  the raw findings are retained, not suppressed or described as a clean scan.
+- The final-head mixed 5,000-entity regression passed: 18.359 seconds for loading
+  and validation, 34.405 seconds for the Git check, and 69.25 seconds for the bulk
+  offering change. These measurements cover that fixture, not a production SLA.
+- [Pages run 34070152065](https://github.com/j3brns996/Modelo/actions/runs/34070152065)
+  passed and deployed the synthetic demo from the merge. The public agent
+  README and documentation page returned HTTP 200; the configured proposal link
+  was present.
+- Task-owned temporary checkouts, environments, helper files, the Git bundle
+  and the temporary UBS source clone are absent. CI evidence and working
+  checkouts remain; unrelated original-checkout edits are preserved.
+
+## Remaining release work
+
+The scoped simplification is complete. On continuation, the user instructed
+completion of the remaining plan. [Issue #93](https://github.com/j3brns996/Modelo/issues/93)
+tracks the following dependent release packages. Production release work remains governed
+by the [launch runbook](launch-runbook.md): accepted-receipt consumption,
+merge-tree verification, deployment of the exact final build, detached release
+receipts, protected releases, recovery and isolated restore rehearsals. T10 also
+requires remote protection tests, an independent eligible reviewer, accessibility
+evidence and the owner's licence decision. Do not add production records or
+claim a 1.0 release before those gates pass.
+
+| Package | Change radius | Required proof | Status |
+|---|---|---|---|
+| W9: accepted release | Existing platform/receipt code, trusted evidence artifact, GitHub adapter, CLI and tests | Real receipt correlation, accepted metadata retention, independent provider review, exact squash parent/tree and private delivery enforcement | In progress |
+| W10: publication | GitHub release workflow, existing final builder and release assets | Build once; verify exact uploaded bytes and protected tag; reject collisions and incomplete retries | Pending W9 |
+| W11: recovery | Git and provider exports, dependency archive, recovery verification and runbook | Checksummed complete export; offline restore; reject unsafe archives and missing evidence | Pending W10 |
+| W12: remote T10 | Isolated GitHub/GitLab rehearsal, reviewer identity, accessibility and licence evidence | Real positive and negative host tests; no fabricated approvals or launch claims | External inputs requested; implementation proceeds independently |
+
+Read-only CTO review identified that release correlations currently exist only
+in test helpers, trusted artifacts omit accepted MAC metadata, and the GitHub
+pre-merge adapter accepts only the public profile. Fix these roots using the
+existing schemas and final builder. A supplied eligibility label is not proof
+of provider approval. Public-repository artifacts are not private delivery.
 
 ## Specification coverage and retained boundaries
 
@@ -392,6 +446,30 @@ and release/restore rehearsal must be verified remotely. Prose and local tests
 cannot substitute for host controls.
 
 ## Current status
+
+### W9–W12 working log: 7 September 2026
+
+Issue [#93](https://github.com/j3brns996/Modelo/issues/93) owns the release and
+recovery implementation. The owner has left the repository licence undecided.
+No licence is selected or implied by publication. GitHub reviewer identity:
+`j3brns`. GitLab identity: `julianburns`. The isolated GitLab restore target is
+`https://gitlab.com/julianburns/modelo`; two successful `git ls-remote` reads
+returned no refs. The earlier `julianburns/models` comparison repository is a
+different project and is not a restore target.
+
+Independent review found missing PR-head retrieval after squash merge, stale
+push evidence, a recovery archive replacement race, incomplete remote Git and
+CI exports, and an offline UBS source gap. The working changes address these
+at the workflow, provider acceptance and recovery boundaries. Narrow tests
+cover receipt correlations, changed release bytes, failed or stale CI,
+ineligible approval, unsafe archives and explicit offline scanner sources.
+Full recovery and remote T10 evidence remain pending; local tests do not establish
+production readiness.
+
+The GitHub capability probe currently rejects the live host configuration:
+independent approval controls, the required trusted check and protected release
+tags are missing. No host protection setting has been changed. Release automation
+also requires a scoped credential and actual independent human approval.
 
 | Gate | Status |
 |---|---|

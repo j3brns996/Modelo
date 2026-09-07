@@ -18,9 +18,20 @@ from typing import Any
 from modelo.build import BuildError, _git, _layout, _strict_json_bytes, _strict_json_file
 from modelo.change import with_snapshot
 from modelo.config import CONTRACT_VERSION, load_config
-from modelo.receipt import canonical_bytes, publication_digest, sha256_bytes
+from modelo.receipt import (
+    canonical_bytes,
+    publication_digest,
+    release_correlation_errors,
+    sha256_bytes,
+)
 from modelo.schemas import SchemaSet
-from modelo.site import ValidationBuildRequest, _committed_yaml_config, build_validation_site
+from modelo.site import (
+    FinalBuildRequest,
+    ValidationBuildRequest,
+    _committed_yaml_config,
+    build_final_site,
+    build_validation_site,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +47,157 @@ class TrustedControlCheckRequest:
     root: Path
     context: Path
     output: Path
+
+
+@dataclass(frozen=True, slots=True)
+class ReleaseRequest:
+    """Inputs supplied only after the host adapter verifies acceptance and approval."""
+
+    root: Path
+    accepted_check: Path
+    accepted_check_digest: str
+    approval: dict[str, Any]
+    merge_commit: str
+    release: str
+    mac_metadata: Path
+    publication_capability: str
+
+
+def build_release(request: ReleaseRequest) -> dict[str, Any]:
+    """Build one final publication and its detached receipt from accepted inputs.
+
+    This local assembly does not authenticate a Git-host review or CI run. The
+    trusted host adapter must establish those facts before calling it.
+    """
+    root = request.root.resolve()
+    config = load_config(root)
+    check = _read_json(request.accepted_check, "accepted check receipt")
+    if sha256_bytes(canonical_bytes(check)) != request.accepted_check_digest:
+        raise BuildError("accepted check receipt digest differs from trusted acceptance")
+    schemas = SchemaSet(root, config.paths["schemas"])
+    findings = schemas.validate(config.paths["check_receipt_schema"].name, check, "accepted check")
+    if findings:
+        raise BuildError(f"accepted check violates schema: {findings[0].message}")
+    head = check["head_sha"]
+    base = check["base_sha"]
+    merge = request.merge_commit
+    if str(_git(root, "rev-parse", "--verify", f"{merge}^{{commit}}")).strip() != merge:
+        raise BuildError("release merge must be a complete canonical commit SHA")
+    parents = str(_git(root, "rev-list", "--parents", "-n", "1", merge)).split()[1:]
+    if parents != [base]:
+        raise BuildError("release requires a squash commit whose parent is the accepted base")
+    merge_tree = str(_git(root, "rev-parse", f"{merge}^{{tree}}")).strip()
+    head_tree = str(_git(root, "rev-parse", f"{head}^{{tree}}")).strip()
+    if merge_tree != head_tree or head_tree != check["head_tree_sha"]:
+        raise BuildError("release merge tree differs from the accepted head tree")
+    document = _committed_yaml_config(root, base, "modelo.yaml")
+    _verify_protected_workflow(check["ci"] | {"repository": check["repository"]}, document)
+    if check["ci"]["workflow_sha"] != base or check["ci"]["head_sha"] != head:
+        raise BuildError("accepted check workflow/base/head correlation failed")
+    if check["ci"]["provider"] != check["repository"]["provider"]:
+        raise BuildError("accepted check provider differs from repository")
+    metadata = _strict_json_file(request.mac_metadata)
+    for field, expected in {
+        "repository": check["repository"],
+        "base_sha": base,
+        "head_sha": head,
+        "head_tree_sha": head_tree,
+        "payload_digest": check["mac_payload_digest"],
+        "expected_change_delta": check["change_delta"],
+    }.items():
+        if metadata.get(field) != expected:
+            raise BuildError(f"accepted MAC metadata differs: {field}")
+    if metadata.get("issue", {}).get("reference") != check["mac_issue"]:
+        raise BuildError("accepted MAC issue differs from receipt")
+    actors_path = config.paths["actors_registry"].as_posix()
+    actors_digest = sha256_bytes(bytes(_git(root, "show", f"{head}:{actors_path}", binary=True)))
+    tool_digest = publication_digest(
+        _committed_files(root, head, ("pyproject.toml", "tooling/modelo"))
+    )
+    lock_digest = sha256_bytes(bytes(_git(root, "show", f"{head}:uv.lock", binary=True)))
+    if (actors_digest, tool_digest, lock_digest) != (
+        check["actors_registry_digest"],
+        check["tool_digest"],
+        check["lock_digest"],
+    ):
+        raise BuildError("accepted source tool, lock or actor digest differs")
+    receipt = {
+        field: check[field]
+        for field in (
+            "contract_version",
+            "repository",
+            "base_sha",
+            "head_tree_sha",
+            "as_of",
+            "source_date_epoch",
+            "profile",
+            "base_url",
+            "base_path",
+            "promotion_durability",
+            "artifacts",
+            "tool_digest",
+            "lock_digest",
+            "ci",
+            "mac_issue",
+            "change_request",
+            "change_delta",
+        )
+    }
+    receipt.update(
+        release=request.release,
+        source_sha=head,
+        merge_sha=merge,
+        merge_tree_sha=merge_tree,
+        accepted_check_receipt_digest=request.accepted_check_digest,
+        approval=request.approval,
+    )
+    findings = schemas.validate(
+        config.paths["release_receipt_schema"].name, receipt, "release receipt"
+    )
+    if findings:
+        raise BuildError(f"release receipt violates schema: {findings[0].message}")
+    errors = release_correlation_errors(check, receipt)
+    if errors:
+        raise BuildError("release receipt correlation failed: " + ", ".join(sorted(errors)))
+    output = root / "dist/receipts/release.json"
+    if output.exists():
+        raise BuildError("release receipt already exists; use a fresh release workspace")
+    result = build_final_site(
+        FinalBuildRequest(
+            root=root,
+            base_commit=base,
+            source_commit=head,
+            source_tree=head_tree,
+            merge_commit=merge,
+            merge_tree=merge_tree,
+            as_of=date.fromisoformat(check["as_of"]),
+            source_date_epoch=check["source_date_epoch"],
+            profile=check["profile"],
+            base_url=check["base_url"],
+            base_path=check["base_path"],
+            output="dist/final",
+            mac_metadata=request.mac_metadata,
+            publication_capability=request.publication_capability,
+        )
+    )
+    catalogue_digest = sha256_bytes((result.output / "site/data/catalogue.json").read_bytes())
+    if catalogue_digest != check["artifacts"]["catalogue"]["sha256"]:
+        raise BuildError("final catalogue differs from accepted catalogue")
+    receipt["artifacts"] = {
+        "catalogue": {"path": "site/data/catalogue.json", "sha256": catalogue_digest},
+        "publication": {"path": "site", "sha256": result.publication_digest},
+        "manifest": {
+            "path": "site/data/manifest.json",
+            "sha256": sha256_bytes(result.manifest_bytes),
+        },
+    }
+    findings = schemas.validate(
+        config.paths["release_receipt_schema"].name, receipt, "release receipt"
+    )
+    if findings or release_correlation_errors(check, receipt):
+        raise BuildError("final release receipt failed validation")
+    _atomic_write(output, canonical_bytes(receipt))
+    return receipt
 
 
 def _committed_files(root: Path, commit: str, prefixes: tuple[str, ...]) -> dict[str, bytes]:

@@ -11,7 +11,6 @@ import yaml
 
 from modelo.diagnostics import Diagnostic, Severity
 
-
 JsonScalar: TypeAlias = None | bool | int | float | str
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
 

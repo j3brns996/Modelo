@@ -10,7 +10,6 @@ from typing import Any, Iterable, Mapping
 from modelo.diagnostics import Diagnostic, Severity
 from modelo.schemas import SchemaSet
 
-
 _MISSING = object()
 _SENSITIVE_PARAMETER_KEYS = {
     "credentials": "credentials",
@@ -65,9 +64,7 @@ def canonical_json(value: Any) -> str:
         return "[" + ",".join(canonical_json(item) for item in value) + "]"
     if isinstance(value, dict) and all(isinstance(key, str) for key in value):
         keys = sorted(value, key=lambda key: key.encode("utf-16-be", "surrogatepass"))
-        return "{" + ",".join(
-            f"{_string(key)}:{canonical_json(value[key])}" for key in keys
-        ) + "}"
+        return "{" + ",".join(f"{_string(key)}:{canonical_json(value[key])}" for key in keys) + "}"
     raise ValueError("value is outside Modelo's canonical JSON domain")
 
 
@@ -114,14 +111,10 @@ def external_facts(
 
     facts: list[ExternalFact] = []
 
-    def walk(
-        value: Any, node: Mapping[str, Any], base: Mapping[str, Any], at: str
-    ) -> None:
+    def walk(value: Any, node: Mapping[str, Any], base: Mapping[str, Any], at: str) -> None:
         resolved, resolved_base = schemas.resolve(node, base)
         provenance = node.get("x-modelo-provenance", resolved.get("x-modelo-provenance"))
-        freshness = node.get(
-            "x-modelo-freshness-class", resolved.get("x-modelo-freshness-class")
-        )
+        freshness = node.get("x-modelo-freshness-class", resolved.get("x-modelo-freshness-class"))
         if provenance == "external" and not isinstance(value, (dict, list)):
             facts.append(ExternalFact(at, value, freshness if isinstance(freshness, str) else None))
             return
@@ -133,9 +126,7 @@ def external_facts(
                     if child is None:
                         child = resolved.get("additionalProperties")
                     if isinstance(child, Mapping):
-                        walk(
-                            value[key], child, resolved_base, f"{at}/{escape_pointer(key)}"
-                        )
+                        walk(value[key], child, resolved_base, f"{at}/{escape_pointer(key)}")
         elif isinstance(value, list):
             items = resolved.get("items")
             if isinstance(items, Mapping):
@@ -165,53 +156,73 @@ def validate_evidence_links(
     for fact in external_facts(document, schema, schemas):
         reference = refs.get(fact.pointer)
         if not isinstance(reference, dict):
-            diagnostics.append(_diagnostic(
-                "EVIDENCE_MISSING", path, fact.pointer,
-                "externally sourced fact has no exact evidence reference",
-                "Add an evidence_refs entry for this fact pointer.",
-            ))
+            diagnostics.append(
+                _diagnostic(
+                    "EVIDENCE_MISSING",
+                    path,
+                    fact.pointer,
+                    "externally sourced fact has no exact evidence reference",
+                    "Add an evidence_refs entry for this fact pointer.",
+                )
+            )
             continue
         identifier = reference.get("id")
         record = evidence.get(identifier) if isinstance(identifier, str) else None
         if record is None:
-            diagnostics.append(_diagnostic(
-                "EVIDENCE_MISSING", path, fact.pointer,
-                "referenced evidence record does not exist",
-                "Add the content-addressed evidence record or correct the reference.",
-            ))
+            diagnostics.append(
+                _diagnostic(
+                    "EVIDENCE_MISSING",
+                    path,
+                    fact.pointer,
+                    "referenced evidence record does not exist",
+                    "Add the content-addressed evidence record or correct the reference.",
+                )
+            )
             continue
         projection_pointer = reference.get("projection_pointer")
         try:
             projected = resolve_pointer(record.get("projection"), projection_pointer)
         except (KeyError, IndexError, TypeError):
-            diagnostics.append(_diagnostic(
-                "EVIDENCE_MISSING", path, fact.pointer,
-                "evidence projection pointer does not resolve",
-                "Use an explicit pointer into the referenced evidence projection.",
-            ))
+            diagnostics.append(
+                _diagnostic(
+                    "EVIDENCE_MISSING",
+                    path,
+                    fact.pointer,
+                    "evidence projection pointer does not resolve",
+                    "Use an explicit pointer into the referenced evidence projection.",
+                )
+            )
             continue
         if canonical_json(fact.value) != canonical_json(projected):
-            diagnostics.append(_diagnostic(
-                "EVIDENCE_VALUE_MISMATCH", path, fact.pointer,
-                "fact value differs from its evidence projection",
-                "Make the fact and projection canonically equal without transformation.",
-            ))
+            diagnostics.append(
+                _diagnostic(
+                    "EVIDENCE_VALUE_MISMATCH",
+                    path,
+                    fact.pointer,
+                    "fact value differs from its evidence projection",
+                    "Make the fact and projection canonically equal without transformation.",
+                )
+            )
     return tuple(diagnostics)
 
 
 def validate_content_addresses(
-    records: Iterable[tuple[str, Mapping[str, Any]]]
+    records: Iterable[tuple[str, Mapping[str, Any]]],
 ) -> tuple[Diagnostic, ...]:
     diagnostics: list[Diagnostic] = []
     for path, record in records:
         expected = evidence_id(record)
         actual = record.get("id")
         if actual != expected:
-            diagnostics.append(_diagnostic(
-                "EVIDENCE_ID_MISMATCH", path, "/id",
-                "evidence id is not the SHA-256 of the canonical envelope without id",
-                f"Set id and filename to {expected}.",
-            ))
+            diagnostics.append(
+                _diagnostic(
+                    "EVIDENCE_ID_MISMATCH",
+                    path,
+                    "/id",
+                    "evidence id is not the SHA-256 of the canonical envelope without id",
+                    f"Set id and filename to {expected}.",
+                )
+            )
     return tuple(diagnostics)
 
 
@@ -252,8 +263,7 @@ def create_evidence_record(
             missing.append("sanitised_parameters")
         if missing:
             raise ValueError(
-                "invalid evidence record: first-party-read-api requires "
-                + ", ".join(missing)
+                "invalid evidence record: first-party-read-api requires " + ", ".join(missing)
             )
         if (provider, service) != ("aws", "bedrock"):
             raise ValueError(

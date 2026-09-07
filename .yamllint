@@ -1,0 +1,14 @@
+extends: default
+
+rules:
+  document-start: disable
+  line-length: disable
+  indentation:
+    indent-sequences: consistent
+  truthy:
+    check-keys: false
+
+ignore: |
+  .venv/
+  dist/
+  uv.lock

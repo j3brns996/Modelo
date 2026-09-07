@@ -1,16 +1,19 @@
 from __future__ import annotations
 
-from pathlib import Path
 import subprocess
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
 from modelo.local_ci import (
-    ChangeMode, LocalCIError, advisory_run, classify_change_mode,
-    discover_test_files, verification_shards, verify,
+    ChangeMode,
+    LocalCIError,
+    advisory_run,
+    classify_change_mode,
+    discover_test_files,
+    verification_shards,
+    verify,
 )
-
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -83,3 +86,28 @@ def test_advisory_control_mode_runs_the_fixed_verifier(tmp_path: Path) -> None:
     ):
         advisory_run(tmp_path, "base", "head", None, jobs=2)
     control_verify.assert_called_once_with(tmp_path, 2)
+
+
+def test_local_command_timeout_is_a_reported_verification_failure(tmp_path: Path) -> None:
+    from modelo.local_ci import _run
+
+    with patch("modelo.local_ci.subprocess.run", side_effect=subprocess.TimeoutExpired("uv", 1200)):
+        with pytest.raises(LocalCIError, match="cannot execute verification"):
+            _run(["uv", "--version"], cwd=tmp_path)
+
+
+def test_shared_git_timeout_reaches_every_build_and_history_caller(tmp_path: Path) -> None:
+    from modelo.build import BuildError
+    from modelo.build import _git as build_git
+    from modelo.change import GitError, _git, require_ancestor
+    from modelo.site import _git as site_git
+
+    with patch("modelo.change.subprocess.run", side_effect=subprocess.TimeoutExpired("git", 60)):
+        for action, error in (
+            (lambda: _git(tmp_path, "status"), GitError),
+            (lambda: require_ancestor(tmp_path, "base", "head"), GitError),
+            (lambda: build_git(tmp_path, "status"), BuildError),
+            (lambda: site_git(tmp_path, "status"), BuildError),
+        ):
+            with pytest.raises(error):
+                action()

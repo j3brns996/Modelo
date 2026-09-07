@@ -1,20 +1,17 @@
 """Reproducible mixed-file capacity check; timings are observations, not SLAs."""
 
+import json
 from copy import deepcopy
 from datetime import date
-import json
 from pathlib import Path
-import sys
 from time import perf_counter
 
 from modelo.evidence import evidence_id
 from modelo.receipt import canonical_bytes, catalogue_projection
 from modelo.validators import _load_state, _validate_state, check_repository
-
+from repository import Repository
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "tests/fixtures/semantic"))
-from repository import Repository
 
 
 def test_5000_mixed_entities_through_files_history_and_projection():
@@ -38,7 +35,9 @@ def test_5000_mixed_entities_through_files_history_and_projection():
             evidence = deepcopy(observation)
             evidence["source"]["sanitised_parameters"]["modelIdentifier"] = provider_id
             evidence["projection"]["modelId"] = provider_id
-            evidence["projection"]["modelArn"] = f"arn:aws:bedrock:eu-west-2::foundation-model/{provider_id}"
+            evidence["projection"]["modelArn"] = (
+                f"arn:aws:bedrock:eu-west-2::foundation-model/{provider_id}"
+            )
             evidence["id"] = evidence_id(evidence)
             candidate = deepcopy(model)
             candidate.update(id=identifier, canonical_urn=f"urn:modelo:model-release:{identifier}")
@@ -56,7 +55,13 @@ def test_5000_mixed_entities_through_files_history_and_projection():
             write(f"catalogue/offerings/aws-bedrock/{identifier}.yaml", access)
             write(f"catalogue/evidence/{evidence['id']}.yaml", evidence)
 
-        count = sum(len(getattr(initial, key)) for key in ("models", "offerings", "evidence", "conditions", "vendors", "services")) + 1663 * 3
+        count = (
+            sum(
+                len(getattr(initial, key))
+                for key in ("models", "offerings", "evidence", "conditions", "vendors", "services")
+            )
+            + 1663 * 3
+        )
         for index in range(5000 - count):
             candidate = deepcopy(model)
             candidate.update(id=f"unbound-{index}", identity_claims=[])
@@ -69,7 +74,10 @@ def test_5000_mixed_entities_through_files_history_and_projection():
         state = _validate_state(repo.root, date(2026, 9, 1))
         timings["load_schema_semantics_seconds"] = round(perf_counter() - start, 3)
         assert not state.diagnostics, state.diagnostics[:5]
-        counts = {key: len(getattr(state, key)) for key in ("models", "offerings", "evidence", "conditions", "vendors", "services")}
+        counts = {
+            key: len(getattr(state, key))
+            for key in ("models", "offerings", "evidence", "conditions", "vendors", "services")
+        }
         assert sum(counts.values()) == 5000
         print(json.dumps({"counts": counts, **timings}), flush=True)
 
@@ -79,19 +87,33 @@ def test_5000_mixed_entities_through_files_history_and_projection():
         # Exercise the changed-path index with a real bulk policy update, not
         # only the base=head scheduled-audit shortcut.
         for identifier, access in state.offerings.items():
-            changed = dict(access, approval_rationale="Updated synthetic capacity-test policy; no production permission.")
+            changed = dict(
+                access,
+                approval_rationale="Updated synthetic capacity-test policy; no production permission.",
+            )
             write(state.offering_paths[identifier], changed)
         changed_head = repo.commit("bulk synthetic offering policy update")
         start = perf_counter()
         assert not check_repository(repo.root, head, changed_head, date(2026, 9, 1))
         timings["bulk_offering_change_check_seconds"] = round(perf_counter() - start, 3)
         start = perf_counter()
-        projection = catalogue_projection(contract_version="0.1.0", source_commit=head,
-            source_tree=repo.git("rev-parse", f"{head}^{{tree}}").strip(), as_of="2026-09-01", profile="synthetic",
-            models=state.models.values(), offerings=state.offerings.values(), evidence=state.evidence.values(),
-            conditions=state.conditions.values(), vendors={"vendors": state.vendors},
-            inference_services={"inference_services": state.services}, freshness={"classes_days": state.thresholds})
-        assert not state.schemas.validate("catalogue-output.schema.json", projection, "catalogue.json")
+        projection = catalogue_projection(
+            contract_version="0.1.0",
+            source_commit=head,
+            source_tree=repo.git("rev-parse", f"{head}^{{tree}}").strip(),
+            as_of="2026-09-01",
+            profile="synthetic",
+            models=state.models.values(),
+            offerings=state.offerings.values(),
+            evidence=state.evidence.values(),
+            conditions=state.conditions.values(),
+            vendors={"vendors": state.vendors},
+            inference_services={"inference_services": state.services},
+            freshness={"classes_days": state.thresholds},
+        )
+        assert not state.schemas.validate(
+            "catalogue-output.schema.json", projection, "catalogue.json"
+        )
         assert projection["source_tree"] != repo.git("rev-parse", "HEAD^{tree}").strip()
         raw = canonical_bytes(projection)
         timings["projection_schema_and_serialisation_seconds"] = round(perf_counter() - start, 3)

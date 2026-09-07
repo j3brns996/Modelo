@@ -2,24 +2,29 @@
 
 from __future__ import annotations
 
-from datetime import date
 import json
-from pathlib import Path
 import re
+from datetime import date
+from pathlib import Path
 from typing import Any
 
 from modelo.build import BuildError, _git
+from modelo.config import CONTRACT_VERSION
 from modelo.guided_intake import GuidedIntakeResult, compile_guided_intake
 from modelo.mac import MacError, extract_adapter_issue_payload
 from modelo.platform import _atomic_write, _read_json
-from modelo.config import CONTRACT_VERSION
 from modelo.receipt import canonical_bytes, sha256_bytes, sort_change_delta
 from modelo.site import _committed_yaml_config
 
-
-_ISSUE = re.compile(r"<!-- modelo:mac-issue -->(https://github\.com/([^/]+)/([^/]+)/issues/([1-9][0-9]{0,19}))<!-- /modelo:mac-issue -->")
-_CONTROL_ISSUE = re.compile(r"<!-- modelo:control-issue -->(https://github\.com/([^/]+)/([^/]+)/issues/([1-9][0-9]{0,19}))<!-- /modelo:control-issue -->")
-_DELTA = re.compile(r"(?ms)<!-- modelo:change-delta -->\s*```json\n(\[[\s\S]*?\])\n```\s*<!-- /modelo:change-delta -->")
+_ISSUE = re.compile(
+    r"<!-- modelo:mac-issue -->(https://github\.com/([^/]+)/([^/]+)/issues/([1-9][0-9]{0,19}))<!-- /modelo:mac-issue -->"
+)
+_CONTROL_ISSUE = re.compile(
+    r"<!-- modelo:control-issue -->(https://github\.com/([^/]+)/([^/]+)/issues/([1-9][0-9]{0,19}))<!-- /modelo:control-issue -->"
+)
+_DELTA = re.compile(
+    r"(?ms)<!-- modelo:change-delta -->\s*```json\n(\[[\s\S]*?\])\n```\s*<!-- /modelo:change-delta -->"
+)
 _DIGEST = re.compile(r"(?m)^- Neutral payload digest: `(sha256:[0-9a-f]{64})`$")
 _REPOSITORY = re.compile(
     r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?/"
@@ -31,7 +36,11 @@ GitHubIntakeResult = GuidedIntakeResult
 def compile_github_intake(event: dict[str, Any]) -> GuidedIntakeResult:
     repository = event.get("repository")
     issue = event.get("issue")
-    if not isinstance(repository, dict) or not isinstance(issue, dict) or issue.get("state") != "open":
+    if (
+        not isinstance(repository, dict)
+        or not isinstance(issue, dict)
+        or issue.get("state") != "open"
+    ):
         raise ValueError("GitHub intake requires an open issue event")
     full_name = repository.get("full_name")
     number = issue.get("number")
@@ -55,7 +64,10 @@ def compile_github_intake(event: dict[str, Any]) -> GuidedIntakeResult:
 
 
 def write_github_intake_outputs(
-    *, event_path: Path, issue_body_output: Path, comment_output: Path,
+    *,
+    event_path: Path,
+    issue_body_output: Path,
+    comment_output: Path,
 ) -> None:
     result = compile_github_intake(_read_json(event_path, "GitHub issue event"))
     _atomic_write(issue_body_output, result.issue_body.encode("utf-8"))
@@ -70,7 +82,9 @@ def _pull_request(event_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         raise BuildError("GitHub event is not a pull request")
     if pull.get("base", {}).get("ref") != repository.get("default_branch"):
         raise BuildError("pull request does not target the repository default branch")
-    if pull.get("state") != "open" or pull.get("head", {}).get("repo", {}).get("full_name") != repository.get("full_name"):
+    if pull.get("state") != "open" or pull.get("head", {}).get("repo", {}).get(
+        "full_name"
+    ) != repository.get("full_name"):
         raise BuildError("trusted GitHub check accepts only open same-repository pull requests")
     return pull, repository
 
@@ -81,7 +95,10 @@ def github_issue_reference(event_path: Path) -> str:
 
 
 def _github_issue_reference(
-    pull: dict[str, Any], repository: dict[str, Any], *, control: bool,
+    pull: dict[str, Any],
+    repository: dict[str, Any],
+    *,
+    control: bool,
 ) -> str:
     pattern = _CONTROL_ISSUE if control else _ISSUE
     marker = "control-issue" if control else "mac-issue"
@@ -97,9 +114,7 @@ def _github_issue_reference(
     ):
         noun = "implementation" if control else "MAC"
         prefix = "control " if control else ""
-        raise BuildError(
-            f"{prefix}pull request lacks one same-repository {noun} issue marker"
-        )
+        raise BuildError(f"{prefix}pull request lacks one same-repository {noun} issue marker")
     return matches[0][3]
 
 
@@ -126,8 +141,15 @@ def _require_github_config(configured: dict[str, Any], repository: dict[str, Any
 
 
 def prepare_github(
-    *, root: Path, event_path: Path, issue_path: Path, validation_sha: str,
-    validation_tree: str, as_of: date, metadata_output: Path, context_output: Path,
+    *,
+    root: Path,
+    event_path: Path,
+    issue_path: Path,
+    validation_sha: str,
+    validation_tree: str,
+    as_of: date,
+    metadata_output: Path,
+    context_output: Path,
 ) -> None:
     pull, repository = _pull_request(event_path)
     issue_reference = _github_issue_reference(pull, repository, control=False)
@@ -155,6 +177,7 @@ def prepare_github(
     if digest_matches != [sha256_bytes(canonical_bytes(payload))]:
         raise BuildError("pull request payload digest differs from the linked MAC issue")
     try:
+
         def unique(pairs):
             result = {}
             for key, value in pairs:
@@ -162,8 +185,10 @@ def prepare_github(
                     raise ValueError("duplicate key")
                 result[key] = value
             return result
+
         delta = json.loads(
-            delta_matches[0], object_pairs_hook=unique,
+            delta_matches[0],
+            object_pairs_hook=unique,
             parse_float=lambda token: (_ for _ in ()).throw(ValueError(token)),
             parse_constant=lambda token: (_ for _ in ()).throw(ValueError(token)),
         )
@@ -180,26 +205,48 @@ def prepare_github(
     profile = configured["publication"]["active_profile"]
     profile_config = configured["publication"]["profiles"][profile]
     if profile_config["delivery"] != "pages" or profile_config["visibility"] != "public":
-        raise BuildError("GitHub pre-merge adapter currently requires the configured public Pages profile")
+        raise BuildError(
+            "GitHub pre-merge adapter currently requires the configured public Pages profile"
+        )
     owner, name = str(repository["full_name"]).split("/", 1)
     metadata = {
         "contract_version": CONTRACT_VERSION,
-        "repository": {"provider": "github", "host": "github.com", "namespace": owner, "name": name},
-        "issue": {"reference": issue_reference, "url": str(issue.get("html_url", "")), "state": "open"},
-        "base_sha": base, "head_sha": head, "head_tree_sha": tree,
-        "payload": payload, "payload_digest": sha256_bytes(canonical_bytes(payload)),
+        "repository": {
+            "provider": "github",
+            "host": "github.com",
+            "namespace": owner,
+            "name": name,
+        },
+        "issue": {
+            "reference": issue_reference,
+            "url": str(issue.get("html_url", "")),
+            "state": "open",
+        },
+        "base_sha": base,
+        "head_sha": head,
+        "head_tree_sha": tree,
+        "payload": payload,
+        "payload_digest": sha256_bytes(canonical_bytes(payload)),
         "expected_change_delta": sort_change_delta(delta),
     }
     context = {
-        "contract_version": CONTRACT_VERSION, "repository": metadata["repository"],
-        "change_request": str(pull.get("number", "")), "base_sha": base, "head_sha": head,
-        "head_tree_sha": tree, "validation_sha": validation_sha,
-        "validation_tree_sha": validation_tree, "as_of": as_of.isoformat(),
-        "source_date_epoch": epoch, "profile": profile,
-        "base_url": configured["site"]["base_url"], "base_path": configured["site"]["base_path"],
+        "contract_version": CONTRACT_VERSION,
+        "repository": metadata["repository"],
+        "change_request": str(pull.get("number", "")),
+        "base_sha": base,
+        "head_sha": head,
+        "head_tree_sha": tree,
+        "validation_sha": validation_sha,
+        "validation_tree_sha": validation_tree,
+        "as_of": as_of.isoformat(),
+        "source_date_epoch": epoch,
+        "profile": profile,
+        "base_url": configured["site"]["base_url"],
+        "base_path": configured["site"]["base_path"],
         "publication_capability": "public-pages",
         "workflow_identity": f"{repository['full_name']}/{configured['paths']['github_adapter']}/workflows/modelo.yml@{configured['project']['default_branch']}",
-        "workflow_sha": base, "run_id": str(__import__('os').environ.get("GITHUB_RUN_ID", "local")),
+        "workflow_sha": base,
+        "run_id": str(__import__("os").environ.get("GITHUB_RUN_ID", "local")),
         "check_name": "modelo/check",
         "gates": {"lock": "success", "schema": "success", "tests": "success", "package": "success"},
     }
@@ -208,8 +255,14 @@ def prepare_github(
 
 
 def prepare_github_control(
-    *, root: Path, event_path: Path, issue_path: Path, validation_sha: str, validation_tree: str,
-    as_of: date, context_output: Path,
+    *,
+    root: Path,
+    event_path: Path,
+    issue_path: Path,
+    validation_sha: str,
+    validation_tree: str,
+    as_of: date,
+    context_output: Path,
 ) -> None:
     pull, repository = _pull_request(event_path)
     issue_reference = _github_issue_reference(pull, repository, control=True)
@@ -236,20 +289,32 @@ def prepare_github_control(
     owner, name = str(repository["full_name"]).split("/", 1)
     context = {
         "contract_version": CONTRACT_VERSION,
-        "repository": {"provider": "github", "host": "github.com", "namespace": owner, "name": name},
+        "repository": {
+            "provider": "github",
+            "host": "github.com",
+            "namespace": owner,
+            "name": name,
+        },
         "control_issue": issue_reference,
         "control_issue_digest": sha256_bytes(str(issue.get("body", "")).encode("utf-8")),
         "change_request": str(pull.get("number", "")),
-        "base_sha": base, "head_sha": head,
-        "head_tree_sha": tree, "validation_sha": validation_sha,
-        "validation_tree_sha": validation_tree, "as_of": as_of.isoformat(),
+        "base_sha": base,
+        "head_sha": head,
+        "head_tree_sha": tree,
+        "validation_sha": validation_sha,
+        "validation_tree_sha": validation_tree,
+        "as_of": as_of.isoformat(),
         "source_date_epoch": epoch,
         "workflow_identity": f"{repository['full_name']}/{protected['paths']['github_adapter']}/workflows/modelo.yml@{protected['project']['default_branch']}",
-        "workflow_sha": base, "run_id": str(__import__('os').environ.get("GITHUB_RUN_ID", "local")),
+        "workflow_sha": base,
+        "run_id": str(__import__("os").environ.get("GITHUB_RUN_ID", "local")),
         "check_name": "modelo/check",
         "gates": {
-            "lock": "success", "schema": "success", "trusted_tests": "success",
-            "proposed_tests": "success", "trusted_package": "success",
+            "lock": "success",
+            "schema": "success",
+            "trusted_tests": "success",
+            "proposed_tests": "success",
+            "trusted_package": "success",
             "proposed_package": "success",
         },
     }

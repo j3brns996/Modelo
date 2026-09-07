@@ -4,8 +4,8 @@ import unittest
 from pathlib import Path
 
 import yaml
-
 from modelo.schemas import SchemaSet
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -24,8 +24,11 @@ class SchemaRuntimeTests(unittest.TestCase):
         document = {
             "id": "sha256-" + "a" * 64,
             "source": {"type": "official-vendor-documentation", "uri": "https://example.invalid/x"},
-            "retrieved_by": "manual", "observed_at": "2026-02-30T00:00:00Z",
-            "scope": {}, "projection": {}, "visibility": "public",
+            "retrieved_by": "manual",
+            "observed_at": "2026-02-30T00:00:00Z",
+            "scope": {},
+            "projection": {},
+            "visibility": "public",
         }
         findings = self.schemas.validate("evidence.schema.json", document, "e.yaml")
         self.assertTrue(any("format" in finding.message for finding in findings))
@@ -45,7 +48,9 @@ class SchemaRuntimeTests(unittest.TestCase):
 
     def test_every_externally_sourced_field_has_a_valid_freshness_class(self) -> None:
         valid_classes = set(
-            self.schemas.schema("freshness-policy.schema.json")["properties"]["classes_days"]["required"]
+            self.schemas.schema("freshness-policy.schema.json")["properties"]["classes_days"][
+                "required"
+            ]
         )
         self.assertTrue(valid_classes)
 
@@ -53,7 +58,8 @@ class SchemaRuntimeTests(unittest.TestCase):
             if isinstance(node, dict):
                 if node.get("x-modelo-provenance") == "external":
                     self.assertIn(
-                        node.get("x-modelo-freshness-class"), valid_classes,
+                        node.get("x-modelo-freshness-class"),
+                        valid_classes,
                         f"{name} is externally sourced but has no valid x-modelo-freshness-class",
                     )
                 for child in node.values():
@@ -87,8 +93,11 @@ class SchemaRuntimeTests(unittest.TestCase):
         base = {
             "id": "sha256-" + "a" * 64,
             "source": {"type": "official-vendor-documentation", "uri": "https://example.invalid/x"},
-            "retrieved_by": "manual", "observed_at": valid[0],
-            "scope": {}, "projection": {}, "visibility": "public",
+            "retrieved_by": "manual",
+            "observed_at": valid[0],
+            "scope": {},
+            "projection": {},
+            "visibility": "public",
         }
         for value in valid:
             with self.subTest(value=value):
@@ -96,7 +105,9 @@ class SchemaRuntimeTests(unittest.TestCase):
         for value in invalid:
             with self.subTest(value=value):
                 candidate = dict(base, observed_at=value)
-                self.assertTrue(any(error.validator == "format" for error in validator.iter_errors(candidate)))
+                self.assertTrue(
+                    any(error.validator == "format" for error in validator.iter_errors(candidate))
+                )
 
     def test_provider_adapter_schemas_validate_valid_and_invalid_routes(self) -> None:
         valid_gcp_publisher = {
@@ -115,7 +126,9 @@ class SchemaRuntimeTests(unittest.TestCase):
             },
         }
         self.assertEqual(
-            self.schemas.validate("providers/gcp-vertex.schema.json", valid_gcp_publisher, "gcp-route.yaml"),
+            self.schemas.validate(
+                "providers/gcp-vertex.schema.json", valid_gcp_publisher, "gcp-route.yaml"
+            ),
             (),
         )
 
@@ -134,12 +147,16 @@ class SchemaRuntimeTests(unittest.TestCase):
             },
         }
         self.assertEqual(
-            self.schemas.validate("providers/gcp-vertex.schema.json", valid_gcp_endpoint, "gcp-endpoint.yaml"),
+            self.schemas.validate(
+                "providers/gcp-vertex.schema.json", valid_gcp_endpoint, "gcp-endpoint.yaml"
+            ),
             (),
         )
 
         invalid_gcp = dict(valid_gcp_publisher, location="INVALID_LOCATION")
-        findings = self.schemas.validate("providers/gcp-vertex.schema.json", invalid_gcp, "gcp-invalid.yaml")
+        findings = self.schemas.validate(
+            "providers/gcp-vertex.schema.json", invalid_gcp, "gcp-invalid.yaml"
+        )
         self.assertTrue(len(findings) > 0)
 
         valid_azure_deployment = {
@@ -158,12 +175,16 @@ class SchemaRuntimeTests(unittest.TestCase):
             },
         }
         self.assertEqual(
-            self.schemas.validate("providers/azure-foundry.schema.json", valid_azure_deployment, "azure-route.yaml"),
+            self.schemas.validate(
+                "providers/azure-foundry.schema.json", valid_azure_deployment, "azure-route.yaml"
+            ),
             (),
         )
 
         invalid_azure = dict(valid_azure_deployment, region="INVALID REGION!")
-        findings = self.schemas.validate("providers/azure-foundry.schema.json", invalid_azure, "azure-invalid.yaml")
+        findings = self.schemas.validate(
+            "providers/azure-foundry.schema.json", invalid_azure, "azure-invalid.yaml"
+        )
         self.assertTrue(len(findings) > 0)
 
     def test_offering_route_oneof_branches_keep_disjoint_discriminator_fields(self) -> None:
@@ -184,8 +205,7 @@ class SchemaRuntimeTests(unittest.TestCase):
         branches = offering["properties"]["routes"]["items"]["oneOf"]
         self.assertEqual(len(branches), 3)
         required_sets = [
-            frozenset(self.schemas.resolve(branch, offering)[0]["required"])
-            for branch in branches
+            frozenset(self.schemas.resolve(branch, offering)[0]["required"]) for branch in branches
         ]
         common = frozenset.intersection(*required_sets)
         self.assertIn("id", common)

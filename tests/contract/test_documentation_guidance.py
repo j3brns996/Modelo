@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 import re
 import struct
 import tomllib
+from pathlib import Path
 from urllib.parse import urlparse
 
 import yaml
-
 
 ROOT = Path(__file__).resolve().parents[2]
 README = ROOT / "README.md"
@@ -20,13 +19,27 @@ MACHINE_CONTRACT = ROOT / "docs/contract.yaml"
 MAC_CONTRACT = ROOT / "docs/mac-contract.md"
 VERSION_FILE = ROOT / "VERSION"
 PYPROJECT = ROOT / "pyproject.toml"
-IMPLEMENTATION_PLAN = ROOT / "docs/implementation-plan.md"
+IMPLEMENTATION_PLAN = ROOT / "docs/IMPLEMENTATION-PLAN.MD"
 LAUNCH_RUNBOOK = ROOT / "docs/launch-runbook.md"
 AGENTS = ROOT / "AGENTS.md"
 SITE_DOCS = ROOT / "site/content/docs.md"
 SITE_PROPOSE = ROOT / "site/content/propose.md"
 CLI_SOURCE = ROOT / "tooling/modelo/src/modelo/cli.py"
 MODELO_CONFIG = ROOT / "modelo.yaml"
+
+
+def test_current_schema_guide_explains_the_declared_profile_and_policy_fields():
+    import json
+
+    contract = yaml.safe_load(_read(MACHINE_CONTRACT))
+    guide = _read(ROOT / "docs/schema-guide.md")
+    assert contract["entity_acceptance"]["profile"] in guide
+    offering = json.loads(_read(ROOT / "schemas/offering.schema.json"))
+    for name in offering["required"]:
+        if offering["properties"][name].get("x-modelo-provenance") == "policy":
+            assert name in guide
+
+
 README_SCREENSHOTS = {
     "docs/img/modelo-home.png": ("home", "navigation", "synthetic", "status", "catalogue"),
     "docs/img/modelo-catalogue.png": ("catalogue", "filters", "model", "result", "table"),
@@ -45,9 +58,7 @@ def _normalise(text: str) -> str:
 def _headings(text: str, level: int) -> list[str]:
     marker = "#" * level
     return [
-        line[len(marker):].strip()
-        for line in text.splitlines()
-        if line.startswith(f"{marker} ")
+        line[len(marker) :].strip() for line in text.splitlines() if line.startswith(f"{marker} ")
     ]
 
 
@@ -277,12 +288,18 @@ def test_authoring_contract_defines_evidence_and_json_input_boundaries() -> None
     api = evidence["first_party_read_api"]
     assert api["supported_provider_service"] == {"provider": "aws", "service": "bedrock"}
     assert set(api["explicit_required_arguments"]) == {
-        "provider", "service", "operation", "partition", "region", "sanitised_parameters",
+        "provider",
+        "service",
+        "operation",
+        "partition",
+        "region",
+        "sanitised_parameters",
     }
     assert api["uri_mapping"] == "documentation_uri"
     documentation = evidence["documentation_sources"]
     assert set(documentation["types"]) == {
-        "official-provider-documentation", "official-vendor-documentation",
+        "official-provider-documentation",
+        "official-vendor-documentation",
     }
     assert documentation["source_specific_arguments"] == ["uri"]
     assert set(documentation["rejects_api_only_arguments"]) == set(
@@ -415,7 +432,7 @@ def test_security_policy_states_current_reporting_and_reuse_limits() -> None:
     lowered = text.lower()
     assert "2026-09-02" in text
     _assert_contains_all_tokens(lowered, ("private vulnerability reporting", "not configured"))
-    assert ("private" in lowered or "confidential" in lowered)
+    assert "private" in lowered or "confidential" in lowered
     assert (
         "promised" in lowered
         and "private" in lowered
@@ -423,7 +440,9 @@ def test_security_policy_states_current_reporting_and_reuse_limits() -> None:
         and "repository" in lowered
         and "channel" in lowered
     ), "SECURITY.md must state that no private/confidential repository channel is promised"
-    assert "public" in lowered and any(token in lowered for token in ("secrets", "credentials", "tokens"))
+    assert "public" in lowered and any(
+        token in lowered for token in ("secrets", "credentials", "tokens")
+    )
     assert "public visibility" in lowered
     assert any(token in lowered for token in ("reuse", "reuse rights"))
     assert any(token in lowered for token in ("no root licence", "no root license", "undecided"))
@@ -439,7 +458,10 @@ def test_docs_readme_marks_internal_docs_as_non_site_content() -> None:
     lowered = text.lower()
     assert "repository contributors" in lowered
     assert "published site route" in lowered
-    assert any(phrase in lowered for phrase in ("not the published site route", "is not the published site route"))
+    assert any(
+        phrase in lowered
+        for phrase in ("not the published site route", "is not the published site route")
+    )
     assert "authoring.md" in lowered
 
 

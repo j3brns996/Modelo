@@ -133,7 +133,9 @@ def discover_yaml_files(
                 elif entry.is_file(follow_symlinks=False):
                     if entry.name.endswith(".yaml"):
                         discovered.append(relative)
-                    elif entry.name != "README.md" and (not allow_documents or entry_path.suffix.lower() in {".yaml", ".yml"}):
+                    elif entry.name != "README.md" and (
+                        not allow_documents or entry_path.suffix.lower() in {".yaml", ".yml"}
+                    ):
                         raise _error(
                             "unrecognised file beneath governed entity root",
                             "Use the exact .yaml entity filename; keep supporting documents outside entity roots (README.md is allowed).",

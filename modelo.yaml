@@ -64,7 +64,7 @@ paths:
   docs: docs
   human_specification: SPEC.md
   machine_contract: docs/contract.yaml
-  implementation_plan: docs/implementation-plan.md
+  implementation_plan: docs/IMPLEMENTATION-PLAN.MD
   site_contract: docs/site-contract.md
   mac_contract: docs/mac-contract.md
   security_contract: docs/security-contract.md

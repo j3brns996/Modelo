@@ -3,13 +3,10 @@
 from copy import deepcopy
 from datetime import date
 from pathlib import Path, PurePosixPath
-import json
 
 import pytest
-
 from modelo.schemas import SchemaSet
 from modelo.validators import _load_state, _reference_checks
-
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -18,8 +15,10 @@ ROOT = Path(__file__).resolve().parents[2]
 def repository():
     # Use the ordinary fixture loader without Git history or repository copying.
     import sys
+
     sys.path.insert(0, str(ROOT / "tests/fixtures/semantic"))
     from repository import Repository
+
     repo = Repository()
     try:
         yield repo
@@ -60,6 +59,7 @@ def test_supersession_cycle_is_rejected(state):
 @pytest.mark.parametrize("status", ["probable", "conflicting", "unresolved"])
 def test_disputed_claims_can_be_retained_but_cannot_bind_routes(state, status):
     from modelo.identity import has_provider_claim
+
     model = state.models["test-model"]
     model["identity_claims"][0]["status"] = status
     assert not has_provider_claim(model, model["identity_claims"][0]["value"])
@@ -72,7 +72,9 @@ def test_disputed_claims_can_be_retained_but_cannot_bind_routes(state, status):
     assert not state.diagnostics
 
 
-@pytest.mark.parametrize("field,kind", [("rights_owner_vendor_id", "model"), ("operator_vendor_id", "service")])
+@pytest.mark.parametrize(
+    "field,kind", [("rights_owner_vendor_id", "model"), ("operator_vendor_id", "service")]
+)
 def test_legal_entity_bindings_require_existing_legal_entity(state, field, kind):
     record = state.models["test-model"] if kind == "model" else state.services["aws-bedrock"]
     for identifier in ("missing", "test-vendor"):
@@ -88,24 +90,37 @@ def test_legal_entity_bindings_require_existing_legal_entity(state, field, kind)
 
 def test_optional_legal_facts_require_evidence(state):
     from modelo.validators import _evidence_checks
+
     state.vendors["test-vendor"].update(legal_name="Test Vendor Ltd", domicile="United Kingdom")
     state.models["test-model"]["licence_uri"] = "https://example.invalid/terms"
     _evidence_checks(state, date(2026, 9, 1))
-    assert {"/legal_name", "/domicile", "/licence_uri"} <= {d.json_pointer for d in state.diagnostics}
+    assert {"/legal_name", "/domicile", "/licence_uri"} <= {
+        d.json_pointer for d in state.diagnostics
+    }
 
 
 def test_evidenced_legal_facts_and_licence_are_accepted(state):
     from modelo.evidence import evidence_id
     from modelo.validators import _evidence_checks
+
     observation = deepcopy(next(iter(state.evidence.values())))
-    observation["projection"] = {"legal_name": "Test Vendor Ltd", "domicile": "United Kingdom", "licence_uri": "https://example.invalid/terms"}
+    observation["projection"] = {
+        "legal_name": "Test Vendor Ltd",
+        "domicile": "United Kingdom",
+        "licence_uri": "https://example.invalid/terms",
+    }
     observation["id"] = evidence_id(observation)
     state.evidence[observation["id"]] = observation
     state.evidence_paths[observation["id"]] = f"catalogue/evidence/{observation['id']}.yaml"
     for field in ("legal_name", "domicile", "licence_uri"):
-        record = state.models["test-model"] if field == "licence_uri" else state.vendors["test-vendor"]
+        record = (
+            state.models["test-model"] if field == "licence_uri" else state.vendors["test-vendor"]
+        )
         record[field] = observation["projection"][field]
-        record["evidence_refs"][f"/{field}"] = {"id": observation["id"], "projection_pointer": f"/{field}"}
+        record["evidence_refs"][f"/{field}"] = {
+            "id": observation["id"],
+            "projection_pointer": f"/{field}",
+        }
     _evidence_checks(state, date(2026, 9, 1))
     assert not state.diagnostics
 
@@ -123,16 +138,32 @@ def test_bounded_approval_and_optional_facts_schema(state):
         assert schema.validate("offering.schema.json", invalid, "offering.yaml")
     offering["condition_refs"] = []
     assert schema.validate("offering.schema.json", offering, "offering.yaml")
-    offering["no_conditions_rationale"] = "Isolated synthetic tests have no additional use conditions."
+    offering["no_conditions_rationale"] = (
+        "Isolated synthetic tests have no additional use conditions."
+    )
     assert not schema.validate("offering.schema.json", offering, "offering.yaml")
     offering["condition_refs"] = [{"id": "test-condition", "version": 1}]
     assert schema.validate("offering.schema.json", offering, "offering.yaml")
     vendor = deepcopy(state.vendors["test-vendor"])
     vendor["domicile"] = "United Kingdom"
-    assert schema.validate("vendors-registry.schema.json", {"vendors": {"test-vendor": vendor}}, "vendors.yaml")
+    assert schema.validate(
+        "vendors-registry.schema.json", {"vendors": {"test-vendor": vendor}}, "vendors.yaml"
+    )
 
 
-@pytest.mark.parametrize("raw,match", [('{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://example.invalid/a","type":"object","type":"string"}', "duplicate JSON key"), ('{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://example.invalid/a","type":"object"}', "duplicate schema")])
+@pytest.mark.parametrize(
+    "raw,match",
+    [
+        (
+            '{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://example.invalid/a","type":"object","type":"string"}',
+            "duplicate JSON key",
+        ),
+        (
+            '{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://example.invalid/a","type":"object"}',
+            "duplicate schema",
+        ),
+    ],
+)
 def test_schema_identity_is_unambiguous(tmp_path, raw, match):
     directory = tmp_path / "schemas"
     directory.mkdir()
@@ -142,10 +173,14 @@ def test_schema_identity_is_unambiguous(tmp_path, raw, match):
         SchemaSet(tmp_path, PurePosixPath("schemas"))
 
 
-@pytest.mark.parametrize("review_by,overdue", [(None, False), ("2026-09-01", False), ("2026-08-31", True), ("2026-09-02", False)])
+@pytest.mark.parametrize(
+    "review_by,overdue",
+    [(None, False), ("2026-09-01", False), ("2026-08-31", True), ("2026-09-02", False)],
+)
 def test_review_deadline_is_inclusive_and_does_not_mutate_records(repository, review_by, overdue):
-    from modelo.validators import _validate_state
     import yaml
+    from modelo.validators import _validate_state
+
     path = repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml"
     original = path.read_bytes()
     try:
@@ -161,7 +196,14 @@ def test_review_deadline_is_inclusive_and_does_not_mutate_records(repository, re
         path.write_bytes(original)
 
 
-@pytest.mark.parametrize("relative", ["catalogue/models/wrong-id.yaml", "catalogue/model/test-model.yaml", "catalogue/governance/unrecognised.yaml"])
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "catalogue/models/wrong-id.yaml",
+        "catalogue/model/test-model.yaml",
+        "catalogue/governance/unrecognised.yaml",
+    ],
+)
 def test_wrong_record_location_is_not_silently_accepted(repository, relative):
     target = repository.root / relative
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -175,7 +217,12 @@ def test_wrong_record_location_is_not_silently_accepted(repository, relative):
 
 def test_approval_scope_is_visible_and_escaped(state):
     from modelo.site import _approval_scope
-    offering = dict(state.offerings["test-offering"], approved_use="Summarise <private> data & check outputs", approval_owner="Team <A>")
+
+    offering = dict(
+        state.offerings["test-offering"],
+        approved_use="Summarise <private> data & check outputs",
+        approval_owner="Team <A>",
+    )
     html = _approval_scope(offering)
     assert "Summarise &lt;private&gt; data &amp; check outputs" in html
     assert "Team &lt;A&gt;" in html
@@ -187,10 +234,14 @@ def test_approval_scope_is_visible_and_escaped(state):
 def test_schema_profile_matches_published_acceptance_contract(state):
     import yaml
     from modelo.identity import ENTITY_PROFILE
+
     contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
     assert contract["entity_acceptance"]["profile"] == ENTITY_PROFILE
     assert state.schemas.schema("model.schema.json")["x-modelo-entity-profile"] == ENTITY_PROFILE
-    assert state.schemas.schema("catalogue-output.schema.json")["x-modelo-entity-profile"] == ENTITY_PROFILE
+    assert (
+        state.schemas.schema("catalogue-output.schema.json")["x-modelo-entity-profile"]
+        == ENTITY_PROFILE
+    )
     assert contract["entity_acceptance"]["semantic_adapters"] == ["aws-bedrock"]
     for schema in contract["entity_acceptance"]["source_schemas"].values():
         assert schema in state.schemas.documents
@@ -213,8 +264,15 @@ def test_offering_ids_remain_global_and_route_ids_are_local(state):
 def test_duplicate_offering_id_in_another_service_directory_fails(repository):
     target = repository.root / "catalogue/offerings/other-service/test-offering.yaml"
     target.parent.mkdir(parents=True, exist_ok=True)
-    original = (repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml").read_text(encoding="utf-8")
-    target.write_text(original.replace("inference_service_id: aws-bedrock", "inference_service_id: other-service"), encoding="utf-8")
+    original = (repository.root / "catalogue/offerings/aws-bedrock/test-offering.yaml").read_text(
+        encoding="utf-8"
+    )
+    target.write_text(
+        original.replace(
+            "inference_service_id: aws-bedrock", "inference_service_id: other-service"
+        ),
+        encoding="utf-8",
+    )
     try:
         findings = _load_state(repository.root).diagnostics
         assert any("offering identity is duplicated" in d.message for d in findings)

@@ -2,23 +2,24 @@
 
 from __future__ import annotations
 
-from datetime import date
 import json
-from pathlib import Path
 import re
+from datetime import date
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
 from modelo.build import BuildError, _git
+from modelo.config import CONTRACT_VERSION
 from modelo.guided_intake import GuidedIntakeResult, compile_guided_intake
 from modelo.mac import MacError, extract_adapter_issue_payload
-from modelo.config import CONTRACT_VERSION
 from modelo.platform import _atomic_write, _read_json
 from modelo.receipt import canonical_bytes, sha256_bytes, sort_change_delta
 from modelo.site import _committed_yaml_config
 
-
-_DELTA = re.compile(r"(?ms)<!-- modelo:change-delta -->\s*```json\n(\[[\s\S]*?\])\n```\s*<!-- /modelo:change-delta -->")
+_DELTA = re.compile(
+    r"(?ms)<!-- modelo:change-delta -->\s*```json\n(\[[\s\S]*?\])\n```\s*<!-- /modelo:change-delta -->"
+)
 _DIGEST = re.compile(r"(?m)^- Neutral payload digest: `(sha256:[0-9a-f]{64})`$")
 _HOST = re.compile(
     r"(?=.{1,253}(?![\s\S]))(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*"
@@ -64,7 +65,11 @@ def _gitlab_project_identity(project: dict[str, Any]) -> tuple[str, str, str, st
 def compile_gitlab_intake(event: dict[str, Any]) -> GuidedIntakeResult:
     project = event.get("project")
     object_attributes = event.get("object_attributes")
-    if not isinstance(project, dict) or not isinstance(object_attributes, dict) or object_attributes.get("state") != "opened":
+    if (
+        not isinstance(project, dict)
+        or not isinstance(object_attributes, dict)
+        or object_attributes.get("state") != "opened"
+    ):
         raise ValueError("GitLab intake requires an open issue event")
     iid = object_attributes.get("iid")
     description = object_attributes.get("description")
@@ -81,7 +86,10 @@ def compile_gitlab_intake(event: dict[str, Any]) -> GuidedIntakeResult:
 
 
 def write_gitlab_intake_outputs(
-    *, event_path: Path, issue_body_output: Path, comment_output: Path,
+    *,
+    event_path: Path,
+    issue_body_output: Path,
+    comment_output: Path,
 ) -> None:
     result = compile_gitlab_intake(_read_json(event_path, "GitLab issue event"))
     _atomic_write(issue_body_output, result.issue_body.encode("utf-8"))
@@ -118,7 +126,10 @@ def _merge_request(event_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 def _gitlab_issue_reference(
-    description: str, project_url: str, *, control: bool,
+    description: str,
+    project_url: str,
+    *,
+    control: bool,
 ) -> str:
     marker = "control-issue" if control else "mac-issue"
     opening = f"<!-- modelo:{marker} -->"
@@ -133,14 +144,14 @@ def _gitlab_issue_reference(
         or description.count(opening) != 1
         or description.count(closing) != 1
         or not matches[0].startswith(prefix)
-        or not re.fullmatch(r"[1-9][0-9]{0,19}", matches[0][len(prefix):])
+        or not re.fullmatch(r"[1-9][0-9]{0,19}", matches[0][len(prefix) :])
     ):
         noun = "implementation" if control else "MAC"
         raise BuildError(
             f"{'control merge request' if control else 'merge request'} lacks one "
             f"same-repository {noun} issue marker"
         )
-    return matches[0][len(prefix):]
+    return matches[0][len(prefix) :]
 
 
 def gitlab_issue_reference(event_path: Path) -> str:
@@ -173,7 +184,9 @@ def _require_gitlab_config(configured: dict[str, Any], project: dict[str, Any]) 
 
 
 def _require_gitlab_issue(
-    issue: dict[str, Any], project: dict[str, Any], issue_reference: str,
+    issue: dict[str, Any],
+    project: dict[str, Any],
+    issue_reference: str,
 ) -> None:
     _, _, _, _, project_url = _gitlab_project_identity(project)
     expected_issue_url = f"{project_url}/-/issues/{issue_reference}"
@@ -190,13 +203,22 @@ def _require_gitlab_issue(
 
 
 def prepare_gitlab(
-    *, root: Path, event_path: Path, issue_path: Path, validation_sha: str,
-    validation_tree: str, as_of: date, metadata_output: Path, context_output: Path,
+    *,
+    root: Path,
+    event_path: Path,
+    issue_path: Path,
+    validation_sha: str,
+    validation_tree: str,
+    as_of: date,
+    metadata_output: Path,
+    context_output: Path,
 ) -> None:
     mr, project = _merge_request(event_path)
     _, _, _, _, project_url = _gitlab_project_identity(project)
     issue_reference = _gitlab_issue_reference(
-        str(mr.get("description", "")), project_url, control=False,
+        str(mr.get("description", "")),
+        project_url,
+        control=False,
     )
     issue = _read_json(issue_path, "GitLab issue")
     try:
@@ -204,7 +226,9 @@ def prepare_gitlab(
     except BuildError as exc:
         raise BuildError("GitLab issue response differs from linked open MAC issue") from exc
     try:
-        payload = extract_adapter_issue_payload(str(issue.get("description") or issue.get("body", "")), "gitlab")
+        payload = extract_adapter_issue_payload(
+            str(issue.get("description") or issue.get("body", "")), "gitlab"
+        )
     except MacError as exc:
         raise BuildError(f"invalid GitLab MAC issue body: {exc}") from exc
     description = str(mr.get("description", ""))
@@ -215,6 +239,7 @@ def prepare_gitlab(
     if digest_matches != [sha256_bytes(canonical_bytes(payload))]:
         raise BuildError("merge request payload digest differs from the linked MAC issue")
     try:
+
         def unique(pairs):
             result = {}
             for key, value in pairs:
@@ -222,8 +247,10 @@ def prepare_gitlab(
                     raise ValueError("duplicate key")
                 result[key] = value
             return result
+
         delta = json.loads(
-            delta_matches[0], object_pairs_hook=unique,
+            delta_matches[0],
+            object_pairs_hook=unique,
             parse_float=lambda token: (_ for _ in ()).throw(ValueError(token)),
             parse_constant=lambda token: (_ for _ in ()).throw(ValueError(token)),
         )
@@ -240,26 +267,43 @@ def prepare_gitlab(
     profile = configured["publication"]["active_profile"]
     profile_config = configured["publication"]["profiles"][profile]
     if profile_config["delivery"] != "pages" or profile_config["visibility"] != "public":
-        raise BuildError("GitLab pre-merge adapter currently requires the configured public Pages profile")
+        raise BuildError(
+            "GitLab pre-merge adapter currently requires the configured public Pages profile"
+        )
     host, _, namespace, name, _ = _gitlab_project_identity(project)
     metadata = {
         "contract_version": CONTRACT_VERSION,
         "repository": {"provider": "gitlab", "host": host, "namespace": namespace, "name": name},
-        "issue": {"reference": issue_reference, "url": str(issue.get("web_url", "")), "state": "open"},
-        "base_sha": base, "head_sha": head, "head_tree_sha": tree,
-        "payload": payload, "payload_digest": sha256_bytes(canonical_bytes(payload)),
+        "issue": {
+            "reference": issue_reference,
+            "url": str(issue.get("web_url", "")),
+            "state": "open",
+        },
+        "base_sha": base,
+        "head_sha": head,
+        "head_tree_sha": tree,
+        "payload": payload,
+        "payload_digest": sha256_bytes(canonical_bytes(payload)),
         "expected_change_delta": sort_change_delta(delta),
     }
     context = {
-        "contract_version": CONTRACT_VERSION, "repository": metadata["repository"],
-        "change_request": str(mr.get("iid") or mr.get("id", "")), "base_sha": base, "head_sha": head,
-        "head_tree_sha": tree, "validation_sha": validation_sha,
-        "validation_tree_sha": validation_tree, "as_of": as_of.isoformat(),
-        "source_date_epoch": epoch, "profile": profile,
-        "base_url": configured["site"]["base_url"], "base_path": configured["site"]["base_path"],
+        "contract_version": CONTRACT_VERSION,
+        "repository": metadata["repository"],
+        "change_request": str(mr.get("iid") or mr.get("id", "")),
+        "base_sha": base,
+        "head_sha": head,
+        "head_tree_sha": tree,
+        "validation_sha": validation_sha,
+        "validation_tree_sha": validation_tree,
+        "as_of": as_of.isoformat(),
+        "source_date_epoch": epoch,
+        "profile": profile,
+        "base_url": configured["site"]["base_url"],
+        "base_path": configured["site"]["base_path"],
         "publication_capability": "public-pages",
         "workflow_identity": f"{project['path_with_namespace']}/{configured['paths']['gitlab_ci']}@{configured['project']['default_branch']}",
-        "workflow_sha": base, "run_id": str(__import__('os').environ.get("CI_PIPELINE_ID", "local")),
+        "workflow_sha": base,
+        "run_id": str(__import__("os").environ.get("CI_PIPELINE_ID", "local")),
         "check_name": "modelo/check",
         "gates": {"lock": "success", "schema": "success", "tests": "success", "package": "success"},
     }
@@ -268,13 +312,21 @@ def prepare_gitlab(
 
 
 def prepare_gitlab_control(
-    *, root: Path, event_path: Path, issue_path: Path, validation_sha: str, validation_tree: str,
-    as_of: date, context_output: Path,
+    *,
+    root: Path,
+    event_path: Path,
+    issue_path: Path,
+    validation_sha: str,
+    validation_tree: str,
+    as_of: date,
+    context_output: Path,
 ) -> None:
     mr, project = _merge_request(event_path)
     _, _, _, _, project_url = _gitlab_project_identity(project)
     issue_reference = _gitlab_issue_reference(
-        str(mr.get("description", "")), project_url, control=True,
+        str(mr.get("description", "")),
+        project_url,
+        control=True,
     )
     issue = _read_json(issue_path, "GitLab control issue")
     try:
@@ -294,18 +346,27 @@ def prepare_gitlab_control(
         "contract_version": CONTRACT_VERSION,
         "repository": {"provider": "gitlab", "host": host, "namespace": namespace, "name": name},
         "control_issue": issue_reference,
-        "control_issue_digest": sha256_bytes(str(issue.get("description") or issue.get("body", "")).encode("utf-8")),
+        "control_issue_digest": sha256_bytes(
+            str(issue.get("description") or issue.get("body", "")).encode("utf-8")
+        ),
         "change_request": str(mr.get("iid") or mr.get("id", "")),
-        "base_sha": base, "head_sha": head,
-        "head_tree_sha": tree, "validation_sha": validation_sha,
-        "validation_tree_sha": validation_tree, "as_of": as_of.isoformat(),
+        "base_sha": base,
+        "head_sha": head,
+        "head_tree_sha": tree,
+        "validation_sha": validation_sha,
+        "validation_tree_sha": validation_tree,
+        "as_of": as_of.isoformat(),
         "source_date_epoch": epoch,
         "workflow_identity": f"{project['path_with_namespace']}/{protected['paths']['gitlab_ci']}@{protected['project']['default_branch']}",
-        "workflow_sha": base, "run_id": str(__import__('os').environ.get("CI_PIPELINE_ID", "local")),
+        "workflow_sha": base,
+        "run_id": str(__import__("os").environ.get("CI_PIPELINE_ID", "local")),
         "check_name": "modelo/check",
         "gates": {
-            "lock": "success", "schema": "success", "trusted_tests": "success",
-            "proposed_tests": "success", "trusted_package": "success",
+            "lock": "success",
+            "schema": "success",
+            "trusted_tests": "success",
+            "proposed_tests": "success",
+            "trusted_package": "success",
             "proposed_package": "success",
         },
     }

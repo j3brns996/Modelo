@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import re
+from dataclasses import dataclass
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
 from modelo.mac import MAX_BODY_BYTES, MacError, payload_digest, with_computed_keys
 from modelo.receipt import canonical_bytes, sha256_bytes
-
 
 INTAKE_START = "<!-- modelo:intake-generated-start -->"
 INTAKE_END = "<!-- modelo:intake-generated-end -->"
@@ -112,7 +111,7 @@ def _without_generated_intake(body: str) -> str:
         or body.find(INTAKE_END, end + 1) >= 0
     ):
         raise ValueError("issue contains an ambiguous generated intake block")
-    if body[end + len(INTAKE_END):].strip():
+    if body[end + len(INTAKE_END) :].strip():
         raise ValueError("generated intake block must be the final issue section")
     return body[:start].rstrip()
 
@@ -133,24 +132,28 @@ def _issue_sections(body: str, request_labels: tuple[str, ...]) -> dict[str, str
             raise MacError("guided proposal field headings are out of order")
         previous_rank = rank
         end = matches[index + 1].start() if index + 1 < len(matches) else len(body)
-        sections[field] = body[match.end():end].strip()
+        sections[field] = body[match.end() : end].strip()
     return sections
 
 
 def _answer(
-    sections: dict[str, str], field: str, *, plain: bool = False,
+    sections: dict[str, str],
+    field: str,
+    *,
+    plain: bool = False,
     display_label: str | None = None,
 ) -> str:
     value = sections.get(field, "").strip()
     if not value or value == "_No response_":
-        raise MacError(
-            f"guided proposal is missing {display_label or _DISPLAY_LABELS[field]}"
-        )
+        raise MacError(f"guided proposal is missing {display_label or _DISPLAY_LABELS[field]}")
     return " ".join(value.split()) if plain else value
 
 
 def _lines(
-    sections: dict[str, str], field: str, *, required: bool = True,
+    sections: dict[str, str],
+    field: str,
+    *,
+    required: bool = True,
 ) -> list[str]:
     value = sections.get(field, "").strip()
     if not value or value == "_No response_":
@@ -176,7 +179,9 @@ def _candidate_evidence(sections: dict[str, str]) -> list[dict[str, str]]:
 
 
 def _compile_payload(
-    sections: dict[str, str], issue_url: str, request_label: str,
+    sections: dict[str, str],
+    issue_url: str,
+    request_label: str,
 ) -> dict[str, Any]:
     operation = _answer(sections, "request_type", display_label=request_label)
     if operation not in _OPERATION_FIELDS:
@@ -198,15 +203,19 @@ def _compile_payload(
         "acceptance": _lines(sections, "acceptance"),
     }
     if operation in {"add", "change"}:
-        payload["subjects"] = [{
-            "kind": _answer(sections, "subject_kind"),
-            "identity": _answer(sections, "subject_identity"),
-        }]
+        payload["subjects"] = [
+            {
+                "kind": _answer(sections, "subject_kind"),
+                "identity": _answer(sections, "subject_identity"),
+            }
+        ]
     elif operation == "revoke":
-        payload["subjects"] = [{
-            "kind": "offering",
-            "identity": _answer(sections, "offering_identity"),
-        }]
+        payload["subjects"] = [
+            {
+                "kind": "offering",
+                "identity": _answer(sections, "offering_identity"),
+            }
+        ]
     elif operation == "move":
         payload["subjects"] = [
             {
@@ -243,15 +252,21 @@ def _compile_payload(
 
 
 def _intake_issue_body(
-    source: str, payload: dict[str, Any], provider_name: str,
+    source: str,
+    payload: dict[str, Any],
+    provider_name: str,
 ) -> str:
     pretty = json.dumps(payload, ensure_ascii=False, allow_nan=False, indent=2, sort_keys=True)
     body = (
-        source + "\n\n" + INTAKE_START + "\n"
+        source
+        + "\n\n"
+        + INTAKE_START
+        + "\n"
         + f"<!-- modelo:intake-source {sha256_bytes(source.encode('utf-8'))} -->\n"
         + f"### Change details (JSON)\n\n```json\n{pretty}\n```\n\n"
         + f"### Change fingerprint\n\n{payload_digest(payload)}\n"
-        + INTAKE_END + "\n"
+        + INTAKE_END
+        + "\n"
     )
     if len(body.encode("utf-8")) > MAX_BODY_BYTES:
         raise MacError(f"generated proposal exceeds the {provider_name} issue body limit")
@@ -259,9 +274,7 @@ def _intake_issue_body(
 
 
 def _intake_comment(payload: dict[str, Any], change_request_name: str) -> str:
-    identities = ", ".join(
-        f"{item['kind']}:{item['identity']}" for item in payload["subjects"]
-    )
+    identities = ", ".join(f"{item['kind']}:{item['identity']}" for item in payload["subjects"])
     digest = sha256_bytes(canonical_bytes(payload))
     return (
         INTAKE_RESULT + "\n## Proposal ready\n\n"
@@ -277,8 +290,12 @@ def _intake_comment(payload: dict[str, Any], change_request_name: str) -> str:
 
 
 def compile_guided_intake(
-    *, body: str, issue_url: str, request_labels: tuple[str, ...],
-    provider_name: str, change_request_name: str,
+    *,
+    body: str,
+    issue_url: str,
+    request_labels: tuple[str, ...],
+    provider_name: str,
+    change_request_name: str,
 ) -> GuidedIntakeResult:
     """Compile recognized form headings while leaving prose headings inside answers intact."""
     had_generated = INTAKE_START in body or INTAKE_END in body
@@ -286,9 +303,7 @@ def compile_guided_intake(
     try:
         sections = _issue_sections(source, request_labels)
     except MacError as exc:
-        if not had_generated and not any(
-            f"### {label}\n\n" in source for label in request_labels
-        ):
+        if not had_generated and not any(f"### {label}\n\n" in source for label in request_labels):
             raise ValueError("issue is not a supported guided proposal") from exc
         sections = {}
         compile_error: MacError | None = exc
@@ -307,8 +322,10 @@ def compile_guided_intake(
     except (MacError, ValueError) as exc:
         message = str(exc).splitlines()[0]
         comment = (
-            INTAKE_RESULT + "\n## Proposal needs attention\n\n"
-            + message + ". Update the issue fields and Modelo will check them again.\n"
+            INTAKE_RESULT
+            + "\n## Proposal needs attention\n\n"
+            + message
+            + ". Update the issue fields and Modelo will check them again.\n"
         )
         return GuidedIntakeResult(False, source + "\n", comment, None)
     return GuidedIntakeResult(True, issue_body, comment_body, payload)

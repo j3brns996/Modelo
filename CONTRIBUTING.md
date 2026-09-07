@@ -38,6 +38,30 @@ Setup:
 uv sync --locked
 ```
 
+Use Ubuntu 24.04 or Ubuntu 24.04 under WSL for the complete checks, matching CI.
+Bash, Git, jq and GNU coreutils are system prerequisites. The locked environment
+supplies Ruff, yamllint, ast-grep and Linux ripgrep. The first UBS run fetches its
+pinned source into the user tool cache; subsequent runs verify that checkout.
+No installer, hooks, agent configuration changes or automatic updates run.
+
+Run the quality tools directly:
+
+```bash
+uv run --locked modelo-local-ci lint
+```
+
+Ruff lint/format and yamllint are blocking. UBS scan failures, empty scans and
+inventory mismatches also block. Completed heuristic findings are retained in
+`dist/quality/ubs.json` with stderr and the scanned inventory for independent
+review. They are not automatically waived or described as clean. Resolve real
+defects and explain false positives in the PR; never weaken sound code to
+satisfy a heuristic. See [the decision](docs/adr/0004-v1-simplification.md).
+
+The complete Python test inventory includes this same quality entry point and
+real failing/corrected input checks, so the protected CI runner executes the
+local tools rather than merely checking configuration text. Raw reports can be
+reproduced with the command above at the reviewed commit.
+
 Local-ci:
 
 ```bash

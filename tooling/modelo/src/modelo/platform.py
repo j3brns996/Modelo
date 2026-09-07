@@ -7,12 +7,12 @@ schema, Git and artefact correlations have been proved locally.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import date
 import json
 import os
-from pathlib import Path, PurePosixPath
 import tempfile
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
 from typing import Any
 
 from modelo.build import BuildError, _git, _layout, _strict_json_bytes, _strict_json_file
@@ -84,7 +84,8 @@ def _verify_protected_workflow(context: dict[str, Any], protected: dict[str, Any
     protected_repository = protected["repository"]
     provider = protected_repository["adapter"]
     if provider not in {"github", "gitlab"} or repository["provider"] not in {
-        "github", "gitlab",
+        "github",
+        "gitlab",
     }:
         raise BuildError("trusted workflow provider is unsupported")
     if repository != {
@@ -116,7 +117,9 @@ def run_trusted_check(request: TrustedCheckRequest) -> dict[str, Any]:
     context = _read_json(request.context, "trusted check context")
     metadata = _strict_json_file(request.mac_metadata)
     head = context.get("head_sha", "")
-    schemas = with_snapshot(root, head, lambda snapshot: SchemaSet(snapshot, config.paths["schemas"]))
+    schemas = with_snapshot(
+        root, head, lambda snapshot: SchemaSet(snapshot, config.paths["schemas"])
+    )
     context_schema = config.paths["trusted_check_context_schema"].name
     findings = schemas.validate(context_schema, context, str(request.context))
     if findings:
@@ -124,8 +127,10 @@ def run_trusted_check(request: TrustedCheckRequest) -> dict[str, Any]:
     repository = context["repository"]
     configured = layout.repository
     if repository != {
-        "provider": configured["adapter"], "host": configured["host"],
-        "namespace": configured["namespace"], "name": configured["name"],
+        "provider": configured["adapter"],
+        "host": configured["host"],
+        "namespace": configured["namespace"],
+        "name": configured["name"],
     }:
         raise BuildError("trusted repository identity differs from modelo.yaml")
     if context["workflow_sha"] != context["base_sha"]:
@@ -134,7 +139,9 @@ def run_trusted_check(request: TrustedCheckRequest) -> dict[str, Any]:
     _verify_protected_workflow(context, protected_document)
     if context["validation_tree_sha"] != context["head_tree_sha"]:
         raise BuildError("validation tree must equal proposed head tree")
-    changed_raw = bytes(_git(root, "diff", "--name-only", "-z", context["base_sha"], head, binary=True))
+    changed_raw = bytes(
+        _git(root, "diff", "--name-only", "-z", context["base_sha"], head, binary=True)
+    )
     changed_paths = [item.decode("utf-8", "strict") for item in changed_raw.split(b"\0") if item]
     if not changed_paths or any(not path.startswith("catalogue/") for path in changed_paths):
         raise BuildError("MAC data mode accepts catalogue-only changes")
@@ -143,15 +150,24 @@ def run_trusted_check(request: TrustedCheckRequest) -> dict[str, Any]:
     if metadata.get("head_tree_sha") != context["head_tree_sha"]:
         raise BuildError("MAC metadata tree differs from trusted context")
 
-    build_validation_site(ValidationBuildRequest(
-        root=root, base_commit=context["base_sha"], source_commit=head,
-        source_tree=context["head_tree_sha"], validation_commit=context["validation_sha"],
-        validation_tree=context["validation_tree_sha"], as_of=date.fromisoformat(context["as_of"]),
-        source_date_epoch=context["source_date_epoch"], profile=context["profile"],
-        base_url=context["base_url"], base_path=context["base_path"],
-        output=layout.validation_root.as_posix(), mac_metadata=request.mac_metadata,
-        publication_capability=context["publication_capability"],
-    ))
+    build_validation_site(
+        ValidationBuildRequest(
+            root=root,
+            base_commit=context["base_sha"],
+            source_commit=head,
+            source_tree=context["head_tree_sha"],
+            validation_commit=context["validation_sha"],
+            validation_tree=context["validation_tree_sha"],
+            as_of=date.fromisoformat(context["as_of"]),
+            source_date_epoch=context["source_date_epoch"],
+            profile=context["profile"],
+            base_url=context["base_url"],
+            base_path=context["base_path"],
+            output=layout.validation_root.as_posix(),
+            mac_metadata=request.mac_metadata,
+            publication_capability=context["publication_capability"],
+        )
+    )
     site_root = root / layout.validation_root / layout.publication_subdir
     catalogue_path = site_root / layout.catalogue_path
     manifest_path = site_root / layout.manifest_path
@@ -165,28 +181,45 @@ def run_trusted_check(request: TrustedCheckRequest) -> dict[str, Any]:
     actors_raw = bytes(_git(root, "show", f"{head}:{actors_path}", binary=True))
     lock_raw = bytes(_git(root, "show", f"{head}:uv.lock", binary=True))
     receipt = {
-        "contract_version": CONTRACT_VERSION, "repository": repository,
-        "change_request": context["change_request"], "base_sha": context["base_sha"],
-        "head_sha": head, "head_tree_sha": context["head_tree_sha"],
+        "contract_version": CONTRACT_VERSION,
+        "repository": repository,
+        "change_request": context["change_request"],
+        "base_sha": context["base_sha"],
+        "head_sha": head,
+        "head_tree_sha": context["head_tree_sha"],
         "validation_sha": context["validation_sha"],
-        "validation_tree_sha": context["validation_tree_sha"], "as_of": context["as_of"],
-        "source_date_epoch": context["source_date_epoch"], "profile": context["profile"],
-        "base_url": context["base_url"], "base_path": context["base_path"],
+        "validation_tree_sha": context["validation_tree_sha"],
+        "as_of": context["as_of"],
+        "source_date_epoch": context["source_date_epoch"],
+        "profile": context["profile"],
+        "base_url": context["base_url"],
+        "base_path": context["base_path"],
         "promotion_durability": "fsync-durable",
         "artifacts": {
-            "catalogue": {"path": "site/data/catalogue.json", "sha256": sha256_bytes(catalogue_path.read_bytes())},
+            "catalogue": {
+                "path": "site/data/catalogue.json",
+                "sha256": sha256_bytes(catalogue_path.read_bytes()),
+            },
             "publication": {"path": "site", "sha256": manifest["publication_digest"]},
-            "manifest": {"path": "site/data/manifest.json", "sha256": sha256_bytes(manifest_path.read_bytes())},
+            "manifest": {
+                "path": "site/data/manifest.json",
+                "sha256": sha256_bytes(manifest_path.read_bytes()),
+            },
         },
-        "tool_digest": publication_digest(tool_files), "lock_digest": sha256_bytes(lock_raw),
+        "tool_digest": publication_digest(tool_files),
+        "lock_digest": sha256_bytes(lock_raw),
         "actors_registry_digest": sha256_bytes(actors_raw),
         "mac_issue": metadata["issue"]["reference"],
         "mac_payload_digest": metadata["payload_digest"],
         "change_delta": metadata["expected_change_delta"],
         "ci": {
-            "provider": repository["provider"], "workflow_identity": context["workflow_identity"],
-            "workflow_sha": context["workflow_sha"], "run_id": context["run_id"],
-            "check": context["check_name"], "result": "success", "head_sha": head,
+            "provider": repository["provider"],
+            "workflow_identity": context["workflow_identity"],
+            "workflow_sha": context["workflow_sha"],
+            "run_id": context["run_id"],
+            "check": context["check_name"],
+            "result": "success",
+            "head_sha": head,
             "gates": {**context["gates"], "validation_site": "success"},
         },
     }
@@ -219,8 +252,10 @@ def run_trusted_control_check(request: TrustedControlCheckRequest) -> dict[str, 
     repository = context["repository"]
     configured = document["repository"]
     if repository != {
-        "provider": configured["adapter"], "host": configured["host"],
-        "namespace": configured["namespace"], "name": configured["name"],
+        "provider": configured["adapter"],
+        "host": configured["host"],
+        "namespace": configured["namespace"],
+        "name": configured["name"],
     }:
         raise BuildError("trusted repository identity differs from proposed modelo.yaml")
     if context["workflow_sha"] != context["base_sha"]:
@@ -233,7 +268,10 @@ def run_trusted_control_check(request: TrustedControlCheckRequest) -> dict[str, 
     parents = str(_git(root, "rev-list", "--parents", "-n", "1", validation)).split()
     if actual_head_tree != context["head_tree_sha"]:
         raise BuildError("proposed head tree differs from trusted context")
-    if actual_validation_tree != context["validation_tree_sha"] or actual_validation_tree != actual_head_tree:
+    if (
+        actual_validation_tree != context["validation_tree_sha"]
+        or actual_validation_tree != actual_head_tree
+    ):
         raise BuildError("control validation tree must equal proposed head tree")
     if parents != [validation, base, head]:
         raise BuildError("control validation commit must have exact base and head parents")
@@ -252,23 +290,33 @@ def run_trusted_control_check(request: TrustedControlCheckRequest) -> dict[str, 
     trusted_lock = bytes(_git(root, "show", f"{base}:uv.lock", binary=True))
     proposed_lock = bytes(_git(root, "show", f"{head}:uv.lock", binary=True))
     receipt = {
-        "contract_version": CONTRACT_VERSION, "kind": "control-plane", "repository": repository,
+        "contract_version": CONTRACT_VERSION,
+        "kind": "control-plane",
+        "repository": repository,
         "control_issue": context["control_issue"],
         "control_issue_digest": context["control_issue_digest"],
         "change_request": context["change_request"],
-        "base_sha": base, "head_sha": head,
-        "head_tree_sha": actual_head_tree, "validation_sha": validation,
-        "validation_tree_sha": actual_validation_tree, "as_of": context["as_of"],
-        "source_date_epoch": context["source_date_epoch"], "changed_paths": paths,
+        "base_sha": base,
+        "head_sha": head,
+        "head_tree_sha": actual_head_tree,
+        "validation_sha": validation,
+        "validation_tree_sha": actual_validation_tree,
+        "as_of": context["as_of"],
+        "source_date_epoch": context["source_date_epoch"],
+        "changed_paths": paths,
         "trusted_tool_digest": publication_digest(trusted_tools),
         "proposed_tool_digest": publication_digest(proposed_tools),
         "trusted_lock_digest": sha256_bytes(trusted_lock),
         "proposed_lock_digest": sha256_bytes(proposed_lock),
         "approval_mode": "human-codeowner-only",
         "ci": {
-            "provider": repository["provider"], "workflow_identity": context["workflow_identity"],
-            "workflow_sha": context["workflow_sha"], "run_id": context["run_id"],
-            "check": context["check_name"], "result": "success", "head_sha": head,
+            "provider": repository["provider"],
+            "workflow_identity": context["workflow_identity"],
+            "workflow_sha": context["workflow_sha"],
+            "run_id": context["run_id"],
+            "check": context["check_name"],
+            "result": "success",
+            "head_sha": head,
             "gates": context["gates"],
         },
     }

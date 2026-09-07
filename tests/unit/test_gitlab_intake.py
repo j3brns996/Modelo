@@ -1,20 +1,25 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from datetime import date
-import json
 from unittest.mock import patch
 from uuid import UUID
 
 import pytest
-
 from modelo.build import BuildError
 from modelo.gitlab_adapter import (
-    compile_gitlab_intake, gitlab_control_issue_reference, gitlab_issue_reference,
-    prepare_gitlab, prepare_gitlab_control,
+    compile_gitlab_intake,
+    gitlab_control_issue_reference,
+    gitlab_issue_reference,
+    prepare_gitlab,
+    prepare_gitlab_control,
 )
 from modelo.mac import (
-    MacError, extract_adapter_issue_payload, render_adapter_issue_body, validate_payload,
+    MacError,
+    extract_adapter_issue_payload,
+    render_adapter_issue_body,
+    validate_payload,
 )
 from modelo.receipt import canonical_bytes, sha256_bytes
 
@@ -24,7 +29,9 @@ def issue_body(**sections: str) -> str:
 
 
 def event(
-    body: str, iid: int = 43, *,
+    body: str,
+    iid: int = 43,
+    *,
     project_path: str = "j3brns996/Modelo",
     project_url: str = "https://gitlab.com/j3brns996/Modelo",
 ) -> dict[str, object]:
@@ -42,7 +49,8 @@ def common(operation: str) -> dict[str, str]:
         "Purpose": "Make the model available for a reviewed workload",
         "Requested outcome": "Add one evidenced model record to the catalogue.",
         "Why is this needed?": "The platform team needs a governed record before proposing an offering.",
-        "Supporting observations": "https://example.invalid/model | 2026-09-02T08:00:00Z | sha256-" + "1" * 64,
+        "Supporting observations": "https://example.invalid/model | 2026-09-02T08:00:00Z | sha256-"
+        + "1" * 64,
         "Acceptance checks": "The model name matches the retained evidence.\nThe record passes Modelo validation.",
     }
 
@@ -66,9 +74,16 @@ def test_gitlab_guided_move_and_batch_compile_operation_specific_fields() -> Non
         "Request type": "move",
         "Current offering identity": "bedrock-model-old",
         "Replacement offering identity": "bedrock-model-new",
-        **{key: value for key, value in common("move").items() if key not in {
-            "Request type", "Subject type", "Subject identity",
-        }},
+        **{
+            key: value
+            for key, value in common("move").items()
+            if key
+            not in {
+                "Request type",
+                "Subject type",
+                "Subject identity",
+            }
+        },
     }
     moved = compile_gitlab_intake(event(issue_body(**move)))
     assert moved.payload["subjects"] == [
@@ -90,7 +105,8 @@ def test_gitlab_guided_move_and_batch_compile_operation_specific_fields() -> Non
         "Provider partition": "aws",
         "Source region": "us-east-1",
         "Inference service": "aws-bedrock",
-        "Supporting observations": "https://example.invalid/model | 2026-09-02T08:00:00Z | sha256-" + "1" * 64,
+        "Supporting observations": "https://example.invalid/model | 2026-09-02T08:00:00Z | sha256-"
+        + "1" * 64,
         "Acceptance checks": "The model name matches the retained evidence.\nThe record passes Modelo validation.",
     }
     compiled = compile_gitlab_intake(event(issue_body(**batch)))
@@ -106,12 +122,21 @@ def test_gitlab_guided_change_and_revoke_preserve_the_expected_subject_kind() ->
     revoke = {
         "Request type": "revoke",
         "Offering identity": "bedrock-example-model",
-        **{key: value for key, value in common("revoke").items() if key not in {
-            "Request type", "Subject type", "Subject identity",
-        }},
+        **{
+            key: value
+            for key, value in common("revoke").items()
+            if key
+            not in {
+                "Request type",
+                "Subject type",
+                "Subject identity",
+            }
+        },
     }
     revoked = compile_gitlab_intake(event(issue_body(**revoke)))
-    assert revoked.payload["subjects"] == [{"kind": "offering", "identity": "bedrock-example-model"}]
+    assert revoked.payload["subjects"] == [
+        {"kind": "offering", "identity": "bedrock-example-model"}
+    ]
 
 
 def test_gitlab_invalid_edit_removes_stale_generated_payload_and_reports_one_error() -> None:
@@ -127,21 +152,27 @@ def test_gitlab_invalid_edit_removes_stale_generated_payload_and_reports_one_err
 
 
 def test_gitlab_nested_namespace_and_self_host_are_part_of_the_stable_request_id() -> None:
-    first = compile_gitlab_intake(event(
-        issue_body(**common("add")),
-        project_path="group/platform/Modelo",
-        project_url="https://gitlab.example.invalid/group/platform/Modelo",
-    ))
-    second = compile_gitlab_intake(event(
-        issue_body(**common("add")),
-        project_path="group/platform/Modelo",
-        project_url="https://gitlab.example.invalid/group/platform/Modelo",
-    ))
-    other_host = compile_gitlab_intake(event(
-        issue_body(**common("add")),
-        project_path="group/platform/Modelo",
-        project_url="https://gitlab.other.invalid/group/platform/Modelo",
-    ))
+    first = compile_gitlab_intake(
+        event(
+            issue_body(**common("add")),
+            project_path="group/platform/Modelo",
+            project_url="https://gitlab.example.invalid/group/platform/Modelo",
+        )
+    )
+    second = compile_gitlab_intake(
+        event(
+            issue_body(**common("add")),
+            project_path="group/platform/Modelo",
+            project_url="https://gitlab.example.invalid/group/platform/Modelo",
+        )
+    )
+    other_host = compile_gitlab_intake(
+        event(
+            issue_body(**common("add")),
+            project_path="group/platform/Modelo",
+            project_url="https://gitlab.other.invalid/group/platform/Modelo",
+        )
+    )
     assert first.valid and second.valid and other_host.valid
     assert first.payload["request_id"] == second.payload["request_id"]
     assert first.payload["request_id"] != other_host.payload["request_id"]
@@ -163,11 +194,13 @@ def test_gitlab_project_url_must_be_canonical_and_match_the_namespace(
     project_url: str,
 ) -> None:
     with pytest.raises(ValueError, match="canonical HTTPS"):
-        compile_gitlab_intake(event(
-            issue_body(**common("add")),
-            project_path="group/Modelo",
-            project_url=project_url,
-        ))
+        compile_gitlab_intake(
+            event(
+                issue_body(**common("add")),
+                project_path="group/Modelo",
+                project_url=project_url,
+            )
+        )
 
 
 def test_gitlab_parser_preserves_unknown_headings_and_rejects_known_reordering() -> None:
@@ -199,13 +232,9 @@ def test_gitlab_rejects_inapplicable_recognized_heading_without_losing_prose() -
 
 def test_gitlab_markers_bind_nested_namespace_host_and_exact_cardinality(tmp_path) -> None:
     project_url = "https://gitlab.example.invalid/group/platform/Modelo"
-    marker = (
-        f"<!-- modelo:mac-issue -->{project_url}/-/issues/43"
-        "<!-- /modelo:mac-issue -->"
-    )
+    marker = f"<!-- modelo:mac-issue -->{project_url}/-/issues/43<!-- /modelo:mac-issue -->"
     control_marker = (
-        f"<!-- modelo:control-issue -->{project_url}/-/issues/44"
-        "<!-- /modelo:control-issue -->"
+        f"<!-- modelo:control-issue -->{project_url}/-/issues/44<!-- /modelo:control-issue -->"
     )
     raw_event = {
         "project": {
@@ -246,17 +275,21 @@ def test_gitlab_prepare_binds_project_issue_profile_and_preserves_outputs_on_fai
     tmp_path,
 ) -> None:
     project_url = "https://gitlab.example.invalid/group/platform/Modelo"
-    payload = compile_gitlab_intake(event(
-        issue_body(**common("add")),
-        project_path="group/platform/Modelo",
-        project_url=project_url,
-    )).payload
+    payload = compile_gitlab_intake(
+        event(
+            issue_body(**common("add")),
+            project_path="group/platform/Modelo",
+            project_url=project_url,
+        )
+    ).payload
     digest = sha256_bytes(canonical_bytes(payload))
-    delta = [{
-        "operation": "add",
-        "path": "catalogue/models/example-model-v1.yaml",
-        "after": "sha256:" + "a" * 64,
-    }]
+    delta = [
+        {
+            "operation": "add",
+            "path": "catalogue/models/example-model-v1.yaml",
+            "after": "sha256:" + "a" * 64,
+        }
+    ]
     description = (
         f"<!-- modelo:mac-issue -->{project_url}/-/issues/43"
         "<!-- /modelo:mac-issue -->\n"
@@ -321,8 +354,9 @@ def test_gitlab_prepare_binds_project_issue_profile_and_preserves_outputs_on_fai
             patch("modelo.gitlab_adapter._committed_yaml_config", return_value=selected_config),
             patch(
                 "modelo.gitlab_adapter._git",
-                side_effect=lambda _root, command, *args: "3" * 40
-                if command == "rev-parse" else "100",
+                side_effect=lambda _root, command, *args: (
+                    "3" * 40 if command == "rev-parse" else "100"
+                ),
             ),
         ):
             prepare_gitlab(
@@ -345,9 +379,7 @@ def test_gitlab_prepare_binds_project_issue_profile_and_preserves_outputs_on_fai
         "namespace": "group/platform",
         "name": "Modelo",
     }
-    assert context["workflow_identity"] == (
-        "group/platform/Modelo/.gitlab-ci.yml@main"
-    )
+    assert context["workflow_identity"] == ("group/platform/Modelo/.gitlab-ci.yml@main")
 
     invalid_cases = []
     for container, key in (
@@ -445,8 +477,9 @@ def test_gitlab_control_prepare_uses_nested_identity_and_preserves_output_on_fai
             patch("modelo.gitlab_adapter._committed_yaml_config", return_value=selected_config),
             patch(
                 "modelo.gitlab_adapter._git",
-                side_effect=lambda _root, command, *args: "3" * 40
-                if command == "rev-parse" else "100",
+                side_effect=lambda _root, command, *args: (
+                    "3" * 40 if command == "rev-parse" else "100"
+                ),
             ),
         ):
             prepare_gitlab_control(
@@ -468,16 +501,12 @@ def test_gitlab_control_prepare_uses_nested_identity_and_preserves_output_on_fai
         "name": "Modelo",
     }
     assert context["change_request"] == "9"
-    assert context["workflow_identity"] == (
-        "group/platform/Modelo/.gitlab-ci.yml@main"
-    )
+    assert context["workflow_identity"] == ("group/platform/Modelo/.gitlab-ci.yml@main")
 
     wrong_url = {**raw_issue, "web_url": f"{project_url}/-/issues/45"}
     wrong_project = {**raw_issue, "project_id": 8}
     wrong_config = deepcopy(config)
-    wrong_config["repository"]["web_base"] = (
-        "https://gitlab.example.invalid/group/platform/Other"
-    )
+    wrong_config["repository"]["web_base"] = "https://gitlab.example.invalid/group/platform/Other"
     sentinel = b"unchanged\n"
     for selected_issue, selected_config in (
         (wrong_url, config),

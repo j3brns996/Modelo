@@ -8,7 +8,6 @@ from pathlib import Path
 
 from modelo.config import ConfigError, load_config
 
-
 ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP_FILES = ("modelo.yaml", "VERSION", ".python-version", "pyproject.toml", "uv.lock")
 
@@ -69,7 +68,10 @@ class ConfigTests(unittest.TestCase):
 
     def test_restricted_yaml_constructs_fail(self) -> None:
         cases = {
-            "duplicate": ("config_version: '0.1.0'\nconfig_version: '0.1.0'\n", "YAML_DUPLICATE_KEY"),
+            "duplicate": (
+                "config_version: '0.1.0'\nconfig_version: '0.1.0'\n",
+                "YAML_DUPLICATE_KEY",
+            ),
             "anchor": ("value: &x 1\n", "YAML_ALIAS_OR_ANCHOR"),
             "alias": ("value: &x 1\ncopy: *x\n", "YAML_ALIAS_OR_ANCHOR"),
             "tag": ("value: !thing 1\n", "YAML_CUSTOM_TAG"),
@@ -83,8 +85,10 @@ class ConfigTests(unittest.TestCase):
                 self.assert_code(root, code)
 
     def test_unsupported_version_and_environment_interpolation_fail(self) -> None:
-        for old, new in (("config_version: \"0.1.0\"", "config_version: \"9.0.0\""),
-                         ("title: Modelo", "title: ${TITLE}")):
+        for old, new in (
+            ('config_version: "0.1.0"', 'config_version: "9.0.0"'),
+            ("title: Modelo", "title: ${TITLE}"),
+        ):
             root = self.clone_bootstrap()
             path = root / "modelo.yaml"
             path.write_text(path.read_text(encoding="utf-8").replace(old, new), encoding="utf-8")
@@ -107,7 +111,9 @@ class ConfigTests(unittest.TestCase):
         (root / "escape").symlink_to(outside.name, target_is_directory=True)
         path = root / "modelo.yaml"
         path.write_text(
-            path.read_text(encoding="utf-8").replace("version_file: VERSION", "version_file: escape/VERSION"),
+            path.read_text(encoding="utf-8").replace(
+                "version_file: VERSION", "version_file: escape/VERSION"
+            ),
             encoding="utf-8",
         )
         self.assert_code(root, "FILE_OR_PATH_ERROR")
@@ -115,7 +121,11 @@ class ConfigTests(unittest.TestCase):
     def test_depth_node_and_byte_limits_fail_before_construction(self) -> None:
         cases = (
             ("deep", "value: " + "[" * 500 + "0" + "]" * 500, "YAML_LIMIT_EXCEEDED"),
-            ("nodes", "values:\n" + "".join("  - value\n" for _ in range(2_001)), "YAML_LIMIT_EXCEEDED"),
+            (
+                "nodes",
+                "values:\n" + "".join("  - value\n" for _ in range(2_001)),
+                "YAML_LIMIT_EXCEEDED",
+            ),
         )
         for name, content, code in cases:
             with self.subTest(name=name):
@@ -137,8 +147,13 @@ class ConfigTests(unittest.TestCase):
             self.assert_code(root, "SCHEMA_VIOLATION")
 
     def test_adapter_and_web_base_mismatch_fail(self) -> None:
-        for old, new in (("adapter: github", "adapter: unknown"),
-                         ("web_base: https://github.com/j3brns996/Modelo", "web_base: https://example.invalid/repo")):
+        for old, new in (
+            ("adapter: github", "adapter: unknown"),
+            (
+                "web_base: https://github.com/j3brns996/Modelo",
+                "web_base: https://example.invalid/repo",
+            ),
+        ):
             root = self.clone_bootstrap()
             path = root / "modelo.yaml"
             path.write_text(path.read_text(encoding="utf-8").replace(old, new, 1), encoding="utf-8")
@@ -159,7 +174,13 @@ class ConfigTests(unittest.TestCase):
         subprocess.run(["git", "init", "-q", str(root)], check=True)
         shutil.copyfile(ROOT / ".gitignore", root / ".gitignore")
         shutil.copyfile(ROOT / ".gitattributes", root / ".gitattributes")
-        for relative in ("dist/probe", "site/probe.html", "schemas/probe.json", "tests/fixtures/probe.yaml", "uv.lock"):
+        for relative in (
+            "dist/probe",
+            "site/probe.html",
+            "schemas/probe.json",
+            "tests/fixtures/probe.yaml",
+            "uv.lock",
+        ):
             target = root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.touch()
@@ -167,19 +188,36 @@ class ConfigTests(unittest.TestCase):
             ["git", "-C", str(root), "check-ignore", "-q", "dist/probe"], check=False
         )
         self.assertEqual(ignored.returncode, 0)
-        for relative in ("site/probe.html", "schemas/probe.json", "tests/fixtures/probe.yaml", "uv.lock"):
+        for relative in (
+            "site/probe.html",
+            "schemas/probe.json",
+            "tests/fixtures/probe.yaml",
+            "uv.lock",
+        ):
             result = subprocess.run(
                 ["git", "-C", str(root), "check-ignore", "-q", relative], check=False
             )
             self.assertEqual(result.returncode, 1, relative)
         attributes = subprocess.run(
-            ["git", "-C", str(root), "check-attr", "text", "eol", "--", "site/probe.html", "uv.lock"],
+            [
+                "git",
+                "-C",
+                str(root),
+                "check-attr",
+                "text",
+                "eol",
+                "--",
+                "site/probe.html",
+                "uv.lock",
+            ],
             text=True,
             capture_output=True,
             check=True,
         ).stdout
         self.assertNotIn("unspecified", attributes)
-        self.assertEqual((ROOT / "CODEOWNERS").read_text(encoding="utf-8").splitlines()[-1], "* @j3brns")
+        self.assertEqual(
+            (ROOT / "CODEOWNERS").read_text(encoding="utf-8").splitlines()[-1], "* @j3brns"
+        )
 
 
 if __name__ == "__main__":

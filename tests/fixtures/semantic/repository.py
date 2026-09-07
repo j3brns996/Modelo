@@ -7,7 +7,6 @@ import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-
 ROOT = Path(__file__).resolve().parents[3]
 VALID = ROOT / "tests/fixtures/semantic/valid"
 

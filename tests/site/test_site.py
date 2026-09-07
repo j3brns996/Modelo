@@ -1,26 +1,27 @@
 from __future__ import annotations
 
-from dataclasses import replace
-from datetime import date
 import json
 import re
-from zipfile import ZipFile
-from html.parser import HTMLParser
-from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import tempfile
 import unittest
+from dataclasses import replace
+from datetime import date
+from html.parser import HTMLParser
+from pathlib import Path, PurePosixPath
 from unittest.mock import patch
+from zipfile import ZipFile
 
 import modelo.build as build_module
 from modelo.build import BuildError, _layout, _projection_from_snapshot, recover_candidate
 from modelo.change import with_snapshot
-from modelo.mac import compute_keys
-from modelo.mac import render_adapter_issue_body
 from modelo.github_adapter import prepare_github, prepare_github_control
+from modelo.mac import compute_keys, render_adapter_issue_body
 from modelo.platform import (
-    TrustedCheckRequest, TrustedControlCheckRequest, _verify_protected_workflow,
+    TrustedCheckRequest,
+    TrustedControlCheckRequest,
+    _verify_protected_workflow,
     run_trusted_check,
     run_trusted_control_check,
 )
@@ -29,10 +30,9 @@ from modelo.site import (
     DemoBuildRequest,
     FinalBuildRequest,
     ValidationBuildRequest,
-    _Resolver,
-    _entry,
     _history_html,
     _pricing_rows,
+    _Resolver,
     _route_rows,
     _supporting_evidence,
     build_demo_site,
@@ -40,19 +40,26 @@ from modelo.site import (
     build_validation_site,
 )
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class LinkParser(HTMLParser):
     def __init__(self) -> None:
-        super().__init__(); self.links = []; self.ids = set(); self.tables = []
+        super().__init__()
+        self.links = []
+        self.ids = set()
+        self.tables = []
+
     def handle_starttag(self, tag, attributes):
         attrs = dict(attributes)
-        if "id" in attrs: self.ids.add(attrs["id"])
-        if tag == "a" and "href" in attrs: self.links.append((attrs["href"], attrs.get("rel", "")))
-        if tag == "table": self.tables.append(False)
-        if tag == "caption" and self.tables: self.tables[-1] = True
+        if "id" in attrs:
+            self.ids.add(attrs["id"])
+        if tag == "a" and "href" in attrs:
+            self.links.append((attrs["href"], attrs.get("rel", "")))
+        if tag == "table":
+            self.tables.append(False)
+        if tag == "caption" and self.tables:
+            self.tables[-1] = True
 
 
 def git(root: Path, *arguments: str) -> str:
@@ -71,7 +78,8 @@ class FinalSiteTests(unittest.TestCase):
             ignore=shutil.ignore_patterns(".git", ".venv", "dist", "__pycache__", "*.pyc"),
         )
         shutil.copytree(
-            self.root / "tests/fixtures/build/synthetic", self.root / "catalogue",
+            self.root / "tests/fixtures/build/synthetic",
+            self.root / "catalogue",
             dirs_exist_ok=True,
         )
         actors = self.root / "catalogue/governance/actors.yaml"
@@ -85,17 +93,21 @@ class FinalSiteTests(unittest.TestCase):
         self.base = git(self.root, "rev-parse", "HEAD")
         history_path = self.root / "tests/fixtures/build/synthetic/history.txt"
         history_path.write_text("added\n", encoding="utf-8", newline="\n")
-        git(self.root, "add", "."); git(self.root, "commit", "-m", 'add <script>alert("history")</script> marker')
+        git(self.root, "add", ".")
+        git(self.root, "commit", "-m", 'add <script>alert("history")</script> marker')
         history_path.write_text("changed\n", encoding="utf-8", newline="\n")
-        git(self.root, "add", "."); git(self.root, "commit", "-m", "change history marker")
+        git(self.root, "add", ".")
+        git(self.root, "commit", "-m", "change history marker")
         history_path.unlink()
-        git(self.root, "add", "."); git(self.root, "commit", "-m", "revoke history marker")
+        git(self.root, "add", ".")
+        git(self.root, "commit", "-m", "revoke history marker")
         condition = self.root / "catalogue/policies/conditions/test-condition/2.yaml"
         condition.parent.mkdir(parents=True, exist_ok=True)
         condition.write_text(
             "id: test-condition\nversion: 2\ntitle: Second condition\n"
             "description: Synthetic second immutable version.\nowner: Test policy owner\n",
-            encoding="utf-8", newline="\n",
+            encoding="utf-8",
+            newline="\n",
         )
         git(self.root, "add", ".")
         git(self.root, "commit", "-m", "add synthetic condition")
@@ -146,7 +158,13 @@ class FinalSiteTests(unittest.TestCase):
         }
         (data / "manifest.json").write_bytes(canonical_bytes(manifest))
         path = "catalogue/policies/conditions/test-condition/2.yaml"
-        delta_record = [{"operation": "add", "path": path, "after": sha256_bytes((self.root / path).read_bytes())}]
+        delta_record = [
+            {
+                "operation": "add",
+                "path": path,
+                "after": sha256_bytes((self.root / path).read_bytes()),
+            }
+        ]
         self.expected_delta = canonical_bytes(delta_record)
         payload = json.loads((ROOT / "tests/fixtures/mac/add.json").read_text(encoding="utf-8"))
         payload["subjects"] = [{"kind": "condition", "identity": "test-condition"}]
@@ -155,15 +173,30 @@ class FinalSiteTests(unittest.TestCase):
         payload["dedupe_key"], payload["idempotency_key"] = compute_keys(payload)
         metadata = {
             "contract_version": "0.1.0",
-            "repository": {"provider": "github", "host": "github.com", "namespace": "j3brns996", "name": "Modelo"},
-            "issue": {"reference": "27", "url": "https://github.com/j3brns996/Modelo/issues/27", "state": "open"},
-            "base_sha": self.base, "head_sha": self.source, "head_tree_sha": self.tree,
-            "payload": payload, "payload_digest": sha256_bytes(canonical_bytes(payload)),
+            "repository": {
+                "provider": "github",
+                "host": "github.com",
+                "namespace": "j3brns996",
+                "name": "Modelo",
+            },
+            "issue": {
+                "reference": "27",
+                "url": "https://github.com/j3brns996/Modelo/issues/27",
+                "state": "open",
+            },
+            "base_sha": self.base,
+            "head_sha": self.source,
+            "head_tree_sha": self.tree,
+            "payload": payload,
+            "payload_digest": sha256_bytes(canonical_bytes(payload)),
             "expected_change_delta": delta_record,
         }
-        metadata_file = tempfile.NamedTemporaryFile(prefix="modelo-site-metadata-", suffix=".json", delete=False)
+        metadata_file = tempfile.NamedTemporaryFile(
+            prefix="modelo-site-metadata-", suffix=".json", delete=False
+        )
         self.metadata_path = Path(metadata_file.name)
-        metadata_file.write(canonical_bytes(metadata)); metadata_file.close()
+        metadata_file.write(canonical_bytes(metadata))
+        metadata_file.close()
         git(self.root, "commit", "--allow-empty", "-m", "merge MAC 27")
         self.merge = git(self.root, "rev-parse", "HEAD")
 
@@ -171,7 +204,9 @@ class FinalSiteTests(unittest.TestCase):
         self.metadata_path.unlink(missing_ok=True)
         self.temporary.cleanup()
 
-    def request(self, *, base_path: str = "/Modelo/", base_url: str | None = None) -> FinalBuildRequest:
+    def request(
+        self, *, base_path: str = "/Modelo/", base_url: str | None = None
+    ) -> FinalBuildRequest:
         return FinalBuildRequest(
             root=self.root,
             base_commit=self.base,
@@ -191,9 +226,13 @@ class FinalSiteTests(unittest.TestCase):
 
     def demo_request(self) -> DemoBuildRequest:
         return DemoBuildRequest(
-            root=self.root, source_commit=self.source, source_tree=self.tree,
-            as_of=date(2026, 9, 6), source_date_epoch=self.epoch,
-            base_url="https://example.invalid/Modelo/", base_path="/Modelo/",
+            root=self.root,
+            source_commit=self.source,
+            source_tree=self.tree,
+            as_of=date(2026, 9, 6),
+            source_date_epoch=self.epoch,
+            base_url="https://example.invalid/Modelo/",
+            base_path="/Modelo/",
             output="dist/pages",
         )
 
@@ -202,12 +241,14 @@ class FinalSiteTests(unittest.TestCase):
         first = build_demo_site(self.demo_request())
         first_bytes = {
             item.relative_to(first.output).as_posix(): item.read_bytes()
-            for item in first.output.rglob("*") if item.is_file()
+            for item in first.output.rglob("*")
+            if item.is_file()
         }
         second = build_demo_site(self.demo_request())
         second_bytes = {
             item.relative_to(second.output).as_posix(): item.read_bytes()
-            for item in second.output.rglob("*") if item.is_file()
+            for item in second.output.rglob("*")
+            if item.is_file()
         }
         self.assertEqual(first_bytes, second_bytes)
         site = first.output / "site"
@@ -222,7 +263,9 @@ class FinalSiteTests(unittest.TestCase):
             self.assertIn("Demonstration catalogue", rendered)
             self.assertIn("synthetic data, not enterprise approval.", rendered)
             self.assertNotIn("Approval merge", rendered)
-        offering = (site / "offerings/aws-bedrock/test-offering/index.html").read_text(encoding="utf-8")
+        offering = (site / "offerings/aws-bedrock/test-offering/index.html").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("Demo provenance", offering)
         self.assertIn("not approved for enterprise use", offering)
         model_page = (site / "models/test-model/index.html").read_text(encoding="utf-8")
@@ -241,15 +284,23 @@ class FinalSiteTests(unittest.TestCase):
         home = (site / "index.html").read_text(encoding="utf-8")
         for anchor in ("interaction-modes", "people", "nist-context", "system-design"):
             self.assertIn('id="' + anchor + '"', guide)
-        self.assertIn('/Modelo/docs/#interaction-modes', home)
-        self.assertIn('/Modelo/docs/#nist-context', home)
-        for statement in ("No mixed proposals", "Agent approval is currently disabled",
-                          "Not a certification", "Not a complete organisational AI-system inventory",
-                          "Covered-by-parent is not exemption", "T10 remain outstanding"):
+        self.assertIn("/Modelo/docs/#interaction-modes", home)
+        self.assertIn("/Modelo/docs/#nist-context", home)
+        for statement in (
+            "No mixed proposals",
+            "Agent approval is currently disabled",
+            "Not a certification",
+            "Not a complete organisational AI-system inventory",
+            "Covered-by-parent is not exemption",
+            "T10 remain outstanding",
+        ):
             self.assertIn(statement, guide)
-        self.assertIn("If any coverage criterion fails, a separate external AI-use entry is required", guide)
+        self.assertIn(
+            "If any coverage criterion fails, a separate external AI-use entry is required", guide
+        )
         import re
         from xml.etree import ElementTree
+
         diagrams = re.findall(r"<svg\b.*?</svg>", guide, re.S)
         self.assertEqual(len(diagrams), 2)
         overview = (site / "overview/index.html").read_text(encoding="utf-8")
@@ -298,10 +349,7 @@ class FinalSiteTests(unittest.TestCase):
         result = build_final_site(self.request())
         site = result.output / "site"
         manifest = json.loads((site / "data/manifest.json").read_text())
-        actual = {
-            path.relative_to(site).as_posix()
-            for path in site.rglob("*") if path.is_file()
-        }
+        actual = {path.relative_to(site).as_posix() for path in site.rglob("*") if path.is_file()}
         self.assertEqual(actual, set(manifest["files"]) | {"data/manifest.json"})
         self.assertEqual(
             (site / "data/catalogue.json").read_bytes(),
@@ -319,29 +367,44 @@ class FinalSiteTests(unittest.TestCase):
         first = build_final_site(self.request())
         first_bytes = {
             item.relative_to(first.output).as_posix(): item.read_bytes()
-            for item in first.output.rglob("*") if item.is_file()
+            for item in first.output.rglob("*")
+            if item.is_file()
         }
         second = build_final_site(self.request())
         second_bytes = {
             item.relative_to(second.output).as_posix(): item.read_bytes()
-            for item in second.output.rglob("*") if item.is_file()
+            for item in second.output.rglob("*")
+            if item.is_file()
         }
         self.assertEqual(first_bytes, second_bytes)
 
     def test_validation_site_binds_exact_test_merge_without_claiming_approval(self) -> None:
         validation = git(
-            self.root, "commit-tree", self.tree,
-            "-p", self.base, "-p", self.source,
-            "-m", "synthetic validation integration",
+            self.root,
+            "commit-tree",
+            self.tree,
+            "-p",
+            self.base,
+            "-p",
+            self.source,
+            "-m",
+            "synthetic validation integration",
         )
         git(self.root, "checkout", "--detach", validation)
         request = ValidationBuildRequest(
-            root=self.root, base_commit=self.base, source_commit=self.source,
-            source_tree=self.tree, validation_commit=validation,
-            validation_tree=self.tree, as_of=date(2026, 9, 6),
-            source_date_epoch=self.epoch, profile="synthetic",
-            base_url="https://example.invalid/Modelo/", base_path="/Modelo/",
-            output="dist/validation", mac_metadata=self.metadata_path,
+            root=self.root,
+            base_commit=self.base,
+            source_commit=self.source,
+            source_tree=self.tree,
+            validation_commit=validation,
+            validation_tree=self.tree,
+            as_of=date(2026, 9, 6),
+            source_date_epoch=self.epoch,
+            profile="synthetic",
+            base_url="https://example.invalid/Modelo/",
+            base_path="/Modelo/",
+            output="dist/validation",
+            mac_metadata=self.metadata_path,
             publication_capability="public-pages",
         )
         result = build_validation_site(request)
@@ -362,9 +425,15 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn("not approval", offering)
 
         wrong_order = git(
-            self.root, "commit-tree", self.tree,
-            "-p", self.source, "-p", self.base,
-            "-m", "wrong validation parents",
+            self.root,
+            "commit-tree",
+            self.tree,
+            "-p",
+            self.source,
+            "-p",
+            self.base,
+            "-m",
+            "wrong validation parents",
         )
         git(self.root, "checkout", "--detach", wrong_order)
         with self.assertRaisesRegex(BuildError, "exact base and source parents"):
@@ -372,22 +441,47 @@ class FinalSiteTests(unittest.TestCase):
 
     def test_trusted_platform_check_binds_validation_and_writes_detached_receipt(self) -> None:
         validation = git(
-            self.root, "commit-tree", self.tree, "-p", self.base, "-p", self.source,
-            "-m", "trusted validation integration",
+            self.root,
+            "commit-tree",
+            self.tree,
+            "-p",
+            self.base,
+            "-p",
+            self.source,
+            "-m",
+            "trusted validation integration",
         )
         git(self.root, "checkout", "--detach", validation)
         context = {
             "contract_version": "0.1.0",
-            "repository": {"provider": "github", "host": "github.com", "namespace": "j3brns996", "name": "Modelo"},
-            "change_request": "29", "base_sha": self.base, "head_sha": self.source,
-            "head_tree_sha": self.tree, "validation_sha": validation,
-            "validation_tree_sha": self.tree, "as_of": "2026-09-06",
-            "source_date_epoch": self.epoch, "profile": "synthetic",
-            "base_url": "https://j3brns996.github.io/Modelo/", "base_path": "/Modelo/",
+            "repository": {
+                "provider": "github",
+                "host": "github.com",
+                "namespace": "j3brns996",
+                "name": "Modelo",
+            },
+            "change_request": "29",
+            "base_sha": self.base,
+            "head_sha": self.source,
+            "head_tree_sha": self.tree,
+            "validation_sha": validation,
+            "validation_tree_sha": self.tree,
+            "as_of": "2026-09-06",
+            "source_date_epoch": self.epoch,
+            "profile": "synthetic",
+            "base_url": "https://j3brns996.github.io/Modelo/",
+            "base_path": "/Modelo/",
             "publication_capability": "public-pages",
             "workflow_identity": "j3brns996/Modelo/.github/workflows/modelo.yml@main",
-            "workflow_sha": self.base, "run_id": "123", "check_name": "modelo/check",
-            "gates": {"lock": "success", "schema": "success", "tests": "success", "package": "success"},
+            "workflow_sha": self.base,
+            "run_id": "123",
+            "check_name": "modelo/check",
+            "gates": {
+                "lock": "success",
+                "schema": "success",
+                "tests": "success",
+                "package": "success",
+            },
         }
         context_path = self.root / "trusted-context.json"
         context_path.write_bytes(canonical_bytes(context))
@@ -399,61 +493,94 @@ class FinalSiteTests(unittest.TestCase):
         external = Path(self.temporary.name) / "trusted-context.json"
         external.write_bytes(canonical_bytes(context))
         output = self.root / "dist/receipts/check.json"
-        receipt = run_trusted_check(TrustedCheckRequest(
-            root=self.root, context=external, mac_metadata=self.metadata_path, output=output,
-        ))
+        receipt = run_trusted_check(
+            TrustedCheckRequest(
+                root=self.root,
+                context=external,
+                mac_metadata=self.metadata_path,
+                output=output,
+            )
+        )
         self.assertEqual(receipt["validation_sha"], validation)
         self.assertEqual(receipt["validation_tree_sha"], self.tree)
         self.assertEqual(receipt["ci"]["head_sha"], self.source)
         self.assertEqual(receipt["ci"]["workflow_sha"], self.base)
         self.assertEqual(output.read_bytes(), canonical_bytes(receipt))
-        bad = dict(context); bad["workflow_sha"] = self.source
+        bad = dict(context)
+        bad["workflow_sha"] = self.source
         external.write_bytes(canonical_bytes(bad))
         with self.assertRaisesRegex(BuildError, "workflow SHA"):
-            run_trusted_check(TrustedCheckRequest(
-                root=self.root, context=external, mac_metadata=self.metadata_path, output=output,
-            ))
+            run_trusted_check(
+                TrustedCheckRequest(
+                    root=self.root,
+                    context=external,
+                    mac_metadata=self.metadata_path,
+                    output=output,
+                )
+            )
         bad = dict(context)
         bad["workflow_identity"] = "j3brns996/Modelo/.github/workflows/forged.yml@main"
         external.write_bytes(canonical_bytes(bad))
         with self.assertRaisesRegex(BuildError, "workflow identity"):
-            run_trusted_check(TrustedCheckRequest(
-                root=self.root, context=external, mac_metadata=self.metadata_path, output=output,
-            ))
-        external.write_text('{"contract_version":"0.1.0","contract_version":"0.1.0"}\n', encoding="utf-8")
+            run_trusted_check(
+                TrustedCheckRequest(
+                    root=self.root,
+                    context=external,
+                    mac_metadata=self.metadata_path,
+                    output=output,
+                )
+            )
+        external.write_text(
+            '{"contract_version":"0.1.0","contract_version":"0.1.0"}\n', encoding="utf-8"
+        )
         with self.assertRaisesRegex(BuildError, "strict trusted check context JSON"):
-            run_trusted_check(TrustedCheckRequest(
-                root=self.root, context=external, mac_metadata=self.metadata_path, output=output,
-            ))
+            run_trusted_check(
+                TrustedCheckRequest(
+                    root=self.root,
+                    context=external,
+                    mac_metadata=self.metadata_path,
+                    output=output,
+                )
+            )
 
     def test_protected_workflow_identity_is_provider_specific_and_exact(self) -> None:
         github = {
             "repository": {
-                "adapter": "github", "host": "github.example.invalid",
-                "namespace": "platform", "name": "registry",
+                "adapter": "github",
+                "host": "github.example.invalid",
+                "namespace": "platform",
+                "name": "registry",
             },
             "paths": {"github_adapter": ".github", "gitlab_ci": ".gitlab-ci.yml"},
             "project": {"default_branch": "main"},
         }
         github_context = {
             "repository": {
-                "provider": "github", "host": "github.example.invalid",
-                "namespace": "platform", "name": "registry",
+                "provider": "github",
+                "host": "github.example.invalid",
+                "namespace": "platform",
+                "name": "registry",
             },
             "workflow_identity": "platform/registry/.github/workflows/modelo.yml@main",
         }
         _verify_protected_workflow(github_context, github)
 
         gitlab = json.loads(json.dumps(github))
-        gitlab["repository"].update({
-            "adapter": "gitlab", "host": "gitlab.example.invalid",
-            "namespace": "group/subgroup", "name": "catalogue",
-        })
+        gitlab["repository"].update(
+            {
+                "adapter": "gitlab",
+                "host": "gitlab.example.invalid",
+                "namespace": "group/subgroup",
+                "name": "catalogue",
+            }
+        )
         gitlab["project"]["default_branch"] = "stable"
         gitlab_context = {
             "repository": {
-                "provider": "gitlab", "host": "gitlab.example.invalid",
-                "namespace": "group/subgroup", "name": "catalogue",
+                "provider": "gitlab",
+                "host": "gitlab.example.invalid",
+                "namespace": "group/subgroup",
+                "name": "catalogue",
             },
             "workflow_identity": "group/subgroup/catalogue/.gitlab-ci.yml@stable",
         }
@@ -489,8 +616,15 @@ class FinalSiteTests(unittest.TestCase):
 
     def test_github_adapter_binds_issue_pr_and_git_coordinates(self) -> None:
         validation = git(
-            self.root, "commit-tree", self.tree, "-p", self.base, "-p", self.source,
-            "-m", "adapter validation integration",
+            self.root,
+            "commit-tree",
+            self.tree,
+            "-p",
+            self.base,
+            "-p",
+            self.source,
+            "-m",
+            "adapter validation integration",
         )
         metadata = json.loads(self.metadata_path.read_text(encoding="utf-8"))
         delta = json.dumps(metadata["expected_change_delta"], sort_keys=True, indent=2)
@@ -499,18 +633,22 @@ class FinalSiteTests(unittest.TestCase):
             "https://github.com/j3brns996/Modelo/issues/27<!-- /modelo:mac-issue -->\n\n"
             f"- Neutral payload digest: `{metadata['payload_digest']}`\n\n"
             "## Expected change delta\n\n<!-- modelo:change-delta -->\n```json\n"
-            + delta + "\n```\n<!-- /modelo:change-delta -->\n"
+            + delta
+            + "\n```\n<!-- /modelo:change-delta -->\n"
         )
         event = {
             "repository": {"full_name": "j3brns996/Modelo", "default_branch": "main"},
             "pull_request": {
-                "number": 29, "state": "open", "body": body,
+                "number": 29,
+                "state": "open",
+                "body": body,
                 "base": {"sha": self.base, "ref": "main"},
                 "head": {"sha": self.source, "repo": {"full_name": "j3brns996/Modelo"}},
             },
         }
         issue = {
-            "number": 27, "state": "open",
+            "number": 27,
+            "state": "open",
             "html_url": "https://github.com/j3brns996/Modelo/issues/27",
             "body": render_adapter_issue_body(metadata["payload"], "github"),
         }
@@ -518,15 +656,23 @@ class FinalSiteTests(unittest.TestCase):
         issue_path = Path(self.temporary.name) / "issue.json"
         prepared_metadata = Path(self.temporary.name) / "prepared-metadata.json"
         prepared_context = Path(self.temporary.name) / "prepared-context.json"
-        event_path.write_bytes(canonical_bytes(event)); issue_path.write_bytes(canonical_bytes(issue))
+        event_path.write_bytes(canonical_bytes(event))
+        issue_path.write_bytes(canonical_bytes(issue))
         prepare_github(
-            root=self.root, event_path=event_path, issue_path=issue_path,
-            validation_sha=validation, validation_tree=self.tree, as_of=date(2026, 9, 6),
-            metadata_output=prepared_metadata, context_output=prepared_context,
+            root=self.root,
+            event_path=event_path,
+            issue_path=issue_path,
+            validation_sha=validation,
+            validation_tree=self.tree,
+            as_of=date(2026, 9, 6),
+            metadata_output=prepared_metadata,
+            context_output=prepared_context,
         )
         actual_metadata = json.loads(prepared_metadata.read_text(encoding="utf-8"))
         actual_context = json.loads(prepared_context.read_text(encoding="utf-8"))
-        self.assertEqual(actual_metadata["expected_change_delta"], metadata["expected_change_delta"])
+        self.assertEqual(
+            actual_metadata["expected_change_delta"], metadata["expected_change_delta"]
+        )
         self.assertEqual(actual_metadata["payload_digest"], metadata["payload_digest"])
         self.assertEqual(actual_context["head_sha"], self.source)
         self.assertEqual(actual_context["validation_sha"], validation)
@@ -535,9 +681,13 @@ class FinalSiteTests(unittest.TestCase):
         event_path.write_bytes(canonical_bytes(wrong_branch))
         with self.assertRaisesRegex(BuildError, "default branch"):
             prepare_github(
-                root=self.root, event_path=event_path, issue_path=issue_path,
-                validation_sha=validation, validation_tree=self.tree,
-                as_of=date(2026, 9, 6), metadata_output=prepared_metadata,
+                root=self.root,
+                event_path=event_path,
+                issue_path=issue_path,
+                validation_sha=validation,
+                validation_tree=self.tree,
+                as_of=date(2026, 9, 6),
+                metadata_output=prepared_metadata,
                 context_output=prepared_context,
             )
         duplicate_marker = json.loads(json.dumps(event))
@@ -548,9 +698,13 @@ class FinalSiteTests(unittest.TestCase):
         event_path.write_bytes(canonical_bytes(duplicate_marker))
         with self.assertRaisesRegex(BuildError, "one same-repository MAC issue"):
             prepare_github(
-                root=self.root, event_path=event_path, issue_path=issue_path,
-                validation_sha=validation, validation_tree=self.tree,
-                as_of=date(2026, 9, 6), metadata_output=prepared_metadata,
+                root=self.root,
+                event_path=event_path,
+                issue_path=issue_path,
+                validation_sha=validation,
+                validation_tree=self.tree,
+                as_of=date(2026, 9, 6),
+                metadata_output=prepared_metadata,
                 context_output=prepared_context,
             )
 
@@ -563,13 +717,21 @@ class FinalSiteTests(unittest.TestCase):
         head = git(self.root, "rev-parse", "HEAD")
         tree = git(self.root, "rev-parse", "HEAD^{tree}")
         validation = git(
-            self.root, "commit-tree", tree, "-p", self.source, "-p", head,
-            "-m", "control validation integration",
+            self.root,
+            "commit-tree",
+            tree,
+            "-p",
+            self.source,
+            "-p",
+            head,
+            "-m",
+            "control validation integration",
         )
         event = {
             "repository": {"full_name": "j3brns996/Modelo", "default_branch": "main"},
             "pull_request": {
-                "number": 30, "state": "open",
+                "number": 30,
+                "state": "open",
                 "body": "- Issue: <!-- modelo:control-issue -->https://github.com/j3brns996/Modelo/issues/28<!-- /modelo:control-issue -->",
                 "base": {"sha": self.source, "ref": "main"},
                 "head": {"sha": head, "repo": {"full_name": "j3brns996/Modelo"}},
@@ -579,21 +741,34 @@ class FinalSiteTests(unittest.TestCase):
         issue_path = Path(self.temporary.name) / "control-issue.json"
         context_path = Path(self.temporary.name) / "control-context.json"
         event_path.write_bytes(canonical_bytes(event))
-        issue_path.write_bytes(canonical_bytes({
-            "number": 28, "state": "open",
-            "html_url": "https://github.com/j3brns996/Modelo/issues/28",
-            "body": "Bootstrap trusted CI, portable skills and launch rehearsal.",
-        }))
+        issue_path.write_bytes(
+            canonical_bytes(
+                {
+                    "number": 28,
+                    "state": "open",
+                    "html_url": "https://github.com/j3brns996/Modelo/issues/28",
+                    "body": "Bootstrap trusted CI, portable skills and launch rehearsal.",
+                }
+            )
+        )
         prepare_github_control(
-            root=self.root, event_path=event_path, issue_path=issue_path,
+            root=self.root,
+            event_path=event_path,
+            issue_path=issue_path,
             validation_sha=validation,
-            validation_tree=tree, as_of=date(2026, 9, 6), context_output=context_path,
+            validation_tree=tree,
+            as_of=date(2026, 9, 6),
+            context_output=context_path,
         )
         git(self.root, "checkout", "--detach", validation)
         output = self.root / "dist/receipts/control-check.json"
-        receipt = run_trusted_control_check(TrustedControlCheckRequest(
-            root=self.root, context=context_path, output=output,
-        ))
+        receipt = run_trusted_control_check(
+            TrustedControlCheckRequest(
+                root=self.root,
+                context=context_path,
+                output=output,
+            )
+        )
         self.assertEqual(receipt["kind"], "control-plane")
         self.assertEqual(receipt["approval_mode"], "human-codeowner-only")
         self.assertEqual(receipt["changed_paths"], ["docs/control-test.md"])
@@ -604,9 +779,13 @@ class FinalSiteTests(unittest.TestCase):
         forged_context["workflow_identity"] = "j3brns996/Modelo/.github/workflows/forged.yml@main"
         context_path.write_bytes(canonical_bytes(forged_context))
         with self.assertRaisesRegex(BuildError, "workflow identity"):
-            run_trusted_control_check(TrustedControlCheckRequest(
-                root=self.root, context=context_path, output=output,
-            ))
+            run_trusted_control_check(
+                TrustedControlCheckRequest(
+                    root=self.root,
+                    context=context_path,
+                    output=output,
+                )
+            )
 
         # A control-plane change may never smuggle catalogue data around the
         # MAC issue/payload contract. Mixed changes are rejected fail-closed.
@@ -618,21 +797,36 @@ class FinalSiteTests(unittest.TestCase):
         mixed_head = git(self.root, "rev-parse", "HEAD")
         mixed_tree = git(self.root, "rev-parse", "HEAD^{tree}")
         mixed_validation = git(
-            self.root, "commit-tree", mixed_tree, "-p", self.source, "-p", mixed_head,
-            "-m", "mixed validation integration",
+            self.root,
+            "commit-tree",
+            mixed_tree,
+            "-p",
+            self.source,
+            "-p",
+            mixed_head,
+            "-m",
+            "mixed validation integration",
         )
         event["pull_request"]["head"]["sha"] = mixed_head
         event_path.write_bytes(canonical_bytes(event))
         prepare_github_control(
-            root=self.root, event_path=event_path, issue_path=issue_path,
-            validation_sha=mixed_validation, validation_tree=mixed_tree,
-            as_of=date(2026, 9, 6), context_output=context_path,
+            root=self.root,
+            event_path=event_path,
+            issue_path=issue_path,
+            validation_sha=mixed_validation,
+            validation_tree=mixed_tree,
+            as_of=date(2026, 9, 6),
+            context_output=context_path,
         )
         git(self.root, "checkout", "--detach", mixed_validation)
         with self.assertRaisesRegex(BuildError, "forbids catalogue paths"):
-            run_trusted_control_check(TrustedControlCheckRequest(
-                root=self.root, context=context_path, output=output,
-            ))
+            run_trusted_control_check(
+                TrustedControlCheckRequest(
+                    root=self.root,
+                    context=context_path,
+                    output=output,
+                )
+            )
 
     def test_final_output_uses_the_configured_build_layout(self) -> None:
         current = _layout(self.root)
@@ -697,6 +891,9 @@ class FinalSiteTests(unittest.TestCase):
         home = (result.output / "site/index.html").read_text()
         self.assertIn('href="/catalogue/"', home)
         self.assertNotIn('href="//', home)
+        guide = (result.output / "site/docs/index.html").read_text()
+        self.assertIn('href="/propose/#builder"', guide)
+        self.assertNotIn("[interactive helper]", guide)
 
     def test_missing_mutable_candidate_does_not_affect_trusted_rebuild(self) -> None:
         (self.root / "dist/candidate/site/data/change-delta.json").unlink()
@@ -715,11 +912,14 @@ class FinalSiteTests(unittest.TestCase):
 
     def test_shallow_history_fails_closed(self) -> None:
         original = subprocess.run
+
         def shallow(arguments, *args, **kwargs):
             if arguments[:3] == ["git", "rev-parse", "--is-shallow-repository"]:
                 return subprocess.CompletedProcess(arguments, 0, "true\n", "")
             return original(arguments, *args, **kwargs)
+
         from unittest.mock import patch
+
         with patch("modelo.site.subprocess.run", side_effect=shallow):
             with self.assertRaisesRegex(Exception, "non-shallow"):
                 build_final_site(self.request())
@@ -740,7 +940,7 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn("style-src 'self'", base)
         self.assertIn("font-src 'self'", base)
         self.assertIn("connect-src 'self'", base)
-        self.assertNotIn('fonts.googleapis.com', base)
+        self.assertNotIn("fonts.googleapis.com", base)
         self.assertIn('name="referrer" content="no-referrer"', base)
         runtime = (ROOT / "site/assets/vendor/alpine-csp-3.16.3.min.js").read_bytes()
         self.assertEqual(
@@ -759,8 +959,12 @@ class FinalSiteTests(unittest.TestCase):
         model = (site / "models/test-model/index.html").read_text(encoding="utf-8")
         css = (site / "assets/site.css").read_text(encoding="utf-8")
         for marker in (
-            "home-hero", "publication-summary", "home-search", "history-summary",
-            "Browse all models", "Provider availability alone does not grant approval.",
+            "home-hero",
+            "publication-summary",
+            "home-search",
+            "history-summary",
+            "Browse all models",
+            "Provider availability alone does not grant approval.",
         ):
             self.assertIn(marker, home)
         for page in site.rglob("*.html"):
@@ -772,18 +976,32 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn('data-default-view="table"', catalogue)
         self.assertIn('data-default-view="table" data-view="table"', catalogue)
         self.assertIn('data-view="table" aria-pressed="true"', catalogue)
-        for value in ("chat", "function-calling", "reasoning", "vision", "open-weights", "proprietary"):
+        for value in (
+            "chat",
+            "function-calling",
+            "reasoning",
+            "vision",
+            "open-weights",
+            "proprietary",
+        ):
             self.assertIn(f'data-value="{value}"', catalogue)
         self.assertIn("Atlas Reasoning", model)
         self.assertIn("128,000", model)
         self.assertIn("Supporting evidence", model)
         self.assertIn("Retained observation:", model)
-        offering = (site / "offerings/aws-bedrock/test-offering/index.html").read_text(encoding="utf-8")
+        offering = (site / "offerings/aws-bedrock/test-offering/index.html").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("Synthetic enterprise policy for build tests.", offering)
         self.assertIn("Test policy owner", offering)
         self.assertIn("Retained observation:", offering)
         self.assertIn("Source documentation</a>", offering)
-        for contract in ("@media (max-width: 880px)", "@media (max-width: 580px)", ".model-card {", ".fact-grid"):
+        for contract in (
+            "@media (max-width: 880px)",
+            "@media (max-width: 580px)",
+            ".model-card {",
+            ".fact-grid",
+        ):
             self.assertIn(contract, css)
         self.assertIn("textarea[data-proposal-summary]", css)
 
@@ -793,7 +1011,9 @@ class FinalSiteTests(unittest.TestCase):
         css = (site / "assets/site.css").read_text(encoding="utf-8")
         self.assertEqual(catalogue.count("data-model-card"), 25)
         self.assertIn("26 records", catalogue)
-        self.assertRegex(catalogue, r"Source revision <time[^>]+>\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC</time>")
+        self.assertRegex(
+            catalogue, r"Source revision <time[^>]+>\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC</time>"
+        )
         self.assertIn('href="/Modelo/agents/README.md">Agents</a>', catalogue)
         self.assertIn("Documented UK availability", catalogue)
         self.assertIn("They have no approved offering record here.", catalogue)
@@ -802,7 +1022,9 @@ class FinalSiteTests(unittest.TestCase):
         changes = (site / "changes/index.html").read_text(encoding="utf-8")
         self.assertIn("Request backlog", changes)
         self.assertIn("Status may have changed.", changes)
-        self.assertIn("Compare capabilities and check the recorded ways to use each model.", catalogue)
+        self.assertIn(
+            "Compare capabilities and check the recorded ways to use each model.", catalogue
+        )
         self.assertIn("data-catalogue-grid", catalogue)
         self.assertIn("data-catalogue-table", catalogue)
         self.assertIn("model-card__description", catalogue)
@@ -816,7 +1038,9 @@ class FinalSiteTests(unittest.TestCase):
 
     def test_offering_explains_why_it_is_approved(self) -> None:
         site = build_final_site(self.request()).output / "site"
-        offering = (site / "offerings/aws-bedrock/test-offering/index.html").read_text(encoding="utf-8")
+        offering = (site / "offerings/aws-bedrock/test-offering/index.html").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("Why this offering is approved", offering)
         self.assertIn("Approved for synthetic integration testing", offering)
 
@@ -825,9 +1049,14 @@ class FinalSiteTests(unittest.TestCase):
         catalogue = (site / "catalogue/index.html").read_text(encoding="utf-8")
         javascript = (site / "assets/catalogue.js").read_text(encoding="utf-8")
         for marker in (
-            'x-data="catalogueExplorer"', 'aria-live="polite"', "data-active-filters",
-            "data-advanced-filters", "data-sort", 'data-view="grid"',
-            "data-comparison-dialog", "data-comparison-content",
+            'x-data="catalogueExplorer"',
+            'aria-live="polite"',
+            "data-active-filters",
+            "data-advanced-filters",
+            "data-sort",
+            'data-view="grid"',
+            "data-comparison-dialog",
+            "data-comparison-content",
             'data-comparison-tray role="status" aria-live="polite"',
         ):
             self.assertIn(marker, catalogue)
@@ -841,16 +1070,25 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn("window.history.replaceState", javascript)
         self.assertIn("window.localStorage.getItem", javascript)
         self.assertIn("window.localStorage.setItem", javascript)
-        self.assertLess(javascript.index('parameters.get("view")'), javascript.index("window.localStorage.getItem"))
+        self.assertLess(
+            javascript.index('parameters.get("view")'),
+            javascript.index("window.localStorage.getItem"),
+        )
         self.assertIn("url.searchParams.append", javascript)
         self.assertIn("dataset.searchText", javascript)
-        self.assertIn('data-search-text="test-model|Atlas Reasoning|Synthetic reasoning model for governed catalogue demonstrations.|test-vendor', catalogue)
+        self.assertIn(
+            'data-search-text="test-model|Atlas Reasoning|Synthetic reasoning model for governed catalogue demonstrations.|test-vendor',
+            catalogue,
+        )
         self.assertIn("document.createElement", javascript)
         self.assertIn("textContent", javascript)
-        self.assertLess(catalogue.index("/assets/catalogue.js"), catalogue.index("/assets/vendor/alpine-csp-3.16.3.min.js"))
-        self.assertNotIn("<script src=\"http", catalogue)
+        self.assertLess(
+            catalogue.index("/assets/catalogue.js"),
+            catalogue.index("/assets/vendor/alpine-csp-3.16.3.min.js"),
+        )
+        self.assertNotIn('<script src="http', catalogue)
         propose = (site / "propose/index.html").read_text(encoding="utf-8")
-        self.assertIn('/Modelo/assets/proposal.js', propose)
+        self.assertIn("/Modelo/assets/proposal.js", propose)
         self.assertNotIn("catalogue.js", propose)
         self.assertNotIn("alpine-csp", propose)
         for page in site.rglob("*.html"):
@@ -864,7 +1102,18 @@ class FinalSiteTests(unittest.TestCase):
     def test_search_facets_docs_evidence_footer_and_history_contract(self) -> None:
         site = build_final_site(self.request()).output / "site"
         catalogue = (site / "catalogue/index.html").read_text(encoding="utf-8")
-        for facet in ("kind", "vendor", "service", "source-region", "route-type", "capability", "modality", "licence", "lifecycle", "condition"):
+        for facet in (
+            "kind",
+            "vendor",
+            "service",
+            "source-region",
+            "route-type",
+            "capability",
+            "modality",
+            "licence",
+            "lifecycle",
+            "condition",
+        ):
             self.assertIn(f'data-filter="{facet}"', catalogue)
         self.assertIn("data-catalogue-row", catalogue)
         model = (site / "models/test-model/index.html").read_text(encoding="utf-8")
@@ -872,7 +1121,7 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn("sha256-", model)
         docs = (site / "docs/index.html").read_text(encoding="utf-8")
         overview = (site / "overview/index.html").read_text(encoding="utf-8")
-        self.assertIn('/Modelo/overview/', docs)
+        self.assertIn("/Modelo/overview/", docs)
         for section in ("what", "why", "who", "where", "when", "how"):
             self.assertIn(f'id="{section}"', overview)
         self.assertIn("PK and FK", overview)
@@ -897,14 +1146,26 @@ class FinalSiteTests(unittest.TestCase):
         self.assertIn("Do not use\nan issue API", guide)
         with ZipFile(site / "data/proposal-schema.zip") as bundle:
             self.assertEqual(bundle.read("README.md").decode("utf-8"), guide)
-            for name in ("model-request.yml", "mac-add.yml", "mac-change.yml", "mac-revoke.yml", "mac-move.yml", "mac-batch.yml"):
+            for name in (
+                "model-request.yml",
+                "mac-add.yml",
+                "mac-change.yml",
+                "mac-revoke.yml",
+                "mac-move.yml",
+                "mac-batch.yml",
+            ):
                 raw = (self.root / ".github/ISSUE_TEMPLATE" / name).read_bytes()
                 self.assertEqual(bundle.read("templates/" + name), raw)
                 self.assertIn(raw.decode("utf-8"), guide)
             for schema in (site / "data/schemas").rglob("*.json"):
-                self.assertEqual(bundle.read("schemas/" + schema.relative_to(site / "data/schemas").as_posix()), schema.read_bytes())
+                self.assertEqual(
+                    bundle.read("schemas/" + schema.relative_to(site / "data/schemas").as_posix()),
+                    schema.read_bytes(),
+                )
         self.assertIn("/Modelo/agents/README.md", overview)
-        self.assertIn("/Modelo/agents/README.md", (site / "propose/index.html").read_text(encoding="utf-8"))
+        self.assertIn(
+            "/Modelo/agents/README.md", (site / "propose/index.html").read_text(encoding="utf-8")
+        )
         home = (site / "index.html").read_text(encoding="utf-8")
         self.assertIn(f'href="https://github.com/j3brns996/Modelo/commit/{self.source}"', home)
         self.assertIn(f'href="https://github.com/j3brns996/Modelo/commit/{self.merge}"', home)
@@ -916,7 +1177,7 @@ class FinalSiteTests(unittest.TestCase):
         site = build_final_site(self.request()).output / "site"
         propose_page = (site / "propose/index.html").read_text(encoding="utf-8")
 
-        self.assertIn('<form data-proposal-builder', propose_page)
+        self.assertIn("<form data-proposal-builder", propose_page)
         for field in (
             'data-field="request_type"',
             'data-field="subject_kind"',
@@ -931,7 +1192,9 @@ class FinalSiteTests(unittest.TestCase):
 
         for op in ("add", "change"):
             self.assertIn(f'value="{op}"', propose_page)
-        operation_control = propose_page.split('id="proposal-request-type"', 1)[1].split("</select>", 1)[0]
+        operation_control = propose_page.split('id="proposal-request-type"', 1)[1].split(
+            "</select>", 1
+        )[0]
         for supported in ("revoke", "move", "batch"):
             self.assertIn(f'value="{supported}"', operation_control)
         self.assertEqual(propose_page.count('class="intake-card" rel="noopener noreferrer"'), 5)
@@ -952,26 +1215,40 @@ class FinalSiteTests(unittest.TestCase):
             self.assertIn(f'for="{control_id}"', propose_page)
             self.assertIn(f'id="{control_id}"', propose_page)
 
-        self.assertIn('data-proposal-summary', propose_page)
-        self.assertIn('data-copy-summary', propose_page)
-        self.assertIn('data-proposal-issue-link', propose_page)
+        self.assertIn("data-proposal-summary", propose_page)
+        self.assertIn("data-copy-summary", propose_page)
+        self.assertIn("data-proposal-issue-link", propose_page)
         for status in ("data-proposal-url-status", "data-proposal-copy-status"):
             self.assertIn(status, propose_page)
-        self.assertEqual(propose_page.count('role="status" aria-live="polite" aria-atomic="true"'), 5)
-        self.assertIn('data-model-request', propose_page)
-        self.assertIn('data-request-url="https://github.com/j3brns996/Modelo/issues/new?template=model-request.yml"', propose_page)
+        self.assertEqual(
+            propose_page.count('role="status" aria-live="polite" aria-atomic="true"'), 5
+        )
+        self.assertIn("data-model-request", propose_page)
+        self.assertIn(
+            'data-request-url="https://github.com/j3brns996/Modelo/issues/new?template=model-request.yml"',
+            propose_page,
+        )
         self.assertIn('<details id="detailed-proposal"', propose_page)
-        self.assertNotIn('data-test-access=', propose_page)
-        self.assertIn('data-intake-add="https://github.com/j3brns996/Modelo/issues/new?template=mac-add.yml"', propose_page)
-        self.assertIn('data-intake-change="https://github.com/j3brns996/Modelo/issues/new?template=mac-change.yml"', propose_page)
-        self.assertIn('href="https://github.com/j3brns996/Modelo/issues/new?template=mac-add.yml"', propose_page)
+        self.assertNotIn("data-test-access=", propose_page)
+        self.assertIn(
+            'data-intake-add="https://github.com/j3brns996/Modelo/issues/new?template=mac-add.yml"',
+            propose_page,
+        )
+        self.assertIn(
+            'data-intake-change="https://github.com/j3brns996/Modelo/issues/new?template=mac-change.yml"',
+            propose_page,
+        )
+        self.assertIn(
+            'href="https://github.com/j3brns996/Modelo/issues/new?template=mac-add.yml"',
+            propose_page,
+        )
         self.assertIn('rel="noopener noreferrer"', propose_page)
         self.assertIn("non-canonical", propose_page)
         self.assertIn("not a MAC payload", propose_page)
         self.assertNotIn("YAML", propose_page)
-        self.assertIn('/Modelo/assets/proposal.js', propose_page)
-        self.assertNotIn('/Modelo/assets/catalogue.js', propose_page)
-        self.assertNotIn('/Modelo/assets/vendor/alpine-csp-3.16.3.min.js', propose_page)
+        self.assertIn("/Modelo/assets/proposal.js", propose_page)
+        self.assertNotIn("/Modelo/assets/catalogue.js", propose_page)
+        self.assertNotIn("/Modelo/assets/vendor/alpine-csp-3.16.3.min.js", propose_page)
 
     def test_proposal_urls_follow_overridden_repository_configuration(self) -> None:
         git(self.root, "checkout", "--detach", self.source)
@@ -979,7 +1256,10 @@ class FinalSiteTests(unittest.TestCase):
         config = config_path.read_text(encoding="utf-8")
         config = config.replace("adapter: github", "adapter: gitlab")
         config = config.replace("host: github.com", "host: code.example.invalid")
-        config = config.replace("request_intake: /issues/new?template=model-request.yml", "request_intake: /-/issues/new?issuable_template=Model-Request")
+        config = config.replace(
+            "request_intake: /issues/new?template=model-request.yml",
+            "request_intake: /-/issues/new?issuable_template=Model-Request",
+        )
         config = config.replace("namespace: j3brns996", "namespace: platform")
         config = config.replace("name: Modelo", "name: Registry")
         config = config.replace(
@@ -1008,9 +1288,18 @@ class FinalSiteTests(unittest.TestCase):
         page = (site / "propose/index.html").read_text(encoding="utf-8")
         guide = (site / "agents/README.md").read_text(encoding="utf-8")
         self.assertIn("Configured Git host: **gitlab**", guide)
-        self.assertIn("https://code.example.invalid/platform/Registry/tickets/new?intake=add-v2", guide)
+        self.assertIn(
+            "https://code.example.invalid/platform/Registry/tickets/new?intake=add-v2", guide
+        )
         with ZipFile(site / "data/proposal-schema.zip") as bundle:
-            for name in ("Model-Request.md", "MAC-Add.md", "MAC-Change.md", "MAC-Revoke.md", "MAC-Move.md", "MAC-Batch.md"):
+            for name in (
+                "Model-Request.md",
+                "MAC-Add.md",
+                "MAC-Change.md",
+                "MAC-Revoke.md",
+                "MAC-Move.md",
+                "MAC-Batch.md",
+            ):
                 raw = (self.root / ".gitlab/issue_templates" / name).read_bytes()
                 self.assertEqual(bundle.read("templates/" + name), raw)
                 self.assertIn(raw.decode("utf-8"), guide)
@@ -1019,7 +1308,10 @@ class FinalSiteTests(unittest.TestCase):
         change = "https://code.example.invalid/platform/Registry/tickets/new?intake=change-v2"
         self.assertIn('data-test-access="https://code.example.invalid/platform/Registry"', page)
         self.assertIn("connect-src 'self' https://code.example.invalid;", page)
-        self.assertIn('data-request-url="https://code.example.invalid/platform/Registry/-/issues/new?issuable_template=Model-Request"', page)
+        self.assertIn(
+            'data-request-url="https://code.example.invalid/platform/Registry/-/issues/new?issuable_template=Model-Request"',
+            page,
+        )
         self.assertIn(f'data-intake-add="{add}"', page)
         self.assertIn(f'data-intake-change="{change}"', page)
         self.assertNotIn("github.com/j3brns996/Modelo/issues/new", page)
@@ -1031,7 +1323,8 @@ class FinalSiteTests(unittest.TestCase):
             html = page.read_text(encoding="utf-8")
             self.assertIn('role="search" action="/Modelo/catalogue/" method="get"', html)
             self.assertIn('id="nav-search" name="q" type="search" maxlength="200"', html)
-            parser = LinkParser(); parser.feed(html)
+            parser = LinkParser()
+            parser.feed(html)
             self.assertTrue(all(parser.tables), page)
             for href, rel in parser.links:
                 if href.startswith("https://"):
@@ -1041,10 +1334,12 @@ class FinalSiteTests(unittest.TestCase):
                 if href.startswith("#"):
                     local, fragment = page.relative_to(site).as_posix(), href[1:]
                 target = local + "index.html" if local.endswith("/") else local
-                if not target: target = "index.html"
+                if not target:
+                    target = "index.html"
                 self.assertIn(target, emitted, (page, href))
                 if fragment:
-                    target_parser = LinkParser(); target_parser.feed((site / target).read_text(encoding="utf-8"))
+                    target_parser = LinkParser()
+                    target_parser.feed((site / target).read_text(encoding="utf-8"))
                     self.assertIn(fragment, target_parser.ids)
 
     def test_private_profile_requires_explicit_restricted_capability(self) -> None:
@@ -1052,47 +1347,88 @@ class FinalSiteTests(unittest.TestCase):
             build_final_site(replace(self.request(), profile="private"))
 
     def test_malicious_values_are_inert(self) -> None:
-        rendered = _history_html([{"url": "https://example.invalid/x", "sha": "a" * 40, "date": "2026-09-06", "subject": '<script>alert("x")</script>', "changes": ['add: <img src=x onerror=alert(1)>']}])
+        rendered = _history_html(
+            [
+                {
+                    "url": "https://example.invalid/x",
+                    "sha": "a" * 40,
+                    "date": "2026-09-06",
+                    "subject": '<script>alert("x")</script>',
+                    "changes": ["add: <img src=x onerror=alert(1)>"],
+                }
+            ]
+        )
         self.assertNotIn("<script>", rendered)
         self.assertNotIn("<img", rendered)
         self.assertIn("&lt;script&gt;", rendered)
-        expanded = _history_html([{"url": "https://example.invalid/x", "sha": "a" * 40, "date": "2026-09-06", "subject": "Six paths", "changes": [str(i) for i in range(6)]}])
+        expanded = _history_html(
+            [
+                {
+                    "url": "https://example.invalid/x",
+                    "sha": "a" * 40,
+                    "date": "2026-09-06",
+                    "subject": "Six paths",
+                    "changes": [str(i) for i in range(6)],
+                }
+            ]
+        )
         self.assertEqual(expanded.split("<details>")[0].count("<li "), 4)
         self.assertIn("Show 2 more changed paths", expanded)
         self.assertEqual(len(re.findall(r"<li\b", expanded)), 6)
         self.assertNotIn("<ul></ul>", expanded)
-        proof = _supporting_evidence(["example"], {"example": {
-            "source": {"uri": "https://example.invalid/proof"}, "observed_at": "2026-09-06T00:00:00Z",
-            "projection": {"value": "<script>alert(1)</script>"},
-        }})
+        proof = _supporting_evidence(
+            ["example"],
+            {
+                "example": {
+                    "source": {"uri": "https://example.invalid/proof"},
+                    "observed_at": "2026-09-06T00:00:00Z",
+                    "projection": {"value": "<script>alert(1)</script>"},
+                }
+            },
+        )
         self.assertNotIn("<script>", proof)
         self.assertIn("&lt;script&gt;", proof)
         self.assertIn('href="https://example.invalid/proof"', proof)
         site = build_final_site(self.request()).output / "site"
         generated = b"\n".join(path.read_bytes() for path in site.rglob("*") if path.is_file())
         self.assertNotIn(b'<script>alert("history")</script>', generated)
-        self.assertIn(b'&lt;script&gt;alert(&quot;history&quot;)&lt;/script&gt;', generated)
+        self.assertIn(b"&lt;script&gt;alert(&quot;history&quot;)&lt;/script&gt;", generated)
 
     def test_synthetic_generated_bytes_fail_on_private_canary_in_history(self) -> None:
         import modelo.site as site_module
+
         canary = "MODELO_PRIVATE_CANARY"
-        with patch.object(site_module, "_history", return_value=[{
-            "sha": "a" * 40, "date": "2026-09-06", "subject": canary,
-            "changes": ["add: harmless"], "url": "https://example.invalid/commit",
-        }]):
+        with patch.object(
+            site_module,
+            "_history",
+            return_value=[
+                {
+                    "sha": "a" * 40,
+                    "date": "2026-09-06",
+                    "subject": canary,
+                    "changes": ["add: harmless"],
+                    "url": "https://example.invalid/commit",
+                }
+            ],
+        ):
             with self.assertRaisesRegex(BuildError, "private leakage"):
                 build_final_site(self.request())
 
     def test_missing_and_extra_generated_inventory_fail_exactly(self) -> None:
         import modelo.site as site_module
+
         real = site_module._site_files
         for mode in ("missing", "extra"):
             with self.subTest(mode=mode):
+
                 def changed(*args, selected=mode, **kwargs):
                     files = real(*args, **kwargs)
-                    if selected == "missing": files.pop("index.html")
-                    else: files["undeclared.txt"] = b"extra\n"
+                    if selected == "missing":
+                        files.pop("index.html")
+                    else:
+                        files["undeclared.txt"] = b"extra\n"
                     return files
+
                 with patch.object(site_module, "_site_files", side_effect=changed):
                     with self.assertRaisesRegex(BuildError, "inventory mismatch"):
                         build_final_site(self.request())
@@ -1101,7 +1437,8 @@ class FinalSiteTests(unittest.TestCase):
         first = build_final_site(self.request())
         snapshot = {
             path.relative_to(first.output).as_posix(): path.read_bytes()
-            for path in first.output.rglob("*") if path.is_file()
+            for path in first.output.rglob("*")
+            if path.is_file()
         }
         with tempfile.TemporaryDirectory(prefix="modelo-disjoint-final-") as temporary:
             displaced = Path(temporary) / "first-final-tree"
@@ -1109,47 +1446,87 @@ class FinalSiteTests(unittest.TestCase):
             second = build_final_site(self.request())
             rebuilt = {
                 path.relative_to(second.output).as_posix(): path.read_bytes()
-                for path in second.output.rglob("*") if path.is_file()
+                for path in second.output.rglob("*")
+                if path.is_file()
             }
             self.assertEqual(rebuilt, snapshot)
 
     def test_github_gitlab_root_subpath_and_route_collision(self) -> None:
         routes = {
-            "home": "/", "catalogue": "/catalogue/", "model": "/models/{model_id}/",
-            "offering": "/offerings/{inference_service_id}/{offering_id}/", "changes": "/changes/",
-            "process": "/process/", "propose": "/propose/", "docs": "/docs/", "overview": "/overview/", "not_found": "/404.html",
-            "asset_css": "/assets/site.css", "asset_catalogue_js": "/assets/catalogue.js",
+            "home": "/",
+            "catalogue": "/catalogue/",
+            "model": "/models/{model_id}/",
+            "offering": "/offerings/{inference_service_id}/{offering_id}/",
+            "changes": "/changes/",
+            "process": "/process/",
+            "propose": "/propose/",
+            "docs": "/docs/",
+            "overview": "/overview/",
+            "not_found": "/404.html",
+            "asset_css": "/assets/site.css",
+            "asset_catalogue_js": "/assets/catalogue.js",
             "asset_proposal_js": "/assets/proposal.js",
             "asset_alpine": "/assets/vendor/alpine-csp-3.16.3.min.js",
             "asset_third_party_notices": "/assets/vendor/THIRD-PARTY-NOTICES.md",
-            "catalogue_data": "/data/catalogue.json", "change_delta_data": "/data/change-delta.json",
-            "manifest_data": "/data/manifest.json", "schemas_data": "/data/schemas/", "proposal_schema_bundle_data": "/data/proposal-schema.zip",
-            "human_specification": "/docs/SPEC.md", "machine_contract": "/docs/contract.yaml", "requester_agent": "/agents/README.md",
+            "catalogue_data": "/data/catalogue.json",
+            "change_delta_data": "/data/change-delta.json",
+            "manifest_data": "/data/manifest.json",
+            "schemas_data": "/data/schemas/",
+            "proposal_schema_bundle_data": "/data/proposal-schema.zip",
+            "human_specification": "/docs/SPEC.md",
+            "machine_contract": "/docs/contract.yaml",
+            "requester_agent": "/agents/README.md",
         }
-        for base_url, base_path in (("https://example.invalid/", "/"), ("https://example.invalid/group/project/", "/group/project/")):
-            resolver = _Resolver(base_url, base_path, routes, {"web_base": "https://gitlab.com/group/project", "web_routes": {"commit": "/-/commit/{commit_sha}"}})
+        for base_url, base_path in (
+            ("https://example.invalid/", "/"),
+            ("https://example.invalid/group/project/", "/group/project/"),
+        ):
+            resolver = _Resolver(
+                base_url,
+                base_path,
+                routes,
+                {
+                    "web_base": "https://gitlab.com/group/project",
+                    "web_routes": {"commit": "/-/commit/{commit_sha}"},
+                },
+            )
             self.assertEqual(resolver.site("catalogue"), base_path + "catalogue/")
-            self.assertEqual(resolver.repository_url("commit", commit_sha="a" * 40), "https://gitlab.com/group/project/-/commit/" + "a" * 40)
-        broken = dict(routes); broken["process"] = broken["catalogue"]
+            self.assertEqual(
+                resolver.repository_url("commit", commit_sha="a" * 40),
+                "https://gitlab.com/group/project/-/commit/" + "a" * 40,
+            )
+        broken = dict(routes)
+        broken["process"] = broken["catalogue"]
         with self.assertRaisesRegex(BuildError, "collide"):
-            _Resolver("https://example.invalid/", "/", broken, {"web_base": "https://github.com/o/r", "web_routes": {"commit": "/commit/{commit_sha}"}})
+            _Resolver(
+                "https://example.invalid/",
+                "/",
+                broken,
+                {
+                    "web_base": "https://github.com/o/r",
+                    "web_routes": {"commit": "/commit/{commit_sha}"},
+                },
+            )
 
     def test_final_recovery_crash_injection_across_every_shared_phase(self) -> None:
         baseline = build_final_site(self.request())
         baseline_bytes = {
             path.relative_to(baseline.output).as_posix(): path.read_bytes()
-            for path in baseline.output.rglob("*") if path.is_file()
+            for path in baseline.output.rglob("*")
+            if path.is_file()
         }
         real_persist = build_module._persist_journal
         for selected in build_module.PHASES:
             with self.subTest(phase=selected):
                 raised = False
+
                 def crash(parent, lock, journal, *, initial=False):
                     nonlocal raised
                     real_persist(parent, lock, journal, initial=initial)
                     if journal["phase"] == selected and not raised:
                         raised = True
                         raise KeyboardInterrupt("simulated process death")
+
                 with patch.object(build_module, "_persist_journal", side_effect=crash):
                     with self.assertRaises(KeyboardInterrupt):
                         build_final_site(self.request())
@@ -1158,46 +1535,129 @@ class FinalSiteTests(unittest.TestCase):
                         recover_candidate(self.root)
                     current = {
                         path.relative_to(baseline.output).as_posix(): path.read_bytes()
-                        for path in baseline.output.rglob("*") if path.is_file()
+                        for path in baseline.output.rglob("*")
+                        if path.is_file()
                     }
                     self.assertEqual(current, baseline_bytes, selected)
                     (self.root / "dist/.modelo-build.lock").unlink()
                     continue
-                self.assertIn(recover_candidate(self.root), {
-                    build_module.RecoveryOutcome.ROLLED_BACK,
-                    build_module.RecoveryOutcome.COMMITTED,
-                })
+                self.assertIn(
+                    recover_candidate(self.root),
+                    {
+                        build_module.RecoveryOutcome.ROLLED_BACK,
+                        build_module.RecoveryOutcome.COMMITTED,
+                    },
+                )
                 self.assertFalse((self.root / "dist/.modelo-build.lock").exists())
                 current = {
                     path.relative_to(baseline.output).as_posix(): path.read_bytes()
-                    for path in baseline.output.rglob("*") if path.is_file()
+                    for path in baseline.output.rglob("*")
+                    if path.is_file()
                 }
                 self.assertEqual(current, baseline_bytes, selected)
 
 
 class RegionViewTests(unittest.TestCase):
     def test_direct_route_has_no_destination_region(self) -> None:
-        offering = {"routes": [{"id": "direct", "source_region": "eu-west-2", "reference": "test.model-v1", "model_binding": {"kind": "foundation-model", "model_evidence": {"id": "e"}}}]}
+        offering = {
+            "routes": [
+                {
+                    "id": "direct",
+                    "source_region": "eu-west-2",
+                    "reference": "test.model-v1",
+                    "model_binding": {"kind": "foundation-model", "model_evidence": {"id": "e"}},
+                }
+            ]
+        }
         html = _route_rows(offering, {})
         self.assertIn("eu-west-2", html)
         self.assertIn("None", html)
 
     def test_profile_destinations_come_from_bound_evidence(self) -> None:
-        offering = {"routes": [{"id": "profile", "source_region": "eu-west-2", "reference": "eu.test.model-v1", "model_binding": {"kind": "system-inference-profile", "profile_evidence": {"id": "profile"}, "destinations": [{"destination_pointer": "/models/0/modelArn", "model_evidence": {"id": "east"}}, {"destination_pointer": "/models/1/modelArn", "model_evidence": {"id": "west"}}]}}]}
-        evidence = {"east": {"source": {"region": "eu-central-1"}}, "west": {"source": {"region": "eu-west-1"}}}
+        offering = {
+            "routes": [
+                {
+                    "id": "profile",
+                    "source_region": "eu-west-2",
+                    "reference": "eu.test.model-v1",
+                    "model_binding": {
+                        "kind": "system-inference-profile",
+                        "profile_evidence": {"id": "profile"},
+                        "destinations": [
+                            {
+                                "destination_pointer": "/models/0/modelArn",
+                                "model_evidence": {"id": "east"},
+                            },
+                            {
+                                "destination_pointer": "/models/1/modelArn",
+                                "model_evidence": {"id": "west"},
+                            },
+                        ],
+                    },
+                }
+            ]
+        }
+        evidence = {
+            "east": {"source": {"region": "eu-central-1"}},
+            "west": {"source": {"region": "eu-west-1"}},
+        }
         html = _route_rows(offering, evidence)
         self.assertIn("eu-west-2", html)
         self.assertIn("eu-central-1, eu-west-1", html)
 
-    def test_same_profile_two_source_regions_keep_distinct_routes_prices_and_destinations(self) -> None:
+    def test_same_profile_two_source_regions_keep_distinct_routes_prices_and_destinations(
+        self,
+    ) -> None:
         offering = {
             "routes": [
-                {"id": "profile-uk", "source_region": "eu-west-2", "reference": "global.test.profile-v1", "model_binding": {"kind": "system-inference-profile", "profile_evidence": {"id": "p-uk"}, "destinations": [{"destination_pointer": "/models/0/modelArn", "model_evidence": {"id": "uk-destination"}}]}},
-                {"id": "profile-us", "source_region": "us-east-1", "reference": "global.test.profile-v1", "model_binding": {"kind": "system-inference-profile", "profile_evidence": {"id": "p-us"}, "destinations": [{"destination_pointer": "/models/0/modelArn", "model_evidence": {"id": "us-destination"}}]}},
+                {
+                    "id": "profile-uk",
+                    "source_region": "eu-west-2",
+                    "reference": "global.test.profile-v1",
+                    "model_binding": {
+                        "kind": "system-inference-profile",
+                        "profile_evidence": {"id": "p-uk"},
+                        "destinations": [
+                            {
+                                "destination_pointer": "/models/0/modelArn",
+                                "model_evidence": {"id": "uk-destination"},
+                            }
+                        ],
+                    },
+                },
+                {
+                    "id": "profile-us",
+                    "source_region": "us-east-1",
+                    "reference": "global.test.profile-v1",
+                    "model_binding": {
+                        "kind": "system-inference-profile",
+                        "profile_evidence": {"id": "p-us"},
+                        "destinations": [
+                            {
+                                "destination_pointer": "/models/0/modelArn",
+                                "model_evidence": {"id": "us-destination"},
+                            }
+                        ],
+                    },
+                },
             ],
             "pricing": [
-                {"dimension": "input", "amount": "1.00", "currency": "USD", "quantity": 1000000, "unit": "token", "route_ids": ["profile-uk"]},
-                {"dimension": "input", "amount": "2.00", "currency": "USD", "quantity": 1000000, "unit": "token", "route_ids": ["profile-us"]},
+                {
+                    "dimension": "input",
+                    "amount": "1.00",
+                    "currency": "USD",
+                    "quantity": 1000000,
+                    "unit": "token",
+                    "route_ids": ["profile-uk"],
+                },
+                {
+                    "dimension": "input",
+                    "amount": "2.00",
+                    "currency": "USD",
+                    "quantity": 1000000,
+                    "unit": "token",
+                    "route_ids": ["profile-us"],
+                },
             ],
         }
         evidence = {
@@ -1209,8 +1669,10 @@ class RegionViewTests(unittest.TestCase):
         self.assertEqual(routes.count("global.test.profile-v1"), 2)
         for value in ("eu-west-2", "eu-west-1", "us-east-1", "us-west-2"):
             self.assertIn(value, routes)
-        self.assertIn("1.00", prices); self.assertIn("profile-uk", prices)
-        self.assertIn("2.00", prices); self.assertIn("profile-us", prices)
+        self.assertIn("1.00", prices)
+        self.assertIn("profile-uk", prices)
+        self.assertIn("2.00", prices)
+        self.assertIn("profile-us", prices)
 
 
 if __name__ == "__main__":

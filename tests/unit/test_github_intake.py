@@ -1,19 +1,23 @@
 from __future__ import annotations
 
-from datetime import date
 import json
+from datetime import date
 from unittest.mock import patch
 from uuid import UUID
 
 import pytest
-
 from modelo.build import BuildError
 from modelo.github_adapter import (
-    compile_github_intake, github_control_issue_reference, github_issue_reference,
+    compile_github_intake,
+    github_control_issue_reference,
+    github_issue_reference,
     prepare_github,
 )
 from modelo.mac import (
-    MacError, extract_adapter_issue_payload, render_adapter_issue_body, validate_payload,
+    MacError,
+    extract_adapter_issue_payload,
+    render_adapter_issue_body,
+    validate_payload,
 )
 from modelo.receipt import canonical_bytes, sha256_bytes
 
@@ -37,7 +41,8 @@ def common(operation: str, request_label: str = "Modelo MAC request type") -> di
         "Purpose": "Make the model available for a reviewed workload",
         "Requested outcome": "Add one evidenced model record to the catalogue.",
         "Why is this needed?": "The platform team needs a governed record before proposing an offering.",
-        "Supporting observations": "https://example.invalid/model | 2026-09-02T08:00:00Z | sha256-" + "1" * 64,
+        "Supporting observations": "https://example.invalid/model | 2026-09-02T08:00:00Z | sha256-"
+        + "1" * 64,
         "Acceptance checks": "The model name matches the retained evidence.\nThe record passes Modelo validation.",
     }
 
@@ -57,7 +62,8 @@ def batch_fields() -> dict[str, str]:
         "Provider partition": "aws",
         "Source region": "us-east-1",
         "Inference service": "aws-bedrock",
-        "Supporting observations": "https://example.invalid/model | 2026-09-02T08:00:00Z | sha256-" + "1" * 64,
+        "Supporting observations": "https://example.invalid/model | 2026-09-02T08:00:00Z | sha256-"
+        + "1" * 64,
         "Acceptance checks": "The model name matches the retained evidence.\nThe record passes Modelo validation.",
     }
 
@@ -81,9 +87,16 @@ def test_guided_move_and_batch_compile_operation_specific_fields() -> None:
         "Modelo MAC request type": "move",
         "Current offering identity": "bedrock-model-old",
         "Replacement offering identity": "bedrock-model-new",
-        **{key: value for key, value in common("move").items() if key not in {
-            "Modelo MAC request type", "Subject type", "Subject identity",
-        }},
+        **{
+            key: value
+            for key, value in common("move").items()
+            if key
+            not in {
+                "Modelo MAC request type",
+                "Subject type",
+                "Subject identity",
+            }
+        },
     }
     moved = compile_github_intake(event(issue_body(**move)))
     assert moved.payload["subjects"] == [
@@ -104,18 +117,28 @@ def test_guided_change_and_revoke_preserve_the_expected_subject_kind() -> None:
     revoke = {
         "Modelo MAC request type": "revoke",
         "Offering identity": "bedrock-example-model",
-        **{key: value for key, value in common("revoke").items() if key not in {
-            "Modelo MAC request type", "Subject type", "Subject identity",
-        }},
+        **{
+            key: value
+            for key, value in common("revoke").items()
+            if key
+            not in {
+                "Modelo MAC request type",
+                "Subject type",
+                "Subject identity",
+            }
+        },
     }
     revoked = compile_github_intake(event(issue_body(**revoke)))
-    assert revoked.payload["subjects"] == [{"kind": "offering", "identity": "bedrock-example-model"}]
+    assert revoked.payload["subjects"] == [
+        {"kind": "offering", "identity": "bedrock-example-model"}
+    ]
 
 
 @pytest.mark.parametrize("operation", ["add", "change", "batch"])
 @pytest.mark.parametrize("blank", ["", "_No response_"])
 def test_optional_candidate_evidence_compiles_to_an_empty_array(
-    operation: str, blank: str,
+    operation: str,
+    blank: str,
 ) -> None:
     values = batch_fields() if operation == "batch" else common(operation)
     values["Supporting observations"] = blank
@@ -182,7 +205,9 @@ def test_invalid_edit_removes_stale_generated_payload_and_reports_one_error() ->
 
 def test_generated_payload_cannot_overflow_the_issue_body() -> None:
     values = common("add")
-    values["Acceptance checks"] = "\n".join("check-" + str(index) + "-" + "x" * 1900 for index in range(25))
+    values["Acceptance checks"] = "\n".join(
+        "check-" + str(index) + "-" + "x" * 1900 for index in range(25)
+    )
     result = compile_github_intake(event(issue_body(**values)))
     assert not result.valid
     assert "exceeds the GitHub issue body limit" in result.comment_body
@@ -199,7 +224,12 @@ def test_unrelated_or_malformed_issue_event_fails_closed() -> None:
     with pytest.raises(ValueError, match="supported guided proposal"):
         compile_github_intake(event("### Something else\n\nhello\n"))
     with pytest.raises(ValueError, match="open issue"):
-        compile_github_intake({"repository": {"full_name": "j3brns996/Modelo"}, "issue": {"number": 1, "state": "closed", "body": ""}})
+        compile_github_intake(
+            {
+                "repository": {"full_name": "j3brns996/Modelo"},
+                "issue": {"number": 1, "state": "closed", "body": ""},
+            }
+        )
 
 
 def test_legacy_request_heading_remains_compatible_for_direct_compilation() -> None:
@@ -226,7 +256,8 @@ def test_legacy_request_heading_remains_compatible_for_direct_compilation() -> N
     ],
 )
 def test_duplicate_alias_and_out_of_order_recognized_headings_fail_closed(
-    body: str, expected: str,
+    body: str,
+    expected: str,
 ) -> None:
     result = compile_github_intake(event(body))
     assert not result.valid
@@ -279,11 +310,13 @@ def test_github_prepare_binds_exact_repository_and_issue_and_preserves_outputs_o
 ) -> None:
     payload = compile_github_intake(event(issue_body(**common("add")))).payload
     digest = sha256_bytes(canonical_bytes(payload))
-    delta = [{
-        "operation": "add",
-        "path": "catalogue/models/example-model-v1.yaml",
-        "after": "sha256:" + "a" * 64,
-    }]
+    delta = [
+        {
+            "operation": "add",
+            "path": "catalogue/models/example-model-v1.yaml",
+            "after": "sha256:" + "a" * 64,
+        }
+    ]
     pull_body = (
         "<!-- modelo:mac-issue -->https://github.com/j3brns996/Modelo/issues/43"
         "<!-- /modelo:mac-issue -->\n"
@@ -339,8 +372,9 @@ def test_github_prepare_binds_exact_repository_and_issue_and_preserves_outputs_o
             patch("modelo.github_adapter._committed_yaml_config", return_value=selected_config),
             patch(
                 "modelo.github_adapter._git",
-                side_effect=lambda _root, command, *args: "3" * 40
-                if command == "rev-parse" else "100",
+                side_effect=lambda _root, command, *args: (
+                    "3" * 40 if command == "rev-parse" else "100"
+                ),
             ),
         ):
             prepare_github(
@@ -382,13 +416,13 @@ def test_github_prepare_binds_exact_repository_and_issue_and_preserves_outputs_o
     ],
 )
 def test_github_issue_markers_reject_ambiguous_raw_tokens(
-    tmp_path, marker: str, reference, extra_token: str,
+    tmp_path,
+    marker: str,
+    reference,
+    extra_token: str,
 ) -> None:
     issue_url = "https://github.com/j3brns996/Modelo/issues/43"
-    body = (
-        f"<!-- modelo:{marker} -->{issue_url}<!-- /modelo:{marker} -->\n"
-        + extra_token
-    )
+    body = f"<!-- modelo:{marker} -->{issue_url}<!-- /modelo:{marker} -->\n" + extra_token
     raw_event = {
         "repository": {"full_name": "j3brns996/Modelo", "default_branch": "main"},
         "pull_request": {

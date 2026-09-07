@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import date
-from io import BytesIO
 import tempfile
 import unittest
-from unittest.mock import patch
+from datetime import date
+from io import BytesIO
 from pathlib import Path
+from unittest.mock import patch
 
 from modelo.loader import LoadError, YamlLimits, load_yaml_mapping
 
@@ -55,9 +55,7 @@ class LoaderTests(unittest.TestCase):
         root = self.repository()
         self.write(
             root,
-            "minimum: -9223372036854775808\n"
-            "maximum: 9223372036854775807\n"
-            'decimal: "19.95"\n',
+            'minimum: -9223372036854775808\nmaximum: 9223372036854775807\ndecimal: "19.95"\n',
         )
         document = load_yaml_mapping(root, "catalogue/item.yaml")
         self.assertEqual(document["minimum"], -(2**63))

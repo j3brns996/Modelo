@@ -12,7 +12,6 @@ from modelo.evidence import (
 )
 from modelo.schemas import SchemaSet
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -110,8 +109,9 @@ class EvidenceTests(unittest.TestCase):
             "schemas": self.schemas,
         }
         for changes in cases:
-            with self.subTest(changes=changes), self.assertRaisesRegex(
-                ValueError, "invalid evidence record"
+            with (
+                self.subTest(changes=changes),
+                self.assertRaisesRegex(ValueError, "invalid evidence record"),
             ):
                 create_evidence_record(**(defaults | changes))
 
@@ -130,13 +130,18 @@ class EvidenceTests(unittest.TestCase):
             "sanitised_parameters": {},
         }
         for omitted in (
-            "provider", "service", "operation", "partition", "region",
+            "provider",
+            "service",
+            "operation",
+            "partition",
+            "region",
             "sanitised_parameters",
         ):
             arguments = dict(defaults)
             arguments.pop(omitted)
-            with self.subTest(omitted=omitted), self.assertRaisesRegex(
-                ValueError, "invalid evidence record"
+            with (
+                self.subTest(omitted=omitted),
+                self.assertRaisesRegex(ValueError, "invalid evidence record"),
             ):
                 create_evidence_record(**arguments)
 
@@ -156,8 +161,9 @@ class EvidenceTests(unittest.TestCase):
             ("region", "us-east-1"),
             ("sanitised_parameters", {}),
         ):
-            with self.subTest(name=name), self.assertRaisesRegex(
-                ValueError, "documentation sources do not accept"
+            with (
+                self.subTest(name=name),
+                self.assertRaisesRegex(ValueError, "documentation sources do not accept"),
             ):
                 create_evidence_record(**(defaults | {name: value}))
 
@@ -178,8 +184,11 @@ class EvidenceTests(unittest.TestCase):
             ("aws", "vertex"),
             ("gcp", "bedrock"),
         ):
-            with self.subTest(provider=provider, service=service), self.assertRaisesRegex(
-                ValueError, "supports only provider aws with service bedrock"
+            with (
+                self.subTest(provider=provider, service=service),
+                self.assertRaisesRegex(
+                    ValueError, "supports only provider aws with service bedrock"
+                ),
             ):
                 create_evidence_record(
                     **defaults,
@@ -207,10 +216,13 @@ class EvidenceTests(unittest.TestCase):
             ({"items": [{"CrE_Den-TiAls": "secret"}]}, "credentials"),
         )
         for parameters, key in cases:
-            with self.subTest(parameters=parameters), self.assertRaisesRegex(
-                ValueError,
-                f"sanitised_parameters contains prohibited sensitive key {key}",
-            ) as caught:
+            with (
+                self.subTest(parameters=parameters),
+                self.assertRaisesRegex(
+                    ValueError,
+                    f"sanitised_parameters contains prohibited sensitive key {key}",
+                ) as caught,
+            ):
                 create_evidence_record(
                     **defaults,
                     sanitised_parameters=parameters,

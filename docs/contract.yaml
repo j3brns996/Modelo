@@ -681,8 +681,13 @@ validation:
   command: modelo check --base BASE --head HEAD --as-of YYYY-MM-DD
   local_ci:
     command: modelo-local-ci run --base BASE --head HEAD --as-of YYYY-MM-DD --jobs 3
+    lint_command: modelo-local-ci lint
     authority: advisory_non_accepting
     fixed_gates: [complete_python_test_inventory, offline_package_build]
+    quality_test: tests/contract/test_quality.py
+    blocking_quality: [ruff_lint, ruff_format, yamllint, ubs_scan_execution_and_inventory]
+    ubs_findings: raw_report_requires_independent_disposition_not_zero_heuristic_counts
+    environment: ubuntu_24_04_or_equivalent_wsl
     maximum_test_processes: 3
     configurable_task_dsl: false
     accepting_receipt_output: false

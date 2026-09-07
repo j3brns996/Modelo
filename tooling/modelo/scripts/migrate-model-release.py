@@ -1,11 +1,9 @@
 """Print a non-accepting identity migration draft; never modify input files."""
 
 import argparse
-from pathlib import Path
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 import yaml
-
 from modelo.identity import migrate_bound_model, migrate_offering
 from modelo.loader import load_yaml_mapping
 
@@ -27,8 +25,12 @@ def read(path: Path):
 if args.model:
     if not all((args.evidence, args.id_pointer, args.reviewed_model_id)):
         parser.error("model migration requires --evidence, --id-pointer and --reviewed-model-id")
-    draft = migrate_bound_model(read(args.model), read(args.evidence),
-                                id_pointer=args.id_pointer, reviewed_model_id=args.reviewed_model_id)
+    draft = migrate_bound_model(
+        read(args.model),
+        read(args.evidence),
+        id_pointer=args.id_pointer,
+        reviewed_model_id=args.reviewed_model_id,
+    )
 else:
     if any((args.evidence, args.id_pointer, args.reviewed_model_id)):
         parser.error("offering migration takes only --offering")

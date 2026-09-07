@@ -1,33 +1,8 @@
-stages:
-  - validate
-  - deploy
+# Activation requires a protected adapter and remote T10 rehearsal.
+stages: [validate]
 
 modelo/check:
   stage: validate
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  variables:
-    UV_NO_CACHE: "1"
   script:
-    - test "$CI_MERGE_REQUEST_SOURCE_PROJECT_ID" = "$CI_PROJECT_ID"
-    - test "$(uv --version)" = "uv 0.11.33 (x86_64-unknown-linux-gnu)"
-    - uv sync --locked
-    - uv run --locked pytest -q
-    - uv build --offline --no-cache
-    - uv run --locked modelo platform gitlab-prepare --event "$CI_EVENT_JSON" --issue "$CI_ISSUE_JSON" --validation-sha "$CI_COMMIT_SHA" --validation-tree "$(git rev-parse HEAD^{tree})" --as-of "$(date -u +%F)" --metadata-output "$RUNNER_TEMP/mac.json" --context-output "$RUNNER_TEMP/context.json"
-    - uv run --locked modelo platform check --context "$RUNNER_TEMP/context.json" --mac-metadata "$RUNNER_TEMP/mac.json" --output "$CI_PROJECT_DIR/dist/receipts/check.json"
-
-pages:
-  stage: deploy
-  rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-  variables:
-    UV_NO_CACHE: "1"
-  script:
-    - uv sync --locked
-    - uv run --locked modelo build --kind final --base-commit "$CI_COMMIT_BEFORE_SHA" --source-commit "$CI_COMMIT_SHA" --source-tree "$(git rev-parse HEAD^{tree})" --merge-commit "$CI_COMMIT_SHA" --merge-tree "$(git rev-parse HEAD^{tree})" --as-of "$(date -u +%F)" --source-date-epoch "$(git show -s --format=%at HEAD)" --mac-metadata "$RUNNER_TEMP/mac.json" --profile synthetic --publication-capability public-pages --base-url "$CI_PAGES_URL" --base-path /Modelo/ --output dist/final
-    - mkdir -p public
-    - cp -r dist/final/site/* public/
-  artifacts:
-    paths:
-      - public
+    - echo "GitLab trusted acceptance is not activated; complete the host-switch rehearsal." >&2
+    - exit 1

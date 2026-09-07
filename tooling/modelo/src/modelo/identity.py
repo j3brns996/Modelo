@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 import re
+from copy import deepcopy
 from typing import Any, Mapping
 
 from modelo.evidence import evidence_id, resolve_pointer
@@ -14,9 +14,11 @@ BOUND_STATUSES = frozenset({"verified", "vendor-asserted", "provider-mapped"})
 
 
 def canonical_urn(kind: str, identifier: str) -> str:
-    if kind not in {"model-release", "offering"} or not re.fullmatch(
-        r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", identifier
-    ) or len(identifier) > 128:
+    if (
+        kind not in {"model-release", "offering"}
+        or not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", identifier)
+        or len(identifier) > 128
+    ):
         raise ValueError("canonical URN requires a supported kind and internal ID")
     return f"urn:modelo:{kind}:{identifier}"
 
@@ -36,8 +38,11 @@ def has_provider_claim(model: Mapping[str, Any], value: Any) -> bool:
 
 
 def migrate_bound_model(
-    model: Mapping[str, Any], evidence: Mapping[str, Any], *,
-    id_pointer: str, reviewed_model_id: str,
+    model: Mapping[str, Any],
+    evidence: Mapping[str, Any],
+    *,
+    id_pointer: str,
+    reviewed_model_id: str,
 ) -> dict[str, Any]:
     """Return a local draft from an explicitly reviewed API-to-model binding.
 
@@ -50,7 +55,9 @@ def migrate_bound_model(
         raise ValueError("migration evidence content address is invalid")
     source = evidence.get("source", {})
     if (source.get("type"), source.get("provider"), source.get("service")) != (
-        "first-party-read-api", "aws", "bedrock"
+        "first-party-read-api",
+        "aws",
+        "bedrock",
     ) or source.get("operation") not in {"GetFoundationModel", "ListFoundationModels"}:
         raise ValueError("migration requires explicit Bedrock model API evidence")
     value = resolve_pointer(evidence["projection"], id_pointer)
@@ -58,7 +65,9 @@ def migrate_bound_model(
         raise ValueError("model ID pointer must select a nonempty string")
     result = deepcopy(dict(model))
     result["canonical_urn"] = canonical_urn("model-release", str(model["id"]))
-    claim = dict(namespace=AWS_MODEL_NAMESPACE, value=value, relation="identifies", status="provider-mapped")
+    claim = dict(
+        namespace=AWS_MODEL_NAMESPACE, value=value, relation="identifies", status="provider-mapped"
+    )
     claims = result.setdefault("identity_claims", [])
     keys = [(item["namespace"], item["value"], item["relation"]) for item in claims]
     if len(keys) != len(set(keys)):
@@ -70,7 +79,8 @@ def migrate_bound_model(
     index = len(claims)
     claims.append(claim)
     result["evidence_refs"][f"/identity_claims/{index}/value"] = {
-        "id": evidence["id"], "projection_pointer": id_pointer,
+        "id": evidence["id"],
+        "projection_pointer": id_pointer,
     }
     return result
 

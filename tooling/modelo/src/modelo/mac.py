@@ -20,6 +20,8 @@ from uuid import UUID, uuid4
 
 from jsonschema import FormatChecker
 
+from modelo.loader import strict_unique_json_pairs
+from modelo.receipt import SHA256_DASH_PATTERN
 
 Adapter = Literal["github", "gitlab"]
 MAX_BODY_BYTES = 65_536
@@ -31,8 +33,7 @@ PAYLOAD_START = "<!-- modelo:mac-payload:start -->"
 PAYLOAD_END = "<!-- modelo:mac-payload:end -->"
 INTAKE_START = "<!-- modelo:intake-generated-start -->"
 INTAKE_END = "<!-- modelo:intake-generated-end -->"
-from modelo.loader import strict_unique_json_pairs
-from modelo.receipt import SHA256_DASH_PATTERN
+
 _IDENTITY_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9._:/@+-]*[a-z0-9])?$")
 _HOST_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
 _HTTPS_PATTERN = re.compile(
@@ -176,7 +177,9 @@ def _validate_subjects(payload: Mapping[str, Any]) -> list[dict[str, str]]:
     subjects: list[dict[str, str]] = []
     reservations: set[tuple[str, str]] = set()
     for index, item in enumerate(raw):
-        subject = _mapping(item, f"subjects[{index}]", {"kind", "identity", "role"}, {"kind", "identity"})
+        subject = _mapping(
+            item, f"subjects[{index}]", {"kind", "identity", "role"}, {"kind", "identity"}
+        )
         kind = _text(subject["kind"], f"subjects[{index}].kind", maximum=32)
         identity = _identity(subject["identity"], f"subjects[{index}].identity")
         if kind not in _KINDS:
@@ -235,13 +238,19 @@ def _validate_evidence(value: Any) -> list[dict[str, str]]:
             {"uri", "observed_at", "digest"},
             {"uri", "observed_at", "digest"},
         )
-        observed_at = _text(evidence["observed_at"], f"candidate_evidence[{index}].observed_at", maximum=40)
+        observed_at = _text(
+            evidence["observed_at"], f"candidate_evidence[{index}].observed_at", maximum=40
+        )
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z", observed_at):
-            raise MacError(f"candidate_evidence[{index}].observed_at must be an RFC3339 UTC timestamp")
+            raise MacError(
+                f"candidate_evidence[{index}].observed_at must be an RFC3339 UTC timestamp"
+            )
         try:
             parsed_time = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
         except ValueError as exc:
-            raise MacError(f"candidate_evidence[{index}].observed_at is not a real timestamp") from exc
+            raise MacError(
+                f"candidate_evidence[{index}].observed_at is not a real timestamp"
+            ) from exc
         if parsed_time.tzinfo != timezone.utc:
             raise MacError(f"candidate_evidence[{index}].observed_at must use UTC")
         result.append(
@@ -297,7 +306,9 @@ def validate_payload(payload: Mapping[str, Any], *, verify_hashes: bool = True) 
         if item_operation not in _ITEM_OPERATIONS:
             raise MacError("item_operation is unsupported")
         batch_scope = _validate_batch_scope(value["batch_scope"])
-        if item_operation == "revoke" and any(subject["kind"] != "offering" for subject in subjects):
+        if item_operation == "revoke" and any(
+            subject["kind"] != "offering" for subject in subjects
+        ):
             raise MacError("batch revoke supports offering subjects only")
         if any(role is not None for role in roles):
             raise MacError("batch subjects cannot have roles")
@@ -338,12 +349,12 @@ def validate_payload(payload: Mapping[str, Any], *, verify_hashes: bool = True) 
     if batch_scope is not None:
         result["batch_scope"] = batch_scope
     rendered_payload_bytes = len(
-        json.dumps(result, ensure_ascii=False, allow_nan=False, indent=2, sort_keys=True).encode("utf-8")
+        json.dumps(result, ensure_ascii=False, allow_nan=False, indent=2, sort_keys=True).encode(
+            "utf-8"
+        )
     )
     if rendered_payload_bytes > MAX_RENDERED_PAYLOAD_BYTES:
-        raise MacError(
-            f"rendered canonical payload exceeds {MAX_RENDERED_PAYLOAD_BYTES} bytes"
-        )
+        raise MacError(f"rendered canonical payload exceeds {MAX_RENDERED_PAYLOAD_BYTES} bytes")
     if verify_hashes:
         expected_dedupe, expected_idempotency = compute_keys(result)
         if result["dedupe_key"] != expected_dedupe:
@@ -359,7 +370,10 @@ def compute_keys(payload: Mapping[str, Any]) -> tuple[str, str]:
     value = validate_payload(payload, verify_hashes=False)
     effective_operation = value.get("item_operation", value["operation"])
     reservations = sorted(
-        ({"kind": subject["kind"], "identity": subject["identity"]} for subject in value["subjects"]),
+        (
+            {"kind": subject["kind"], "identity": subject["identity"]}
+            for subject in value["subjects"]
+        ),
         key=lambda item: (item["kind"], item["identity"]),
     )
     dedupe_input = {
@@ -425,10 +439,7 @@ def render_adapter_issue_body(payload: Mapping[str, Any], adapter: Adapter) -> s
             f"### Neutral payload digest\n\n{digest}\n"
         )
     else:
-        body = (
-            f"# MAC request\n\n```json\n{pretty}\n```\n\n"
-            f"Neutral payload digest: `{digest}`\n"
-        )
+        body = f"# MAC request\n\n```json\n{pretty}\n```\n\nNeutral payload digest: `{digest}`\n"
     if len(body.encode("utf-8")) > MAX_BODY_BYTES:
         raise MacError(f"rendered adapter issue body exceeds {MAX_BODY_BYTES} bytes")
     return body
@@ -439,7 +450,9 @@ def _parse_json_payload(raw: str) -> dict[str, Any]:
         value = json.loads(
             raw,
             object_pairs_hook=_object_pairs,
-            parse_constant=lambda token: (_ for _ in ()).throw(MacError(f"invalid JSON value {token}")),
+            parse_constant=lambda token: (_ for _ in ()).throw(
+                MacError(f"invalid JSON value {token}")
+            ),
         )
     except (json.JSONDecodeError, UnicodeError, RecursionError) as exc:
         raise MacError(f"invalid MAC JSON: {exc}") from exc
@@ -463,14 +476,14 @@ def _validate_generated_intake_envelope(body: str) -> None:
         return
     if len(starts) != 1 or len(ends) != 1 or ends[0] < starts[0]:
         raise MacError("generated intake block is ambiguous")
-    if body[ends[0] + len(INTAKE_END):].strip():
+    if body[ends[0] + len(INTAKE_END) :].strip():
         raise MacError("generated intake block is not final")
 
     source_digests = re.findall(
         r"<!-- modelo:intake-source (sha256:[0-9a-f]{64}) -->",
-        body[starts[0]:ends[0]],
+        body[starts[0] : ends[0]],
     )
-    source = body[:starts[0]].rstrip()
+    source = body[: starts[0]].rstrip()
     actual = "sha256:" + hashlib.sha256(source.encode("utf-8")).hexdigest()
     if source_digests != [actual]:
         raise MacError("guided proposal human fields changed after payload generation")
@@ -486,17 +499,21 @@ def extract_adapter_issue_payload(body: str, adapter: Adapter) -> dict[str, Any]
 
     if adapter == "github":
         payload_matches = re.findall(
-            r"(?ms)^### (?:Neutral MAC payload|Change details \(JSON\))\n\n```json\n([\s\S]*?)\n```(?:\n|$)", body
+            r"(?ms)^### (?:Neutral MAC payload|Change details \(JSON\))\n\n```json\n([\s\S]*?)\n```(?:\n|$)",
+            body,
         )
         digest_matches = re.findall(
-            r"(?m)^### (?:Neutral payload digest|Change fingerprint)\n\n(sha256-[0-9a-f]{64})$", body
+            r"(?m)^### (?:Neutral payload digest|Change fingerprint)\n\n(sha256-[0-9a-f]{64})$",
+            body,
         )
     else:
         payload_matches = re.findall(
-            r"(?ms)^(?:### (?:Neutral MAC payload|Change details \(JSON\))\n\n)?```json\n([\s\S]*?)\n```(?:\n|$)", body
+            r"(?ms)^(?:### (?:Neutral MAC payload|Change details \(JSON\))\n\n)?```json\n([\s\S]*?)\n```(?:\n|$)",
+            body,
         )
         digest_matches = re.findall(
-            r"(?m)^(?:### (?:Neutral payload digest|Change fingerprint)\n\n|Neutral payload digest: `)(sha256-[0-9a-f]{64})`?$", body
+            r"(?m)^(?:### (?:Neutral payload digest|Change fingerprint)\n\n|Neutral payload digest: `)(sha256-[0-9a-f]{64})`?$",
+            body,
         )
     if len(payload_matches) != 1 or len(digest_matches) != 1:
         raise MacError("adapter issue body must contain one MAC payload and one digest field")

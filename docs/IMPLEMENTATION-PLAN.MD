@@ -1,4 +1,175 @@
-# Modelo v0.1 implementation and verification plan
+# Modelo v1 implementation plan and execution log
+
+Engineering issue: [#91](https://github.com/j3brns996/Modelo/issues/91).
+Working branch: `v1-simplification`, initially based on PR #90 at `ae5962a`.
+Status: implementation in progress. This section is the current execution plan;
+the bootstrap record below is historical evidence, not a second work queue.
+
+Completion here means the scoped v1 engineering work is verified and merged.
+It does not mean a 1.0 release or production launch: those require the remaining
+remote capability, publication and human T10 evidence. Keep the current version
+until its release criteria are demonstrated.
+
+## Execution prompt
+
+Plan and implement a pragmatic simplification through v1. Do the work, use
+independent agents and continue through tests, review, PRs and trusted CI.
+Preserve existing entity types and filename-enforced identities. No new entity
+types, generic metadata maps, speculative wrappers or compatibility machinery.
+Apply Ponytail: question the need, reuse existing code, prefer the standard
+library and native host facilities, then write the minimum complete solution.
+
+No technical debt: no deferred defects, temporary workarounds, placeholder
+implementations, disabled checks or symptom-only patches. Trace every affected
+caller and fix the root cause. Keep necessary validation, security,
+accessibility, evidence integrity and approval controls. Exclude optional future
+capabilities without scaffolding them. Keep host-specific concerns in adapters;
+requesters submit through Git-host issues/forms, not a Modelo application API.
+
+Before each change, identify its radius: code, callers, paths, schemas, records,
+commands, documentation, generated artifacts, CI and consumers. State acceptance
+criteria, compatibility and rollback. Define proof before implementation; show
+defects failing first, then run focused and required broader checks. Parse
+structured edits, read back the exact diff and test affected documentation.
+
+Assess every specification for necessary and testable requirements, one
+authoritative definition, consistent identities and boundaries, implementation
+traceability, explicit failure behaviour and claims supported by evidence.
+Separate executable tests from architectural judgment. NIST mapping describes
+supported outcomes; it does not mandate Modelo's implementation mechanisms.
+
+Use one writer per branch/worktree. Delegate bounded read-only research and
+independent architecture, correctness and documentation reviews. Fix blocking
+findings and repeat affected verification. Record exact tested commits and
+distinguish assumptions, observations and external dependencies. Preserve
+unrelated work and clean task-owned resources. Do not claim completion while
+required work or blocking conflicts remain.
+
+## Authority and conflict register
+
+On 2026-09-07 the user explicitly authorised merging test-passing PRs through
+v1. This session instruction overrides the general agent no-merge instruction
+for this work. It does not authorise bypassing required host controls, fabricating
+approvals or accepting stale CI. Production catalogue records remain prohibited
+until remote T10 passes. A blocked host approval remains an external blocker.
+
+| Conflict | Sources | Resolution |
+|---|---|---|
+| Merge authority | AGENTS.md and maintainer skill prohibit agent merges; user grants merges through v1 | Follow explicit session authority after current-head checks and independent review; no bypass |
+| Deliberate shortcuts | Ponytail permits marked shortcuts; user forbids technical debt | User's zero-debt rule wins; no shortcut exceptions introduced |
+| Existing plan filename | Config references lowercase historical plan; user requests IMPLEMENTATION-PLAN.MD | Case-rename one file and update references; retain bootstrap evidence below |
+| Lint acceptance | Original checkout has advisory, unpinned local lint instructions; user requires functioning local/CI tools | Preserve original edits; implement pinned blocking gates in this worktree |
+| UBS name | User calls it ultimate bug squasher; official repository is Ultimate Bug Scanner | Integrate Dicklesworthstone/ultimate_bug_scanner at a verified fixed revision |
+| Apparent GitLab readiness | Pipeline scaffold looks runnable; launch documents say activation is unavailable | Replace misleading behaviour with an explicit activation boundary and regression tests |
+| Specification promises | Reservation, scanning and command claims exceed inspected implementation | Reconcile each claim with executable proof; no silent weakening |
+
+## Work breakdown and acceptance
+
+| Package | Work and change radius | Dependencies | Required proof | Status |
+|---|---|---|---|---|
+| W0: authority and plan | Instructions, this plan, configuration path and documentation links | None | Conflict dispositions; exact-case links resolve | Implemented; focused docs checks pass |
+| W1: baseline | Main and PR #90 state, existing tests, schemas, CLI and publication flow | W0 | Baseline failures distinguished from regressions; source commit recorded | In progress |
+| W2: architecture | All specifications, config contracts, schemas, agent rules and workflow claims | W1 | Every document assessed; findings classified retain/clarify/consolidate/remove/implement/decision | Coverage recorded below; final integrated tests pending |
+| W3: canonical contract | Schema guide, entity ledger, decision links, source schemas and published bundle | W2 | Keys/paths/profile agree; negative filename/reference/history tests; no entity additions | Pending |
+| W4: quality tools | pyproject.toml, uv.lock, local_ci.py, CI, lint configuration and contributor commands | W1 | Pinned yamllint, Ruff and UBS run locally and remotely; real failure and clean controls; incomplete summaries rejected | Local Linux tool and control tests pass; remote pending |
+| W5: workflow | Git-host adapters, MAC documentation, CI acceptance and request templates | W2 | Stale head, invalid input, failed/missing checks and unsupported host activation rejected | Pending |
+| W6: publication | Build/receipt code, configuration, security/site contracts and launch runbook | W2, W5 | Named purpose for retained mechanisms; failure tests before any removal; no false production-readiness claim | Assessing retained guarantees |
+| W7: documentation | README, docs index, schema guide, site templates, published agent/form/schema artifacts | W3-W6 | Commands, links, positive/negative examples and nondefault base paths exercised | Pending |
+| W8: integration | Full tests, 5,000-entity workload, package/site builds and independent reviews | W3-W7 | Results tied to exact commit; trusted CI; no blocking findings | Pending |
+
+Deliver small PRs by dependency: plan/contract reconciliation; blocking quality
+toolchain; workflow/publication corrections and final integration. Adjust the
+split only when shared-file or trusted-runner dependencies require it, and log
+the reason. Do not merge mixed catalogue and control-plane changes.
+
+Implementation uses one control-plane PR for quality gates and specification
+corrections because the new executable documentation checks must land with the
+corrected sources, and the first formatter baseline touches the same Python
+files. Formatting is mechanical; substantive changes are the shared Git timeout,
+quality gate, configured proposal link and explicit inactive GitLab pipeline.
+
+For each package use a step card: problem, intended behaviour, affected paths
+and callers, smallest solution, acceptance tests, compatibility and rollback.
+Then implement rather than stopping at the card. Roll back code/config changes
+through a reviewed revert; never rewrite merged evidence or approvals.
+
+## Local and CI toolchain acceptance
+
+Use locked Python/uv dependencies for yamllint and Ruff. Pin UBS and its required
+scanner dependencies; inspect the official source before installation. Do not
+run a floating curl-to-shell installer, enable automatic updates, edit user
+agent configuration or install hooks as a side effect.
+
+Local and CI commands must invoke the same gates. Demonstrate each tool detects
+an appropriate harmless failing fixture and accepts its corrected counterpart.
+For UBS, prove the intended language scanners executed, covered the selected
+files and completed. Exit zero alone is insufficient for an empty or partial
+scan. Distinguish real defects, scanner failures and false positives; do not
+hide findings with blanket exclusions or suppressions. Use Linux/WSL where
+required and document the actual supported execution environment.
+
+## Initial architecture findings and disposition
+
+- Consolidate stale profile 0.2 guidance with the 0.3 source schemas and required
+  offering scope/accountability. Keep diagrams about keys and relationships.
+- Correct evidence wording: externally sourced facts need evidence; policy
+  fields and internal references follow their declared rules.
+- Replace the escaped Markdown proposal link with an existing template link
+  using the configured route; test a nondefault base path.
+- Reconcile local-font behaviour, obsolete demo counts and ambiguous ADR
+  numbering without breaking existing published links.
+- Distinguish a computed idempotency key from cross-request reservation; test
+  the actual boundary. Clarify which stages belong to modelo check, local
+  verification and trusted remote acceptance.
+- Do not represent the absent capabilities command or incomplete GitLab
+  publication pipeline as an available operational control.
+- Retain evidence hashes and detached receipts unless a concrete replacement
+  preserves their approval/source/artifact binding. Native artifact metadata
+  alone does not prove business approval.
+- Assess local crash recovery against its actual filesystem contract. Native
+  deployment is not a substitute until that contract and failure tests change.
+
+## Evidence and progress log
+
+| Date | Work | Evidence and limits |
+|---|---|---|
+| 2026-09-07 | Baseline branch and isolation | PR #90 remains open at ae5962a; prior trusted run 34064099254 passed 438 tests. New worktree Modelo-v1 preserves original CONTRIBUTING.md/uv.lock/advisory yamllint edits. These are prior results, not acceptance of new changes. |
+| 2026-09-07 | Independent architecture review | CTO reviewed ae5962a read-only; findings above include misleading GitLab readiness, duplicate contract prose and unsupported reservation/scanning claims. No approval issued. |
+| 2026-09-07 | Independent documentation review | Reviewer found stale schema guide, policy-evidence wording and escaped proposal link. Existing selected-host template/schema bundling was consistent on inspected source. No new tests run by reviewer. |
+| 2026-09-07 | UBS identification | Official GitHub repository identified; fixed revision, dependencies and failure semantics under investigation. Not installed or accepted yet. |
+| 2026-09-07 | PR #90 merged | Exact previously tested head ae5962a was squash-merged as f5fda188 under explicit user authority. GitHub rejected merge-commit mode; squash used without bypass. |
+| 2026-09-07 | Failure reproduction | New tests failed on profile 0.2 guidance, runnable-looking GitLab Pages and missing root-deployment proposal link before corrections. |
+| 2026-09-07 | Local verification | 21 documentation tests pass; 11 workflow/site/timeout tests pass on Linux; 4 actual quality-tool and bad/corrected-input tests pass on Linux. Windows broader baseline has old system uv and lacks O_NOFOLLOW, so full verification uses locked Ubuntu/WSL. |
+| 2026-09-07 | UBS disposition | Initial 24 Python/2 JS scan returned 19 critical and 162 warning heuristic counts. Independent category/source review found static-template, public-digest, denylist-key and configured-URL false positives; Path division and exact bool/int checks remain correct. Missing local subprocess deadlines were corrected in shared helpers with error-propagation tests. Raw reports remain visible; not a clean-scan claim. |
+| 2026-09-07 | Toolchain pins | Ruff 0.16.6, yamllint 1.38.0, ast-grep 0.40.1 and Linux ripgrep 15.1.0 are locked. UBS source is pinned at 0af10c926d6fbb14a1f589326d75c03f610207f0. System Bash/Git/jq/coreutils are prerequisites. No hooks or agent configuration changed. |
+
+## Specification coverage and retained boundaries
+
+| Family | Assessed sources | Disposition and proof |
+|---|---|---|
+| Authority | AGENTS.md, CONTRIBUTING.md, CODEOWNERS, SECURITY.md, four portable skills | Retain authority boundaries; session merge exception recorded; contributor commands tested |
+| Global configuration | SPEC.md, modelo.yaml, docs/contract.yaml, modelo.schema.json | Clarify command ownership and paths; existing config/schema fixtures plus documentation checks |
+| Entity schemas | common, model, model-release, offering, vendor/service registries, evidence, condition, freshness-policy | Retain acceptance checks; consolidate guidance; profile, identity/history and 5,000-entity regressions |
+| Provider contracts | Three provider schemas and docs/providers files | AWS semantic support retained; Azure/GCP remain explicitly unsupported; no inferred provider facts |
+| Proposals | MAC schemas, mac-contract.md, selected-host templates | Retain payload/head correlation; retire unsupported cross-issue reservation promise; existing round-trip/idempotency/stale-base tests |
+| Publication | catalogue-output/build-manifest schemas, site-contract.md | Retain same-source bundle and manifest; output/link/CSP/fixture tests |
+| Receipts and trust | Check/control/release receipts and trusted contexts | Retain approval/source/artifact bindings and existing negative fixtures; no production orchestration claim |
+| Host workflows | Three GitHub workflows, GitLab pipeline | Protected runner retained; inactive GitLab script is executed by a negative test; remote settings still need T10 |
+| Toolchain | pyproject.toml, uv.lock, Python pin, gitattributes | Real tools run in the shared test inventory; bad/corrected controls; no machine-level Ruff inheritance |
+| Decisions and explanations | All ADRs, schema guide, entity ledger, ELI21 | Remove duplicate field table; distinguish offering policy from external application-use context; preserve existing decision URLs |
+| Operating status | This plan, launch-runbook.md, maturity profile | Distinguish engineering completion, synthetic evidence and production launch; retain launch gates |
+| NIST | Mapping schema/YAML, method-equivalence and embedded-AI guidance | Retain bounded contribution/non-certification claims; no new technical mandate or catalogue entity |
+| Human and agent surfaces | README, docs index, authoring, quickstart, site content/templates | Configured link regression and existing same-source host-form/schema-bundle checks |
+| Historical reviews | docs/reviews files and bootstrap section below | Preserve as dated evidence, not new normative requirements |
+
+The inventory covers all 24 schema files and the normative document families.
+Executable fixtures validate machine rules; independent review assesses purpose
+and proportionality. Neither substitutes for remote or operating evidence.
+
+## Historical bootstrap record
+
+The following v0.1 record is retained for traceability. Its task statuses and
+commands describe the bootstrap context; current execution is governed above.
 
 Status: historical bootstrap delivery record and current control posture. T8
 pre-merge CI, T9 and the public synthetic Pages demo workflow are implemented.

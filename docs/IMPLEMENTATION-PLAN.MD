@@ -2,7 +2,8 @@
 
 Engineering issue: [#91](https://github.com/j3brns996/Modelo/issues/91).
 Working branch: `v1-simplification`, initially based on PR #90 at `ae5962a`.
-Status: implementation in progress. This section is the current execution plan;
+Status: implementation complete; [PR #92](https://github.com/j3brns996/Modelo/pull/92)
+tracks independent review and current-head CI/merge acceptance. This is the execution plan;
 the bootstrap record below is historical evidence, not a second work queue.
 
 Completion here means the scoped v1 engineering work is verified and merged.
@@ -68,14 +69,14 @@ until remote T10 passes. A blocked host approval remains an external blocker.
 | Package | Work and change radius | Dependencies | Required proof | Status |
 |---|---|---|---|---|
 | W0: authority and plan | Instructions, this plan, configuration path and documentation links | None | Conflict dispositions; exact-case links resolve | Implemented; focused docs checks pass |
-| W1: baseline | Main and PR #90 state, existing tests, schemas, CLI and publication flow | W0 | Baseline failures distinguished from regressions; source commit recorded | In progress |
+| W1: baseline | Main and PR #90 state, existing tests, schemas, CLI and publication flow | W0 | Baseline failures distinguished from regressions; source commit recorded | Recorded |
 | W2: architecture | All specifications, config contracts, schemas, agent rules and workflow claims | W1 | Every document assessed; findings classified retain/clarify/consolidate/remove/implement/decision | Coverage recorded below; final integrated tests pending |
-| W3: canonical contract | Schema guide, entity ledger, decision links, source schemas and published bundle | W2 | Keys/paths/profile agree; negative filename/reference/history tests; no entity additions | Pending |
+| W3: canonical contract | Schema guide, entity ledger, decision links, source schemas and published bundle | W2 | Keys/paths/profile agree; negative filename/reference/history tests; no entity additions | Implemented and reviewed |
 | W4: quality tools | pyproject.toml, uv.lock, local_ci.py, CI, lint configuration and contributor commands | W1 | Pinned yamllint, Ruff and UBS run locally and remotely; real failure and clean controls; incomplete summaries rejected | Local Linux tool and control tests pass; remote pending |
-| W5: workflow | Git-host adapters, MAC documentation, CI acceptance and request templates | W2 | Stale head, invalid input, failed/missing checks and unsupported host activation rejected | Pending |
-| W6: publication | Build/receipt code, configuration, security/site contracts and launch runbook | W2, W5 | Named purpose for retained mechanisms; failure tests before any removal; no false production-readiness claim | Assessing retained guarantees |
-| W7: documentation | README, docs index, schema guide, site templates, published agent/form/schema artifacts | W3-W6 | Commands, links, positive/negative examples and nondefault base paths exercised | Pending |
-| W8: integration | Full tests, 5,000-entity workload, package/site builds and independent reviews | W3-W7 | Results tied to exact commit; trusted CI; no blocking findings | Pending |
+| W5: workflow | Git-host adapters, MAC documentation, CI acceptance and request templates | W2 | Stale head, invalid input, failed/missing checks and unsupported host activation rejected | Implemented and reviewed |
+| W6: publication | Build/receipt code, configuration, security/site contracts and launch runbook | W2, W5 | Named purpose for retained mechanisms; failure tests before any removal; no false production-readiness claim | Retain existing guarantees; no justified replacement |
+| W7: documentation | README, docs index, schema guide, site templates, published agent/form/schema artifacts | W3-W6 | Commands, links, positive/negative examples and nondefault base paths exercised | Implemented; focused tests pass |
+| W8: integration | Full tests, 5,000-entity workload, package/site builds and independent reviews | W3-W7 | Results tied to exact commit; trusted CI; no blocking findings | Local evidence below; final acceptance in PR #92 |
 
 Deliver small PRs by dependency: plan/contract reconciliation; blocking quality
 toolchain; workflow/publication corrections and final integration. Adjust the
@@ -143,6 +144,8 @@ required and document the actual supported execution environment.
 | 2026-09-07 | UBS disposition | Initial 24 Python/2 JS scan returned 19 critical and 162 warning heuristic counts. Independent category/source review found static-template, public-digest, denylist-key and configured-URL false positives; Path division and exact bool/int checks remain correct. Missing local subprocess deadlines were corrected in shared helpers with error-propagation tests. Raw reports remain visible; not a clean-scan claim. |
 | 2026-09-07 | Toolchain pins | Ruff 0.16.6, yamllint 1.38.0, ast-grep 0.40.1 and Linux ripgrep 15.1.0 are locked. UBS source is pinned at 0af10c926d6fbb14a1f589326d75c03f610207f0. System Bash/Git/jq/coreutils are prerequisites. No hooks or agent configuration changed. |
 | 2026-09-07 | Independent integration findings | Review of e49ea9 found ambient scan-reduction settings, missing remote report retention, stale failure reports and omitted migration script. Corrections use a controlled scanner environment, failed-run markers, explicit error checks, full first-party scope and read-only exact-head artifact workflow. New regression checks pass locally; final remote acceptance remains pending. |
+| 2026-09-07 | Local full suite and regression | At e49ea9, 444 tests passed including the 5,000-entity case; one shallow-history test mocked the removed site subprocess import. Its corrected shared-helper mock and typed BuildError assertion pass. The locked offline package build also passes. This is not a claim that the initial full run was green. |
+| 2026-09-07 | Corrected quality integration | At 2bbd574, 21 Linux quality/workflow/timeout checks pass. Both independent reviewers report no remaining source-review blockers. CI quality run 34069247195 succeeds and retains raw evidence. All 28 file hashes match Git objects at that commit; 19 critical/155 warning heuristic counts remain reviewed false positives, not suppressed findings. |
 
 ## Specification coverage and retained boundaries
 

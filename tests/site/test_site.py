@@ -914,14 +914,14 @@ class FinalSiteTests(unittest.TestCase):
         original = subprocess.run
 
         def shallow(arguments, *args, **kwargs):
-            if arguments[:3] == ["git", "rev-parse", "--is-shallow-repository"]:
+            if arguments[-2:] == ["rev-parse", "--is-shallow-repository"]:
                 return subprocess.CompletedProcess(arguments, 0, "true\n", "")
             return original(arguments, *args, **kwargs)
 
         from unittest.mock import patch
 
-        with patch("modelo.site.subprocess.run", side_effect=shallow):
-            with self.assertRaisesRegex(Exception, "non-shallow"):
+        with patch("modelo.change.subprocess.run", side_effect=shallow):
+            with self.assertRaisesRegex(BuildError, "shallow"):
                 build_final_site(self.request())
 
     def test_assets_have_no_unsafe_dom_or_remote_dependency(self) -> None:

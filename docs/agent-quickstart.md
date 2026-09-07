@@ -60,6 +60,14 @@ uv tool run --from uv==0.11.33 uv sync --locked
 uv tool run --from uv==0.11.33 uv run --locked modelo check --base <base-sha> --head <head-sha> --as-of YYYY-MM-DD
 ```
 
+On Windows, use WSL2 for full verification. Clone the repository under the WSL
+Linux filesystem, such as `~/src/Modelo`, and run Git, `uv`, tests, builds, and
+UBS there. Do not run Linux tools against `/mnt/c/...`; cross-filesystem I/O is
+slower and permission, symlink, and executable-bit behavior differs. Use one
+Git environment for a working tree and keep line endings controlled by
+`.gitattributes`. Native Windows remains suitable for editing and lightweight
+Ruff or yamllint checks.
+
 Run narrow tests first. Include the issue, diff, base/head/tree SHAs, test
 results, and trusted CI reference in the change request. A local pass does not
 replace successful trusted CI for the exact head. A new commit requires new

@@ -22,6 +22,7 @@ maintenance, and review handoff.
 | How does the static site work? | [site-contract.md](site-contract.md) | Normative reference |
 | What is the security posture? | [security-contract.md](security-contract.md), [SECURITY.md](../SECURITY.md) | Current reference |
 | What is the implementation and launch status? | [IMPLEMENTATION-PLAN.MD](IMPLEMENTATION-PLAN.MD), [launch-runbook.md](launch-runbook.md) | Current / historical |
+| How should Windows developers run full checks? | [agent-quickstart.md](agent-quickstart.md) | Current guide |
 | How does AWS Bedrock discovery work? | [providers/aws-bedrock.md](providers/aws-bedrock.md) | Reference |
 | Where are dated review notes and decisions? | [reviews/](reviews/), [adr/](adr/) | Review evidence / historical |
 

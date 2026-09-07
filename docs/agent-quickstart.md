@@ -51,9 +51,13 @@ merge. A simple request is triage; it is not a canonical MAC or approval.
 
 Use the Python and uv versions pinned in `modelo.yaml`.
 
+If the installed `uv` is older or reports a lockfile/configuration error, run
+the pinned executable through the tool runner. This keeps the command identical
+across Windows, macOS, Linux, and CI:
+
 ```bash
-uv sync --locked
-uv run --locked modelo check --base <base-sha> --head <head-sha> --as-of YYYY-MM-DD
+uv tool run --from uv==0.11.33 uv sync --locked
+uv tool run --from uv==0.11.33 uv run --locked modelo check --base <base-sha> --head <head-sha> --as-of YYYY-MM-DD
 ```
 
 Run narrow tests first. Include the issue, diff, base/head/tree SHAs, test

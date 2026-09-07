@@ -5,7 +5,8 @@ at `/docs/`.
 
 ![Modelo: model availability passes through evidence, conditions, offering, route, and review before approved use](img/modelo-title.png)
 
-Concept illustration. Counts and status indicators are illustrative. Modelo records offering approvals; application owners govern specific uses.
+Concept illustration. Counts and status indicators are illustrative. Modelo
+records offering approvals. Application owners govern specific uses.
 
 ## Read by question
 

@@ -16,8 +16,6 @@ Concept illustration. Counts and status indicators are illustrative.
 
 ## Choose your next action
 
-Use this table to identify who acts, what they provide, and where the work ends.
-
 | Your role | Your action | Your agent's task |
 |---|---|---|
 | Requester | [Describe your need](https://j3brns996.github.io/Modelo/propose/), then review and submit the native issue form. | Research the need, check inventory, and prepare the form. |
@@ -89,6 +87,11 @@ uv run --locked modelo --version
 uv build --offline --no-cache
 uv run --locked modelo-local-ci run --base <base-sha> --head <head-sha> --as-of YYYY-MM-DD --jobs 3
 ```
+
+If your installed `uv` is older than the pinned `0.11.33`, use the portable
+bootstrap form in the [agent quickstart](docs/agent-quickstart.md):
+`uv tool run --from uv==0.11.33 uv <command>`. It selects the same `uv` release
+on Windows, macOS, Linux, and CI.
 
 Run narrow tests first. Local CI is advisory; `modelo/check` remains the acceptance
 gate. Never commit generated `dist/` output. Keep system performance and capacity

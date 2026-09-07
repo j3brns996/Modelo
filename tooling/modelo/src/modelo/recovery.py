@@ -16,9 +16,31 @@ from urllib.parse import urlsplit
 from urllib.request import urlopen
 
 from modelo.build import BuildError, _git, _safe_inventory_path, _strict_json_bytes
+from modelo.config import load_config
 from modelo.github_release import _api, _items, _repository, _response, github_capabilities
 from modelo.quality import UBS_REPOSITORY, UBS_REVISION, command
-from modelo.receipt import canonical_bytes, sha256_bytes
+from modelo.receipt import canonical_bytes, release_correlation_errors, sha256_bytes
+from modelo.schemas import SchemaSet
+
+
+def _verify_release_receipts(root: Path, target: Path, tag: str) -> None:
+    config = load_config(root)
+    schemas = SchemaSet(root, config.paths["schemas"])
+    documents = []
+    for name, key in (
+        ("check.json", "check_receipt_schema"),
+        ("release.json", "release_receipt_schema"),
+    ):
+        raw = (target / name).read_bytes()
+        document = _strict_json_bytes(raw, "archived " + name)
+        if raw != canonical_bytes(document) or schemas.validate(
+            config.paths[key].name, document, name
+        ):
+            raise BuildError("durable release receipt is noncanonical or violates its schema")
+        documents.append(document)
+    check, receipt = documents
+    if receipt["release"] != tag or release_correlation_errors(check, receipt):
+        raise BuildError("durable release receipt provenance differs")
 
 
 def _file_digest(path: Path) -> str:
@@ -211,18 +233,7 @@ def export_recovery(root: Path, output: Path) -> dict:
                 }
                 if not required.issubset({asset["name"] for asset in assets}):
                     raise BuildError("published catalogue release lacks durable recovery evidence")
-                check = _strict_json_bytes((target / "check.json").read_bytes(), "archived check")
-                receipt = _strict_json_bytes(
-                    (target / "release.json").read_bytes(), "archived release"
-                )
-                if (
-                    receipt.get("accepted_check_receipt_digest")
-                    != sha256_bytes(canonical_bytes(check))
-                    or receipt.get("ci", {}).get("run_id") != check.get("ci", {}).get("run_id")
-                    or receipt.get("head_sha") != check.get("head_sha")
-                    or receipt.get("release") != release["tag_name"]
-                ):
-                    raise BuildError("durable release receipt provenance differs")
+                _verify_release_receipts(root, target, release["tag_name"])
         (stage / "host.json").write_bytes(canonical_bytes(metadata))
         files = [
             path
@@ -410,6 +421,12 @@ def _restore_snapshot(bundle: Path, expected_digest: str, output: Path) -> dict:
         output,
     )
     command(["git", "checkout", "--detach", source], output / "worktree")
+    metadata = _strict_json_bytes((output / "host.json").read_bytes(), "restored host metadata")
+    for release in metadata["releases"]:
+        if release.get("tag_name", "").startswith("catalogue-") and not release.get("draft"):
+            _verify_release_receipts(
+                output / "worktree", output / "releases" / str(release["id"]), release["tag_name"]
+            )
     if command(["uv", "--version"], output).split()[:2] != ["uv", "0.11.33"]:
         raise BuildError("offline recovery requires pinned uv 0.11.33")
     command(

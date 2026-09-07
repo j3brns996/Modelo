@@ -2,28 +2,29 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import date
-from enum import Enum
 import ctypes
 import errno
 import json
 import os
-from pathlib import Path, PurePosixPath
 import secrets
 import shutil
 import stat
 import subprocess
 import tarfile
+from dataclasses import dataclass
+from datetime import date
+from enum import Enum
+from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
 from types import MappingProxyType
 from typing import Any, Mapping
 from urllib.parse import urlsplit
 
 from modelo.change import GitError, changed_paths, require_ancestor, resolve_commit, with_snapshot
+from modelo.change import _git as local_git
 from modelo.config import CONTRACT_VERSION, ConfigError, load_config
 from modelo.evidence import canonical_json
-from modelo.loader import load_yaml_mapping, strict_unique_json_pairs
+from modelo.loader import load_yaml_mapping
 from modelo.mac import MacError, validate_payload
 from modelo.receipt import (
     canonical_bytes,
@@ -36,7 +37,6 @@ from modelo.receipt import (
 )
 from modelo.schemas import SchemaSet
 from modelo.validators import CheckSystemError, _validate_state, check_repository
-
 
 MAX_METADATA_BYTES = 262_144
 
@@ -109,7 +109,11 @@ def _safe_config_path(raw: Any, label: str) -> PurePosixPath:
     if not isinstance(raw, str) or not raw or raw == "." or "\\" in raw:
         raise BuildError(f"configured {label} is not a safe repository-relative path")
     path = PurePosixPath(raw)
-    if path.is_absolute() or path.as_posix() != raw or any(part in {"", ".", ".."} for part in path.parts):
+    if (
+        path.is_absolute()
+        or path.as_posix() != raw
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
         raise BuildError(f"configured {label} is not a safe repository-relative path")
     return path
 
@@ -121,7 +125,10 @@ def _layout(root: Path) -> BuildLayout:
         build = document["build"]
         repository = document["repository"]
         profiles_raw = document["publication"]["profiles"]
-        path = lambda key: _safe_config_path(paths[key], f"paths.{key}")
+
+        def path(key):
+            return _safe_config_path(paths[key], f"paths.{key}")
+
         profiles = {
             name: _safe_config_path(value["source"], f"publication.profiles.{name}.source")
             for name, value in profiles_raw.items()
@@ -131,7 +138,9 @@ def _layout(root: Path) -> BuildLayout:
         final_root = _safe_config_path(build["final_root"], "build.final_root")
         pages_root = _safe_config_path(build["pages_root"], "build.pages_root")
         target_parent = _safe_config_path(build["target_parent"], "build.target_parent")
-        publication_subdir = _safe_config_path(build["publication_subdir"], "build.publication_subdir")
+        publication_subdir = _safe_config_path(
+            build["publication_subdir"], "build.publication_subdir"
+        )
         catalogue_path = _safe_config_path(build["catalogue_path"], "build.catalogue_path")
         delta_path = _safe_config_path(build["change_delta_path"], "build.change_delta_path")
         manifest_path = _safe_config_path(build["manifest_path"], "build.manifest_path")
@@ -149,11 +158,12 @@ def _layout(root: Path) -> BuildLayout:
         }
         issue_route = repository["web_routes"]["issue"]
         if not isinstance(issue_route, str) or issue_route.count("{issue_number}") != 1:
-            raise BuildError("configured repository issue route must contain {issue_number} exactly once")
-        schema_paths = {
-            key: path(key) for key in (
-                "mac_metadata_schema", "catalogue_output_schema", "build_manifest_schema"
+            raise BuildError(
+                "configured repository issue route must contain {issue_number} exactly once"
             )
+        schema_paths = {
+            key: path(key)
+            for key in ("mac_metadata_schema", "catalogue_output_schema", "build_manifest_schema")
         }
     except (KeyError, TypeError, AttributeError) as exc:
         raise BuildError("modelo.yaml lacks the complete build layout") from exc
@@ -180,40 +190,62 @@ def _layout(root: Path) -> BuildLayout:
             "configured candidate, validation, final and Pages roots and writer lock must be distinct under target_parent"
         )
     input_keys = (
-        "catalogue", "schemas", "fixtures", "site_source", "site_templates", "site_assets",
-        "site_content", "implementation", "tests", "machine_contract", "human_specification",
+        "catalogue",
+        "schemas",
+        "fixtures",
+        "site_source",
+        "site_templates",
+        "site_assets",
+        "site_content",
+        "implementation",
+        "tests",
+        "machine_contract",
+        "human_specification",
     )
-    inputs = tuple(dict.fromkeys([
-        PurePosixPath("modelo.yaml"), *(path(key) for key in input_keys), *profiles.values()
-    ]))
+    inputs = tuple(
+        dict.fromkeys(
+            [PurePosixPath("modelo.yaml"), *(path(key) for key in input_keys), *profiles.values()]
+        )
+    )
     for output in (candidate_root, validation_root, final_root, pages_root):
         for source in inputs:
             if output == source or output in source.parents or source in output.parents:
                 raise BuildError("configured build output overlaps a configured input")
     return BuildLayout(
-        catalogue=path("catalogue"), models=path("models"), offerings=path("offerings"),
-        evidence=path("evidence"), governance=path("governance"), conditions=path("conditions"),
-        schemas=schemas_root, mac_metadata_schema=schema_paths["mac_metadata_schema"].name,
+        catalogue=path("catalogue"),
+        models=path("models"),
+        offerings=path("offerings"),
+        evidence=path("evidence"),
+        governance=path("governance"),
+        conditions=path("conditions"),
+        schemas=schemas_root,
+        mac_metadata_schema=schema_paths["mac_metadata_schema"].name,
         catalogue_output_schema=schema_paths["catalogue_output_schema"].name,
         build_manifest_schema=schema_paths["build_manifest_schema"].name,
-        candidate_root=candidate_root, validation_root=validation_root, final_root=final_root,
+        candidate_root=candidate_root,
+        validation_root=validation_root,
+        final_root=final_root,
         pages_root=pages_root,
-        target_parent=target_parent, publication_subdir=publication_subdir,
-        catalogue_path=catalogue_path, change_delta_path=delta_path, manifest_path=manifest_path,
-        candidate_inventory=inventory, candidate_manifest_files=manifest_files,
-        writer_lock=writer_lock, profiles=MappingProxyType(profiles),
-        repository=MappingProxyType(repository_values), issue_route=issue_route, input_roots=inputs,
+        target_parent=target_parent,
+        publication_subdir=publication_subdir,
+        catalogue_path=catalogue_path,
+        change_delta_path=delta_path,
+        manifest_path=manifest_path,
+        candidate_inventory=inventory,
+        candidate_manifest_files=manifest_files,
+        writer_lock=writer_lock,
+        profiles=MappingProxyType(profiles),
+        repository=MappingProxyType(repository_values),
+        issue_route=issue_route,
+        input_roots=inputs,
     )
 
 
 def _git(root: Path, *args: str, binary: bool = False) -> bytes | str:
-    result = subprocess.run(
-        ["git", *args], cwd=root, stdin=subprocess.DEVNULL,
-        capture_output=True, text=not binary, check=False,
-    )
-    if result.returncode:
-        raise BuildError("local Git command failed")
-    return result.stdout
+    try:
+        return local_git(root, *args, text=not binary)
+    except GitError as exc:
+        raise BuildError("local Git command failed during build") from exc
 
 
 def _strict_json_bytes(raw: bytes, label: str) -> dict[str, Any]:
@@ -232,8 +264,10 @@ def _strict_json_bytes(raw: bytes, label: str) -> dict[str, Any]:
 
     try:
         value = json.loads(
-            raw.decode("utf-8", "strict"), object_pairs_hook=pairs,
-            parse_float=reject_number, parse_constant=reject_number,
+            raw.decode("utf-8", "strict"),
+            object_pairs_hook=pairs,
+            parse_float=reject_number,
+            parse_constant=reject_number,
         )
     except BuildError:
         raise
@@ -260,6 +294,7 @@ def _strict_json_bytes(raw: bytes, label: str) -> dict[str, Any]:
                 domain(child)
         else:
             raise BuildError(f"{label} value is outside the canonical JSON domain")
+
     domain(value)
     return value
 
@@ -289,10 +324,17 @@ def _read_regular_nofollow(path: Path, *, limit: int, label: str) -> bytes:
             if total > limit:
                 raise BuildError(f"{label} exceeds {limit} bytes")
         after = os.fstat(descriptor)
-        identity = lambda value: (
-            value.st_dev, value.st_ino, value.st_mode, value.st_size,
-            value.st_mtime_ns, value.st_ctime_ns,
-        )
+
+        def identity(value):
+            return (
+                value.st_dev,
+                value.st_ino,
+                value.st_mode,
+                value.st_size,
+                value.st_mtime_ns,
+                value.st_ctime_ns,
+            )
+
         if identity(before) != identity(after):
             raise BuildError(f"{label} changed while it was read")
     finally:
@@ -324,7 +366,8 @@ def _computed_delta(
     deletions = [(status, path) for status, path in changes if status == "D"]
     offering_prefix = layout.offerings.as_posix() + "/"
     if (
-        len(additions) == 1 and len(deletions) == 1
+        len(additions) == 1
+        and len(deletions) == 1
         and additions[0][1].startswith(offering_prefix)
         and deletions[0][1].startswith(offering_prefix)
         and len(changes) == 2
@@ -336,21 +379,35 @@ def _computed_delta(
             raise BuildError("offering add/delete pair requires an explicit move delta")
         source = dict(match["source"])
         destination = dict(match["destination"])
-        source.update(operation="revoke", path=source_path, before=_blob_digest(root, base, source_path))
-        destination.update(operation="add", path=destination_path, after=_blob_digest(root, head, destination_path))
+        source.update(
+            operation="revoke", path=source_path, before=_blob_digest(root, base, source_path)
+        )
+        destination.update(
+            operation="add", path=destination_path, after=_blob_digest(root, head, destination_path)
+        )
         return [{"operation": "move", "source": source, "destination": destination}]
     result: list[dict[str, Any]] = []
     for status, path in changes:
         if status == "A":
-            result.append({"operation": "add", "path": path, "after": _blob_digest(root, head, path)})
+            result.append(
+                {"operation": "add", "path": path, "after": _blob_digest(root, head, path)}
+            )
         elif status == "M":
-            result.append({
-                "operation": "change", "path": path,
-                "before": _blob_digest(root, base, path), "after": _blob_digest(root, head, path),
-            })
+            result.append(
+                {
+                    "operation": "change",
+                    "path": path,
+                    "before": _blob_digest(root, base, path),
+                    "after": _blob_digest(root, head, path),
+                }
+            )
         else:
             match = next(
-                (item for item in expected if item.get("operation") == "revoke" and item.get("path") == path),
+                (
+                    item
+                    for item in expected
+                    if item.get("operation") == "revoke" and item.get("path") == path
+                ),
                 None,
             )
             if match is None:
@@ -365,7 +422,11 @@ def _registry_maps(root: Path, commit: str, layout: BuildLayout) -> dict[str, di
     result: dict[str, dict[str, Any]] = {}
     for kind, path, key in (
         ("vendor", (layout.governance / "vendors.yaml").as_posix(), "vendors"),
-        ("inference-service", (layout.governance / "inference-services.yaml").as_posix(), "inference_services"),
+        (
+            "inference-service",
+            (layout.governance / "inference-services.yaml").as_posix(),
+            "inference_services",
+        ),
     ):
         try:
             raw = _blob(root, commit, path)
@@ -381,16 +442,23 @@ def _registry_maps(root: Path, commit: str, layout: BuildLayout) -> dict[str, di
 
 
 def _metadata_semantics(
-    envelope: Mapping[str, Any], request: BuildRequest, computed: list[dict[str, Any]], layout: BuildLayout
+    envelope: Mapping[str, Any],
+    request: BuildRequest,
+    computed: list[dict[str, Any]],
+    layout: BuildLayout,
 ) -> None:
     repository = envelope["repository"]
     actual_repository = {
-        "adapter": layout.repository["adapter"], "host": layout.repository["host"],
-        "namespace": layout.repository["namespace"], "name": layout.repository["name"],
+        "adapter": layout.repository["adapter"],
+        "host": layout.repository["host"],
+        "namespace": layout.repository["namespace"],
+        "name": layout.repository["name"],
     }
     expected_repository = {
-        "adapter": repository["provider"], "host": repository["host"],
-        "namespace": repository["namespace"], "name": repository["name"],
+        "adapter": repository["provider"],
+        "host": repository["host"],
+        "namespace": repository["namespace"],
+        "name": repository["name"],
     }
     if actual_repository != expected_repository:
         raise BuildError("MAC metadata repository differs from modelo.yaml")
@@ -428,7 +496,9 @@ def _metadata_semantics(
     base_maps = _registry_maps(request.root, request.base_commit, layout)
     head_maps = _registry_maps(request.root, request.source_commit, layout)
     registry_subjects = [item for item in subjects if item["kind"] in registry_paths]
-    registry_delta = [item for item in expected_delta if item.get("path") in registry_paths.values()]
+    registry_delta = [
+        item for item in expected_delta if item.get("path") in registry_paths.values()
+    ]
     if registry_subjects or registry_delta:
         for kind, registry_path in registry_paths.items():
             claimed = {item["identity"] for item in registry_subjects if item["kind"] == kind}
@@ -443,7 +513,9 @@ def _metadata_semantics(
                     transitions[key] = "change"
             if claimed != set(transitions):
                 raise BuildError("MAC registry subjects differ from changed registry keys")
-            if "delete" in transitions.values() or any(value != operation for value in transitions.values()):
+            if "delete" in transitions.values() or any(
+                value != operation for value in transitions.values()
+            ):
                 raise BuildError("MAC registry transition differs from requested operation")
             matches = [item for item in registry_delta if item["path"] == registry_path]
             if bool(transitions) != (len(matches) == 1):
@@ -481,15 +553,27 @@ def _metadata_semantics(
         if kind == "offering":
             parts = relative_parts(path, layout.offerings)
             return (
-                parts is not None and len(parts) == 2 and parts[1] == f"{identity}.yaml"
-                and record.get("id") == identity and record.get("inference_service_id") == parts[0]
+                parts is not None
+                and len(parts) == 2
+                and parts[1] == f"{identity}.yaml"
+                and record.get("id") == identity
+                and record.get("inference_service_id") == parts[0]
             )
         if kind == "condition":
             parts = relative_parts(path, layout.conditions)
-            if parts is None or len(parts) != 2 or parts[0] != identity or not parts[1].endswith(".yaml"):
+            if (
+                parts is None
+                or len(parts) != 2
+                or parts[0] != identity
+                or not parts[1].endswith(".yaml")
+            ):
                 return False
             version = parts[1][:-5]
-            return version.isdigit() and record.get("id") == identity and str(record.get("version")) == version
+            return (
+                version.isdigit()
+                and record.get("id") == identity
+                and str(record.get("version")) == version
+            )
         return False
 
     ordinary_subjects = [item for item in subjects if item["kind"] not in registry_paths]
@@ -499,7 +583,9 @@ def _metadata_semantics(
         source = next(item for item in ordinary_subjects if item.get("role") == "source")
         destination = next(item for item in ordinary_subjects if item.get("role") == "destination")
         delta = expected_delta[0]
-        if not matches(source, delta["source"]["path"], "revoke") or not matches(destination, delta["destination"]["path"], "add"):
+        if not matches(source, delta["source"]["path"], "revoke") or not matches(
+            destination, delta["destination"]["path"], "add"
+        ):
             raise BuildError("move subjects differ from delta paths")
         if delta["source"].get("replacement") != delta["destination"]["path"]:
             raise BuildError("move replacement must equal its destination")
@@ -507,10 +593,14 @@ def _metadata_semantics(
         ordinary_delta = [item for item in expected_delta if item not in registry_delta]
         unmatched = list(ordinary_delta)
         for subject in ordinary_subjects:
-            match = next((
-                item for item in unmatched
-                if item["operation"] == operation and matches(subject, item["path"], operation)
-            ), None)
+            match = next(
+                (
+                    item
+                    for item in unmatched
+                    if item["operation"] == operation and matches(subject, item["path"], operation)
+                ),
+                None,
+            )
             if match is None:
                 raise BuildError("MAC subjects/operation differ from delta")
             unmatched.remove(match)
@@ -518,28 +608,50 @@ def _metadata_semantics(
             raise BuildError("MAC delta contains an unclaimed subject")
         if operation == "revoke":
             # ls-tree, not a diff, is the authoritative set at head.
-            output = _git(request.root, "ls-tree", "-r", "--name-only", request.source_commit, "--", layout.offerings.as_posix())
+            output = _git(
+                request.root,
+                "ls-tree",
+                "-r",
+                "--name-only",
+                request.source_commit,
+                "--",
+                layout.offerings.as_posix(),
+            )
             head_offerings = set(str(output).splitlines())
             for delta in ordinary_delta:
                 replacement = delta.get("replacement")
-                if replacement is not None and (replacement == delta["path"] or replacement not in head_offerings):
+                if replacement is not None and (
+                    replacement == delta["path"] or replacement not in head_offerings
+                ):
                     raise BuildError("revoke replacement is not a distinct current head offering")
 
 
 def _safe_url(base_url: str | None, base_path: str) -> None:
     path = PurePosixPath(base_path)
-    if not base_path.startswith("/") or not base_path.endswith("/") or "//" in base_path or "%" in base_path or any(part in {".", ".."} for part in path.parts):
+    if (
+        not base_path.startswith("/")
+        or not base_path.endswith("/")
+        or "//" in base_path
+        or "%" in base_path
+        or any(part in {".", ".."} for part in path.parts)
+    ):
         raise BuildError("base path is not canonical")
     if base_url is None:
         return
     try:
         parsed = urlsplit(base_url)
         valid = (
-            parsed.scheme == "https" and parsed.hostname is not None
-            and parsed.hostname == parsed.hostname.lower() and parsed.port is None
-            and parsed.username is None and parsed.password is None
-            and not parsed.query and not parsed.fragment and parsed.path == base_path
-            and "%" not in parsed.path and base_url.endswith("/")
+            parsed.scheme == "https"
+            and parsed.hostname is not None
+            and parsed.hostname == parsed.hostname.lower()
+            and parsed.port is None
+            and parsed.username is None
+            and parsed.password is None
+            and not parsed.query
+            and not parsed.fragment
+            and parsed.path == base_path
+            and "%" not in parsed.path
+            and base_url.endswith("/")
         )
     except ValueError:
         valid = False
@@ -547,7 +659,14 @@ def _safe_url(base_url: str | None, base_path: str) -> None:
         raise BuildError("base URL is not canonical HTTPS or differs from base path")
 
 
-def _projection_from_snapshot(snapshot: Path, profile: str, source_commit: str, source_tree: str, as_of: date, layout: BuildLayout) -> dict[str, Any]:
+def _projection_from_snapshot(
+    snapshot: Path,
+    profile: str,
+    source_commit: str,
+    source_tree: str,
+    as_of: date,
+    layout: BuildLayout,
+) -> dict[str, Any]:
     try:
         source = layout.profiles[profile]
     except KeyError as exc:
@@ -564,16 +683,26 @@ def _projection_from_snapshot(snapshot: Path, profile: str, source_commit: str, 
     state = _validate_state(snapshot, as_of)
     if state.diagnostics:
         first = state.diagnostics[0]
-        raise BuildError(f"selected publication projection is invalid: {first.code} {first.path}{first.json_pointer}")
+        raise BuildError(
+            f"selected publication projection is invalid: {first.code} {first.path}{first.json_pointer}"
+        )
     projection = catalogue_projection(
-        contract_version=CONTRACT_VERSION, source_commit=source_commit, source_tree=source_tree,
-        as_of=as_of.isoformat(), profile=profile, models=state.models.values(),
-        offerings=state.offerings.values(), evidence=state.evidence.values(),
-        conditions=state.conditions.values(), vendors={"vendors": state.vendors},
+        contract_version=CONTRACT_VERSION,
+        source_commit=source_commit,
+        source_tree=source_tree,
+        as_of=as_of.isoformat(),
+        profile=profile,
+        models=state.models.values(),
+        offerings=state.offerings.values(),
+        evidence=state.evidence.values(),
+        conditions=state.conditions.values(),
+        vendors={"vendors": state.vendors},
         inference_services={"inference_services": state.services},
         freshness={"classes_days": state.thresholds},
     )
-    findings = state.schemas.validate(layout.catalogue_output_schema, projection, layout.catalogue_path.as_posix())
+    findings = state.schemas.validate(
+        layout.catalogue_output_schema, projection, layout.catalogue_path.as_posix()
+    )
     if findings:
         raise BuildError(f"canonical projection violates its schema: {findings[0].message}")
     return projection
@@ -581,8 +710,10 @@ def _projection_from_snapshot(snapshot: Path, profile: str, source_commit: str, 
 
 def _fsync_dir(path: Path) -> None:
     descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-    try: os.fsync(descriptor)
-    finally: os.close(descriptor)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def _rename_noreplace(source: Path, destination: Path) -> None:
@@ -595,8 +726,11 @@ def _rename_noreplace(source: Path, destination: Path) -> None:
     if renameat2 is None:
         raise BuildError("platform cannot enforce collision-free atomic rename")
     result = renameat2(
-        ctypes.c_int(-100), ctypes.c_char_p(os.fsencode(source)),
-        ctypes.c_int(-100), ctypes.c_char_p(os.fsencode(destination)), ctypes.c_uint(1),
+        ctypes.c_int(-100),
+        ctypes.c_char_p(os.fsencode(source)),
+        ctypes.c_int(-100),
+        ctypes.c_char_p(os.fsencode(destination)),
+        ctypes.c_uint(1),
     )
     if result != 0:
         code = ctypes.get_errno()
@@ -606,9 +740,19 @@ def _rename_noreplace(source: Path, destination: Path) -> None:
 
 
 PHASES = (
-    "lock", "stage", "fsync_stage", "validate_stage", "backup_old",
-    "promote_new", "fsync_parent", "verify_target", "remove_backup", "unlock",
+    "lock",
+    "stage",
+    "fsync_stage",
+    "validate_stage",
+    "backup_old",
+    "promote_new",
+    "fsync_parent",
+    "verify_target",
+    "remove_backup",
+    "unlock",
 )
+
+
 class RecoveryOutcome(Enum):
     ROLLED_BACK = "rolled-back"
     COMMITTED = "committed"
@@ -627,19 +771,30 @@ def _inventory(files: Mapping[str, bytes]) -> dict[str, Any]:
 def _inventory_digest(files: Mapping[str, Mapping[str, Any]]) -> str:
     records = bytearray()
     for path in sorted(files, key=lambda value: value.encode("utf-8")):
-        records.extend(path.encode("utf-8")); records.extend(b"\0")
-        records.extend(files[path]["sha256"].encode("ascii")); records.extend(b"\0")
-        records.extend(str(files[path]["size"]).encode("ascii")); records.extend(b"\n")
+        records.extend(path.encode("utf-8"))
+        records.extend(b"\0")
+        records.extend(files[path]["sha256"].encode("ascii"))
+        records.extend(b"\0")
+        records.extend(str(files[path]["size"]).encode("ascii"))
+        records.extend(b"\n")
     return sha256_bytes(bytes(records))
 
 
 def _record(
-    phase: str, target: str, token: str,
-    old: Mapping[str, Any] | None, new: Mapping[str, Any],
+    phase: str,
+    target: str,
+    token: str,
+    old: Mapping[str, Any] | None,
+    new: Mapping[str, Any],
 ) -> dict[str, Any]:
     body = {
-        "version": 2, "sequence": PHASES.index(phase), "phase": phase,
-        "target": target, "token": token, "old": old, "new": new,
+        "version": 2,
+        "sequence": PHASES.index(phase),
+        "phase": phase,
+        "target": target,
+        "token": token,
+        "old": old,
+        "new": new,
     }
     body["record_digest"] = sha256_bytes(canonical_bytes(body))
     return body
@@ -648,13 +803,24 @@ def _record(
 def _safe_inventory_path(value: str) -> bool:
     path = PurePosixPath(value)
     return (
-        bool(value) and not path.is_absolute() and path.as_posix() == value
+        bool(value)
+        and not path.is_absolute()
+        and path.as_posix() == value
         and all(part not in {"", ".", ".."} for part in path.parts)
     )
 
 
 def _validate_record(value: Mapping[str, Any], layout: BuildLayout) -> dict[str, Any]:
-    expected_keys = {"version", "sequence", "phase", "target", "token", "old", "new", "record_digest"}
+    expected_keys = {
+        "version",
+        "sequence",
+        "phase",
+        "target",
+        "token",
+        "old",
+        "new",
+        "record_digest",
+    }
     if (
         set(value) != expected_keys
         or type(value.get("version")) is not int
@@ -664,18 +830,24 @@ def _validate_record(value: Mapping[str, Any], layout: BuildLayout) -> dict[str,
     phase = value.get("phase")
     sequence = value.get("sequence")
     if (
-        not isinstance(phase, str) or phase not in PHASES
-        or type(sequence) is not int or sequence != PHASES.index(phase)
+        not isinstance(phase, str)
+        or phase not in PHASES
+        or type(sequence) is not int
+        or sequence != PHASES.index(phase)
     ):
         raise BuildError("build recovery journal phase/sequence is invalid")
     token = value.get("token")
     if (
-        value.get("target") not in {
-            layout.candidate_root.name, layout.validation_root.name,
-            layout.final_root.name, layout.pages_root.name,
+        value.get("target")
+        not in {
+            layout.candidate_root.name,
+            layout.validation_root.name,
+            layout.final_root.name,
+            layout.pages_root.name,
         }
         or not isinstance(token, str)
-        or len(token) != 32 or any(character not in "0123456789abcdef" for character in token)
+        or len(token) != 32
+        or any(character not in "0123456789abcdef" for character in token)
     ):
         raise BuildError("build recovery journal contains unsafe paths")
     body = {key: value[key] for key in value if key != "record_digest"}
@@ -695,18 +867,29 @@ def _validate_record(value: Mapping[str, Any], layout: BuildLayout) -> dict[str,
         if (
             not isinstance(files, dict)
             or (candidate and set(files) != expected_paths)
-            or (not candidate and (
-                not files or len(files) > 10_000
-                or (layout.publication_subdir / layout.manifest_path).as_posix() not in files
-                or any(not isinstance(path, str) or not _safe_inventory_path(path) for path in files)
-            ))
+            or (
+                not candidate
+                and (
+                    not files
+                    or len(files) > 10_000
+                    or (layout.publication_subdir / layout.manifest_path).as_posix() not in files
+                    or any(
+                        not isinstance(path, str) or not _safe_inventory_path(path)
+                        for path in files
+                    )
+                )
+            )
         ):
             raise BuildError("build recovery journal inventory paths are invalid")
         for item in files.values():
             if (
-                not isinstance(item, dict) or set(item) != {"sha256", "size"}
-                or not isinstance(item["size"], int) or isinstance(item["size"], bool) or item["size"] < 0
-                or not isinstance(item["sha256"], str) or len(item["sha256"]) != 71
+                not isinstance(item, dict)
+                or set(item) != {"sha256", "size"}
+                or not isinstance(item["size"], int)
+                or isinstance(item["size"], bool)
+                or item["size"] < 0
+                or not isinstance(item["sha256"], str)
+                or len(item["sha256"]) != 71
                 or not item["sha256"].startswith("sha256:")
                 or any(character not in "0123456789abcdef" for character in item["sha256"][7:])
             ):
@@ -725,11 +908,19 @@ def _write_all(descriptor: int, raw: bytes) -> None:
         offset += written
 
 
-def _persist_journal(parent: Path, lock: Path, value: Mapping[str, Any], *, initial: bool = False) -> None:
+def _persist_journal(
+    parent: Path, lock: Path, value: Mapping[str, Any], *, initial: bool = False
+) -> None:
     raw = canonical_bytes(dict(value))
     if len(raw) > 32_768:
         raise BuildError("build journal exceeds its bound")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = (
+        os.O_WRONLY
+        | os.O_CREAT
+        | os.O_EXCL
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
     path = lock if initial else parent / f".{lock.name}.{value['token']}.{value['sequence']}.tmp"
     descriptor = os.open(path, flags, 0o600)
     try:
@@ -743,7 +934,10 @@ def _persist_journal(parent: Path, lock: Path, value: Mapping[str, Any], *, init
 
 
 def _reject_journal_temporaries(
-    parent: Path, lock: Path, journal: Mapping[str, Any], lock_raw: bytes,
+    parent: Path,
+    lock: Path,
+    journal: Mapping[str, Any],
+    lock_raw: bytes,
 ) -> None:
     """Fail closed for every token-shaped journal temporary.
 
@@ -806,7 +1000,9 @@ def _candidate_inventory(root: Path, target: Path, layout: BuildLayout) -> dict[
     catalogue = _strict_json_bytes(raw[catalogue_relative], "candidate catalogue")
     if canonical_bytes(catalogue) != raw[catalogue_relative]:
         raise BuildError("candidate catalogue is not canonical")
-    findings = schemas.validate(layout.catalogue_output_schema, catalogue, layout.catalogue_path.as_posix())
+    findings = schemas.validate(
+        layout.catalogue_output_schema, catalogue, layout.catalogue_path.as_posix()
+    )
     if findings:
         raise BuildError("candidate catalogue violates its configured schema")
     try:
@@ -853,11 +1049,13 @@ def _publication_inventory(root: Path, target: Path, layout: BuildLayout) -> dic
         raise BuildError(f"{expected_kind} manifest is not canonical {expected_kind} metadata")
     files = {
         PurePosixPath(path).relative_to(layout.publication_subdir).as_posix(): data
-        for path, data in raw.items() if path != manifest_path
+        for path, data in raw.items()
+        if path != manifest_path
     }
     recorded = manifest.get("files")
     file_entries_match = (
-        isinstance(recorded, dict) and set(recorded) == set(files)
+        isinstance(recorded, dict)
+        and set(recorded) == set(files)
         and all(
             isinstance(recorded[path], dict)
             and recorded[path].get("sha256") == sha256_bytes(data)
@@ -876,7 +1074,9 @@ def _publication_inventory(root: Path, target: Path, layout: BuildLayout) -> dic
     return _inventory(raw)
 
 
-def _matches_inventory(root: Path, target: Path, layout: BuildLayout, expected: Mapping[str, Any]) -> bool:
+def _matches_inventory(
+    root: Path, target: Path, layout: BuildLayout, expected: Mapping[str, Any]
+) -> bool:
     try:
         return _publication_inventory(root, target, layout) == expected
     except (BuildError, OSError, RecursionError):
@@ -889,7 +1089,10 @@ def _verified_subset(target: Path, expected: Mapping[str, Any]) -> bool:
         raw = _walk_regular_tree(target)
         files = expected["files"]
         for path, data in raw.items():
-            if path not in files or files[path] != {"sha256": sha256_bytes(data), "size": len(data)}:
+            if path not in files or files[path] != {
+                "sha256": sha256_bytes(data),
+                "size": len(data),
+            }:
                 return False
         return True
     except (BuildError, OSError, RecursionError):
@@ -901,11 +1104,15 @@ def _remove_verified_tree(target: Path, expected: Mapping[str, Any]) -> None:
         return
     if not _verified_subset(target, expected):
         raise BuildError("refusing to remove an unrecorded or unsafe candidate tree")
-    raw_paths = sorted(_walk_regular_tree(target), key=lambda item: (item.count("/"), item), reverse=True)
+    raw_paths = sorted(
+        _walk_regular_tree(target), key=lambda item: (item.count("/"), item), reverse=True
+    )
     for relative in raw_paths:
         (target / PurePosixPath(relative)).unlink()
     directories = sorted(
-        (path for path in target.rglob("*") if path.is_dir()), key=lambda path: len(path.parts), reverse=True
+        (path for path in target.rglob("*") if path.is_dir()),
+        key=lambda path: len(path.parts),
+        reverse=True,
     )
     for directory in directories:
         directory.rmdir()
@@ -928,7 +1135,9 @@ def _remove_owned_partial_staging(target: Path, expected: Mapping[str, Any]) -> 
     for relative in sorted(_walk_regular_tree(target), reverse=True):
         (target / PurePosixPath(relative)).unlink()
     for directory in sorted(
-        (path for path in target.rglob("*") if path.is_dir()), key=lambda path: len(path.parts), reverse=True
+        (path for path in target.rglob("*") if path.is_dir()),
+        key=lambda path: len(path.parts),
+        reverse=True,
     ):
         directory.rmdir()
     target.rmdir()
@@ -958,12 +1167,8 @@ def _recover_candidate(root: Path) -> RecoveryOutcome | None:
             raise BuildError("build recovery target parent traverses a symlink")
     if not lock.exists() and not lock.is_symlink():
         return None
-    lock_raw = _read_regular_nofollow(
-        lock, limit=32_768, label="build recovery journal"
-    )
-    journal = _validate_record(
-        _strict_json_bytes(lock_raw, "build recovery journal"), layout
-    )
+    lock_raw = _read_regular_nofollow(lock, limit=32_768, label="build recovery journal")
+    journal = _validate_record(_strict_json_bytes(lock_raw, "build recovery journal"), layout)
     token = journal["token"]
     _reject_journal_temporaries(parent, lock, journal, lock_raw)
     selected = {
@@ -976,13 +1181,19 @@ def _recover_candidate(root: Path) -> RecoveryOutcome | None:
     staging = parent / f"{target.name}.{token}.staging"
     backup = parent / f"{target.name}.{token}.backup"
     old, new, phase = journal["old"], journal["new"], journal["phase"]
-    present = lambda path: path.exists() or path.is_symlink()
+
+    def present(path):
+        return path.exists() or path.is_symlink()
+
     p_target, p_stage, p_backup = present(target), present(staging), present(backup)
-    target_old = old is not None and p_target and _matches_inventory(repository, target, layout, old)
+    target_old = (
+        old is not None and p_target and _matches_inventory(repository, target, layout, old)
+    )
     target_new = p_target and _matches_inventory(repository, target, layout, new)
-    backup_old = old is not None and p_backup and _matches_inventory(repository, backup, layout, old)
+    backup_old = (
+        old is not None and p_backup and _matches_inventory(repository, backup, layout, old)
+    )
     backup_subset = old is not None and p_backup and _verified_subset(backup, old)
-    staging_new = p_stage and _matches_inventory(repository, staging, layout, new)
     staging_subset = p_stage and _verified_subset(staging, new)
     staging_partial = p_stage and _owned_partial_staging(staging, new)
 
@@ -1018,15 +1229,13 @@ def _recover_candidate(root: Path) -> RecoveryOutcome | None:
     elif phase in {"fsync_stage", "validate_stage"}:
         valid = base_target and not p_backup and (not p_stage or staging_subset)
     elif phase == "backup_old":
-        valid = (
-            (base_target and not p_backup and (not p_stage or staging_subset))
-            or (old is not None and not p_target and backup_old and staging_subset)
+        valid = (base_target and not p_backup and (not p_stage or staging_subset)) or (
+            old is not None and not p_target and backup_old and staging_subset
         )
     elif phase in {"promote_new", "fsync_parent", "verify_target"}:
         if old is None:
-            valid = (
-                (not p_target and not p_backup and (not p_stage or staging_subset))
-                or (target_new and not p_stage and not p_backup)
+            valid = (not p_target and not p_backup and (not p_stage or staging_subset)) or (
+                target_new and not p_stage and not p_backup
             )
         else:
             valid = (
@@ -1067,15 +1276,24 @@ def _recover_candidate(root: Path) -> RecoveryOutcome | None:
     return finish(RecoveryOutcome.ROLLED_BACK)
 
 
-def _publish(root: Path, output: Path, files: Mapping[str, bytes], manifest: Mapping[str, Any], layout: BuildLayout) -> None:
+def _publish(
+    root: Path,
+    output: Path,
+    files: Mapping[str, bytes],
+    manifest: Mapping[str, Any],
+    layout: BuildLayout,
+) -> None:
     parent = output.parent
     parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     lock = root.joinpath(*layout.writer_lock.parts)
     manifest_bytes = canonical_bytes(dict(manifest))
     publication_files = {
-        (layout.publication_subdir / PurePosixPath(path)).as_posix(): data for path, data in files.items()
+        (layout.publication_subdir / PurePosixPath(path)).as_posix(): data
+        for path, data in files.items()
     }
-    publication_files[(layout.publication_subdir / layout.manifest_path).as_posix()] = manifest_bytes
+    publication_files[(layout.publication_subdir / layout.manifest_path).as_posix()] = (
+        manifest_bytes
+    )
     new_inventory = _inventory(publication_files)
     for _ in range(16):
         token = secrets.token_hex(16)
@@ -1112,16 +1330,28 @@ def _publish(root: Path, output: Path, files: Mapping[str, bytes], manifest: Map
         _persist_journal(parent, lock, journal)
         staging.mkdir(mode=0o755)
         for relative, data in files.items():
-            destination = staging.joinpath(*layout.publication_subdir.parts, *PurePosixPath(relative).parts)
+            destination = staging.joinpath(
+                *layout.publication_subdir.parts, *PurePosixPath(relative).parts
+            )
             destination.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
             with destination.open("xb") as stream:
-                stream.write(data); stream.flush(); os.fsync(stream.fileno())
-        manifest_path = staging.joinpath(*layout.publication_subdir.parts, *layout.manifest_path.parts)
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+        manifest_path = staging.joinpath(
+            *layout.publication_subdir.parts, *layout.manifest_path.parts
+        )
         with manifest_path.open("xb") as stream:
-            stream.write(manifest_bytes); stream.flush(); os.fsync(stream.fileno())
+            stream.write(manifest_bytes)
+            stream.flush()
+            os.fsync(stream.fileno())
         journal = _record("fsync_stage", output.name, token, old_inventory, new_inventory)
         _persist_journal(parent, lock, journal)
-        for directory in sorted((path for path in staging.rglob("*") if path.is_dir()), key=lambda path: len(path.parts), reverse=True):
+        for directory in sorted(
+            (path for path in staging.rglob("*") if path.is_dir()),
+            key=lambda path: len(path.parts),
+            reverse=True,
+        ):
             _fsync_dir(directory)
         _fsync_dir(staging)
         journal = _record("validate_stage", output.name, token, old_inventory, new_inventory)
@@ -1174,8 +1404,13 @@ def build_candidate(request: BuildRequest) -> BuildResult:
     except (BuildError, ConfigError):
         raise
     except (
-        OSError, UnicodeError, RecursionError, subprocess.SubprocessError, GitError,
-        tarfile.TarError, ValueError,
+        OSError,
+        UnicodeError,
+        RecursionError,
+        subprocess.SubprocessError,
+        GitError,
+        tarfile.TarError,
+        ValueError,
     ) as exc:
         raise BuildError(f"build system error ({type(exc).__name__})") from exc
 
@@ -1201,7 +1436,8 @@ def _build_candidate(request: BuildRequest) -> BuildResult:
     except OSError as exc:
         raise BuildError(f"cannot resolve MAC metadata path: {exc}") from exc
     if (
-        metadata_resolved == output or output in metadata_resolved.parents
+        metadata_resolved == output
+        or output in metadata_resolved.parents
         or metadata_resolved in output.parents
     ):
         raise BuildError("candidate output may not overlap the MAC metadata input")
@@ -1236,7 +1472,8 @@ def _build_candidate(request: BuildRequest) -> BuildResult:
         raise BuildError(f"repository validation failed: {diagnostics[0].code}")
     envelope = _strict_json_file(request.mac_metadata)
     findings = with_snapshot(
-        root, head,
+        root,
+        head,
         lambda snapshot: SchemaSet(snapshot, layout.schemas).validate(
             layout.mac_metadata_schema, envelope, str(request.mac_metadata)
         ),
@@ -1247,24 +1484,40 @@ def _build_candidate(request: BuildRequest) -> BuildResult:
     computed = _computed_delta(root, base, head, expected, layout)
     _metadata_semantics(envelope, request, computed, layout)
     projection = with_snapshot(
-        root, head,
-        lambda snapshot: _projection_from_snapshot(snapshot, request.profile, head, actual_tree, request.as_of, layout),
+        root,
+        head,
+        lambda snapshot: _projection_from_snapshot(
+            snapshot, request.profile, head, actual_tree, request.as_of, layout
+        ),
     )
     catalogue_data = canonical_bytes(projection)
     delta_data = change_delta_bytes(expected)
-    files = {layout.catalogue_path.as_posix(): catalogue_data, layout.change_delta_path.as_posix(): delta_data}
+    files = {
+        layout.catalogue_path.as_posix(): catalogue_data,
+        layout.change_delta_path.as_posix(): delta_data,
+    }
     manifest = {
-        "contract_version": CONTRACT_VERSION, "kind": "candidate", "base_commit": base, "source_commit": head,
-        "source_tree": actual_tree, "as_of": request.as_of.isoformat(),
-        "source_date_epoch": request.source_date_epoch, "profile": request.profile,
-        "base_url": request.base_url, "base_path": request.base_path,
-        "promotion_durability": "fsync-durable", "catalogue_path": layout.catalogue_path.as_posix(),
-        "change_delta_path": layout.change_delta_path.as_posix(), "manifest_path": layout.manifest_path.as_posix(),
-        "digest_algorithm": "sha256", "publication_digest": publication_digest(files),
+        "contract_version": CONTRACT_VERSION,
+        "kind": "candidate",
+        "base_commit": base,
+        "source_commit": head,
+        "source_tree": actual_tree,
+        "as_of": request.as_of.isoformat(),
+        "source_date_epoch": request.source_date_epoch,
+        "profile": request.profile,
+        "base_url": request.base_url,
+        "base_path": request.base_path,
+        "promotion_durability": "fsync-durable",
+        "catalogue_path": layout.catalogue_path.as_posix(),
+        "change_delta_path": layout.change_delta_path.as_posix(),
+        "manifest_path": layout.manifest_path.as_posix(),
+        "digest_algorithm": "sha256",
+        "publication_digest": publication_digest(files),
         "files": manifest_entries(files),
     }
     findings = with_snapshot(
-        root, head,
+        root,
+        head,
         lambda snapshot: SchemaSet(snapshot, layout.schemas).validate(
             layout.build_manifest_schema, manifest, layout.manifest_path.as_posix()
         ),
@@ -1274,8 +1527,14 @@ def _build_candidate(request: BuildRequest) -> BuildResult:
     _publish(root, output, files, manifest, layout)
     manifest_data = canonical_bytes(manifest)
     return BuildResult(
-        catalogue_data, delta_data, manifest_data, sha256_bytes(catalogue_data),
-        sha256_bytes(delta_data), sha256_bytes(manifest_data), manifest["publication_digest"], output,
+        catalogue_data,
+        delta_data,
+        manifest_data,
+        sha256_bytes(catalogue_data),
+        sha256_bytes(delta_data),
+        sha256_bytes(manifest_data),
+        manifest["publication_digest"],
+        output,
     )
 
 
@@ -1314,7 +1573,8 @@ def rebuild_candidate_inputs(request: BuildRequest) -> tuple[bytes, bytes, dict[
         raise BuildError(f"repository validation failed: {diagnostics[0].code}")
     envelope = _strict_json_file(request.mac_metadata)
     findings = with_snapshot(
-        root, head,
+        root,
+        head,
         lambda snapshot: SchemaSet(snapshot, layout.schemas).validate(
             layout.mac_metadata_schema, envelope, str(request.mac_metadata)
         ),
@@ -1325,7 +1585,8 @@ def rebuild_candidate_inputs(request: BuildRequest) -> tuple[bytes, bytes, dict[
     computed = _computed_delta(root, base, head, expected, layout)
     _metadata_semantics(envelope, request, computed, layout)
     projection = with_snapshot(
-        root, head,
+        root,
+        head,
         lambda snapshot: _projection_from_snapshot(
             snapshot, request.profile, head, actual_tree, request.as_of, layout
         ),

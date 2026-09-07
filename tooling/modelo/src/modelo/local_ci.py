@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
-import subprocess
-import sys
 from typing import Sequence
 
 from modelo.change import GitError, _git, require_ancestor, resolve_commit
@@ -30,7 +30,9 @@ def classify_change_mode(paths: Sequence[str]) -> ChangeMode:
     if not paths:
         raise LocalCIError("no changed paths")
     if any(
-        not path or "\x00" in path or PurePosixPath(path).is_absolute()
+        not path
+        or "\x00" in path
+        or PurePosixPath(path).is_absolute()
         or any(part in {"", ".", ".."} for part in PurePosixPath(path).parts)
         for path in paths
     ):
@@ -49,7 +51,13 @@ def repository_change_mode(root: Path, base: str, head: str) -> ChangeMode:
         resolved_head = resolve_commit(root, head)
         require_ancestor(root, resolved_base, resolved_head)
         raw = _git(
-            root, "diff", "--name-only", "-z", resolved_base, resolved_head, "--",
+            root,
+            "diff",
+            "--name-only",
+            "-z",
+            resolved_base,
+            resolved_head,
+            "--",
             text=False,
         )
     except GitError as exc:
@@ -83,14 +91,15 @@ def verification_shards(root: Path, jobs: int) -> tuple[tuple[str, ...], ...]:
     if jobs == 1:
         return (files,)
     heavy = [
-        path for path in ("tests/site/test_site.py", "tests/unit/test_build.py")
-        if path in files
+        path for path in ("tests/site/test_site.py", "tests/unit/test_build.py") if path in files
     ]
     if jobs == 2 and heavy:
         groups = [(heavy[0],), tuple(path for path in files if path != heavy[0])]
     elif jobs == 3 and len(heavy) == 2:
         groups = [
-            (heavy[0],), (heavy[1],), tuple(path for path in files if path not in heavy),
+            (heavy[0],),
+            (heavy[1],),
+            tuple(path for path in files if path not in heavy),
         ]
     else:
         groups = [tuple(files[index::jobs]) for index in range(jobs)]
@@ -100,10 +109,15 @@ def verification_shards(root: Path, jobs: int) -> tuple[tuple[str, ...], ...]:
 def _run(arguments: Sequence[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
     try:
         result = subprocess.run(
-            list(arguments), cwd=cwd, text=True, capture_output=True,
-            stdin=subprocess.DEVNULL, check=False,
+            list(arguments),
+            cwd=cwd,
+            text=True,
+            capture_output=True,
+            stdin=subprocess.DEVNULL,
+            timeout=1200,
+            check=False,
         )
-    except OSError as exc:
+    except (OSError, subprocess.TimeoutExpired) as exc:
         raise LocalCIError(f"cannot execute verification command: {exc}") from exc
     return result
 
@@ -127,7 +141,18 @@ def verify(root: Path, jobs: int) -> None:
 
     def test(shard: tuple[str, ...]) -> subprocess.CompletedProcess[str]:
         return _run(
-            ("uv", "run", "--project", str(root), "--locked", "python", "-m", "pytest", "-q", *shard),
+            (
+                "uv",
+                "run",
+                "--project",
+                str(root),
+                "--locked",
+                "python",
+                "-m",
+                "pytest",
+                "-q",
+                *shard,
+            ),
             cwd=root,
         )
 
@@ -172,6 +197,8 @@ def _parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
     classify = commands.add_parser("classify", help="classify the code/data change boundary")
     verify_command = commands.add_parser("verify", help="run the fixed test and package gates")
+    lint = commands.add_parser("lint", help="run locked lint and the required UBS scan")
+    lint.add_argument("--root", type=Path, default=Path.cwd())
     local = commands.add_parser("run", help="run a non-accepting local preflight")
     for command in (classify, local):
         command.add_argument("--root", type=Path, default=Path.cwd())
@@ -189,15 +216,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if arguments.command == "classify":
             print(repository_change_mode(arguments.root, arguments.base, arguments.head).value)
+        elif arguments.command == "lint":
+            from modelo.quality import check
+
+            check(arguments.root)
         elif arguments.command == "verify":
             verify(arguments.root, arguments.jobs)
         else:
             advisory_run(
-                arguments.root, arguments.base, arguments.head,
-                arguments.as_of, arguments.jobs,
+                arguments.root,
+                arguments.base,
+                arguments.head,
+                arguments.as_of,
+                arguments.jobs,
             )
         return 0
-    except LocalCIError as exc:
+    except (LocalCIError, ValueError, subprocess.SubprocessError, OSError) as exc:
         print(f"modelo-local-ci: {exc}", file=sys.stderr)
         return 2
 

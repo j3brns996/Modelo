@@ -97,7 +97,7 @@ Do not merge catalogue data until the next implementation slice supplies:
 
 The second independent review wave added four launch-blocking contracts that
 were absent here: `docs/site-contract.md`, `docs/mac-contract.md`,
-`docs/security-contract.md` and `docs/implementation-plan.md`. They define the
+`docs/security-contract.md` and `docs/IMPLEMENTATION-PLAN.MD`. They define the
 actual templates and routes, neutral MAC hashes, CI trust/approval boundary,
 locked Python/`uv` build, task graph and verification gates. `npx` and Agent
 Skills are not build inputs. Agent approval is data-only; control-plane changes

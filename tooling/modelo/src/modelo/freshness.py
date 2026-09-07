@@ -47,15 +47,25 @@ def validate_freshness(
             continue
         age = (as_of - observed).days
         if age < 0:
-            diagnostics.append(Diagnostic(
-                "EVIDENCE_FUTURE", Severity.ERROR, path, fact.pointer,
-                "evidence observation is in the future relative to as-of",
-                "Use evidence observed no later than the explicit as-of date.",
-            ))
+            diagnostics.append(
+                Diagnostic(
+                    "EVIDENCE_FUTURE",
+                    Severity.ERROR,
+                    path,
+                    fact.pointer,
+                    "evidence observation is in the future relative to as-of",
+                    "Use evidence observed no later than the explicit as-of date.",
+                )
+            )
         elif age > thresholds[fact.freshness_class]:
-            diagnostics.append(Diagnostic(
-                "EVIDENCE_STALE", Severity.ERROR, path, fact.pointer,
-                f"evidence is {age} calendar days old; maximum is {thresholds[fact.freshness_class]}",
-                "Refresh the evidence and migrate the fact reference through MAC review.",
-            ))
+            diagnostics.append(
+                Diagnostic(
+                    "EVIDENCE_STALE",
+                    Severity.ERROR,
+                    path,
+                    fact.pointer,
+                    f"evidence is {age} calendar days old; maximum is {thresholds[fact.freshness_class]}",
+                    "Refresh the evidence and migrate the fact reference through MAC review.",
+                )
+            )
     return tuple(diagnostics)

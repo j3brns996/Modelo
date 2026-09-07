@@ -2,29 +2,36 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path, PurePosixPath
-import re
 from typing import Any, Mapping
 
-from modelo.change import GitError, changed_paths, require_ancestor, resolve_commit, validate_changes, validate_condition_history, with_snapshot
+from modelo.change import (
+    GitError,
+    changed_paths,
+    require_ancestor,
+    resolve_commit,
+    validate_changes,
+    validate_condition_history,
+    validate_reserved_identity_history,
+    with_snapshot,
+)
 from modelo.config import ConfigError, ModeloConfig, load_config
 from modelo.diagnostics import Diagnostic, Severity, sort_diagnostics
 from modelo.discovery import DiscoveryError, discover_yaml_files
 from modelo.evidence import (
     canonical_json,
-    evidence_id,
     external_facts,
     resolve_pointer,
     validate_content_addresses,
     validate_evidence_links,
 )
 from modelo.freshness import validate_freshness
+from modelo.identity import BOUND_STATUSES, canonical_urn, has_provider_claim, release_precision
 from modelo.loader import LoadError, load_yaml_mapping
 from modelo.schemas import SchemaSet
-from modelo.identity import BOUND_STATUSES, canonical_urn, has_provider_claim, release_precision
-from modelo.change import validate_reserved_identity_history
 
 
 class CheckSystemError(Exception):
@@ -77,7 +84,9 @@ def _discover(state: State, key: str) -> tuple[PurePosixPath, ...]:
         # therefore the canonical representation of an empty governed set.
         return ()
     try:
-        return discover_yaml_files(state.config.root, state.config.paths[key], allow_documents=key == "catalogue")
+        return discover_yaml_files(
+            state.config.root, state.config.paths[key], allow_documents=key == "catalogue"
+        )
     except DiscoveryError as exc:
         state.diagnostics.append(exc.diagnostic)
         return ()
@@ -91,10 +100,15 @@ def _relative_parts(path: PurePosixPath, root: PurePosixPath) -> tuple[str, ...]
 
 
 def _identity_mismatch(state: State, path: str, pointer: str, message: str) -> None:
-    state.diagnostics.append(_diag(
-        "PATH_IDENTITY_MISMATCH", path, pointer, message,
-        "Make the governed path and internal identity exactly agree.",
-    ))
+    state.diagnostics.append(
+        _diag(
+            "PATH_IDENTITY_MISMATCH",
+            path,
+            pointer,
+            message,
+            "Make the governed path and internal identity exactly agree.",
+        )
+    )
 
 
 def _load_state(root: Path) -> State:
@@ -124,12 +138,22 @@ def _load_state(root: Path) -> State:
             state.vendors = dict(document["vendors"])  # type: ignore[arg-type]
             for key, record in state.vendors.items():
                 if record.get("id") != key:
-                    _identity_mismatch(state, path.as_posix(), f"/vendors/{key}/id", "vendor id differs from its registry key")
+                    _identity_mismatch(
+                        state,
+                        path.as_posix(),
+                        f"/vendors/{key}/id",
+                        "vendor id differs from its registry key",
+                    )
         elif schema_name == "inference-services-registry.schema.json":
             state.services = dict(document["inference_services"])  # type: ignore[arg-type]
             for key, record in state.services.items():
                 if record.get("id") != key:
-                    _identity_mismatch(state, path.as_posix(), f"/inference_services/{key}/id", "inference-service id differs from its registry key")
+                    _identity_mismatch(
+                        state,
+                        path.as_posix(),
+                        f"/inference_services/{key}/id",
+                        "inference-service id differs from its registry key",
+                    )
         else:
             state.thresholds = dict(document["classes_days"])  # type: ignore[arg-type]
 
@@ -140,7 +164,9 @@ def _load_state(root: Path) -> State:
         parts = _relative_parts(path, config.paths["models"])
         identifier = document["id"]
         if len(parts) != 1 or parts[0] != f"{identifier}.yaml":
-            _identity_mismatch(state, path.as_posix(), "/id", "model id differs from its configured filename")
+            _identity_mismatch(
+                state, path.as_posix(), "/id", "model id differs from its configured filename"
+            )
         if identifier in state.models:
             _identity_mismatch(state, path.as_posix(), "/id", "model identity is duplicated")
         state.models[str(identifier)] = document
@@ -148,13 +174,20 @@ def _load_state(root: Path) -> State:
 
     for path in _discover(state, "offerings"):
         document = _load(state, path)
-        if document is None or not _schema(state, "offering.schema.json", document, path.as_posix()):
+        if document is None or not _schema(
+            state, "offering.schema.json", document, path.as_posix()
+        ):
             continue
         parts = _relative_parts(path, config.paths["offerings"])
         identifier = str(document["id"])
         service = str(document["inference_service_id"])
         if len(parts) != 2 or parts != (service, f"{identifier}.yaml"):
-            _identity_mismatch(state, path.as_posix(), "/id", "offering identity or inference service differs from its path")
+            _identity_mismatch(
+                state,
+                path.as_posix(),
+                "/id",
+                "offering identity or inference service differs from its path",
+            )
         if identifier in state.offerings:
             _identity_mismatch(state, path.as_posix(), "/id", "offering identity is duplicated")
         state.offerings[identifier] = document
@@ -162,30 +195,50 @@ def _load_state(root: Path) -> State:
 
     for path in _discover(state, "evidence"):
         document = _load(state, path)
-        if document is None or not _schema(state, "evidence.schema.json", document, path.as_posix()):
+        if document is None or not _schema(
+            state, "evidence.schema.json", document, path.as_posix()
+        ):
             continue
         identifier = str(document["id"])
         parts = _relative_parts(path, config.paths["evidence"])
         if len(parts) != 1 or parts[0] != f"{identifier}.yaml":
-            _identity_mismatch(state, path.as_posix(), "/id", "evidence id differs from its configured filename")
+            _identity_mismatch(
+                state, path.as_posix(), "/id", "evidence id differs from its configured filename"
+            )
         state.evidence[identifier] = document
         state.evidence_paths[identifier] = path.as_posix()
 
     for path in _discover(state, "conditions"):
         document = _load(state, path)
-        if document is None or not _schema(state, "condition.schema.json", document, path.as_posix()):
+        if document is None or not _schema(
+            state, "condition.schema.json", document, path.as_posix()
+        ):
             continue
         identifier = str(document["id"])
         version = int(document["version"])
         parts = _relative_parts(path, config.paths["conditions"])
         if len(parts) != 2 or parts != (identifier, f"{version}.yaml"):
-            _identity_mismatch(state, path.as_posix(), "/id", "condition id/version differs from its path")
+            _identity_mismatch(
+                state, path.as_posix(), "/id", "condition id/version differs from its path"
+            )
         state.conditions[(identifier, version)] = document
     known_registries = set(required) | {config.paths["actors_registry"]}
-    entity_roots = tuple(config.paths[key] for key in ("models", "offerings", "evidence", "conditions"))
+    entity_roots = tuple(
+        config.paths[key] for key in ("models", "offerings", "evidence", "conditions")
+    )
     for path in _discover(state, "catalogue"):
-        if path not in known_registries and not any(path.is_relative_to(parent) for parent in entity_roots):
-            state.diagnostics.append(_diag("PATH_IDENTITY_MISMATCH", path.as_posix(), "", "file has no configured entity schema", "Move the record to its configured entity path; unknown catalogue files are not accepted."))
+        if path not in known_registries and not any(
+            path.is_relative_to(parent) for parent in entity_roots
+        ):
+            state.diagnostics.append(
+                _diag(
+                    "PATH_IDENTITY_MISMATCH",
+                    path.as_posix(),
+                    "",
+                    "file has no configured entity schema",
+                    "Move the record to its configured entity path; unknown catalogue files are not accepted.",
+                )
+            )
     return state
 
 
@@ -193,34 +246,103 @@ def _reference_checks(state: State) -> None:
     verified: dict[tuple[str, str], str] = {}
     for identifier, model in state.models.items():
         path = state.model_paths[identifier]
-        if model.get("canonical_urn", canonical_urn("model-release", identifier)) != canonical_urn("model-release", identifier):
-            state.diagnostics.append(_diag("PATH_IDENTITY_MISMATCH", path, "/canonical_urn", "canonical URN differs from internal identity", "Derive the URN from the unchanged internal ID."))
+        if model.get("canonical_urn", canonical_urn("model-release", identifier)) != canonical_urn(
+            "model-release", identifier
+        ):
+            state.diagnostics.append(
+                _diag(
+                    "PATH_IDENTITY_MISMATCH",
+                    path,
+                    "/canonical_urn",
+                    "canonical URN differs from internal identity",
+                    "Derive the URN from the unchanged internal ID.",
+                )
+            )
         if model.get("family_id") == identifier:
-            state.diagnostics.append(_diag("CHANGE_INVALID", path, "/family_id", "family grouping cannot be the release identity", "Use a distinct optional internal family grouping."))
+            state.diagnostics.append(
+                _diag(
+                    "CHANGE_INVALID",
+                    path,
+                    "/family_id",
+                    "family grouping cannot be the release identity",
+                    "Use a distinct optional internal family grouping.",
+                )
+            )
         supersedes = model.get("supersedes_model_id")
         if supersedes is not None and (supersedes == identifier or supersedes not in state.models):
-            state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, "/supersedes_model_id", "superseded release must be another retained Model", "Reference an existing different release."))
+            state.diagnostics.append(
+                _diag(
+                    "UNKNOWN_REFERENCE",
+                    path,
+                    "/supersedes_model_id",
+                    "superseded release must be another retained Model",
+                    "Reference an existing different release.",
+                )
+            )
         namespaces: dict[str, str] = {}
         claim_keys: set[tuple[str, str, str]] = set()
         for claim in model.get("identity_claims", []):
             claim_key = (claim["namespace"], claim["value"], claim["relation"])
             if claim_key in claim_keys:
-                state.diagnostics.append(_diag("CHANGE_INVALID", path, "/identity_claims", "duplicate identity claim tuple has no single status", "Keep one entry per namespace/value/relation and review its status explicitly."))
+                state.diagnostics.append(
+                    _diag(
+                        "CHANGE_INVALID",
+                        path,
+                        "/identity_claims",
+                        "duplicate identity claim tuple has no single status",
+                        "Keep one entry per namespace/value/relation and review its status explicitly.",
+                    )
+                )
             claim_keys.add(claim_key)
             if claim["status"] not in BOUND_STATUSES:
                 continue
             key = (claim["namespace"], claim["value"])
-            if (key in verified and verified[key] != identifier) or (claim["namespace"] in namespaces and namespaces[claim["namespace"]] != claim["value"]):
-                state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, "/identity_claims", "conflicting route-eligible external identity", "Resolve the conflict through evidenced independent review."))
+            if (key in verified and verified[key] != identifier) or (
+                claim["namespace"] in namespaces
+                and namespaces[claim["namespace"]] != claim["value"]
+            ):
+                state.diagnostics.append(
+                    _diag(
+                        "EVIDENCE_VALUE_MISMATCH",
+                        path,
+                        "/identity_claims",
+                        "conflicting route-eligible external identity",
+                        "Resolve the conflict through evidenced independent review.",
+                    )
+                )
             verified[key] = identifier
             namespaces[claim["namespace"]] = claim["value"]
         if model["vendor_id"] not in state.vendors:
-            state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, "/vendor_id", "model vendor does not exist", "Add or reference a governed vendor."))
+            state.diagnostics.append(
+                _diag(
+                    "UNKNOWN_REFERENCE",
+                    path,
+                    "/vendor_id",
+                    "model vendor does not exist",
+                    "Add or reference a governed vendor.",
+                )
+            )
         owner = model.get("rights_owner_vendor_id")
         if owner is not None and owner not in state.vendors:
-            state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, "/rights_owner_vendor_id", "model rights owner does not exist", "Reference a governed organisation; do not infer ownership from the producer name."))
+            state.diagnostics.append(
+                _diag(
+                    "UNKNOWN_REFERENCE",
+                    path,
+                    "/rights_owner_vendor_id",
+                    "model rights owner does not exist",
+                    "Reference a governed organisation; do not infer ownership from the producer name.",
+                )
+            )
         elif owner is not None and "legal_name" not in state.vendors[owner]:
-            state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, "/rights_owner_vendor_id", "model rights owner has no evidenced legal name", "Establish the legal entity before binding ownership."))
+            state.diagnostics.append(
+                _diag(
+                    "UNKNOWN_REFERENCE",
+                    path,
+                    "/rights_owner_vendor_id",
+                    "model rights owner has no evidenced legal name",
+                    "Establish the legal entity before binding ownership.",
+                )
+            )
     # Each release has at most one predecessor. Visit every edge once, without
     # recursion or a graph dependency, including chains longer than Python's stack.
     visited: set[str] = set()
@@ -229,9 +351,17 @@ def _reference_checks(state: State) -> None:
         current = start
         while current in state.models and current not in visited:
             if current in chain:
-                cycle = list(chain)[chain[current]:]
+                cycle = list(chain)[chain[current] :]
                 for identifier in cycle:
-                    state.diagnostics.append(_diag("CHANGE_INVALID", state.model_paths[identifier], "/supersedes_model_id", "model supersession contains a cycle", "Use an acyclic release history; supersession never transfers offering approval."))
+                    state.diagnostics.append(
+                        _diag(
+                            "CHANGE_INVALID",
+                            state.model_paths[identifier],
+                            "/supersedes_model_id",
+                            "model supersession contains a cycle",
+                            "Use an acyclic release history; supersession never transfers offering approval.",
+                        )
+                    )
                 break
             chain[current] = len(chain)
             current = state.models[current].get("supersedes_model_id")
@@ -240,27 +370,83 @@ def _reference_checks(state: State) -> None:
         operator = service.get("operator_vendor_id")
         if operator is not None and operator not in state.vendors:
             path = (state.config.paths["governance"] / "inference-services.yaml").as_posix()
-            state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, f"/inference_services/{identifier}/operator_vendor_id", "service operator does not exist", "Reference a governed organisation; an adapter name is not a legal entity."))
+            state.diagnostics.append(
+                _diag(
+                    "UNKNOWN_REFERENCE",
+                    path,
+                    f"/inference_services/{identifier}/operator_vendor_id",
+                    "service operator does not exist",
+                    "Reference a governed organisation; an adapter name is not a legal entity.",
+                )
+            )
         elif operator is not None and "legal_name" not in state.vendors[operator]:
             path = (state.config.paths["governance"] / "inference-services.yaml").as_posix()
-            state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, f"/inference_services/{identifier}/operator_vendor_id", "service operator has no evidenced legal name", "Establish the legal entity before binding the operator."))
+            state.diagnostics.append(
+                _diag(
+                    "UNKNOWN_REFERENCE",
+                    path,
+                    f"/inference_services/{identifier}/operator_vendor_id",
+                    "service operator has no evidenced legal name",
+                    "Establish the legal entity before binding the operator.",
+                )
+            )
     for identifier, offering in state.offerings.items():
         path = state.offering_paths[identifier]
         if offering["model_id"] not in state.models:
-            state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, "/model_id", "offering model does not exist", "Reference an existing canonical model."))
+            state.diagnostics.append(
+                _diag(
+                    "UNKNOWN_REFERENCE",
+                    path,
+                    "/model_id",
+                    "offering model does not exist",
+                    "Reference an existing canonical model.",
+                )
+            )
         if offering["inference_service_id"] not in state.services:
-            state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, "/inference_service_id", "offering inference service does not exist", "Reference a governed inference service."))
+            state.diagnostics.append(
+                _diag(
+                    "UNKNOWN_REFERENCE",
+                    path,
+                    "/inference_service_id",
+                    "offering inference service does not exist",
+                    "Reference a governed inference service.",
+                )
+            )
         route_ids = {route["id"] for route in offering["routes"]}
         if len(route_ids) != len(offering["routes"]):
-            state.diagnostics.append(_diag("PATH_IDENTITY_MISMATCH", path, "/routes", "route ids are not unique within the offering", "Give every route a stable unique internal id."))
+            state.diagnostics.append(
+                _diag(
+                    "PATH_IDENTITY_MISMATCH",
+                    path,
+                    "/routes",
+                    "route ids are not unique within the offering",
+                    "Give every route a stable unique internal id.",
+                )
+            )
         for index, price in enumerate(offering.get("pricing", [])):
             for route_id in price["route_ids"]:
                 if route_id not in route_ids:
-                    state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, f"/pricing/{index}/route_ids", "price references an unknown route", "Reference only a route in this offering."))
+                    state.diagnostics.append(
+                        _diag(
+                            "UNKNOWN_REFERENCE",
+                            path,
+                            f"/pricing/{index}/route_ids",
+                            "price references an unknown route",
+                            "Reference only a route in this offering.",
+                        )
+                    )
         for index, reference in enumerate(offering["condition_refs"]):
             key = (reference["id"], reference["version"])
             if key not in state.conditions:
-                state.diagnostics.append(_diag("UNKNOWN_REFERENCE", path, f"/condition_refs/{index}", "condition version does not exist", "Reference an existing immutable condition version."))
+                state.diagnostics.append(
+                    _diag(
+                        "UNKNOWN_REFERENCE",
+                        path,
+                        f"/condition_refs/{index}",
+                        "condition version does not exist",
+                        "Reference an existing immutable condition version.",
+                    )
+                )
 
 
 _AWS_ARN = re.compile(
@@ -292,44 +478,60 @@ def _aws_api_source(
     operation_label = " or ".join(operations)
     source = record.get("source")
     if not isinstance(source, Mapping) or source.get("type") != "first-party-read-api":
-        state.diagnostics.append(_diag(
-            "EVIDENCE_VALUE_MISMATCH", path, pointer,
-            "AWS route binding requires first-party read-API evidence",
-            f"Use AWS Bedrock {operation_label} evidence observed in {region}.",
-        ))
+        state.diagnostics.append(
+            _diag(
+                "EVIDENCE_VALUE_MISMATCH",
+                path,
+                pointer,
+                "AWS route binding requires first-party read-API evidence",
+                f"Use AWS Bedrock {operation_label} evidence observed in {region}.",
+            )
+        )
         return None
     expected = {
-        "provider": "aws", "service": "bedrock", "region": region,
+        "provider": "aws",
+        "service": "bedrock",
+        "region": region,
     }
     for field, value in expected.items():
         if source.get(field) != value:
-            state.diagnostics.append(_diag(
-                "EVIDENCE_VALUE_MISMATCH", path, pointer,
-                f"AWS route evidence {field} does not match its invocation binding",
-                f"Use {operation_label} evidence from AWS Bedrock in {region}.",
-            ))
+            state.diagnostics.append(
+                _diag(
+                    "EVIDENCE_VALUE_MISMATCH",
+                    path,
+                    pointer,
+                    f"AWS route evidence {field} does not match its invocation binding",
+                    f"Use {operation_label} evidence from AWS Bedrock in {region}.",
+                )
+            )
     if source.get("operation") not in operations:
-        state.diagnostics.append(_diag(
-            "EVIDENCE_VALUE_MISMATCH", path, pointer,
-            "AWS route evidence operation does not match its binding kind",
-            f"Use {operation_label} evidence from AWS Bedrock in {region}.",
-        ))
+        state.diagnostics.append(
+            _diag(
+                "EVIDENCE_VALUE_MISMATCH",
+                path,
+                pointer,
+                "AWS route evidence operation does not match its binding kind",
+                f"Use {operation_label} evidence from AWS Bedrock in {region}.",
+            )
+        )
     partition = source.get("partition")
     coherent = (
         (partition == "aws-cn" and region.startswith("cn-"))
         or (partition == "aws-us-gov" and region.startswith("us-gov-"))
         or (
-            partition == "aws"
-            and not region.startswith("cn-")
-            and not region.startswith("us-gov-")
+            partition == "aws" and not region.startswith("cn-") and not region.startswith("us-gov-")
         )
     )
     if not coherent:
-        state.diagnostics.append(_diag(
-            "EVIDENCE_VALUE_MISMATCH", path, pointer,
-            "AWS partition and Region are incoherent",
-            "Use aws-cn with cn-*, aws-us-gov with us-gov-*, and aws for other Regions.",
-        ))
+        state.diagnostics.append(
+            _diag(
+                "EVIDENCE_VALUE_MISMATCH",
+                path,
+                pointer,
+                "AWS partition and Region are incoherent",
+                "Use aws-cn with cn-*, aws-us-gov with us-gov-*, and aws for other Regions.",
+            )
+        )
     return source
 
 
@@ -346,34 +548,58 @@ def _aws_arn_matches_source(
     scope = _aws_arn_scope(value)
     if scope is None:
         if required:
-            state.diagnostics.append(_diag(
-                "EVIDENCE_VALUE_MISMATCH", path, pointer,
-                "AWS evidence value is not a canonical supported ARN",
-                f"Use a canonical AWS-owned Bedrock {resource} ARN.",
-            ))
+            state.diagnostics.append(
+                _diag(
+                    "EVIDENCE_VALUE_MISMATCH",
+                    path,
+                    pointer,
+                    "AWS evidence value is not a canonical supported ARN",
+                    f"Use a canonical AWS-owned Bedrock {resource} ARN.",
+                )
+            )
         return
     if source is None:
         return
     partition, region, kind = scope
     if kind != resource or partition != source.get("partition") or region != source.get("region"):
-        state.diagnostics.append(_diag(
-            "EVIDENCE_VALUE_MISMATCH", path, pointer,
-            "AWS ARN partition, Region or resource type differs from its evidence source",
-            "Use an ARN whose partition, Region and resource type match the bound API evidence.",
-        ))
+        state.diagnostics.append(
+            _diag(
+                "EVIDENCE_VALUE_MISMATCH",
+                path,
+                pointer,
+                "AWS ARN partition, Region or resource type differs from its evidence source",
+                "Use an ARN whose partition, Region and resource type match the bound API evidence.",
+            )
+        )
 
 
 def _model_evidence(
-    state: State, path: str, binding_pointer: str, binding: Mapping[str, Any],
-    model: Mapping[str, Any] | None, *, expected_region: str | None = None,
+    state: State,
+    path: str,
+    binding_pointer: str,
+    binding: Mapping[str, Any],
+    model: Mapping[str, Any] | None,
+    *,
+    expected_region: str | None = None,
 ) -> None:
     identifier = binding.get("id")
     record = state.evidence.get(identifier) if isinstance(identifier, str) else None
     if record is None:
-        state.diagnostics.append(_diag("EVIDENCE_MISSING", path, binding_pointer, "AWS model binding evidence does not exist", "Reference an explicit evidence record."))
+        state.diagnostics.append(
+            _diag(
+                "EVIDENCE_MISSING",
+                path,
+                binding_pointer,
+                "AWS model binding evidence does not exist",
+                "Reference an explicit evidence record.",
+            )
+        )
         return
     source = _aws_api_source(
-        state, path, binding_pointer, record,
+        state,
+        path,
+        binding_pointer,
+        record,
         operations=("GetFoundationModel", "ListFoundationModels"),
         region=expected_region or str(record.get("source", {}).get("region", "")),
     )
@@ -384,13 +610,26 @@ def _model_evidence(
         try:
             resolve_pointer(record["projection"], projection_pointer)
         except (KeyError, IndexError, TypeError):
-            state.diagnostics.append(_diag("EVIDENCE_MISSING", path, binding_pointer, f"AWS {field} does not resolve", "Use an explicit pointer into the selected evidence projection."))
+            state.diagnostics.append(
+                _diag(
+                    "EVIDENCE_MISSING",
+                    path,
+                    binding_pointer,
+                    f"AWS {field} does not resolve",
+                    "Use an explicit pointer into the selected evidence projection.",
+                )
+            )
     try:
         model_arn = resolve_pointer(record["projection"], binding["arn_pointer"])
     except (KeyError, IndexError, TypeError):
         model_arn = None
     _aws_arn_matches_source(
-        state, path, binding_pointer, model_arn, source, resource="foundation-model",
+        state,
+        path,
+        binding_pointer,
+        model_arn,
+        source,
+        resource="foundation-model",
         required=True,
     )
     if model is None:
@@ -404,24 +643,53 @@ def _model_evidence(
             provider_id = model_arn.split("::foundation-model/", 1)[1]
     except (KeyError, IndexError, TypeError, AttributeError):
         provider_id = None
-    if provider_id is not None and isinstance(model_arn, str) and provider_id != model_arn.split("::foundation-model/", 1)[-1]:
-        state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, binding_pointer, "provider model ID differs from its evidenced ARN identity", "Bind ID and ARN from the same foundation-model observation."))
+    if (
+        provider_id is not None
+        and isinstance(model_arn, str)
+        and provider_id != model_arn.split("::foundation-model/", 1)[-1]
+    ):
+        state.diagnostics.append(
+            _diag(
+                "EVIDENCE_VALUE_MISMATCH",
+                path,
+                binding_pointer,
+                "provider model ID differs from its evidenced ARN identity",
+                "Bind ID and ARN from the same foundation-model observation.",
+            )
+        )
     if provider_id is None or not has_provider_claim(model, provider_id):
-        state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, binding_pointer, "provider model ID has no evidenced ModelRelease identity claim", "Bind the exact provider identifier to the Model; display names do not prove identity."))
+        state.diagnostics.append(
+            _diag(
+                "EVIDENCE_VALUE_MISMATCH",
+                path,
+                binding_pointer,
+                "provider model ID has no evidenced ModelRelease identity claim",
+                "Bind the exact provider identifier to the Model; display names do not prove identity.",
+            )
+        )
     vendor = state.vendors.get(model.get("vendor_id"))
-    comparisons = (("name_pointer", model.get("name")), ("provider_pointer", vendor.get("name") if vendor else None))
+    comparisons = (
+        ("name_pointer", model.get("name")),
+        ("provider_pointer", vendor.get("name") if vendor else None),
+    )
     for field, expected in comparisons:
         try:
             actual = resolve_pointer(record["projection"], binding[field])
         except (KeyError, IndexError, TypeError):
             continue
         if expected is not None and canonical_json(actual) != canonical_json(expected):
-            state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, binding_pointer, f"AWS {field} differs from governed identity", "Use evidence whose reported model and provider names exactly match governed records."))
+            state.diagnostics.append(
+                _diag(
+                    "EVIDENCE_VALUE_MISMATCH",
+                    path,
+                    binding_pointer,
+                    f"AWS {field} differs from governed identity",
+                    "Use evidence whose reported model and provider names exactly match governed records.",
+                )
+            )
 
 
-def _aws_offering_checks(
-    state: State, offering: Mapping[str, Any], path: str
-) -> None:
+def _aws_offering_checks(state: State, offering: Mapping[str, Any], path: str) -> None:
     model = state.models.get(offering["model_id"])
     semantic_routes: set[tuple[str, str, str]] = set()
     governance_scopes: set[tuple[str, str]] = set()
@@ -437,46 +705,91 @@ def _aws_offering_checks(
         # duplicate detection, rather than touching `route["source_region"]`
         # and crashing. Every other route in this offering is unaffected.
         if "source_region" not in route:
-            state.diagnostics.append(_diag(
-                "UNKNOWN_REFERENCE", path, route_pointer,
-                "route is not shaped for this offering's resolved aws-bedrock adapter",
-                "Use a route shaped for the aws-bedrock adapter, or resolve the offering to an inference service whose adapter matches this route's provider.",
-            ))
+            state.diagnostics.append(
+                _diag(
+                    "UNKNOWN_REFERENCE",
+                    path,
+                    route_pointer,
+                    "route is not shaped for this offering's resolved aws-bedrock adapter",
+                    "Use a route shaped for the aws-bedrock adapter, or resolve the offering to an inference service whose adapter matches this route's provider.",
+                )
+            )
             continue
         source_region = str(route["source_region"])
         binding = route["model_binding"]
         governance_scopes.add((source_region, str(binding["kind"])))
         if len(governance_scopes) > 1:
-            state.diagnostics.append(_diag("CHANGE_INVALID", path, route_pointer, "routes differ in material processing or source Region scope", "Use separate Offerings for distinct routing and residency decisions."))
-        expected_selector = "provider-model-id" if binding["kind"] == "foundation-model" else "inference-profile"
+            state.diagnostics.append(
+                _diag(
+                    "CHANGE_INVALID",
+                    path,
+                    route_pointer,
+                    "routes differ in material processing or source Region scope",
+                    "Use separate Offerings for distinct routing and residency decisions.",
+                )
+            )
+        expected_selector = (
+            "provider-model-id" if binding["kind"] == "foundation-model" else "inference-profile"
+        )
         if route.get("selector_type") != expected_selector:
-            state.diagnostics.append(_diag("CHANGE_INVALID", path, route_pointer + "/selector_type", "missing or unsupported selector classification", "Use provider-model-id or inference-profile; this adapter does not prove immutability or support floating aliases."))
+            state.diagnostics.append(
+                _diag(
+                    "CHANGE_INVALID",
+                    path,
+                    route_pointer + "/selector_type",
+                    "missing or unsupported selector classification",
+                    "Use provider-model-id or inference-profile; this adapter does not prove immutability or support floating aliases.",
+                )
+            )
         if model is not None and release_precision(model) in {"floating-name", "unresolved"}:
-            state.diagnostics.append(_diag("CHANGE_INVALID", path, "/model_id", "Offering cannot consume a floating or unresolved model identity", "Identify the named release before proposing consumption."))
+            state.diagnostics.append(
+                _diag(
+                    "CHANGE_INVALID",
+                    path,
+                    "/model_id",
+                    "Offering cannot consume a floating or unresolved model identity",
+                    "Identify the named release before proposing consumption.",
+                )
+            )
         semantic_key = (source_region, str(binding["kind"]), str(route["reference"]))
         if semantic_key in semantic_routes:
-            state.diagnostics.append(_diag(
-                "PATH_IDENTITY_MISMATCH", path, route_pointer,
-                "AWS route duplicates an existing invocation coordinate",
-                "Keep one route per source Region, binding kind and provider reference.",
-            ))
+            state.diagnostics.append(
+                _diag(
+                    "PATH_IDENTITY_MISMATCH",
+                    path,
+                    route_pointer,
+                    "AWS route duplicates an existing invocation coordinate",
+                    "Keep one route per source Region, binding kind and provider reference.",
+                )
+            )
         semantic_routes.add(semantic_key)
         if binding["kind"] == "foundation-model":
             evidence_binding = binding["model_evidence"]
             _model_evidence(
-                state, path, f"{route_pointer}/model_binding/model_evidence",
-                evidence_binding, model, expected_region=source_region,
+                state,
+                path,
+                f"{route_pointer}/model_binding/model_evidence",
+                evidence_binding,
+                model,
+                expected_region=source_region,
             )
             record = state.evidence.get(evidence_binding["id"])
             if record:
                 source = _aws_api_source(
-                    state, path, f"{route_pointer}/source_region", record,
+                    state,
+                    path,
+                    f"{route_pointer}/source_region",
+                    record,
                     operations=("GetFoundationModel", "ListFoundationModels"),
                     region=source_region,
                 )
                 _aws_arn_matches_source(
-                    state, path, f"{route_pointer}/reference", route["reference"],
-                    source, resource="foundation-model",
+                    state,
+                    path,
+                    f"{route_pointer}/reference",
+                    route["reference"],
+                    source,
+                    resource="foundation-model",
                 )
                 values = []
                 matching_pointers: set[str] = set()
@@ -489,75 +802,126 @@ def _aws_offering_checks(
                     except (KeyError, IndexError, TypeError):
                         pass
                 if route["reference"] not in values:
-                    state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, f"{route_pointer}/reference", "AWS foundation route reference matches neither evidenced model id nor ARN", "Use the exact evidenced foundation model id or AWS-owned ARN."))
-                fact_reference = offering.get("evidence_refs", {}).get(
-                    f"{route_pointer}/reference"
-                )
+                    state.diagnostics.append(
+                        _diag(
+                            "EVIDENCE_VALUE_MISMATCH",
+                            path,
+                            f"{route_pointer}/reference",
+                            "AWS foundation route reference matches neither evidenced model id nor ARN",
+                            "Use the exact evidenced foundation model id or AWS-owned ARN.",
+                        )
+                    )
+                fact_reference = offering.get("evidence_refs", {}).get(f"{route_pointer}/reference")
                 if (
                     not isinstance(fact_reference, Mapping)
                     or fact_reference.get("id") != evidence_binding["id"]
                     or fact_reference.get("projection_pointer") not in matching_pointers
                 ):
-                    state.diagnostics.append(_diag(
-                        "EVIDENCE_VALUE_MISMATCH", path,
-                        f"{route_pointer}/reference",
-                        "AWS route fact reference is not its explicit model binding evidence",
-                        "Use the bound model evidence ID and the exact matching ID or ARN pointer.",
-                    ))
+                    state.diagnostics.append(
+                        _diag(
+                            "EVIDENCE_VALUE_MISMATCH",
+                            path,
+                            f"{route_pointer}/reference",
+                            "AWS route fact reference is not its explicit model binding evidence",
+                            "Use the bound model evidence ID and the exact matching ID or ARN pointer.",
+                        )
+                    )
         else:
             profile = binding["profile_evidence"]
             profile_record = state.evidence.get(profile["id"])
             if profile_record is None:
-                state.diagnostics.append(_diag("EVIDENCE_MISSING", path, f"{route_pointer}/model_binding/profile_evidence", "AWS profile evidence does not exist", "Reference explicit inference-profile evidence."))
+                state.diagnostics.append(
+                    _diag(
+                        "EVIDENCE_MISSING",
+                        path,
+                        f"{route_pointer}/model_binding/profile_evidence",
+                        "AWS profile evidence does not exist",
+                        "Reference explicit inference-profile evidence.",
+                    )
+                )
                 continue
             profile_source = _aws_api_source(
-                state, path, f"{route_pointer}/source_region", profile_record,
+                state,
+                path,
+                f"{route_pointer}/source_region",
+                profile_record,
                 operations=("GetInferenceProfile", "ListInferenceProfiles"),
                 region=source_region,
             )
             _aws_arn_matches_source(
-                state, path, f"{route_pointer}/reference", route["reference"],
-                profile_source, resource="inference-profile",
+                state,
+                path,
+                f"{route_pointer}/reference",
+                route["reference"],
+                profile_source,
+                resource="inference-profile",
             )
-            fact_reference = offering.get("evidence_refs", {}).get(
-                f"{route_pointer}/reference"
-            )
+            fact_reference = offering.get("evidence_refs", {}).get(f"{route_pointer}/reference")
             if (
                 not isinstance(fact_reference, Mapping)
                 or fact_reference.get("id") != profile["id"]
-                or fact_reference.get("projection_pointer")
-                != profile["projection_pointer"]
+                or fact_reference.get("projection_pointer") != profile["projection_pointer"]
             ):
-                state.diagnostics.append(_diag(
-                    "EVIDENCE_VALUE_MISMATCH", path,
-                    f"{route_pointer}/reference",
-                    "AWS route fact reference is not its explicit profile binding evidence",
-                    "Use the bound profile evidence ID and exact profile reference pointer.",
-                ))
+                state.diagnostics.append(
+                    _diag(
+                        "EVIDENCE_VALUE_MISMATCH",
+                        path,
+                        f"{route_pointer}/reference",
+                        "AWS route fact reference is not its explicit profile binding evidence",
+                        "Use the bound profile evidence ID and exact profile reference pointer.",
+                    )
+                )
             try:
-                profile_value = resolve_pointer(profile_record["projection"], profile["projection_pointer"])
+                profile_value = resolve_pointer(
+                    profile_record["projection"], profile["projection_pointer"]
+                )
                 if canonical_json(profile_value) != canonical_json(route["reference"]):
-                    state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, f"{route_pointer}/reference", "AWS profile reference differs from its explicit evidence projection", "Use the exact evidenced system inference-profile id or ARN."))
+                    state.diagnostics.append(
+                        _diag(
+                            "EVIDENCE_VALUE_MISMATCH",
+                            path,
+                            f"{route_pointer}/reference",
+                            "AWS profile reference differs from its explicit evidence projection",
+                            "Use the exact evidenced system inference-profile id or ARN.",
+                        )
+                    )
             except (KeyError, IndexError, TypeError):
-                state.diagnostics.append(_diag("EVIDENCE_MISSING", path, f"{route_pointer}/model_binding/profile_evidence", "AWS profile projection pointer does not resolve", "Use an explicit profile projection pointer."))
-            for field, expected in (("type_pointer", "SYSTEM_DEFINED"), ("status_pointer", "ACTIVE")):
+                state.diagnostics.append(
+                    _diag(
+                        "EVIDENCE_MISSING",
+                        path,
+                        f"{route_pointer}/model_binding/profile_evidence",
+                        "AWS profile projection pointer does not resolve",
+                        "Use an explicit profile projection pointer.",
+                    )
+                )
+            for field, expected in (
+                ("type_pointer", "SYSTEM_DEFINED"),
+                ("status_pointer", "ACTIVE"),
+            ):
                 try:
                     actual = resolve_pointer(profile_record["projection"], profile[field])
                 except (KeyError, IndexError, TypeError):
-                    state.diagnostics.append(_diag(
-                        "EVIDENCE_MISSING", path,
-                        f"{route_pointer}/model_binding/profile_evidence/{field}",
-                        f"AWS profile {field} does not resolve",
-                        "Bind the explicit profile type and status projections.",
-                    ))
+                    state.diagnostics.append(
+                        _diag(
+                            "EVIDENCE_MISSING",
+                            path,
+                            f"{route_pointer}/model_binding/profile_evidence/{field}",
+                            f"AWS profile {field} does not resolve",
+                            "Bind the explicit profile type and status projections.",
+                        )
+                    )
                 else:
                     if actual != expected:
-                        state.diagnostics.append(_diag(
-                            "EVIDENCE_VALUE_MISMATCH", path,
-                            f"{route_pointer}/model_binding/profile_evidence/{field}",
-                            f"AWS callable system profile must report {expected}",
-                            f"Use a profile whose first-party evidence reports {expected}.",
-                        ))
+                        state.diagnostics.append(
+                            _diag(
+                                "EVIDENCE_VALUE_MISMATCH",
+                                path,
+                                f"{route_pointer}/model_binding/profile_evidence/{field}",
+                                f"AWS callable system profile must report {expected}",
+                                f"Use a profile whose first-party evidence reports {expected}.",
+                            )
+                        )
             try:
                 projected_destinations = resolve_pointer(
                     profile_record["projection"], profile["destinations_pointer"]
@@ -566,12 +930,15 @@ def _aws_offering_checks(
                     raise TypeError("profile destinations are not an array")
             except (KeyError, IndexError, TypeError):
                 projected_destinations = None
-                state.diagnostics.append(_diag(
-                    "EVIDENCE_MISSING", path,
-                    f"{route_pointer}/model_binding/profile_evidence/destinations_pointer",
-                    "AWS profile destinations pointer does not resolve to an array",
-                    "Bind the complete first-party profile destination array.",
-                ))
+                state.diagnostics.append(
+                    _diag(
+                        "EVIDENCE_MISSING",
+                        path,
+                        f"{route_pointer}/model_binding/profile_evidence/destinations_pointer",
+                        "AWS profile destinations pointer does not resolve to an array",
+                        "Bind the complete first-party profile destination array.",
+                    )
+                )
             bound_destination_arns: list[Any] = []
             for destination_index, destination in enumerate(binding["destinations"]):
                 evidence_binding = destination["model_evidence"]
@@ -592,39 +959,74 @@ def _aws_offering_checks(
                 else:
                     bound_destination_arns.append(destination_arn)
                 _model_evidence(
-                    state, path, destination_pointer, evidence_binding, model,
+                    state,
+                    path,
+                    destination_pointer,
+                    evidence_binding,
+                    model,
                     expected_region=expected_region,
                 )
                 if model_record is None:
                     continue
                 destination_source = model_record.get("source")
                 _aws_arn_matches_source(
-                    state, path, destination_pointer, destination_arn,
+                    state,
+                    path,
+                    destination_pointer,
+                    destination_arn,
                     destination_source if isinstance(destination_source, Mapping) else None,
-                    resource="foundation-model", required=True,
+                    resource="foundation-model",
+                    required=True,
                 )
                 try:
-                    model_arn = resolve_pointer(model_record["projection"], evidence_binding["arn_pointer"])
+                    model_arn = resolve_pointer(
+                        model_record["projection"], evidence_binding["arn_pointer"]
+                    )
                 except (KeyError, IndexError, TypeError):
                     continue
                 if canonical_json(destination_arn) != canonical_json(model_arn):
-                    state.diagnostics.append(_diag("EVIDENCE_VALUE_MISMATCH", path, destination_pointer, "profile destination ARN differs from explicit model evidence", "Use matching explicit profile and foundation-model evidence."))
+                    state.diagnostics.append(
+                        _diag(
+                            "EVIDENCE_VALUE_MISMATCH",
+                            path,
+                            destination_pointer,
+                            "profile destination ARN differs from explicit model evidence",
+                            "Use matching explicit profile and foundation-model evidence.",
+                        )
+                    )
             if projected_destinations is not None:
                 projected_arns = [
                     item.get("modelArn") if isinstance(item, Mapping) else None
                     for item in projected_destinations
                 ]
-                profile_residency_scopes.add(tuple(sorted({scope[1] for value in projected_arns if (scope := _aws_arn_scope(value)) is not None})))
+                profile_residency_scopes.add(
+                    tuple(
+                        sorted(
+                            {
+                                scope[1]
+                                for value in projected_arns
+                                if (scope := _aws_arn_scope(value)) is not None
+                            }
+                        )
+                    )
+                )
                 if len(profile_residency_scopes) > 1:
-                    state.diagnostics.append(_diag("CHANGE_INVALID", path, route_pointer, "profile routes differ in destination residency scope", "Use separate Offerings for different processing Region sets."))
+                    state.diagnostics.append(
+                        _diag(
+                            "CHANGE_INVALID",
+                            path,
+                            route_pointer,
+                            "profile routes differ in destination residency scope",
+                            "Use separate Offerings for different processing Region sets.",
+                        )
+                    )
                 destinations_base = profile["destinations_pointer"]
                 expected_pointers = {
                     f"{destinations_base}/{index}/modelArn"
                     for index in range(len(projected_destinations))
                 }
                 actual_pointers = [
-                    destination["destination_pointer"]
-                    for destination in binding["destinations"]
+                    destination["destination_pointer"] for destination in binding["destinations"]
                 ]
                 if (
                     any(value is None for value in projected_arns)
@@ -633,12 +1035,15 @@ def _aws_offering_checks(
                     or sorted(map(canonical_json, projected_arns))
                     != sorted(map(canonical_json, bound_destination_arns))
                 ):
-                    state.diagnostics.append(_diag(
-                        "EVIDENCE_VALUE_MISMATCH", path,
-                        f"{route_pointer}/model_binding/destinations",
-                        "AWS profile destination bindings are not a complete one-to-one projection",
-                        "Bind every and only destination model ARN reported by the selected profile evidence.",
-                    ))
+                    state.diagnostics.append(
+                        _diag(
+                            "EVIDENCE_VALUE_MISMATCH",
+                            path,
+                            f"{route_pointer}/model_binding/destinations",
+                            "AWS profile destination bindings are not a complete one-to-one projection",
+                            "Bind every and only destination model ARN reported by the selected profile evidence.",
+                        )
+                    )
 
 
 def _aws_checks(state: State) -> None:
@@ -653,30 +1058,63 @@ def _aws_checks(state: State) -> None:
         if adapter == "aws-bedrock":
             _aws_offering_checks(state, offering, path)
         else:
-            state.diagnostics.append(_diag(
-                "UNKNOWN_REFERENCE", path, "/inference_service_id",
-                "inference-service adapter has no implemented validator",
-                "Use a service whose governed adapter is implemented.",
-            ))
+            state.diagnostics.append(
+                _diag(
+                    "UNKNOWN_REFERENCE",
+                    path,
+                    "/inference_service_id",
+                    "inference-service adapter has no implemented validator",
+                    "Use a service whose governed adapter is implemented.",
+                )
+            )
 
 
 def _evidence_checks(state: State, as_of: date) -> None:
-    state.diagnostics.extend(validate_content_addresses(
-        (state.evidence_paths[key], record) for key, record in state.evidence.items()
-    ))
+    state.diagnostics.extend(
+        validate_content_addresses(
+            (state.evidence_paths[key], record) for key, record in state.evidence.items()
+        )
+    )
     entities: list[tuple[str, Mapping[str, Any], str]] = []
-    entities.extend((state.model_paths[key], record, "model.schema.json") for key, record in state.models.items())
-    entities.extend((state.offering_paths[key], record, "offering.schema.json") for key, record in state.offerings.items())
-    vendor_schema = state.schemas.schema("vendors-registry.schema.json")["properties"]["vendors"]["additionalProperties"]
+    entities.extend(
+        (state.model_paths[key], record, "model.schema.json")
+        for key, record in state.models.items()
+    )
+    entities.extend(
+        (state.offering_paths[key], record, "offering.schema.json")
+        for key, record in state.offerings.items()
+    )
+    vendor_schema = state.schemas.schema("vendors-registry.schema.json")["properties"]["vendors"][
+        "additionalProperties"
+    ]
     for key, record in state.vendors.items():
-        entities.append((f"{state.config.paths['governance'].as_posix()}/vendors.yaml", record, "<vendor>"))
+        entities.append(
+            (f"{state.config.paths['governance'].as_posix()}/vendors.yaml", record, "<vendor>")
+        )
     for path, document, schema_name in entities:
         schema = vendor_schema if schema_name == "<vendor>" else state.schemas.schema(schema_name)
-        state.diagnostics.extend(validate_evidence_links(path=path, document=document, schema=schema, schemas=state.schemas, evidence=state.evidence))
+        state.diagnostics.extend(
+            validate_evidence_links(
+                path=path,
+                document=document,
+                schema=schema,
+                schemas=state.schemas,
+                evidence=state.evidence,
+            )
+        )
         facts = external_facts(document, schema, state.schemas)
         references = document.get("evidence_refs", {})
         if isinstance(references, Mapping) and state.thresholds:
-            state.diagnostics.extend(validate_freshness(path=path, facts=facts, references=references, evidence=state.evidence, as_of=as_of, thresholds=state.thresholds))
+            state.diagnostics.extend(
+                validate_freshness(
+                    path=path,
+                    facts=facts,
+                    references=references,
+                    evidence=state.evidence,
+                    as_of=as_of,
+                    thresholds=state.thresholds,
+                )
+            )
 
 
 def _validate_state(root: Path, as_of: date) -> State:
@@ -687,7 +1125,15 @@ def _validate_state(root: Path, as_of: date) -> State:
     for identifier, offering in state.offerings.items():
         review_by = offering.get("review_by")
         if review_by is not None and date.fromisoformat(review_by) < as_of:
-            state.diagnostics.append(_diag("CHANGE_INVALID", state.offering_paths[identifier], "/review_by", "offering review is overdue", "Review the offering through a MAC; a failed check does not automatically revoke the published snapshot."))
+            state.diagnostics.append(
+                _diag(
+                    "CHANGE_INVALID",
+                    state.offering_paths[identifier],
+                    "/review_by",
+                    "offering review is overdue",
+                    "Review the offering through a MAC; a failed check does not automatically revoke the published snapshot.",
+                )
+            )
     return state
 
 
@@ -696,40 +1142,61 @@ def check_repository(root: Path, base: str, head: str, as_of: date) -> tuple[Dia
         base_commit = resolve_commit(root, base)
         head_commit = resolve_commit(root, head)
         require_ancestor(root, base_commit, head_commit)
-        base_state = with_snapshot(root, base_commit, lambda snapshot: _validate_state(snapshot, as_of))
-        head_state = base_state if head_commit == base_commit else with_snapshot(root, head_commit, lambda snapshot: _validate_state(snapshot, as_of))
+        base_state = with_snapshot(
+            root, base_commit, lambda snapshot: _validate_state(snapshot, as_of)
+        )
+        head_state = (
+            base_state
+            if head_commit == base_commit
+            else with_snapshot(root, head_commit, lambda snapshot: _validate_state(snapshot, as_of))
+        )
         changes = changed_paths(
             root,
             base_commit,
             head_commit,
-            tuple(sorted({
-                base_state.config.paths["catalogue"].as_posix(),
-                head_state.config.paths["catalogue"].as_posix(),
-            })),
+            tuple(
+                sorted(
+                    {
+                        base_state.config.paths["catalogue"].as_posix(),
+                        head_state.config.paths["catalogue"].as_posix(),
+                    }
+                )
+            ),
         )
     except (GitError, CheckSystemError) as exc:
         raise CheckSystemError(str(exc)) from exc
     diagnostics = list(head_state.diagnostics)
-    diagnostics.extend(validate_changes(
-        changes,
-        evidence_root=head_state.config.paths["evidence"].as_posix(),
-        conditions_root=head_state.config.paths["conditions"].as_posix(),
-        models_root=head_state.config.paths["models"].as_posix(),
-        offerings_root=head_state.config.paths["offerings"].as_posix(),
-    ))
+    diagnostics.extend(
+        validate_changes(
+            changes,
+            evidence_root=head_state.config.paths["evidence"].as_posix(),
+            conditions_root=head_state.config.paths["conditions"].as_posix(),
+            models_root=head_state.config.paths["models"].as_posix(),
+            offerings_root=head_state.config.paths["offerings"].as_posix(),
+        )
+    )
     try:
-        diagnostics.extend(validate_condition_history(
-            root,
-            base_commit,
-            head_commit,
-            head_state.config.paths["conditions"].as_posix(),
-            head_state.config.paths["offerings"].as_posix(),
-        ))
+        diagnostics.extend(
+            validate_condition_history(
+                root,
+                base_commit,
+                head_commit,
+                head_state.config.paths["conditions"].as_posix(),
+                head_state.config.paths["offerings"].as_posix(),
+            )
+        )
     except GitError as exc:
         raise CheckSystemError(str(exc)) from exc
     try:
-        diagnostics.extend(validate_reserved_identity_history(root, base_commit, changes,
-            head_state.config.paths["models"].as_posix(), head_state.config.paths["offerings"].as_posix()))
+        diagnostics.extend(
+            validate_reserved_identity_history(
+                root,
+                base_commit,
+                changes,
+                head_state.config.paths["models"].as_posix(),
+                head_state.config.paths["offerings"].as_posix(),
+            )
+        )
     except GitError as exc:
         raise CheckSystemError(str(exc)) from exc
     # A modified record may not silently change logical identity even if a path error
@@ -745,25 +1212,89 @@ def check_repository(root: Path, base: str, head: str, as_of: date) -> tuple[Dia
             old = base_models_by_path[path]
             new = head_models_by_path[path]
             if old != new:
-                diagnostics.append(_diag("CHANGE_INVALID", path, "/id", "change operation altered model identity", "Use an explicit migration rather than changing identity in place."))
+                diagnostics.append(
+                    _diag(
+                        "CHANGE_INVALID",
+                        path,
+                        "/id",
+                        "change operation altered model identity",
+                        "Use an explicit migration rather than changing identity in place.",
+                    )
+                )
             before, after = base_state.models[old], head_state.models[new]
-            label_changed = before.get("release", {}).get("vendor_label", before["name"]) != after.get("release", {}).get("vendor_label", after["name"])
-            if before["vendor_id"] != after["vendor_id"] or release_precision(before) != release_precision(after) or label_changed:
-                diagnostics.append(_diag("CHANGE_INVALID", path, "/release", "change altered release identity or precision", "Create a distinct release; do not silently upgrade precision or reuse an identity."))
+            label_changed = before.get("release", {}).get(
+                "vendor_label", before["name"]
+            ) != after.get("release", {}).get("vendor_label", after["name"])
+            if (
+                before["vendor_id"] != after["vendor_id"]
+                or release_precision(before) != release_precision(after)
+                or label_changed
+            ):
+                diagnostics.append(
+                    _diag(
+                        "CHANGE_INVALID",
+                        path,
+                        "/release",
+                        "change altered release identity or precision",
+                        "Create a distinct release; do not silently upgrade precision or reuse an identity.",
+                    )
+                )
             # Retain assertions even when disputed; status is maintained by MAC,
             # while route checks still require an eligible evidenced claim.
-            old_claims = {(claim["namespace"], claim["value"], claim["relation"]) for claim in before.get("identity_claims", [])}
-            new_claims = {(claim["namespace"], claim["value"], claim["relation"]) for claim in after.get("identity_claims", [])}
+            old_claims = {
+                (claim["namespace"], claim["value"], claim["relation"])
+                for claim in before.get("identity_claims", [])
+            }
+            new_claims = {
+                (claim["namespace"], claim["value"], claim["relation"])
+                for claim in after.get("identity_claims", [])
+            }
             if not old_claims <= new_claims:
-                diagnostics.append(_diag("CHANGE_INVALID", path, "/identity_claims", "change removed or replaced a retained release identity claim", "Retain claim tuples and evidence; correct their status through governed review."))
+                diagnostics.append(
+                    _diag(
+                        "CHANGE_INVALID",
+                        path,
+                        "/identity_claims",
+                        "change removed or replaced a retained release identity claim",
+                        "Retain claim tuples and evidence; correct their status through governed review.",
+                    )
+                )
         if path in base_offerings_by_path and path in head_offerings_by_path:
             old = base_offerings_by_path[path]
             new = head_offerings_by_path[path]
             if old != new:
-                diagnostics.append(_diag("CHANGE_INVALID", path, "/id", "change operation altered offering identity", "Use atomic add-destination and revoke-source semantics."))
+                diagnostics.append(
+                    _diag(
+                        "CHANGE_INVALID",
+                        path,
+                        "/id",
+                        "change operation altered offering identity",
+                        "Use atomic add-destination and revoke-source semantics.",
+                    )
+                )
             if base_state.offerings[old]["model_id"] != head_state.offerings[new]["model_id"]:
-                diagnostics.append(_diag("CHANGE_INVALID", path, "/model_id", "Offering cannot inherit approval for a different ModelRelease", "Add a new Offering and revoke the previous one in a governed move."))
+                diagnostics.append(
+                    _diag(
+                        "CHANGE_INVALID",
+                        path,
+                        "/model_id",
+                        "Offering cannot inherit approval for a different ModelRelease",
+                        "Add a new Offering and revoke the previous one in a governed move.",
+                    )
+                )
     for identifier in sorted(base_state.offerings.keys() & head_state.offerings.keys()):
-        if base_state.offerings[identifier]["model_id"] != head_state.offerings[identifier]["model_id"] and base_state.offering_paths[identifier] != head_state.offering_paths[identifier]:
-            diagnostics.append(_diag("CHANGE_INVALID", head_state.offering_paths[identifier], "/model_id", "relocated Offering cannot inherit approval for a different ModelRelease", "Use a new Offering ID when the release changes."))
+        if (
+            base_state.offerings[identifier]["model_id"]
+            != head_state.offerings[identifier]["model_id"]
+            and base_state.offering_paths[identifier] != head_state.offering_paths[identifier]
+        ):
+            diagnostics.append(
+                _diag(
+                    "CHANGE_INVALID",
+                    head_state.offering_paths[identifier],
+                    "/model_id",
+                    "relocated Offering cannot inherit approval for a different ModelRelease",
+                    "Use a new Offering ID when the release changes.",
+                )
+            )
     return sort_diagnostics(diagnostics)

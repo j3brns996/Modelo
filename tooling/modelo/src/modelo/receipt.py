@@ -7,13 +7,12 @@ canonical encoder, including its single trailing LF.
 
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import re
+from copy import deepcopy
 from typing import Any, Iterable, Mapping
 
 from modelo.evidence import canonical_json
-
 
 SHA256_PREFIX_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 SHA256_DASH_PATTERN = re.compile(r"^sha256-[0-9a-f]{64}$")
@@ -76,7 +75,7 @@ def _rewrite_index_pointers(
     for pointer, reference in references.items():
         changed = pointer
         if pointer.startswith(prefix):
-            remainder = pointer[len(prefix):]
+            remainder = pointer[len(prefix) :]
             token, separator, suffix = remainder.partition("/")
             if token.isdigit() and int(token) in old_to_new:
                 changed = f"{prefix}{old_to_new[int(token)]}"
@@ -88,10 +87,15 @@ def _rewrite_index_pointers(
     return rewritten
 
 
-def _sort_with_index(values: list[dict[str, Any]], key) -> tuple[list[dict[str, Any]], dict[int, int]]:
+def _sort_with_index(
+    values: list[dict[str, Any]], key
+) -> tuple[list[dict[str, Any]], dict[int, int]]:
     indexed = list(enumerate(values))
     indexed.sort(key=lambda pair: (*key(pair[1]), _canonical_tie(pair[1])))
-    return ([deepcopy(value) for _, value in indexed], {old: new for new, (old, _) in enumerate(indexed)})
+    return (
+        [deepcopy(value) for _, value in indexed],
+        {old: new for new, (old, _) in enumerate(indexed)},
+    )
 
 
 def _normalise_model(value: Mapping[str, Any]) -> dict[str, Any]:
@@ -168,10 +172,25 @@ def catalogue_projection(
         "source_tree": source_tree,
         "as_of": as_of,
         "profile": profile,
-        "models": sorted(normal_models, key=lambda item: (item["id"].encode("ascii"), _canonical_tie(item))),
-        "offerings": sorted(normal_offerings, key=lambda item: (item["inference_service_id"].encode("ascii"), item["id"].encode("ascii"), _canonical_tie(item))),
-        "evidence": sorted((deepcopy(dict(item)) for item in evidence), key=lambda item: (item["id"].encode("ascii"), _canonical_tie(item))),
-        "conditions": sorted((deepcopy(dict(item)) for item in conditions), key=lambda item: (item["id"].encode("ascii"), item["version"], _canonical_tie(item))),
+        "models": sorted(
+            normal_models, key=lambda item: (item["id"].encode("ascii"), _canonical_tie(item))
+        ),
+        "offerings": sorted(
+            normal_offerings,
+            key=lambda item: (
+                item["inference_service_id"].encode("ascii"),
+                item["id"].encode("ascii"),
+                _canonical_tie(item),
+            ),
+        ),
+        "evidence": sorted(
+            (deepcopy(dict(item)) for item in evidence),
+            key=lambda item: (item["id"].encode("ascii"), _canonical_tie(item)),
+        ),
+        "conditions": sorted(
+            (deepcopy(dict(item)) for item in conditions),
+            key=lambda item: (item["id"].encode("ascii"), item["version"], _canonical_tie(item)),
+        ),
         "vendors": deepcopy(dict(vendors)),
         "inference_services": deepcopy(dict(inference_services)),
         "freshness": deepcopy(dict(freshness)),

@@ -85,9 +85,14 @@ Both hashes use RFC 8785 canonical JSON. Their input omits `dedupe_key` and
 `dedupe_key` hashes a typed object containing the sorted `{kind, identity}`
 reservation set, effective operation (`item_operation` for a batch) and purpose.
 `idempotency_key` hashes the remaining complete canonical intent including
-candidate evidence digests. Exact retries return the existing open issue;
-different intent colliding with an open reservation fails closed. Move reserves
-source and destination; batch reserves every subject. CI rechecks reservations.
+candidate evidence digests. These keys correlate intent; they do not reserve
+identities across issues or guarantee exactly-once issue creation. Reprocessing
+one issue updates its generated block rather than adding another block. Separate
+equivalent issues can exist and require triage. Moves identify source and
+destination; batches identify every subject. Current-base/head validation,
+identity checks, independent review and serialised acceptance prevent a stale
+proposal from overriding accepted records. See the
+[v1 simplification decision](adr/0004-v1-simplification.md).
 
 The canonical payload digest is embedded as a stable marker in the issue and
 declared by the change request. A least-privilege host-adapter pre-step reads

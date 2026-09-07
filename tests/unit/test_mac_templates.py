@@ -7,17 +7,14 @@ from pathlib import Path
 
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
-
 from modelo.mac import (
     MAX_ADAPTER_OVERHEAD_BYTES,
     MAX_BODY_BYTES,
     extract_adapter_issue_payload,
-    payload_digest,
     render_adapter_issue_body,
-    with_computed_keys,
     validate_payload,
+    with_computed_keys,
 )
-
 
 ROOT = Path(__file__).resolve().parents[2]
 OPERATIONS = {"add", "change", "revoke", "move", "batch"}
@@ -25,12 +22,31 @@ OPERATIONS = {"add", "change", "revoke", "move", "batch"}
 
 class MacTemplateTests(unittest.TestCase):
     def test_simple_request_is_triage_not_mac(self) -> None:
-        github = yaml.safe_load((ROOT / ".github/ISSUE_TEMPLATE/model-request.yml").read_text(encoding="utf-8"))
+        github = yaml.safe_load(
+            (ROOT / ".github/ISSUE_TEMPLATE/model-request.yml").read_text(encoding="utf-8")
+        )
         fields = [item for item in github["body"] if item["type"] != "markdown"]
-        self.assertEqual([item["id"] for item in fields], ["model_reference", "need", "intended_use", "deployment", "producer_domicile", "service_operator", "processing_territory"])
-        self.assertEqual([item["validations"]["required"] for item in fields], [False, True, True, False, False, False, False])
+        self.assertEqual(
+            [item["id"] for item in fields],
+            [
+                "model_reference",
+                "need",
+                "intended_use",
+                "deployment",
+                "producer_domicile",
+                "service_operator",
+                "processing_territory",
+            ],
+        )
+        self.assertEqual(
+            [item["validations"]["required"] for item in fields],
+            [False, True, True, False, False, False, False],
+        )
         gitlab = (ROOT / ".gitlab/issue_templates/Model-Request.md").read_text(encoding="utf-8")
-        self.assertEqual(re.findall(r"^### (.+)$", gitlab, re.M), [item["attributes"]["label"] for item in fields])
+        self.assertEqual(
+            re.findall(r"^### (.+)$", gitlab, re.M),
+            [item["attributes"]["label"] for item in fields],
+        )
         html = (ROOT / "site/templates/propose.html").read_text(encoding="utf-8")
         groups = {
             "producer_domicile": ["UK", "EU", "China", "USA", "Other"],
@@ -38,16 +54,19 @@ class MacTemplateTests(unittest.TestCase):
             "processing_territory": ["UK", "EU", "China", "USA", "Other"],
         }
         for name, options in groups.items():
-            group = re.search(r'<fieldset[^>]*data-request-choice="' + name + r'".*?</fieldset>', html, re.S).group()
+            group = re.search(
+                r'<fieldset[^>]*data-request-choice="' + name + r'".*?</fieldset>', html, re.S
+            ).group()
             self.assertEqual(re.findall(r'<input type="checkbox" value="([^"]+)"', group), options)
-            self.assertNotRegex(group, r'<input[^>]*\bchecked\b')
+            self.assertNotRegex(group, r"<input[^>]*\bchecked\b")
             native = next(field for field in fields if field["id"] == name)
             self.assertFalse(native["validations"]["required"])
-            self.assertTrue(all(option in native["attributes"]["description"] for option in options))
+            self.assertTrue(
+                all(option in native["attributes"]["description"] for option in options)
+            )
         for body in (json.dumps(github), gitlab):
             self.assertNotIn("Modelo MAC request type", body)
             self.assertNotIn("modelo:mac", body)
-
 
     def fixtures(self) -> dict[str, dict[str, object]]:
         return {
@@ -134,7 +153,8 @@ class MacTemplateTests(unittest.TestCase):
             )
             rendered = "\n".join(
                 item.get("attributes", {}).get("value", "")
-                for item in form["body"] if item["type"] == "markdown"
+                for item in form["body"]
+                if item["type"] == "markdown"
             )
             with self.subTest(operation=operation):
                 self.assertIn(heading, rendered)
@@ -175,12 +195,11 @@ class MacTemplateTests(unittest.TestCase):
             form = yaml.safe_load(
                 (ROOT / f".github/ISSUE_TEMPLATE/mac-{operation}.yml").read_text(encoding="utf-8")
             )
-            fields = {
-                item["id"]: item for item in form["body"]
-                if item["type"] != "markdown"
-            }
+            fields = {item["id"]: item for item in form["body"] if item["type"] != "markdown"}
             with self.subTest(operation=operation):
-                self.assertEqual(set(fields), set(common) | set(operation_fields) | {"final_checks"})
+                self.assertEqual(
+                    set(fields), set(common) | set(operation_fields) | {"final_checks"}
+                )
                 for field_id, (label, required) in common.items():
                     self.assertEqual(fields[field_id]["attributes"]["label"], label)
                     self.assertIs(fields[field_id]["validations"]["required"], required)
@@ -188,10 +207,12 @@ class MacTemplateTests(unittest.TestCase):
                     self.assertEqual(fields[field_id]["attributes"]["label"], label)
                     self.assertTrue(fields[field_id]["validations"]["required"])
                 self.assertEqual(fields["final_checks"]["attributes"]["label"], "Before submitting")
-                self.assertTrue(all(
-                    option["required"]
-                    for option in fields["final_checks"]["attributes"]["options"]
-                ))
+                self.assertTrue(
+                    all(
+                        option["required"]
+                        for option in fields["final_checks"]["attributes"]["options"]
+                    )
+                )
 
         batch_description = next(
             item["attributes"]["description"]
@@ -208,8 +229,7 @@ class MacTemplateTests(unittest.TestCase):
             (ROOT / ".github/ISSUE_TEMPLATE/config.yml").read_text(encoding="utf-8")
         )
         expected = (
-            repository["site"]["base_url"].rstrip("/")
-            + repository["site"]["routes"]["process"]
+            repository["site"]["base_url"].rstrip("/") + repository["site"]["routes"]["process"]
         )
         self.assertEqual(len(chooser["contact_links"]), 1)
         self.assertEqual(chooser["contact_links"][0]["url"], expected)
@@ -217,9 +237,20 @@ class MacTemplateTests(unittest.TestCase):
     def test_pull_request_templates_lead_with_decision_and_evidence(self) -> None:
         mac = (ROOT / ".github/PULL_REQUEST_TEMPLATE/mac.md").read_text(encoding="utf-8")
         control = (ROOT / ".github/PULL_REQUEST_TEMPLATE/control.md").read_text(encoding="utf-8")
-        for heading in ("Decision requested", "Why this should change", "Evidence", "Reviewer decision"):
+        for heading in (
+            "Decision requested",
+            "Why this should change",
+            "Evidence",
+            "Reviewer decision",
+        ):
             self.assertIn(heading, mac)
-        for heading in ("Outcome", "Why now", "Risk and rollback", "Verification", "Reviewer decision"):
+        for heading in (
+            "Outcome",
+            "Why now",
+            "Risk and rollback",
+            "Verification",
+            "Reviewer decision",
+        ):
             self.assertIn(heading, control)
         self.assertNotIn("Bootstrap exception", control)
 
@@ -227,18 +258,20 @@ class MacTemplateTests(unittest.TestCase):
         form = yaml.safe_load(
             (ROOT / ".github/ISSUE_TEMPLATE/control-change.yml").read_text(encoding="utf-8")
         )
-        fields = {
-            item["id"]: item for item in form["body"] if item["type"] != "markdown"
-        }
+        fields = {item["id"]: item for item in form["body"] if item["type"] != "markdown"}
         self.assertEqual(
             set(fields), {"problem", "outcome", "scope", "risk", "acceptance", "final_checks"}
         )
         for field in ("problem", "outcome", "scope", "risk", "acceptance"):
             self.assertTrue(fields[field]["validations"]["required"])
-        self.assertNotIn("Request type", {
-            item["attributes"].get("label") for item in form["body"]
-            if item["type"] != "markdown"
-        })
+        self.assertNotIn(
+            "Request type",
+            {
+                item["attributes"].get("label")
+                for item in form["body"]
+                if item["type"] != "markdown"
+            },
+        )
 
     def test_gitlab_templates_are_operation_specific_and_inert(self) -> None:
         paths = sorted((ROOT / ".gitlab/issue_templates").glob("MAC-*.md"))
@@ -293,7 +326,11 @@ class MacTemplateTests(unittest.TestCase):
         self.assertTrue((ROOT / ".github/workflows/modelo.yml").is_file())
         self.assertTrue((ROOT / ".agents/skills").is_dir())
         self.assertEqual(
-            {path.relative_to(ROOT / "catalogue").as_posix() for path in (ROOT / "catalogue").rglob("*") if path.is_file()},
+            {
+                path.relative_to(ROOT / "catalogue").as_posix()
+                for path in (ROOT / "catalogue").rglob("*")
+                if path.is_file()
+            },
             set(),
         )
         self.assertTrue((ROOT / "site").is_dir())

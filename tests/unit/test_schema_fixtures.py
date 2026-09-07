@@ -11,15 +11,12 @@ import time
 import unittest
 from pathlib import Path, PurePosixPath
 from typing import Any
-from urllib.parse import urljoin
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
-from referencing import Registry, Resource
-
 from modelo.evidence import canonical_json
-
+from referencing import Registry, Resource
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMAS = ROOT / "schemas"
@@ -141,7 +138,9 @@ def _mac_metadata_errors(
 
     payload = envelope["payload"]
     subjects = payload["subjects"]
-    operation = payload["item_operation"] if payload["operation"] == "batch" else payload["operation"]
+    operation = (
+        payload["item_operation"] if payload["operation"] == "batch" else payload["operation"]
+    )
     registry_paths = {
         "vendor": "catalogue/governance/vendors.yaml",
         "inference-service": "catalogue/governance/inference-services.yaml",
@@ -188,8 +187,7 @@ def _mac_metadata_errors(
         registry_subjects = [item for item in subjects if item["kind"] in registry_paths]
         ordinary_subjects = [item for item in subjects if item["kind"] not in registry_paths]
         registry_delta = [
-            item for item in expected_delta
-            if item.get("path") in set(registry_paths.values())
+            item for item in expected_delta if item.get("path") in set(registry_paths.values())
         ]
         ordinary_delta = [item for item in expected_delta if item not in registry_delta]
         if registry_subjects or registry_delta:
@@ -217,7 +215,9 @@ def _mac_metadata_errors(
                         errors.add("registry-deletion")
                     if any(value != operation for value in transitions.values()):
                         errors.add("registry-operation")
-                    matching_delta = [item for item in registry_delta if item["path"] == registry_path]
+                    matching_delta = [
+                        item for item in registry_delta if item["path"] == registry_path
+                    ]
                     if bool(changed) != (len(matching_delta) == 1):
                         errors.add("registry-subjects")
         if len(ordinary_delta) != len(ordinary_subjects):
@@ -226,7 +226,11 @@ def _mac_metadata_errors(
             unmatched = list(ordinary_delta)
             for subject in ordinary_subjects:
                 match = next(
-                    (item for item in unmatched if item["operation"] == operation and path_matches(subject, item["path"])),
+                    (
+                        item
+                        for item in unmatched
+                        if item["operation"] == operation and path_matches(subject, item["path"])
+                    ),
                     None,
                 )
                 if match is None:
@@ -270,10 +274,17 @@ def _read_mac_metadata_contract(path: Path, after_read: Any = None) -> dict[str,
         if after_read is not None:
             after_read()
         after = os.fstat(descriptor)
-        identity = lambda value: (
-            value.st_dev, value.st_ino, value.st_mode, value.st_size,
-            value.st_mtime_ns, value.st_ctime_ns,
-        )
+
+        def identity(value):
+            return (
+                value.st_dev,
+                value.st_ino,
+                value.st_mode,
+                value.st_size,
+                value.st_mtime_ns,
+                value.st_ctime_ns,
+            )
+
         if identity(before) != identity(after):
             raise ValueError("metadata input changed while read")
     finally:
@@ -339,7 +350,9 @@ def _output_path_errors(
         errors.add("output-root")
     if path.is_absolute() or ".." in path.parts or is_symlink:
         errors.add("output-safety")
-    if any(path == PurePosixPath(root) or PurePosixPath(root) in path.parents for root in input_roots):
+    if any(
+        path == PurePosixPath(root) or PurePosixPath(root) in path.parents for root in input_roots
+    ):
         errors.add("output-inside-input")
     return errors
 
@@ -527,8 +540,7 @@ class SchemaFixtureTests(unittest.TestCase):
 
     def test_provider_schema_inventory_matches_implemented_adapters(self) -> None:
         id_to_name = {
-            document["$id"].split("#", 1)[0]: name
-            for name, document in self.schemas.items()
+            document["$id"].split("#", 1)[0]: name for name, document in self.schemas.items()
         }
         pending = ["offering.schema.json"]
         visited: set[str] = set()
@@ -574,9 +586,7 @@ class SchemaFixtureTests(unittest.TestCase):
         # docs/contract.yaml's provider_boundary block (schema admission
         # must never race ahead of what the contract has at least declared),
         # not that admission implies full semantic implementation.
-        contract = yaml.safe_load(
-            (ROOT / "docs/contract.yaml").read_text(encoding="utf-8")
-        )
+        contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
         declared_adapters = {contract["provider_boundary"]["aws"]["adapter"]}
         # provider_boundary's prose keys (gcp_vertex_ai, azure_ai_foundry)
         # are free-form documentation spellings, not the registry's
@@ -614,15 +624,11 @@ class SchemaFixtureTests(unittest.TestCase):
                 format_checker=FormatChecker(),
             )
             if "valid_source" in case:
-                valid = [
-                    yaml.safe_load((ROOT / case["valid_source"]).read_text(encoding="utf-8"))
-                ]
+                valid = [yaml.safe_load((ROOT / case["valid_source"]).read_text(encoding="utf-8"))]
             else:
                 valid = copy.deepcopy(case["valid"])
             for mutation in case.get("valid_mutations", []):
-                valid.append(
-                    _mutate(valid[mutation.get("valid_index", 0)], mutation)
-                )
+                valid.append(_mutate(valid[mutation.get("valid_index", 0)], mutation))
             for index, instance in enumerate(valid):
                 with self.subTest(schema=case["schema"], valid=index):
                     errors = list(validator.iter_errors(instance))
@@ -728,12 +734,20 @@ class SchemaFixtureTests(unittest.TestCase):
         values = [
             {"operation": "revoke", "path": "catalogue/offerings/x/z.yaml", "before": digest},
             {"operation": "add", "path": "catalogue/models/b.yaml", "after": digest},
-            {"operation": "change", "path": "catalogue/models/a.yaml", "before": digest, "after": digest},
+            {
+                "operation": "change",
+                "path": "catalogue/models/a.yaml",
+                "before": digest,
+                "after": digest,
+            },
         ]
         expected = _sort_delta(values)
         self.assertEqual(expected, _sort_delta(list(reversed(values))))
         self.assertEqual([item["operation"] for item in expected], ["add", "change", "revoke"])
-        self.assertEqual(_canonical_receipt_bytes({"change_delta": expected}), _canonical_receipt_bytes({"change_delta": _sort_delta(values[1:] + values[:1])}))
+        self.assertEqual(
+            _canonical_receipt_bytes({"change_delta": expected}),
+            _canonical_receipt_bytes({"change_delta": _sort_delta(values[1:] + values[:1])}),
+        )
 
     def test_change_delta_sort_is_total_when_declared_keys_tie(self) -> None:
         digest = "sha256:" + "a" * 64
@@ -741,25 +755,31 @@ class SchemaFixtureTests(unittest.TestCase):
             {
                 "operation": "move",
                 "source": {
-                    "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/a.yaml",
-                    "before": digest, "reason": "First admissible reason.",
+                    "operation": "revoke",
+                    "path": "catalogue/offerings/aws-bedrock/a.yaml",
+                    "before": digest,
+                    "reason": "First admissible reason.",
                     "effective_at": "2026-08-30T14:00:00Z",
                 },
                 "destination": {
-                    "operation": "add", "path": "catalogue/offerings/aws-bedrock/b.yaml",
+                    "operation": "add",
+                    "path": "catalogue/offerings/aws-bedrock/b.yaml",
                     "after": digest,
                 },
             },
             {
                 "operation": "move",
                 "source": {
-                    "operation": "revoke", "path": "catalogue/offerings/aws-bedrock/a.yaml",
-                    "before": digest, "reason": "Second admissible reason.",
+                    "operation": "revoke",
+                    "path": "catalogue/offerings/aws-bedrock/a.yaml",
+                    "before": digest,
+                    "reason": "Second admissible reason.",
                     "effective_at": "2026-08-30T15:00:00Z",
                     "replacement": "catalogue/offerings/aws-bedrock/b.yaml",
                 },
                 "destination": {
-                    "operation": "add", "path": "catalogue/offerings/aws-bedrock/b.yaml",
+                    "operation": "add",
+                    "path": "catalogue/offerings/aws-bedrock/b.yaml",
                     "after": digest,
                 },
             },
@@ -782,9 +802,7 @@ class SchemaFixtureTests(unittest.TestCase):
         command = "uv build --offline --no-cache"
         self.assertEqual(config["toolchain"]["package_build"], command)
         self.assertIn(command, (ROOT / "README.md").read_text(encoding="utf-8"))
-        version = subprocess.run(
-            ["uv", "--version"], check=True, capture_output=True, text=True
-        )
+        version = subprocess.run(["uv", "--version"], check=True, capture_output=True, text=True)
         self.assertEqual(version.stdout.split()[:2], ["uv", "0.11.33"])
         help_result = subprocess.run(
             ["uv", "build", "--help"], check=True, capture_output=True, text=True
@@ -803,18 +821,31 @@ class SchemaFixtureTests(unittest.TestCase):
                 "conditions": ["id", "version", "canonical_json_bytes"],
                 "routes": ["id", "canonical_json_bytes"],
                 "route_destinations": ["destination_pointer", "canonical_json_bytes"],
-                "pricing": ["dimension", "unit", "quantity", "amount", "currency", "sorted_route_ids", "canonical_json_bytes"],
+                "pricing": [
+                    "dimension",
+                    "unit",
+                    "quantity",
+                    "amount",
+                    "currency",
+                    "sorted_route_ids",
+                    "canonical_json_bytes",
+                ],
                 "condition_refs": ["id", "version", "canonical_json_bytes"],
                 "id_arrays": "ascii_id",
                 "total_tie_breaker": "canonical_json_bytes",
             },
         )
-        self.assertTrue(contract["build"]["semantic_evidence_projection_arrays_preserve_source_order"])
+        self.assertTrue(
+            contract["build"]["semantic_evidence_projection_arrays_preserve_source_order"]
+        )
 
     def test_t6_manifest_completeness_has_exact_fixed_and_derived_inventory(self) -> None:
         contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
         manifest_schema = self.schemas["build-manifest.schema.json"]
-        self.assertEqual(manifest_schema["x-modelo-executable-completeness-owner"], "candidate:T5;validation:T8;final:T6;demo:Pages")
+        self.assertEqual(
+            manifest_schema["x-modelo-executable-completeness-owner"],
+            "candidate:T5;validation:T8;final:T6;demo:Pages",
+        )
         self.assertEqual(
             manifest_schema["x-modelo-executable-completeness"],
             "candidate_files_exact_catalogue_plus_change_delta;validation_final_and_demo_files_equal_contract_fixed_union_all_source_commit_schemas_union_projection_derived_excluding_manifest",
@@ -829,7 +860,9 @@ class SchemaFixtureTests(unittest.TestCase):
             for path in SCHEMAS.rglob("*.schema.json")
         }
         self.assertEqual(configured_schemas, source_schemas)
-        self.assertEqual(contract["build"]["candidate_manifest_completeness_executable_owner"], "t5")
+        self.assertEqual(
+            contract["build"]["candidate_manifest_completeness_executable_owner"], "t5"
+        )
         self.assertEqual(contract["build"]["final_manifest_completeness_executable_owner"], "t6")
         site_contract = (ROOT / "docs/site-contract.md").read_text(encoding="utf-8")
         self.assertIn("`data/change-delta.json`", site_contract)
@@ -838,15 +871,16 @@ class SchemaFixtureTests(unittest.TestCase):
         self.assertNotIn("sixteen schema", site_contract)
         projection = {
             "models": [{"id": "model-a"}, {"id": "model-b"}],
-            "offerings": [
-                {"inference_service_id": "aws-bedrock", "id": "offer-a"}
-            ],
+            "offerings": [{"inference_service_id": "aws-bedrock", "id": "offer-a"}],
         }
         expected = _expected_manifest_files(projection)
         self.assertIn("models/model-a/index.html", expected)
         self.assertIn("offerings/aws-bedrock/offer-a/index.html", expected)
         complete = {path: {} for path in expected}
-        self.assertEqual(_manifest_completeness_errors(complete, projection), {"missing": set(), "unexpected": set()})
+        self.assertEqual(
+            _manifest_completeness_errors(complete, projection),
+            {"missing": set(), "unexpected": set()},
+        )
         for missing in sorted(expected):
             with self.subTest(missing=missing):
                 errors = _manifest_completeness_errors(
@@ -863,7 +897,9 @@ class SchemaFixtureTests(unittest.TestCase):
         config = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
         build = config["build"]
         self.assertEqual(build["implemented_kinds"], ["candidate", "demo", "final"])
-        self.assertEqual(build["final_cli_arguments"], ["merge_commit", "merge_tree", "publication_capability"])
+        self.assertEqual(
+            build["final_cli_arguments"], ["merge_commit", "merge_tree", "publication_capability"]
+        )
         self.assertEqual(
             set(build["candidate_output_inventory"]),
             {
@@ -896,41 +932,72 @@ class SchemaFixtureTests(unittest.TestCase):
         config = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
         contract = yaml.safe_load((ROOT / "docs/contract.yaml").read_text(encoding="utf-8"))
         required = {
-            "kind", "base_commit", "source_commit", "source_tree", "as_of",
-            "source_date_epoch", "mac_metadata", "profile", "base_path", "output",
+            "kind",
+            "base_commit",
+            "source_commit",
+            "source_tree",
+            "as_of",
+            "source_date_epoch",
+            "mac_metadata",
+            "profile",
+            "base_path",
+            "output",
         }
         self.assertEqual(set(config["build"]["required_cli_arguments"]), required)
         self.assertEqual(set(contract["build"]["candidate_cli_required_flags"]), required)
         self.assertEqual(
             set(contract["build"]["final_cli_required_flags"]),
             {
-                "kind", "base_commit", "source_commit", "source_tree",
-                "merge_commit", "merge_tree", "as_of", "source_date_epoch",
-                "mac_metadata", "profile", "publication_capability", "base_url", "base_path", "output",
+                "kind",
+                "base_commit",
+                "source_commit",
+                "source_tree",
+                "merge_commit",
+                "merge_tree",
+                "as_of",
+                "source_date_epoch",
+                "mac_metadata",
+                "profile",
+                "publication_capability",
+                "base_url",
+                "base_path",
+                "output",
             },
         )
         self.assertEqual(config["paths"]["mac_metadata_schema"], "schemas/mac-metadata.schema.json")
         command = config["toolchain"]["clean_clone"]["build"]
         for flag in (
-            "--kind", "--base-commit", "--source-commit", "--source-tree", "--as-of",
-            "--source-date-epoch", "--mac-metadata", "--profile", "--base-path", "--output",
+            "--kind",
+            "--base-commit",
+            "--source-commit",
+            "--source-tree",
+            "--as-of",
+            "--source-date-epoch",
+            "--mac-metadata",
+            "--profile",
+            "--base-path",
+            "--output",
         ):
             self.assertIn(flag, command)
-        for path in (ROOT / "README.md", ROOT / "SPEC.md", ROOT / "docs/implementation-plan.md"):
+        for path in (ROOT / "README.md", ROOT / "SPEC.md", ROOT / "docs/IMPLEMENTATION-PLAN.MD"):
             with self.subTest(path=path.name):
                 self.assertIn("--base-commit", path.read_text(encoding="utf-8"))
         build = config["build"]
         self.assertEqual(
             _output_path_errors(
-                "candidate", build["candidate_root"],
-                build["candidate_root"], build["final_root"],
+                "candidate",
+                build["candidate_root"],
+                build["candidate_root"],
+                build["final_root"],
             ),
             set(),
         )
         self.assertEqual(
             _output_path_errors(
-                "final", build["final_root"],
-                build["candidate_root"], build["final_root"],
+                "final",
+                build["final_root"],
+                build["candidate_root"],
+                build["final_root"],
             ),
             set(),
         )
@@ -946,16 +1013,17 @@ class SchemaFixtureTests(unittest.TestCase):
                 self.assertIn(
                     expected,
                     _output_path_errors(
-                        kind, output, build["candidate_root"], build["final_root"],
+                        kind,
+                        output,
+                        build["candidate_root"],
+                        build["final_root"],
                         is_symlink=symlink,
                     ),
                 )
 
     def test_validated_mac_metadata_correlates_exact_inputs_and_delta(self) -> None:
         envelope = next(
-            case["valid"][0]
-            for case in self.cases
-            if case["schema"] == "mac-metadata.schema.json"
+            case["valid"][0] for case in self.cases if case["schema"] == "mac-metadata.schema.json"
         )
         flags = {
             "base_commit": envelope["base_sha"],
@@ -969,9 +1037,17 @@ class SchemaFixtureTests(unittest.TestCase):
             "base": ("flag", "base_commit", "0" * 40),
             "head": ("flag", "source_commit", "0" * 40),
             "head-tree": ("flag", "source_tree", "0" * 40),
-            "issue-repository": ("envelope", ["issue", "url"], "https://github.com/other/Repo/issues/22"),
+            "issue-repository": (
+                "envelope",
+                ["issue", "url"],
+                "https://github.com/other/Repo/issues/22",
+            ),
             "payload-digest": ("envelope", ["payload_digest"], "sha256:" + "0" * 64),
-            "operation-subjects": ("envelope", ["payload", "subjects", 0, "identity"], "other-model"),
+            "operation-subjects": (
+                "envelope",
+                ["payload", "subjects", 0, "identity"],
+                "other-model",
+            ),
             "computed-delta": ("computed", [0, "after"], "sha256:" + "0" * 64),
         }
         for expected, (target_kind, path, value) in mutations.items():
@@ -992,9 +1068,10 @@ class SchemaFixtureTests(unittest.TestCase):
                 )
         wrong_operation = copy.deepcopy(envelope)
         wrong_operation["payload"]["operation"] = "change"
-        wrong_operation["payload_digest"] = "sha256:" + hashlib.sha256(
-            _canonical_receipt_bytes(wrong_operation["payload"])
-        ).hexdigest()
+        wrong_operation["payload_digest"] = (
+            "sha256:"
+            + hashlib.sha256(_canonical_receipt_bytes(wrong_operation["payload"])).hexdigest()
+        )
         self.assertIn(
             "operation-subjects",
             _mac_metadata_errors(wrong_operation, flags, envelope["expected_change_delta"]),
@@ -1007,17 +1084,18 @@ class SchemaFixtureTests(unittest.TestCase):
 
     def test_registry_subjects_are_derived_from_keyed_document_diff(self) -> None:
         base = next(
-            case["valid"][0] for case in self.cases
-            if case["schema"] == "mac-metadata.schema.json"
+            case["valid"][0] for case in self.cases if case["schema"] == "mac-metadata.schema.json"
         )
         digest_a = "sha256:" + "a" * 64
         digest_b = "sha256:" + "b" * 64
-        delta = [{
-            "operation": "change",
-            "path": "catalogue/governance/vendors.yaml",
-            "before": digest_a,
-            "after": digest_b,
-        }]
+        delta = [
+            {
+                "operation": "change",
+                "path": "catalogue/governance/vendors.yaml",
+                "before": digest_a,
+                "after": digest_b,
+            }
+        ]
         flags = {
             "base_commit": base["base_sha"],
             "source_commit": base["head_sha"],
@@ -1031,9 +1109,9 @@ class SchemaFixtureTests(unittest.TestCase):
                 {"kind": "vendor", "identity": identity} for identity in identities
             ]
             envelope["payload"] = payload
-            envelope["payload_digest"] = "sha256:" + hashlib.sha256(
-                _canonical_receipt_bytes(payload)
-            ).hexdigest()
+            envelope["payload_digest"] = (
+                "sha256:" + hashlib.sha256(_canonical_receipt_bytes(payload)).hexdigest()
+            )
             envelope["expected_change_delta"] = copy.deepcopy(delta)
             return envelope
 
@@ -1051,8 +1129,11 @@ class SchemaFixtureTests(unittest.TestCase):
         self.assertEqual(list(metadata_validator.iter_errors(batch)), [])
         self.assertEqual(
             _mac_metadata_errors(
-                batch, flags, delta,
-                base_registries=base_maps, head_registries=head_maps,
+                batch,
+                flags,
+                delta,
+                base_registries=base_maps,
+                head_registries=head_maps,
             ),
             set(),
         )
@@ -1067,32 +1148,38 @@ class SchemaFixtureTests(unittest.TestCase):
         self.assertIn(
             "registry-operation",
             _mac_metadata_errors(
-                batch, flags, delta,
+                batch,
+                flags,
+                delta,
                 base_registries=changed_maps_base,
                 head_registries=changed_maps_head,
             ),
         )
         changed_batch = copy.deepcopy(batch)
         changed_batch["payload"]["item_operation"] = "change"
-        changed_batch["payload_digest"] = "sha256:" + hashlib.sha256(
-            _canonical_receipt_bytes(changed_batch["payload"])
-        ).hexdigest()
+        changed_batch["payload_digest"] = (
+            "sha256:"
+            + hashlib.sha256(_canonical_receipt_bytes(changed_batch["payload"])).hexdigest()
+        )
         self.assertEqual(
             _mac_metadata_errors(
-                changed_batch, flags, delta,
+                changed_batch,
+                flags,
+                delta,
                 base_registries=changed_maps_base,
                 head_registries=changed_maps_head,
             ),
             set(),
         )
-        deleted_maps = {
-            "vendor": {"vendor-b": {"name": "B"}}, "inference-service": {}
-        }
+        deleted_maps = {"vendor": {"vendor-b": {"name": "B"}}, "inference-service": {}}
         self.assertIn(
             "registry-deletion",
             _mac_metadata_errors(
-                changed_batch, flags, delta,
-                base_registries=changed_maps_head, head_registries=deleted_maps,
+                changed_batch,
+                flags,
+                delta,
+                base_registries=changed_maps_head,
+                head_registries=deleted_maps,
             ),
         )
         for identities in (["vendor-a"], ["vendor-a", "vendor-b", "vendor-c"]):
@@ -1100,15 +1187,20 @@ class SchemaFixtureTests(unittest.TestCase):
                 self.assertIn(
                     "registry-subjects",
                     _mac_metadata_errors(
-                        envelope_for(list(identities)), flags, delta,
-                        base_registries=base_maps, head_registries=head_maps,
+                        envelope_for(list(identities)),
+                        flags,
+                        delta,
+                        base_registries=base_maps,
+                        head_registries=head_maps,
                     ),
                 )
         claim_a_change_b = envelope_for(["vendor-a"])
         self.assertIn(
             "registry-subjects",
             _mac_metadata_errors(
-                claim_a_change_b, flags, delta,
+                claim_a_change_b,
+                flags,
+                delta,
                 base_registries=base_maps,
                 head_registries={
                     "vendor": {"vendor-b": {"name": "B"}},
@@ -1121,7 +1213,9 @@ class SchemaFixtureTests(unittest.TestCase):
         self.assertIn(
             "registry-subjects",
             _mac_metadata_errors(
-                unclaimed, flags, delta,
+                unclaimed,
+                flags,
+                delta,
                 base_registries=base_maps,
                 head_registries={
                     "vendor": {"vendor-a": {"name": "A"}},
@@ -1130,22 +1224,24 @@ class SchemaFixtureTests(unittest.TestCase):
             ),
         )
         service = envelope_for(["service-a"])
-        service["payload"]["subjects"] = [
-            {"kind": "inference-service", "identity": "service-a"}
+        service["payload"]["subjects"] = [{"kind": "inference-service", "identity": "service-a"}]
+        service["payload_digest"] = (
+            "sha256:" + hashlib.sha256(_canonical_receipt_bytes(service["payload"])).hexdigest()
+        )
+        service_delta = [
+            {
+                "operation": "change",
+                "path": "catalogue/governance/inference-services.yaml",
+                "before": digest_a,
+                "after": digest_b,
+            }
         ]
-        service["payload_digest"] = "sha256:" + hashlib.sha256(
-            _canonical_receipt_bytes(service["payload"])
-        ).hexdigest()
-        service_delta = [{
-            "operation": "change",
-            "path": "catalogue/governance/inference-services.yaml",
-            "before": digest_a,
-            "after": digest_b,
-        }]
         service["expected_change_delta"] = service_delta
         self.assertEqual(
             _mac_metadata_errors(
-                service, flags, service_delta,
+                service,
+                flags,
+                service_delta,
                 base_registries={"vendor": {}, "inference-service": {}},
                 head_registries={
                     "vendor": {},
@@ -1176,12 +1272,16 @@ class SchemaFixtureTests(unittest.TestCase):
                 "local_candidate_accepting_durability": False,
                 "outside_repository_temp_path": "allowed",
                 "network_read": False,
-                "validation_order": ["file_boundary", "json_parse", "schema", "semantic_correlations"],
+                "validation_order": [
+                    "file_boundary",
+                    "json_parse",
+                    "schema",
+                    "semantic_correlations",
+                ],
             },
         )
         valid = next(
-            case["valid"][0] for case in self.cases
-            if case["schema"] == "mac-metadata.schema.json"
+            case["valid"][0] for case in self.cases if case["schema"] == "mac-metadata.schema.json"
         )
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -1211,18 +1311,21 @@ class SchemaFixtureTests(unittest.TestCase):
             invalid: list[tuple[str, bytes | None]] = [
                 ("link.json", None),
                 ("large.json", b"{" + b" " * 262144 + b"}"),
-                ("utf8.json", b"{\"x\":\xff}"),
+                ("utf8.json", b'{"x":\xff}'),
                 ("yaml.json", b"key: value\n"),
-                ("duplicate.json", b"{\"x\":1,\"x\":2}"),
-                ("nan.json", b"{\"x\":NaN}"),
-                ("float.json", b"{\"x\":1.5}"),
+                ("duplicate.json", b'{"x":1,"x":2}'),
+                ("nan.json", b'{"x":NaN}'),
+                ("float.json", b'{"x":1.5}'),
                 ("array.json", b"[]"),
             ]
             for name, content in invalid:
                 path = root / name
                 if content is not None:
                     path.write_bytes(content)
-                with self.subTest(name=name), self.assertRaises((OSError, ValueError, UnicodeError, json.JSONDecodeError)):
+                with (
+                    self.subTest(name=name),
+                    self.assertRaises((OSError, ValueError, UnicodeError, json.JSONDecodeError)),
+                ):
                     _read_mac_metadata_contract(path)
 
     def test_source_epoch_is_explicit_but_frozen_to_source_author_time(self) -> None:
@@ -1239,8 +1342,11 @@ class SchemaFixtureTests(unittest.TestCase):
         self.assertEqual(_source_epoch_errors(100, 100), set())
         self.assertEqual(_source_epoch_errors(101, 100), {"source-author-epoch"})
         for path in (
-            ROOT / "SPEC.md", ROOT / "README.md", ROOT / "docs/contract.yaml",
-            ROOT / "docs/implementation-plan.md", ROOT / "docs/site-contract.md",
+            ROOT / "SPEC.md",
+            ROOT / "README.md",
+            ROOT / "docs/contract.yaml",
+            ROOT / "docs/IMPLEMENTATION-PLAN.MD",
+            ROOT / "docs/site-contract.md",
         ):
             text = path.read_text(encoding="utf-8")
             self.assertNotIn("SOURCE_DATE_EPOCH", text)
@@ -1248,9 +1354,7 @@ class SchemaFixtureTests(unittest.TestCase):
 
     def test_revoke_and_move_annotations_are_envelope_only_and_exact(self) -> None:
         base = next(
-            case["valid"][0]
-            for case in self.cases
-            if case["schema"] == "mac-metadata.schema.json"
+            case["valid"][0] for case in self.cases if case["schema"] == "mac-metadata.schema.json"
         )
         flags = {
             "base_commit": base["base_sha"],
@@ -1263,14 +1367,39 @@ class SchemaFixtureTests(unittest.TestCase):
             (
                 "revoke",
                 json.loads((MAC_FIXTURES / "revoke.json").read_text(encoding="utf-8")),
-                [{"operation": "revoke", "path": "catalogue/offerings/aws-bedrock/bedrock-example-model.yaml", "before": digest_a, "reason": "Governance withdrawal.", "effective_at": "2026-08-30T14:00:00Z"}],
+                [
+                    {
+                        "operation": "revoke",
+                        "path": "catalogue/offerings/aws-bedrock/bedrock-example-model.yaml",
+                        "before": digest_a,
+                        "reason": "Governance withdrawal.",
+                        "effective_at": "2026-08-30T14:00:00Z",
+                    }
+                ],
                 [0, "reason"],
                 "Different reason.",
             ),
             (
                 "move",
                 json.loads((MAC_FIXTURES / "move.json").read_text(encoding="utf-8")),
-                [{"operation": "move", "source": {"operation": "revoke", "path": "catalogue/offerings/aws-bedrock/bedrock-example-old.yaml", "before": digest_a, "reason": "Identity moved.", "effective_at": "2026-08-30T14:00:00Z", "replacement": "catalogue/offerings/aws-bedrock/bedrock-example-new.yaml"}, "destination": {"operation": "add", "path": "catalogue/offerings/aws-bedrock/bedrock-example-new.yaml", "after": digest_b}}],
+                [
+                    {
+                        "operation": "move",
+                        "source": {
+                            "operation": "revoke",
+                            "path": "catalogue/offerings/aws-bedrock/bedrock-example-old.yaml",
+                            "before": digest_a,
+                            "reason": "Identity moved.",
+                            "effective_at": "2026-08-30T14:00:00Z",
+                            "replacement": "catalogue/offerings/aws-bedrock/bedrock-example-new.yaml",
+                        },
+                        "destination": {
+                            "operation": "add",
+                            "path": "catalogue/offerings/aws-bedrock/bedrock-example-new.yaml",
+                            "after": digest_b,
+                        },
+                    }
+                ],
                 [0, "source", "effective_at"],
                 "2026-08-30T15:00:00Z",
             ),
@@ -1278,9 +1407,9 @@ class SchemaFixtureTests(unittest.TestCase):
         for name, payload, delta, mutation_path, value in cases:
             envelope = copy.deepcopy(base)
             envelope["payload"] = payload
-            envelope["payload_digest"] = "sha256:" + hashlib.sha256(
-                _canonical_receipt_bytes(payload)
-            ).hexdigest()
+            envelope["payload_digest"] = (
+                "sha256:" + hashlib.sha256(_canonical_receipt_bytes(payload)).hexdigest()
+            )
             envelope["expected_change_delta"] = delta
             self.assertEqual(_mac_metadata_errors(envelope, flags, delta), set())
             changed = copy.deepcopy(delta)
@@ -1293,8 +1422,7 @@ class SchemaFixtureTests(unittest.TestCase):
 
     def test_move_and_revoke_replacements_are_exact_and_resolvable(self) -> None:
         base = next(
-            case["valid"][0] for case in self.cases
-            if case["schema"] == "mac-metadata.schema.json"
+            case["valid"][0] for case in self.cases if case["schema"] == "mac-metadata.schema.json"
         )
         flags = {
             "base_commit": base["base_sha"],
@@ -1304,25 +1432,27 @@ class SchemaFixtureTests(unittest.TestCase):
         digest = "sha256:" + "a" * 64
         move = copy.deepcopy(base)
         move["payload"] = json.loads((MAC_FIXTURES / "move.json").read_text(encoding="utf-8"))
-        move["payload_digest"] = "sha256:" + hashlib.sha256(
-            _canonical_receipt_bytes(move["payload"])
-        ).hexdigest()
-        move_delta = [{
-            "operation": "move",
-            "source": {
-                "operation": "revoke",
-                "path": "catalogue/offerings/aws-bedrock/bedrock-example-old.yaml",
-                "before": digest,
-                "reason": "Identity moved.",
-                "effective_at": "2026-08-30T14:00:00Z",
-                "replacement": "catalogue/offerings/aws-bedrock/bedrock-example-new.yaml",
-            },
-            "destination": {
-                "operation": "add",
-                "path": "catalogue/offerings/aws-bedrock/bedrock-example-new.yaml",
-                "after": digest,
-            },
-        }]
+        move["payload_digest"] = (
+            "sha256:" + hashlib.sha256(_canonical_receipt_bytes(move["payload"])).hexdigest()
+        )
+        move_delta = [
+            {
+                "operation": "move",
+                "source": {
+                    "operation": "revoke",
+                    "path": "catalogue/offerings/aws-bedrock/bedrock-example-old.yaml",
+                    "before": digest,
+                    "reason": "Identity moved.",
+                    "effective_at": "2026-08-30T14:00:00Z",
+                    "replacement": "catalogue/offerings/aws-bedrock/bedrock-example-new.yaml",
+                },
+                "destination": {
+                    "operation": "add",
+                    "path": "catalogue/offerings/aws-bedrock/bedrock-example-new.yaml",
+                    "after": digest,
+                },
+            }
+        ]
         move["expected_change_delta"] = move_delta
         self.assertEqual(_mac_metadata_errors(move, flags, move_delta), set())
         for replacement in (None, "catalogue/offerings/aws-bedrock/arbitrary.yaml"):
@@ -1333,19 +1463,26 @@ class SchemaFixtureTests(unittest.TestCase):
                 changed[0]["source"]["replacement"] = replacement
             changed_envelope = copy.deepcopy(move)
             changed_envelope["expected_change_delta"] = changed
-            self.assertIn("move-replacement", _mac_metadata_errors(changed_envelope, flags, changed))
+            self.assertIn(
+                "move-replacement", _mac_metadata_errors(changed_envelope, flags, changed)
+            )
 
         revoke = copy.deepcopy(base)
         revoke["payload"] = json.loads((MAC_FIXTURES / "revoke.json").read_text(encoding="utf-8"))
-        revoke["payload_digest"] = "sha256:" + hashlib.sha256(
-            _canonical_receipt_bytes(revoke["payload"])
-        ).hexdigest()
+        revoke["payload_digest"] = (
+            "sha256:" + hashlib.sha256(_canonical_receipt_bytes(revoke["payload"])).hexdigest()
+        )
         revoked_path = "catalogue/offerings/aws-bedrock/bedrock-example-model.yaml"
         replacement_path = "catalogue/offerings/aws-bedrock/bedrock-example-new.yaml"
-        revoke_delta = [{
-            "operation": "revoke", "path": revoked_path, "before": digest,
-            "reason": "Governance withdrawal.", "effective_at": "2026-08-30T14:00:00Z",
-        }]
+        revoke_delta = [
+            {
+                "operation": "revoke",
+                "path": revoked_path,
+                "before": digest,
+                "reason": "Governance withdrawal.",
+                "effective_at": "2026-08-30T14:00:00Z",
+            }
+        ]
         revoke["expected_change_delta"] = revoke_delta
         self.assertEqual(
             _mac_metadata_errors(revoke, flags, revoke_delta, head_offering_paths=set()), set()
@@ -1416,7 +1553,10 @@ class SchemaFixtureTests(unittest.TestCase):
             "catalogue": (check["artifacts"]["catalogue"], release["artifacts"]["catalogue"]),
             "tool": (check["tool_digest"], release["tool_digest"]),
             "lock": (check["lock_digest"], release["lock_digest"]),
-            "actors": (check["actors_registry_digest"], release["approval"]["actors_registry_digest"]),
+            "actors": (
+                check["actors_registry_digest"],
+                release["approval"]["actors_registry_digest"],
+            ),
             "workflow": (check["ci"]["workflow_identity"], release["ci"]["workflow_identity"]),
             "workflow SHA": (check["ci"]["workflow_sha"], release["ci"]["workflow_sha"]),
             "workflow gates": (check["ci"]["gates"], release["ci"]["gates"]),
@@ -1459,13 +1599,13 @@ class SchemaFixtureTests(unittest.TestCase):
                 "sha256:" + hashlib.sha256(_canonical_receipt_bytes(check)).hexdigest()
             )
             with self.subTest(expected=expected):
-                self.assertIn(expected, _release_correlation_errors(check, changed_release, trusted))
+                self.assertIn(
+                    expected, _release_correlation_errors(check, changed_release, trusted)
+                )
 
     def test_trusted_check_correlations_reject_result_and_current_base_drift(self) -> None:
         check = next(
-            case["valid"][0]
-            for case in self.cases
-            if case["schema"] == "check-receipt.schema.json"
+            case["valid"][0] for case in self.cases if case["schema"] == "check-receipt.schema.json"
         )
         trusted = _trusted_context(check)
         failed = copy.deepcopy(check)
@@ -1477,9 +1617,7 @@ class SchemaFixtureTests(unittest.TestCase):
 
     def test_trusted_check_correlations_reject_internal_head_and_provider_mismatch(self) -> None:
         check = next(
-            case["valid"][0]
-            for case in self.cases
-            if case["schema"] == "check-receipt.schema.json"
+            case["valid"][0] for case in self.cases if case["schema"] == "check-receipt.schema.json"
         )
         trusted = _trusted_context(check)
         wrong_head = copy.deepcopy(check)
@@ -1487,7 +1625,9 @@ class SchemaFixtureTests(unittest.TestCase):
         self.assertIn("check-ci-head", _trusted_check_correlation_errors(wrong_head, trusted))
         wrong_provider = copy.deepcopy(check)
         wrong_provider["ci"]["provider"] = "gitlab"
-        self.assertIn("check-ci-provider", _trusted_check_correlation_errors(wrong_provider, trusted))
+        self.assertIn(
+            "check-ci-provider", _trusted_check_correlation_errors(wrong_provider, trusted)
+        )
 
     def test_release_correlations_fail_independently(self) -> None:
         by_schema = {case["schema"]: case for case in self.cases}
@@ -1518,10 +1658,14 @@ class SchemaFixtureTests(unittest.TestCase):
                 target = target[component]
             target[path[-1]] = value
             with self.subTest(expected=expected):
-                self.assertIn(expected, _release_correlation_errors(check, changed, _trusted_context(check)))
+                self.assertIn(
+                    expected, _release_correlation_errors(check, changed, _trusted_context(check))
+                )
 
     def test_agent_approval_requires_every_path_to_be_data_only(self) -> None:
-        self.assertTrue(_agent_paths_allowed(["catalogue/models/a.yaml", "catalogue/evidence/sha256-a.yaml"]))
+        self.assertTrue(
+            _agent_paths_allowed(["catalogue/models/a.yaml", "catalogue/evidence/sha256-a.yaml"])
+        )
         self.assertFalse(_agent_paths_allowed([]))
         for control_path in (
             "schemas/model.schema.json",
@@ -1559,12 +1703,26 @@ class SchemaFixtureTests(unittest.TestCase):
         self.assertEqual(
             set(contract["validation"]["t8_trusted_input_equality"]),
             {
-                "repository", "current_base_sha", "current_head_sha",
-                "current_head_tree_sha", "as_of", "source_date_epoch", "profile",
-                "base_url", "base_path", "mac_issue", "mac_payload_digest",
-                "canonical_change_delta", "named_artifacts_and_digests",
-                "tool_digest", "lock_digest", "actors_registry_digest",
-                "ci_provider", "workflow_identity", "run_id", "check_name",
+                "repository",
+                "current_base_sha",
+                "current_head_sha",
+                "current_head_tree_sha",
+                "as_of",
+                "source_date_epoch",
+                "profile",
+                "base_url",
+                "base_path",
+                "mac_issue",
+                "mac_payload_digest",
+                "canonical_change_delta",
+                "named_artifacts_and_digests",
+                "tool_digest",
+                "lock_digest",
+                "actors_registry_digest",
+                "ci_provider",
+                "workflow_identity",
+                "run_id",
+                "check_name",
                 "success_result",
             },
         )
@@ -1576,16 +1734,32 @@ class SchemaFixtureTests(unittest.TestCase):
             set(contract["validation"]["postmerge_publication"]["final_only_digest_exceptions"]),
             {"publication", "manifest"},
         )
-        self.assertTrue(contract["approval"]["agent_approval"]["every_changed_path_must_match_allowlist"])
+        self.assertTrue(
+            contract["approval"]["agent_approval"]["every_changed_path_must_match_allowlist"]
+        )
 
     def test_atomic_publication_contract_is_ordered_and_not_overclaimed(self) -> None:
         config = yaml.safe_load((ROOT / "modelo.yaml").read_text(encoding="utf-8"))
         build = config["build"]
         self.assertEqual(
             set(build["required_cli_arguments"]),
-            {"kind", "base_commit", "source_commit", "source_tree", "as_of", "source_date_epoch", "mac_metadata", "profile", "base_path", "output"},
+            {
+                "kind",
+                "base_commit",
+                "source_commit",
+                "source_tree",
+                "as_of",
+                "source_date_epoch",
+                "mac_metadata",
+                "profile",
+                "base_path",
+                "output",
+            },
         )
-        self.assertEqual(set(build["final_cli_arguments"]), {"merge_commit", "merge_tree", "publication_capability"})
+        self.assertEqual(
+            set(build["final_cli_arguments"]),
+            {"merge_commit", "merge_tree", "publication_capability"},
+        )
         self.assertIs(build["ambient_git_or_environment_inference"], False)
         self.assertEqual(build["lock_acquire"], "exclusive_create_or_fail_fast")
         self.assertEqual(build["target_parent"], "dist")
@@ -1594,9 +1768,22 @@ class SchemaFixtureTests(unittest.TestCase):
         self.assertEqual(build["atomic_publish"], "per_rename_same_filesystem_only")
         self.assertEqual(
             build["promotion_state_machine"],
-            ["lock", "stage", "fsync_stage", "validate_stage", "backup_old", "promote_new", "fsync_parent", "verify_target", "remove_backup", "unlock"],
+            [
+                "lock",
+                "stage",
+                "fsync_stage",
+                "validate_stage",
+                "backup_old",
+                "promote_new",
+                "fsync_parent",
+                "verify_target",
+                "remove_backup",
+                "unlock",
+            ],
         )
-        self.assertEqual(build["crash_recovery"], "explicit_recover_from_journal_or_fail_closed_on_ambiguity")
+        self.assertEqual(
+            build["crash_recovery"], "explicit_recover_from_journal_or_fail_closed_on_ambiguity"
+        )
 
 
 if __name__ == "__main__":

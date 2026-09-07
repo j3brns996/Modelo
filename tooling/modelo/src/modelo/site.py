@@ -2,31 +2,36 @@
 
 from __future__ import annotations
 
+import io
+import json
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from html import escape
-import hashlib
-import io
-from zipfile import ZipFile, ZipInfo
-import json
 from pathlib import Path, PurePosixPath
-import re
-import subprocess
 from string import Template
 from typing import Any, Iterable, Mapping
 from urllib.parse import quote, urlsplit
+from zipfile import ZipFile, ZipInfo
 
 from modelo.build import (
-    BuildError, BuildRequest, _layout, _projection_from_snapshot, _publish, _safe_url,
-    _walk_regular_tree, rebuild_candidate_inputs, recover_candidate,
+    BuildError,
+    BuildRequest,
+    _git,
+    _layout,
+    _projection_from_snapshot,
+    _publish,
+    _safe_url,
+    _walk_regular_tree,
+    rebuild_candidate_inputs,
+    recover_candidate,
 )
-from modelo.change import with_snapshot
+from modelo.change import GitError, require_ancestor, with_snapshot
 from modelo.config import CONTRACT_VERSION, load_config
-from modelo.receipt import canonical_bytes, publication_digest, sha256_bytes
-from modelo.schemas import SchemaSet
 from modelo.identity import canonical_urn, release_precision
 from modelo.proposal import OPERATIONS, lookup_records, render_fields
-
+from modelo.receipt import canonical_bytes, publication_digest, sha256_bytes
+from modelo.schemas import SchemaSet
 
 _ID = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 _PRIVATE_CANARY = b"MODELO_PRIVATE_CANARY"
@@ -44,15 +49,29 @@ def _model_release_facts(model: Mapping[str, Any]) -> str:
         ("Identity precision", precision),
         ("Release date", release.get("released_at", "Not stated")),
     )
-    facts = "".join(f"<div><dt>{escape(label)}</dt><dd>{escape(str(value))}</dd></div>" for label, value in fields)
+    facts = "".join(
+        f"<div><dt>{escape(label)}</dt><dd>{escape(str(value))}</dd></div>"
+        for label, value in fields
+    )
     claims = "".join(
-        "<li><code>" + escape(claim["namespace"]) + ": " + escape(claim["value"])
-        + "</code> — " + escape(claim["relation"]) + "; status: " + escape(claim["status"]) + "</li>"
+        "<li><code>"
+        + escape(claim["namespace"])
+        + ": "
+        + escape(claim["value"])
+        + "</code> — "
+        + escape(claim["relation"])
+        + "; status: "
+        + escape(claim["status"])
+        + "</li>"
         for claim in model.get("identity_claims", [])
     )
-    return '<dl class="fact-grid">' + facts + '</dl><h2>External identity claims</h2>' + (
-        "<ul>" + claims + "</ul>" if claims else "<p>Not stated.</p>"
-    ) + "<p>Identity claim status is not consumption approval; only an Offering grants consumption.</p>"
+    return (
+        '<dl class="fact-grid">'
+        + facts
+        + "</dl><h2>External identity claims</h2>"
+        + ("<ul>" + claims + "</ul>" if claims else "<p>Not stated.</p>")
+        + "<p>Identity claim status is not consumption approval; only an Offering grants consumption.</p>"
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,16 +149,6 @@ class FinalBuildResult:
     file_count: int
 
 
-def _git(root: Path, *arguments: str, binary: bool = False) -> str | bytes:
-    result = subprocess.run(
-        ["git", *arguments], cwd=root, stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=not binary, check=False,
-    )
-    if result.returncode:
-        raise BuildError("local Git command failed while building final site")
-    return result.stdout
-
-
 def _canonical_commit(root: Path, value: str, label: str) -> str:
     resolved = str(_git(root, "rev-parse", "--verify", f"{value}^{{commit}}")).strip()
     if value != resolved or not re.fullmatch(r"[0-9a-f]{40}", value):
@@ -159,16 +168,26 @@ def _blob(root: Path, commit: str, path: str) -> bytes:
 def _entry(data: bytes, path: str = "") -> dict[str, Any]:
     suffix = PurePosixPath(path).suffix
     media = {
-        ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
-        ".js": "text/javascript; charset=utf-8", ".json": "application/json; charset=utf-8",
+        ".html": "text/html; charset=utf-8",
+        ".css": "text/css; charset=utf-8",
+        ".js": "text/javascript; charset=utf-8",
+        ".json": "application/json; charset=utf-8",
         ".zip": "application/zip",
-        ".md": "text/markdown; charset=utf-8", ".yaml": "application/yaml; charset=utf-8",
+        ".md": "text/markdown; charset=utf-8",
+        ".yaml": "application/yaml; charset=utf-8",
     }.get(suffix, "application/json; charset=utf-8")
     return {"sha256": sha256_bytes(data), "size": len(data), "media_type": media}
 
 
 class _Resolver:
-    def __init__(self, base_url: str, base_path: str, site_routes: Mapping[str, str], repository: Mapping[str, Any], fonts: Mapping[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        base_path: str,
+        site_routes: Mapping[str, str],
+        repository: Mapping[str, Any],
+        fonts: Mapping[str, Any] | None = None,
+    ) -> None:
         _safe_url(base_url, base_path)
         parsed = urlsplit(base_url)
         if parsed.path != base_path:
@@ -181,21 +200,55 @@ class _Resolver:
         self._validate_routes()
 
     def _validate_routes(self) -> None:
-        expected_directories = {"home", "catalogue", "model", "offering", "changes", "process", "propose", "docs", "overview"}
+        expected_directories = {
+            "home",
+            "catalogue",
+            "model",
+            "offering",
+            "changes",
+            "process",
+            "propose",
+            "docs",
+            "overview",
+        }
         expected_files = {
-            "not_found", "asset_css", "asset_catalogue_js", "asset_proposal_js", "asset_alpine",
-            "asset_third_party_notices", "catalogue_data", "change_delta_data",
-            "proposal_schema_bundle_data", "manifest_data", "schemas_data", "human_specification", "machine_contract", "requester_agent",
+            "not_found",
+            "asset_css",
+            "asset_catalogue_js",
+            "asset_proposal_js",
+            "asset_alpine",
+            "asset_third_party_notices",
+            "catalogue_data",
+            "change_delta_data",
+            "proposal_schema_bundle_data",
+            "manifest_data",
+            "schemas_data",
+            "human_specification",
+            "machine_contract",
+            "requester_agent",
         }
         if set(self.site_routes) != expected_directories | expected_files:
             raise BuildError("configured site route inventory is incomplete or contains extras")
         rendered: dict[str, str] = {}
-        samples = {"model_id": "sample-model", "inference_service_id": "sample-service", "offering_id": "sample-offering"}
+        samples = {
+            "model_id": "sample-model",
+            "inference_service_id": "sample-service",
+            "offering_id": "sample-offering",
+        }
         for key, route in self.site_routes.items():
-            if not isinstance(route, str) or not route.startswith("/") or "//" in route or ".." in PurePosixPath(route).parts:
+            if (
+                not isinstance(route, str)
+                or not route.startswith("/")
+                or "//" in route
+                or ".." in PurePosixPath(route).parts
+            ):
                 raise BuildError(f"configured site route {key!r} is not canonical")
             placeholders = set(re.findall(r"\{([a-z][a-z0-9_]*)\}", route))
-            if route.count("{") != len(placeholders) or route.count("}") != len(placeholders) or not placeholders <= set(samples):
+            if (
+                route.count("{") != len(placeholders)
+                or route.count("}") != len(placeholders)
+                or not placeholders <= set(samples)
+            ):
                 raise BuildError(f"configured site route {key!r} has invalid placeholders")
             if key in expected_directories and not route.endswith("/"):
                 raise BuildError(f"configured directory route {key!r} needs a trailing slash")
@@ -207,7 +260,9 @@ class _Resolver:
             for name in placeholders:
                 concrete = concrete.replace("{" + name + "}", samples[name])
             if concrete in rendered:
-                raise BuildError(f"configured site routes {rendered[concrete]!r} and {key!r} collide")
+                raise BuildError(
+                    f"configured site routes {rendered[concrete]!r} and {key!r} collide"
+                )
             rendered[concrete] = key
 
     def site(self, key: str, **values: str) -> str:
@@ -277,17 +332,21 @@ def _markdown(raw: bytes) -> str:
         raise BuildError("site content is not strict UTF-8") from exc
     output: list[str] = []
     paragraph: list[str] = []
+
     def flush() -> None:
         if paragraph:
             output.append("<p>" + escape(" ".join(paragraph)) + "</p>")
             paragraph.clear()
+
     for line in lines:
         if not line.strip():
             flush()
         elif line.startswith("## "):
-            flush(); output.append("<h2>" + escape(line[3:]) + "</h2>")
+            flush()
+            output.append("<h2>" + escape(line[3:]) + "</h2>")
         elif line.startswith("# "):
-            flush(); output.append("<h2>" + escape(line[2:]) + "</h2>")
+            flush()
+            output.append("<h2>" + escape(line[2:]) + "</h2>")
         else:
             paragraph.append(line.strip())
     flush()
@@ -308,17 +367,23 @@ def _evidence_region(evidence: Mapping[str, Mapping[str, Any]], identifier: str)
     return region
 
 
-def _supporting_evidence(identifiers: Iterable[str], evidence: Mapping[str, Mapping[str, Any]]) -> str:
+def _supporting_evidence(
+    identifiers: Iterable[str], evidence: Mapping[str, Mapping[str, Any]]
+) -> str:
     items = []
     for identifier in sorted(set(identifiers)):
         record = evidence[identifier]
         source = record["source"]
         uri = source.get("uri", source.get("documentation_uri", ""))
-        items.append('<details class="retained-evidence"><summary>Retained observation: '
-            + escape(record["observed_at"][:10]) + '</summary><p><a rel="noopener noreferrer" href="'
-            + escape(uri, quote=True) + '">Source documentation</a></p><pre><code>'
+        items.append(
+            '<details class="retained-evidence"><summary>Retained observation: '
+            + escape(record["observed_at"][:10])
+            + '</summary><p><a rel="noopener noreferrer" href="'
+            + escape(uri, quote=True)
+            + '">Source documentation</a></p><pre><code>'
             + escape(json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2))
-            + '</code></pre></details>')
+            + "</code></pre></details>"
+        )
     return "".join(items) or '<p class="muted">No supporting evidence is recorded.</p>'
 
 
@@ -329,27 +394,61 @@ def _route_rows(offering: Mapping[str, Any], evidence: Mapping[str, Mapping[str,
         kind = binding["kind"]
         destinations: list[str] = []
         if kind == "system-inference-profile":
-            destinations = sorted({
-                _evidence_region(evidence, item["model_evidence"]["id"])
-                for item in binding["destinations"]
-            })
+            destinations = sorted(
+                {
+                    _evidence_region(evidence, item["model_evidence"]["id"])
+                    for item in binding["destinations"]
+                }
+            )
         rows.append(
-            "<tr><td><code>" + escape(route["id"]) + "</code></td><td>" +
-            escape(route["source_region"]) + "</td><td>" + escape(kind) +
-            "</td><td><code>" + escape(route["reference"]) + "</code></td><td>" +
-            (", ".join(map(escape, destinations)) if destinations else '<span class="muted">None</span>') +
-            "</td></tr>"
+            "<tr><td><code>"
+            + escape(route["id"])
+            + "</code></td><td>"
+            + escape(route["source_region"])
+            + "</td><td>"
+            + escape(kind)
+            + "</td><td><code>"
+            + escape(route["reference"])
+            + "</code></td><td>"
+            + (
+                ", ".join(map(escape, destinations))
+                if destinations
+                else '<span class="muted">None</span>'
+            )
+            + "</td></tr>"
         )
-    return '<table><caption>Callable provider routes</caption><thead><tr><th>Route</th><th>Source region</th><th>Route type</th><th>Reference</th><th>Destination regions</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>"
+    return (
+        "<table><caption>Callable provider routes</caption><thead><tr><th>Route</th><th>Source region</th><th>Route type</th><th>Reference</th><th>Destination regions</th></tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table>"
+    )
 
 
 def _pricing_rows(offering: Mapping[str, Any]) -> str:
     rows = []
     for price in offering.get("pricing", []):
-        rows.append("<tr><td>" + escape(price["dimension"]) + "</td><td>" + escape(price["amount"]) + " " + escape(price["currency"]) + "</td><td>" + escape(str(price["quantity"])) + " " + escape(price["unit"]) + "</td><td>" + _tags(price["route_ids"]) + "</td></tr>")
+        rows.append(
+            "<tr><td>"
+            + escape(price["dimension"])
+            + "</td><td>"
+            + escape(price["amount"])
+            + " "
+            + escape(price["currency"])
+            + "</td><td>"
+            + escape(str(price["quantity"]))
+            + " "
+            + escape(price["unit"])
+            + "</td><td>"
+            + _tags(price["route_ids"])
+            + "</td></tr>"
+        )
     if not rows:
         return '<p class="muted">No pricing facts are published for this offering.</p>'
-    return '<table><caption>Published pricing facts</caption><thead><tr><th>Dimension</th><th>Amount</th><th>Unit</th><th>Routes</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>"
+    return (
+        "<table><caption>Published pricing facts</caption><thead><tr><th>Dimension</th><th>Amount</th><th>Unit</th><th>Routes</th></tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table>"
+    )
 
 
 def _history(root: Path, merge: str, source_path: str, resolver: _Resolver) -> list[dict[str, Any]]:
@@ -375,66 +474,147 @@ def _history(root: Path, merge: str, source_path: str, resolver: _Resolver) -> l
         if changes:
             timestamp = int(str(_git(root, "show", "-s", "--format=%at", commit)).strip())
             subject = str(_git(root, "show", "-s", "--format=%s", commit)).rstrip("\n")
-            result.append({
-                "sha": commit, "date": datetime.fromtimestamp(timestamp, timezone.utc).date().isoformat(),
-                "subject": subject, "changes": sorted(changes, key=lambda value: value.encode("utf-8")),
-                "url": resolver.repository_url("commit", commit_sha=commit),
-            })
+            result.append(
+                {
+                    "sha": commit,
+                    "date": datetime.fromtimestamp(timestamp, timezone.utc).date().isoformat(),
+                    "subject": subject,
+                    "changes": sorted(changes, key=lambda value: value.encode("utf-8")),
+                    "url": resolver.repository_url("commit", commit_sha=commit),
+                }
+            )
     return list(reversed(result))
 
 
 def _history_html(history: Iterable[Mapping[str, Any]]) -> str:
     items = []
     for entry in history:
-        changes = "<ul>" + "".join('<li title="' + escape(item, quote=True) + '">' + escape(item) + "</li>" for item in entry["changes"][:4]) + "</ul>"
+        changes = (
+            "<ul>"
+            + "".join(
+                '<li title="' + escape(item, quote=True) + '">' + escape(item) + "</li>"
+                for item in entry["changes"][:4]
+            )
+            + "</ul>"
+        )
         if len(entry["changes"]) > 4:
-            changes += '<details><summary>Show ' + str(len(entry["changes"]) - 4) + ' more changed paths</summary><ul>' + "".join("<li>" + escape(item) + "</li>" for item in entry["changes"][4:]) + "</ul></details>"
-        items.append('<article class="card"><h2><a rel="noopener noreferrer" href="' + escape(entry["url"], quote=True) + '"><code>' + escape(entry["sha"][:12]) + "</code></a></h2><p><time datetime=\"" + escape(entry["date"], quote=True) + '\">' + escape(entry["date"]) + "</time> · " + escape(entry["subject"]) + "</p>" + changes + "</article>")
-    return '<div class="cards">' + "".join(items) + "</div>" if items else '<p class="muted">No catalogue changes are present in first-parent history.</p>'
+            changes += (
+                "<details><summary>Show "
+                + str(len(entry["changes"]) - 4)
+                + " more changed paths</summary><ul>"
+                + "".join("<li>" + escape(item) + "</li>" for item in entry["changes"][4:])
+                + "</ul></details>"
+            )
+        items.append(
+            '<article class="card"><h2><a rel="noopener noreferrer" href="'
+            + escape(entry["url"], quote=True)
+            + '"><code>'
+            + escape(entry["sha"][:12])
+            + '</code></a></h2><p><time datetime="'
+            + escape(entry["date"], quote=True)
+            + '">'
+            + escape(entry["date"])
+            + "</time> · "
+            + escape(entry["subject"])
+            + "</p>"
+            + changes
+            + "</article>"
+        )
+    return (
+        '<div class="cards">' + "".join(items) + "</div>"
+        if items
+        else '<p class="muted">No catalogue changes are present in first-parent history.</p>'
+    )
 
 
 def _history_summary_html(history: Iterable[Mapping[str, Any]]) -> str:
     items = []
     for entry in history:
         items.append(
-            '<article class="history-card"><div><time datetime="' + escape(entry["date"], quote=True) + '">'
-            + escape(entry["date"]) + '</time><span>' + str(len(entry["changes"])) + ' changed paths</span></div><h3>'
-            + escape(entry["subject"]) + '</h3><a rel="noopener noreferrer" href="'
-            + escape(entry["url"], quote=True) + '"><code>' + escape(entry["sha"][:12])
+            '<article class="history-card"><div><time datetime="'
+            + escape(entry["date"], quote=True)
+            + '">'
+            + escape(entry["date"])
+            + "</time><span>"
+            + str(len(entry["changes"]))
+            + " changed paths</span></div><h3>"
+            + escape(entry["subject"])
+            + '</h3><a rel="noopener noreferrer" href="'
+            + escape(entry["url"], quote=True)
+            + '"><code>'
+            + escape(entry["sha"][:12])
             + '</code><span aria-hidden="true">→</span></a></article>'
         )
-    return '<div class="history-summary">' + "".join(items) + "</div>" if items else '<p class="muted">No catalogue changes are present in first-parent history.</p>'
+    return (
+        '<div class="history-summary">' + "".join(items) + "</div>"
+        if items
+        else '<p class="muted">No catalogue changes are present in first-parent history.</p>'
+    )
 
 
 def _navigation(resolver: _Resolver, current: str) -> str:
     labels = (
-        ("catalogue", "Catalogue"), ("overview", "How it works"),
-        ("changes", "Changes"), ("propose", "Make a proposal"), ("docs", "Field guide"),
+        ("catalogue", "Catalogue"),
+        ("overview", "How it works"),
+        ("changes", "Changes"),
+        ("propose", "Make a proposal"),
+        ("docs", "Field guide"),
         ("requester_agent", "Agents"),
     )
     return "".join(
-        '<a href="' + escape(resolver.site(key), quote=True) + '"'
-        + (' aria-current="page"' if key == current else "") + ">" + label + "</a>"
+        '<a href="'
+        + escape(resolver.site(key), quote=True)
+        + '"'
+        + (' aria-current="page"' if key == current else "")
+        + ">"
+        + label
+        + "</a>"
         for key, label in labels
     )
 
 
-def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, request: _SiteBuildRequest, name: str, title: str, content: str, route: str, route_values: Mapping[str, str] | None = None) -> bytes:
+def _page(
+    root: Path,
+    source: str,
+    templates_path: str,
+    resolver: _Resolver,
+    request: _SiteBuildRequest,
+    name: str,
+    title: str,
+    content: str,
+    route: str,
+    route_values: Mapping[str, str] | None = None,
+) -> bytes:
     base = _template(root, source, templates_path, "base")
     repository = urlsplit(str(resolver.repository["web_base"]))
     values = {
-        "repository_connect_source": escape(" " + repository.scheme + "://" + repository.netloc, quote=True) if name == "propose" and resolver.repository["adapter"] == "gitlab" else "",
+        "repository_connect_source": escape(
+            " " + repository.scheme + "://" + repository.netloc, quote=True
+        )
+        if name == "propose" and resolver.repository["adapter"] == "gitlab"
+        else "",
         "canonical_url": escape(resolver.canonical(route, **dict(route_values or {})), quote=True),
         "asset_css_url": escape(resolver.site("asset_css"), quote=True),
-        "asset_third_party_notices_url": escape(resolver.site("asset_third_party_notices"), quote=True),
-        "scripts": (
-            '<script src="' + escape(resolver.site("asset_catalogue_js"), quote=True) + '" defer></script>\n  '
-            '<script src="' + escape(resolver.site("asset_alpine"), quote=True) + '" defer></script>'
-            if name == "catalogue" else
-            '<script src="' + escape(resolver.site("asset_proposal_js"), quote=True) + '" defer></script>'
-            if name == "propose" else ""
+        "asset_third_party_notices_url": escape(
+            resolver.site("asset_third_party_notices"), quote=True
         ),
-        "title": escape(title), "navigation": _navigation(resolver, route), "content": content,
+        "scripts": (
+            '<script src="'
+            + escape(resolver.site("asset_catalogue_js"), quote=True)
+            + '" defer></script>\n  '
+            '<script src="'
+            + escape(resolver.site("asset_alpine"), quote=True)
+            + '" defer></script>'
+            if name == "catalogue"
+            else '<script src="'
+            + escape(resolver.site("asset_proposal_js"), quote=True)
+            + '" defer></script>'
+            if name == "propose"
+            else ""
+        ),
+        "title": escape(title),
+        "navigation": _navigation(resolver, route),
+        "content": content,
         "page_name": escape(name, quote=True),
         "home_url": escape(resolver.site("home"), quote=True),
         "catalogue_url": escape(resolver.site("catalogue"), quote=True),
@@ -442,161 +622,400 @@ def _page(root: Path, source: str, templates_path: str, resolver: _Resolver, req
         "docs_url": escape(resolver.site("docs"), quote=True),
         "overview_url": escape(resolver.site("overview"), quote=True),
         "repository_url": escape(str(resolver.repository["web_base"]), quote=True),
-        "source_commit_url": escape(resolver.repository_url("commit", commit_sha=request.source_commit), quote=True),
+        "source_commit_url": escape(
+            resolver.repository_url("commit", commit_sha=request.source_commit), quote=True
+        ),
         "status_banner": (
             '<aside class="status-banner" role="status"><strong>Demonstration catalogue</strong>'
             "<span>— synthetic data, not enterprise approval.</span></aside>"
-            if request.kind == "demo" else ""
+            if request.kind == "demo"
+            else ""
         ),
         "integration_label": (
-            "Approval merge" if request.kind == "final" else
-            ("Validation integration" if request.kind == "validation" else "Demo source")
+            "Approval merge"
+            if request.kind == "final"
+            else ("Validation integration" if request.kind == "validation" else "Demo source")
         ),
-        "integration_commit_url": escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True),
-        "source_commit_short": escape(request.source_commit[:12]), "as_of": request.as_of.isoformat(),
+        "integration_commit_url": escape(
+            resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True
+        ),
+        "source_commit_short": escape(request.source_commit[:12]),
+        "as_of": request.as_of.isoformat(),
         "integration_commit_short": escape(request.integration_commit[:12]),
     }
     return (_substitute(base, values, name) + "\n").encode("utf-8")
 
 
 def _organisation_facts(label: str, organisation: Mapping[str, Any]) -> str:
-    fields = ((label, organisation.get("legal_name", "Unknown")),
-              (label + " domicile", organisation.get("domicile", "Unknown")))
-    return '<dl class="fact-grid">' + "".join(
-        "<div><dt>" + label + "</dt><dd>" + escape(value) + "</dd></div>"
-        for label, value in fields) + "</dl>"
+    fields = (
+        (label, organisation.get("legal_name", "Unknown")),
+        (label + " domicile", organisation.get("domicile", "Unknown")),
+    )
+    return (
+        '<dl class="fact-grid">'
+        + "".join(
+            "<div><dt>" + label + "</dt><dd>" + escape(value) + "</dd></div>"
+            for label, value in fields
+        )
+        + "</dl>"
+    )
 
 
 def _approval_scope(offering: Mapping[str, Any]) -> str:
-    fields = (("Approved use", offering["approved_use"]),
-              ("Accountable team or role", offering["approval_owner"]),
-              ("Review by", offering.get("review_by", "Event-triggered review")))
-    return '<dl class="fact-grid">' + "".join(
-        "<div><dt>" + label + "</dt><dd>" + escape(value) + "</dd></div>"
-        for label, value in fields) + "</dl>"
+    fields = (
+        ("Approved use", offering["approved_use"]),
+        ("Accountable team or role", offering["approval_owner"]),
+        ("Review by", offering.get("review_by", "Event-triggered review")),
+    )
+    return (
+        '<dl class="fact-grid">'
+        + "".join(
+            "<div><dt>" + label + "</dt><dd>" + escape(value) + "</dd></div>"
+            for label, value in fields
+        )
+        + "</dl>"
+    )
 
 
-def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, delta_raw: bytes, catalogue: Mapping[str, Any], document: Mapping[str, Any]) -> dict[str, bytes]:
+def _site_files(
+    root: Path,
+    request: _SiteBuildRequest,
+    catalogue_raw: bytes,
+    delta_raw: bytes,
+    catalogue: Mapping[str, Any],
+    document: Mapping[str, Any],
+) -> dict[str, bytes]:
     all_routes = dict(document["site"]["routes"])
-    all_routes.update({key + "_data": value for key, value in document["site"]["data_routes"].items()})
+    all_routes.update(
+        {key + "_data": value for key, value in document["site"]["data_routes"].items()}
+    )
     all_routes.update(document["site"]["asset_routes"])
     all_routes.update(document["site"]["document_routes"])
-    resolver = _Resolver(request.base_url, request.base_path, all_routes, document["repository"], document["site"]["fonts"])
+    resolver = _Resolver(
+        request.base_url,
+        request.base_path,
+        all_routes,
+        document["repository"],
+        document["site"]["fonts"],
+    )
     templates_path = document["paths"]["site_templates"]
-    templates = {name: _template(root, request.source_commit, templates_path, name) for name in ("home", "catalogue", "model", "offering", "changes", "process", "propose", "docs", "overview", "404")}
+    templates = {
+        name: _template(root, request.source_commit, templates_path, name)
+        for name in (
+            "home",
+            "catalogue",
+            "model",
+            "offering",
+            "changes",
+            "process",
+            "propose",
+            "docs",
+            "overview",
+            "404",
+        )
+    }
     evidence = {item["id"]: item for item in catalogue["evidence"]}
     condition_index = {(item["id"], item["version"]): item for item in catalogue["conditions"]}
     offerings_by_model: dict[str, list[Mapping[str, Any]]] = {}
     for item in catalogue["offerings"]:
         offerings_by_model.setdefault(item["model_id"], []).append(item)
-    history = _history(root, request.integration_commit, document["publication"]["profiles"][request.profile]["source"], resolver)
-    metrics = (
-        ("Models", len(catalogue["models"])), ("Offerings", len(catalogue["offerings"])),
-        ("Evidence", len(catalogue["evidence"])), ("Conditions", len(catalogue["conditions"])),
+    history = _history(
+        root,
+        request.integration_commit,
+        document["publication"]["profiles"][request.profile]["source"],
+        resolver,
     )
-    summary = " · ".join(str(value) + " " + (label.lower().rstrip("s") if value == 1 else label.lower()) for label, value in metrics) + " · Data checked " + request.as_of.isoformat()
-    revision_time = datetime.fromtimestamp(request.source_date_epoch, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    revision = 'Source revision <time datetime="' + datetime.fromtimestamp(request.source_date_epoch, timezone.utc).isoformat() + '">' + revision_time + "</time>"
+    metrics = (
+        ("Models", len(catalogue["models"])),
+        ("Offerings", len(catalogue["offerings"])),
+        ("Evidence", len(catalogue["evidence"])),
+        ("Conditions", len(catalogue["conditions"])),
+    )
+    summary = (
+        " · ".join(
+            str(value) + " " + (label.lower().rstrip("s") if value == 1 else label.lower())
+            for label, value in metrics
+        )
+        + " · Data checked "
+        + request.as_of.isoformat()
+    )
+    revision_time = datetime.fromtimestamp(request.source_date_epoch, timezone.utc).strftime(
+        "%Y-%m-%d %H:%M UTC"
+    )
+    revision = (
+        'Source revision <time datetime="'
+        + datetime.fromtimestamp(request.source_date_epoch, timezone.utc).isoformat()
+        + '">'
+        + revision_time
+        + "</time>"
+    )
     summary += " · " + revision
-    home_content = _substitute(templates["home"], {
-        "summary": summary,
-        "recent_changes": _history_summary_html(history[:3]),
-        "catalogue_url": escape(resolver.site("catalogue"), quote=True),
-        "process_url": escape(resolver.site("process"), quote=True),
-        "propose_url": escape(resolver.site("propose"), quote=True),
-        "docs_url": escape(resolver.site("docs"), quote=True),
-    }, "home")
+    home_content = _substitute(
+        templates["home"],
+        {
+            "summary": summary,
+            "recent_changes": _history_summary_html(history[:3]),
+            "catalogue_url": escape(resolver.site("catalogue"), quote=True),
+            "process_url": escape(resolver.site("process"), quote=True),
+            "propose_url": escape(resolver.site("propose"), quote=True),
+            "docs_url": escape(resolver.site("docs"), quote=True),
+        },
+        "home",
+    )
     rows = []
     cards = []
+
     def attributes(values: Mapping[str, Iterable[Any] | Any]) -> str:
         parts = []
         for key, value in values.items():
             items = value if isinstance(value, (list, tuple, set)) else [value]
-            parts.append(' data-' + key + '="' + escape("|".join(str(item) for item in items), quote=True) + '"')
+            parts.append(
+                " data-"
+                + key
+                + '="'
+                + escape("|".join(str(item) for item in items), quote=True)
+                + '"'
+            )
         return "".join(parts)
+
     for model in catalogue["models"]:
         model_name = str(model.get("name", model["id"]))
         model_url = resolver.site("model", model_id=model["id"])
         model_offerings = offerings_by_model.get(model["id"], [])
         services = sorted({item["inference_service_id"] for item in model_offerings})
-        source_regions = sorted({route["source_region"] for item in model_offerings for route in item["routes"]})
-        attrs = attributes({
-            "key": f'model:{model["id"]}', "name": model_name, "kind": "model",
-            "search-text": [model["id"], model_name, model.get("description", ""), model.get("vendor_id", ""), *model.get("capabilities", []), *model.get("modalities", []), model.get("licensing", ""), model.get("lifecycle", ""), *services, *source_regions],
-            "vendor": model.get("vendor_id", ""), "capability": model.get("capabilities", []),
-            "service": services, "source-region": source_regions,
-            "modality": model.get("modalities", []), "licence": model.get("licensing", ""),
-            "lifecycle": model.get("lifecycle", ""), "model-id": model["id"],
-            "model-name": model_name, "model-url": model_url,
-            "compare-capabilities": ", ".join(model.get("capabilities", [])),
-            "compare-modalities": ", ".join(model.get("modalities", [])),
-            "compare-context": model.get("context_window", ""),
-            "compare-licence": model.get("licensing", ""),
-            "compare-lifecycle": model.get("lifecycle", ""),
-        })
+        source_regions = sorted(
+            {route["source_region"] for item in model_offerings for route in item["routes"]}
+        )
+        attrs = attributes(
+            {
+                "key": f"model:{model['id']}",
+                "name": model_name,
+                "kind": "model",
+                "search-text": [
+                    model["id"],
+                    model_name,
+                    model.get("description", ""),
+                    model.get("vendor_id", ""),
+                    *model.get("capabilities", []),
+                    *model.get("modalities", []),
+                    model.get("licensing", ""),
+                    model.get("lifecycle", ""),
+                    *services,
+                    *source_regions,
+                ],
+                "vendor": model.get("vendor_id", ""),
+                "capability": model.get("capabilities", []),
+                "service": services,
+                "source-region": source_regions,
+                "modality": model.get("modalities", []),
+                "licence": model.get("licensing", ""),
+                "lifecycle": model.get("lifecycle", ""),
+                "model-id": model["id"],
+                "model-name": model_name,
+                "model-url": model_url,
+                "compare-capabilities": ", ".join(model.get("capabilities", [])),
+                "compare-modalities": ", ".join(model.get("modalities", [])),
+                "compare-context": model.get("context_window", ""),
+                "compare-licence": model.get("licensing", ""),
+                "compare-lifecycle": model.get("lifecycle", ""),
+            }
+        )
         rows.append(
-            '<tr class="catalogue-row catalogue-row--model" data-catalogue-row data-catalogue-item' + attrs + '><td class="catalogue-kind" data-label="Kind"><span>Model</span></td><td class="catalogue-primary" data-label="Name"><a href="'
-            + escape(model_url, quote=True) + '">' + escape(model_name) + '</a><span class="muted">' + ('Access recorded' if model_offerings else 'No approved access recorded') + '</span></td><td class="catalogue-owner" data-label="Vendor">'
-            + escape(catalogue["vendors"]["vendors"].get(model.get("vendor_id"), {}).get("name", model.get("vendor_id", ""))) + '</td><td class="catalogue-signals" data-label="Capabilities">'
+            '<tr class="catalogue-row catalogue-row--model" data-catalogue-row data-catalogue-item'
+            + attrs
+            + '><td class="catalogue-kind" data-label="Kind"><span>Model</span></td><td class="catalogue-primary" data-label="Name"><a href="'
+            + escape(model_url, quote=True)
+            + '">'
+            + escape(model_name)
+            + '</a><span class="muted">'
+            + ("Access recorded" if model_offerings else "No approved access recorded")
+            + '</span></td><td class="catalogue-owner" data-label="Vendor">'
+            + escape(
+                catalogue["vendors"]["vendors"]
+                .get(model.get("vendor_id"), {})
+                .get("name", model.get("vendor_id", ""))
+            )
+            + '</td><td class="catalogue-signals" data-label="Capabilities">'
             + _tags(model.get("capabilities", []))
-            + ('<span class="context-stat"><small>Context</small><strong>' + f'{model["context_window"]:,}' + "</strong></span>" if model.get("context_window") else "")
+            + (
+                '<span class="context-stat"><small>Context</small><strong>'
+                + f"{model['context_window']:,}"
+                + "</strong></span>"
+                if model.get("context_window")
+                else ""
+            )
             + '</td><td class="catalogue-action" data-label="Action"><button class="button button--small" type="button" data-compare-toggle '
             + 'x-on:click="toggleComparison" aria-pressed="false" hidden>Compare</button></td></tr>'
         )
-        initials = "".join(part[0].upper() for part in model.get("vendor_id", "model").split("-")[:2] if part)
+        initials = "".join(
+            part[0].upper() for part in model.get("vendor_id", "model").split("-")[:2] if part
+        )
         offering_summary = (
-            '<span class="model-card__availability model-card__availability--approved">' + str(len(model_offerings))
-            + (' approved offering' if len(model_offerings) == 1 else ' approved offerings') + '</span>' + _tags(services)
-            if model_offerings else '<span class="model-card__availability">No approved access recorded</span>'
+            '<span class="model-card__availability model-card__availability--approved">'
+            + str(len(model_offerings))
+            + (" approved offering" if len(model_offerings) == 1 else " approved offerings")
+            + "</span>"
+            + _tags(services)
+            if model_offerings
+            else '<span class="model-card__availability">No approved access recorded</span>'
         )
         facts = []
         if model.get("context_window"):
-            facts.append('<div><span>Context</span><strong>' + f'{model["context_window"]:,}' + '</strong></div>')
+            facts.append(
+                "<div><span>Context</span><strong>"
+                + f"{model['context_window']:,}"
+                + "</strong></div>"
+            )
         if model.get("lifecycle"):
-            facts.append('<div><span>Lifecycle</span><strong>' + escape(model["lifecycle"].title()) + '</strong></div>')
+            facts.append(
+                "<div><span>Lifecycle</span><strong>"
+                + escape(model["lifecycle"].title())
+                + "</strong></div>"
+            )
         if model.get("licensing"):
-            facts.append('<div><span>Licence</span><strong>' + escape(model["licensing"].replace("-", " ").title()) + '</strong></div>')
+            facts.append(
+                "<div><span>Licence</span><strong>"
+                + escape(model["licensing"].replace("-", " ").title())
+                + "</strong></div>"
+            )
         cards.append(
-            '<article class="model-card" data-model-card data-catalogue-card data-catalogue-item' + attrs + '>'
-            + '<div class="model-card__heading"><span class="model-card__mark" aria-hidden="true">' + escape(initials) + '</span><div><p>'
-            + escape(catalogue["vendors"]["vendors"].get(model.get("vendor_id"), {}).get("name", model.get("vendor_id", ""))) + '</p><h2><a href="' + escape(model_url, quote=True) + '">' + escape(model_name) + '</a></h2></div>'
-            + '<button class="model-card__save" type="button" aria-label="Compare ' + escape(model_name, quote=True) + '" data-compare-toggle x-on:click="toggleComparison" aria-pressed="false" hidden>Compare</button></div>'
-            + '<p class="model-card__description">' + escape(model.get("description", "No description has been published for this model.")) + '</p>'
-            + '<div class="model-card__tags">' + _tags(model.get("capabilities", [])) + _tags(model.get("modalities", [])) + '</div>'
-            + ('<div class="model-card__facts">' + "".join(facts) + '</div>' if facts else '')
-            + '<div class="model-card__footer"><div>' + offering_summary + '</div><a href="' + escape(model_url, quote=True) + '">View model <span aria-hidden="true">→</span></a></div></article>'
+            '<article class="model-card" data-model-card data-catalogue-card data-catalogue-item'
+            + attrs
+            + ">"
+            + '<div class="model-card__heading"><span class="model-card__mark" aria-hidden="true">'
+            + escape(initials)
+            + "</span><div><p>"
+            + escape(
+                catalogue["vendors"]["vendors"]
+                .get(model.get("vendor_id"), {})
+                .get("name", model.get("vendor_id", ""))
+            )
+            + '</p><h2><a href="'
+            + escape(model_url, quote=True)
+            + '">'
+            + escape(model_name)
+            + "</a></h2></div>"
+            + '<button class="model-card__save" type="button" aria-label="Compare '
+            + escape(model_name, quote=True)
+            + '" data-compare-toggle x-on:click="toggleComparison" aria-pressed="false" hidden>Compare</button></div>'
+            + '<p class="model-card__description">'
+            + escape(model.get("description", "No description has been published for this model."))
+            + "</p>"
+            + '<div class="model-card__tags">'
+            + _tags(model.get("capabilities", []))
+            + _tags(model.get("modalities", []))
+            + "</div>"
+            + ('<div class="model-card__facts">' + "".join(facts) + "</div>" if facts else "")
+            + '<div class="model-card__footer"><div>'
+            + offering_summary
+            + '</div><a href="'
+            + escape(model_url, quote=True)
+            + '">View model <span aria-hidden="true">→</span></a></div></article>'
         )
     for offering in catalogue["offerings"]:
         model = next(item for item in catalogue["models"] if item["id"] == offering["model_id"])
-        attrs = attributes({"key": f'offering:{offering["inference_service_id"]}:{offering["id"]}', "name": offering["id"], "kind": "offering", "search-text": [offering["id"], offering["model_id"], model.get("vendor_id", ""), offering["inference_service_id"], *[route["source_region"] for route in offering["routes"]], *[route["model_binding"]["kind"] for route in offering["routes"]], *model.get("capabilities", []), *model.get("modalities", []), *[item["id"] for item in offering.get("condition_refs", [])]], "vendor": model.get("vendor_id", ""), "service": offering["inference_service_id"], "source-region": [route["source_region"] for route in offering["routes"]], "route-type": [route["model_binding"]["kind"] for route in offering["routes"]], "capability": model.get("capabilities", []), "modality": model.get("modalities", []), "licence": model.get("licensing", ""), "lifecycle": model.get("lifecycle", ""), "condition": [item["id"] for item in offering.get("condition_refs", [])]})
-        rows.append('<tr class="catalogue-row catalogue-row--offering" data-catalogue-row data-catalogue-item' + attrs + '><td class="catalogue-kind" data-label="Kind"><span>Offering</span></td><td class="catalogue-primary" data-label="Name"><a href="' + escape(resolver.site("offering", inference_service_id=offering["inference_service_id"], offering_id=offering["id"]), quote=True) + '">' + escape(offering["id"]) + '</a><code>' + escape(offering["model_id"]) + '</code></td><td class="catalogue-owner" data-label="Service">' + escape(offering["inference_service_id"]) + '</td><td class="catalogue-signals" data-label="Source regions">' + _tags(route["source_region"] for route in offering["routes"]) + '</td><td class="catalogue-action" data-label="Action"><span class="muted">View route →</span></td></tr>')
+        attrs = attributes(
+            {
+                "key": f"offering:{offering['inference_service_id']}:{offering['id']}",
+                "name": offering["id"],
+                "kind": "offering",
+                "search-text": [
+                    offering["id"],
+                    offering["model_id"],
+                    model.get("vendor_id", ""),
+                    offering["inference_service_id"],
+                    *[route["source_region"] for route in offering["routes"]],
+                    *[route["model_binding"]["kind"] for route in offering["routes"]],
+                    *model.get("capabilities", []),
+                    *model.get("modalities", []),
+                    *[item["id"] for item in offering.get("condition_refs", [])],
+                ],
+                "vendor": model.get("vendor_id", ""),
+                "service": offering["inference_service_id"],
+                "source-region": [route["source_region"] for route in offering["routes"]],
+                "route-type": [route["model_binding"]["kind"] for route in offering["routes"]],
+                "capability": model.get("capabilities", []),
+                "modality": model.get("modalities", []),
+                "licence": model.get("licensing", ""),
+                "lifecycle": model.get("lifecycle", ""),
+                "condition": [item["id"] for item in offering.get("condition_refs", [])],
+            }
+        )
+        rows.append(
+            '<tr class="catalogue-row catalogue-row--offering" data-catalogue-row data-catalogue-item'
+            + attrs
+            + '><td class="catalogue-kind" data-label="Kind"><span>Offering</span></td><td class="catalogue-primary" data-label="Name"><a href="'
+            + escape(
+                resolver.site(
+                    "offering",
+                    inference_service_id=offering["inference_service_id"],
+                    offering_id=offering["id"],
+                ),
+                quote=True,
+            )
+            + '">'
+            + escape(offering["id"])
+            + "</a><code>"
+            + escape(offering["model_id"])
+            + '</code></td><td class="catalogue-owner" data-label="Service">'
+            + escape(offering["inference_service_id"])
+            + '</td><td class="catalogue-signals" data-label="Source regions">'
+            + _tags(route["source_region"] for route in offering["routes"])
+            + '</td><td class="catalogue-action" data-label="Action"><span class="muted">View route →</span></td></tr>'
+        )
     filter_fields = (
-        ("kind", "Type", "basic"), ("vendor", "Vendor", "basic"),
-        ("service", "Service", "advanced"), ("source-region", "Source Region", "advanced"),
-        ("capability", "Capability", "basic"), ("route-type", "Route type", "advanced"),
-        ("modality", "Modality", "advanced"), ("licence", "Licence", "advanced"),
-        ("lifecycle", "Lifecycle", "advanced"), ("condition", "Condition", "advanced"),
+        ("kind", "Type", "basic"),
+        ("vendor", "Vendor", "basic"),
+        ("service", "Service", "advanced"),
+        ("source-region", "Source Region", "advanced"),
+        ("capability", "Capability", "basic"),
+        ("route-type", "Route type", "advanced"),
+        ("modality", "Modality", "advanced"),
+        ("licence", "Licence", "advanced"),
+        ("lifecycle", "Lifecycle", "advanced"),
+        ("condition", "Condition", "advanced"),
     )
     controls: dict[str, list[str]] = {"basic": [], "advanced": []}
     for key, label, group in filter_fields:
-        present = sorted({
-            item
-            for html in rows
-            for match in re.findall(r' data-' + re.escape(key) + r'="([^"]*)"', html)
-            for item in match.split("|") if item
-        })
+        present = sorted(
+            {
+                item
+                for html in rows
+                for match in re.findall(r" data-" + re.escape(key) + r'="([^"]*)"', html)
+                for item in match.split("|")
+                if item
+            }
+        )
         if not present:
             continue
         options = "".join(
-            '<button class="filter-chip" type="button" data-filter="' + key
-            + '" data-filter-label="' + escape(label, quote=True) + '" data-value="'
-            + escape(value, quote=True) + '" aria-pressed="false" x-on:click="toggleFilter">'
-            + escape((catalogue["vendors"]["vendors"].get(value, {}).get("name", value) if key == "vendor" else catalogue["inference_services"]["inference_services"].get(value, {}).get("name", value) if key == "service" else value.replace("-", " ").title())) + "</button>"
+            '<button class="filter-chip" type="button" data-filter="'
+            + key
+            + '" data-filter-label="'
+            + escape(label, quote=True)
+            + '" data-value="'
+            + escape(value, quote=True)
+            + '" aria-pressed="false" x-on:click="toggleFilter">'
+            + escape(
+                (
+                    catalogue["vendors"]["vendors"].get(value, {}).get("name", value)
+                    if key == "vendor"
+                    else catalogue["inference_services"]["inference_services"]
+                    .get(value, {})
+                    .get("name", value)
+                    if key == "service"
+                    else value.replace("-", " ").title()
+                )
+            )
+            + "</button>"
             for value in present
         )
         controls[group].append(
-            '<fieldset class="filter-group"><legend>' + escape(label)
-            + '</legend><div class="filter-options">' + options + "</div></fieldset>"
+            '<fieldset class="filter-group"><legend>'
+            + escape(label)
+            + '</legend><div class="filter-options">'
+            + options
+            + "</div></fieldset>"
         )
     caption = "Catalogue models and offerings"
     availability_rows = []
@@ -606,119 +1025,419 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         observation = projection.get("ukAvailability") if isinstance(projection, dict) else None
         if observation is None:
             continue
-        if (not isinstance(observation, dict)
+        if (
+            not isinstance(observation, dict)
             or set(observation) != {"model_id", "provider_reference", "service", "region", "mode"}
             or any(not isinstance(value, str) or not value for value in observation.values())
             or observation["region"] != "eu-west-2"
             or observation["model_id"] not in models_by_id
-            or item["source"]["type"] != "official-provider-documentation"):
-            raise BuildError("documented UK availability needs a model and official provider source")
+            or item["source"]["type"] != "official-provider-documentation"
+        ):
+            raise BuildError(
+                "documented UK availability needs a model and official provider source"
+            )
         model = models_by_id[observation["model_id"]]
-        availability_rows.append('<tr><td><a href="' + escape(resolver.site("model", model_id=model["id"]), quote=True)
-            + '">' + escape(model["name"]) + '</a></td><td>' + escape(observation["service"])
-            + '</td><td>' + escape(observation["region"]) + '</td><td>' + escape(observation["mode"])
-            + '</td><td><a rel="noopener noreferrer" href="' + escape(item["source"]["uri"], quote=True)
-            + '">Provider model card</a><br><small>Observed ' + escape(item["observed_at"][:10]) + '</small></td></tr>')
-    availability_html = ('<section class="content-band"><h2>Documented UK availability</h2>'
-        '<p>These provider offerings are documented in the London region (eu-west-2). They have no approved offering record here. '
-        'A maintainer must gather the required provider evidence and complete the approval workflow before recording approved access.</p>'
-        '<div class="table-scroll"><table><caption>Provider availability observations</caption><thead><tr><th>Model</th><th>Service</th><th>Region</th><th>Mode</th><th>Evidence</th></tr></thead><tbody>'
-        + "".join(availability_rows) + '</tbody></table></div></section>') if availability_rows else ""
+        availability_rows.append(
+            '<tr><td><a href="'
+            + escape(resolver.site("model", model_id=model["id"]), quote=True)
+            + '">'
+            + escape(model["name"])
+            + "</a></td><td>"
+            + escape(observation["service"])
+            + "</td><td>"
+            + escape(observation["region"])
+            + "</td><td>"
+            + escape(observation["mode"])
+            + '</td><td><a rel="noopener noreferrer" href="'
+            + escape(item["source"]["uri"], quote=True)
+            + '">Provider model card</a><br><small>Observed '
+            + escape(item["observed_at"][:10])
+            + "</small></td></tr>"
+        )
+    availability_html = (
+        (
+            '<section class="content-band"><h2>Documented UK availability</h2>'
+            "<p>These provider offerings are documented in the London region (eu-west-2). They have no approved offering record here. "
+            "A maintainer must gather the required provider evidence and complete the approval workflow before recording approved access.</p>"
+            '<div class="table-scroll"><table><caption>Provider availability observations</caption><thead><tr><th>Model</th><th>Service</th><th>Region</th><th>Mode</th><th>Evidence</th></tr></thead><tbody>'
+            + "".join(availability_rows)
+            + "</tbody></table></div></section>"
+        )
+        if availability_rows
+        else ""
+    )
     enhancement = document["site"]["progressive_enhancement"]
-    catalogue_content = _substitute(templates["catalogue"], {
-        "basic_filter_controls": '<div class="filter-groups">' + "".join(controls["basic"]) + "</div>",
-        "advanced_filter_controls": '<div class="filter-groups">' + "".join(controls["advanced"]) + "</div>",
-        "search_max_length": str(enhancement["search_max_length"]),
-        "comparison_max_models": str(enhancement["comparison_max_models"]),
-        "revision": revision,
-        "documented_availability": availability_html,
-        "as_of": request.as_of.isoformat(),
-        "view_storage_key": escape(enhancement["view_storage_key"], quote=True),
-        "default_view": escape(enhancement["default_view"], quote=True),
-        "record_count": str(len(catalogue["models"]) + len(catalogue["offerings"])),
-        "table_view_pressed": "true" if enhancement["default_view"] == "table" else "false",
-        "grid_view_pressed": "true" if enhancement["default_view"] == "grid" else "false",
-        "catalogue_cards": '<div class="model-grid" data-catalogue-grid>' + "".join(cards) + '</div>',
-        "catalogue_rows": '<table data-catalogue-table><caption>' + caption + '</caption><thead><tr><th>Kind</th><th>Name</th><th>Owner/service</th><th>Signals</th><th>Action</th></tr></thead><tbody data-catalogue-body>' + "".join(rows) + "</tbody></table>",
-    }, "catalogue")
-    backlog = json.loads(_blob(root, request.source_commit, document["paths"]["site_content"] + "/backlog.json"))
-    if (not isinstance(backlog, dict) or set(backlog) != {"repository", "observed_at", "items"}
+    catalogue_content = _substitute(
+        templates["catalogue"],
+        {
+            "basic_filter_controls": '<div class="filter-groups">'
+            + "".join(controls["basic"])
+            + "</div>",
+            "advanced_filter_controls": '<div class="filter-groups">'
+            + "".join(controls["advanced"])
+            + "</div>",
+            "search_max_length": str(enhancement["search_max_length"]),
+            "comparison_max_models": str(enhancement["comparison_max_models"]),
+            "revision": revision,
+            "documented_availability": availability_html,
+            "as_of": request.as_of.isoformat(),
+            "view_storage_key": escape(enhancement["view_storage_key"], quote=True),
+            "default_view": escape(enhancement["default_view"], quote=True),
+            "record_count": str(len(catalogue["models"]) + len(catalogue["offerings"])),
+            "table_view_pressed": "true" if enhancement["default_view"] == "table" else "false",
+            "grid_view_pressed": "true" if enhancement["default_view"] == "grid" else "false",
+            "catalogue_cards": '<div class="model-grid" data-catalogue-grid>'
+            + "".join(cards)
+            + "</div>",
+            "catalogue_rows": "<table data-catalogue-table><caption>"
+            + caption
+            + "</caption><thead><tr><th>Kind</th><th>Name</th><th>Owner/service</th><th>Signals</th><th>Action</th></tr></thead><tbody data-catalogue-body>"
+            + "".join(rows)
+            + "</tbody></table>",
+        },
+        "catalogue",
+    )
+    backlog = json.loads(
+        _blob(root, request.source_commit, document["paths"]["site_content"] + "/backlog.json")
+    )
+    if (
+        not isinstance(backlog, dict)
+        or set(backlog) != {"repository", "observed_at", "items"}
         or not isinstance(backlog["repository"], str)
-        or not isinstance(backlog["items"], list) or len(backlog["items"]) > 4
+        or not isinstance(backlog["items"], list)
+        or len(backlog["items"]) > 4
         or not isinstance(backlog["observed_at"], str)
-        or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", backlog["observed_at"])):
-        raise BuildError("backlog snapshot must contain a UTC retrieval time and at most four issues")
+        or not re.fullmatch(
+            r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", backlog["observed_at"]
+        )
+    ):
+        raise BuildError(
+            "backlog snapshot must contain a UTC retrieval time and at most four issues"
+        )
     try:
         datetime.strptime(backlog["observed_at"], "%Y-%m-%dT%H:%M:%SZ")
     except ValueError as exc:
         raise BuildError("backlog snapshot has an invalid retrieval time") from exc
     backlog_rows = []
     for item in backlog["items"]:
-        if (not isinstance(item, dict) or set(item) != {"number", "title"} or type(item["number"]) is not int
-            or item["number"] < 1 or not isinstance(item["title"], str) or not 1 <= len(item["title"]) <= 256):
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"number", "title"}
+            or type(item["number"]) is not int
+            or item["number"] < 1
+            or not isinstance(item["title"], str)
+            or not 1 <= len(item["title"]) <= 256
+        ):
             raise BuildError("backlog issue needs a positive number and bounded title")
         if backlog["repository"].rstrip("/") == str(document["repository"]["web_base"]).rstrip("/"):
-            backlog_rows.append('<li><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("issue", issue_number=str(item["number"])), quote=True) + '">#' + str(item["number"]) + " " + escape(item["title"]) + "</a></li>")
-    backlog_html = '<p class="muted">Open when retrieved at ' + escape(backlog["observed_at"].replace("T", " ").replace("Z", " UTC")) + '. Status may have changed.</p><ul>' + "".join(backlog_rows) + "</ul>" if backlog_rows else '<p class="muted">No snapshot is available for this repository.</p>'
-    history_content = _substitute(templates["changes"], {"history": _history_html(history), "backlog": backlog_html, "backlog_url": escape(resolver.repository_url("backlog"), quote=True)}, "changes")
+            backlog_rows.append(
+                '<li><a rel="noopener noreferrer" href="'
+                + escape(
+                    resolver.repository_url("issue", issue_number=str(item["number"])), quote=True
+                )
+                + '">#'
+                + str(item["number"])
+                + " "
+                + escape(item["title"])
+                + "</a></li>"
+            )
+    backlog_html = (
+        '<p class="muted">Open when retrieved at '
+        + escape(backlog["observed_at"].replace("T", " ").replace("Z", " UTC"))
+        + ". Status may have changed.</p><ul>"
+        + "".join(backlog_rows)
+        + "</ul>"
+        if backlog_rows
+        else '<p class="muted">No snapshot is available for this repository.</p>'
+    )
+    history_content = _substitute(
+        templates["changes"],
+        {
+            "history": _history_html(history),
+            "backlog": backlog_html,
+            "backlog_url": escape(resolver.repository_url("backlog"), quote=True),
+        },
+        "changes",
+    )
     content_path = document["paths"]["site_content"]
-    process_content = _substitute(templates["process"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/process.md"))}, "process")
+    process_content = _substitute(
+        templates["process"],
+        {"body": _markdown(_blob(root, request.source_commit, content_path + "/process.md"))},
+        "process",
+    )
     intake = document["repository"]["web_routes"]["mac_intake"]
-    intake_links = "".join('<a class="intake-card" rel="noopener noreferrer" href="' + escape(str(document["repository"]["web_base"]).rstrip("/") + intake[key], quote=True) + '"><span>' + escape(OPERATIONS[key]) + '</span><small>Open issue form</small><b aria-hidden="true">→</b></a>' for key in OPERATIONS)
+    intake_links = "".join(
+        '<a class="intake-card" rel="noopener noreferrer" href="'
+        + escape(str(document["repository"]["web_base"]).rstrip("/") + intake[key], quote=True)
+        + '"><span>'
+        + escape(OPERATIONS[key])
+        + '</span><small>Open issue form</small><b aria-hidden="true">→</b></a>'
+        for key in OPERATIONS
+    )
     web_base_url = str(document["repository"]["web_base"]).rstrip("/")
-    propose_content = _substitute(templates["propose"], {
-        "body": _markdown(_blob(root, request.source_commit, content_path + "/propose.md")),
-        "intake_links": intake_links,
-        "intake_add_url": escape(web_base_url + intake["add"], quote=True),
-        "access_test": ('<button type="button" class="button" data-test-access="' + escape(web_base_url, quote=True) + '">Test GitLab access</button><p data-access-status role="status" aria-live="polite" aria-atomic="true"></p><p class="field-help"><a target="_blank" rel="noopener noreferrer" href="' + escape(web_base_url, quote=True) + '">Open GitLab repository</a> to check access or sign in. This optional test does not submit your draft.</p>') if document["repository"]["adapter"] == "gitlab" else "",
-        "request_intake_url": escape(resolver.repository_url("request_intake"), quote=True),
-        "requester_agent_url": escape(resolver.site("requester_agent"), quote=True),
-        "intake_attributes": " ".join('data-intake-' + key + '="' + escape(web_base_url + intake[key], quote=True) + '"' for key in OPERATIONS),
-        "provider": escape(document["repository"]["adapter"], quote=True),
-        "provider_label": "GitLab" if document["repository"]["adapter"] == "gitlab" else "GitHub",
-        "lookup_notice": "These are synthetic examples, not enterprise approvals." if request.profile == "synthetic" else "",
-        "lookup_records": escape(json.dumps(lookup_records(catalogue), ensure_ascii=False, separators=(",", ":")), quote=True),
-        "proposal_fields": render_fields(json.loads(_blob(root, request.source_commit, content_path + "/proposal-fields.json"))),
-    }, "propose")
-    docs_links = '<div class="reference-grid"><a href="' + escape(resolver.site("human_specification"), quote=True) + '"><strong>Human specification</strong><span>Rationale and invariants</span></a><a href="' + escape(resolver.site("machine_contract"), quote=True) + '"><strong>Machine contract</strong><span>Compact executable context</span></a><a href="' + escape(resolver.site("schemas_data") + "model.schema.json", quote=True) + '"><strong>Model schema</strong><span>Canonical model shape</span></a><a href="' + escape(resolver.site("schemas_data") + "offering.schema.json", quote=True) + '"><strong>Offering schema</strong><span>Consumption approval shape</span></a></div><div class="clone-command"><span>Clean clone</span><code>git clone ' + escape(str(document["repository"]["web_base"]) + ".git") + "</code></div>"
-    docs_content = _substitute(templates["docs"], {"body": _markdown(_blob(root, request.source_commit, content_path + "/docs.md")), "documentation_links": docs_links, "overview_url": escape(resolver.site("overview"), quote=True)}, "docs")
-    overview_content = _substitute(templates["overview"], {"propose_url": escape(resolver.site("propose"), quote=True), "spec_url": escape(resolver.site("human_specification"), quote=True), "docs_url": escape(resolver.site("docs"), quote=True), "requester_agent_url": escape(resolver.site("requester_agent"), quote=True)}, "overview")
-    not_found_content = _substitute(templates["404"], {"home_url": escape(resolver.site("home"), quote=True)}, "404")
+    propose_content = _substitute(
+        templates["propose"],
+        {
+            "body": _markdown(_blob(root, request.source_commit, content_path + "/propose.md")),
+            "intake_links": intake_links,
+            "intake_add_url": escape(web_base_url + intake["add"], quote=True),
+            "access_test": (
+                '<button type="button" class="button" data-test-access="'
+                + escape(web_base_url, quote=True)
+                + '">Test GitLab access</button><p data-access-status role="status" aria-live="polite" aria-atomic="true"></p><p class="field-help"><a target="_blank" rel="noopener noreferrer" href="'
+                + escape(web_base_url, quote=True)
+                + '">Open GitLab repository</a> to check access or sign in. This optional test does not submit your draft.</p>'
+            )
+            if document["repository"]["adapter"] == "gitlab"
+            else "",
+            "request_intake_url": escape(resolver.repository_url("request_intake"), quote=True),
+            "requester_agent_url": escape(resolver.site("requester_agent"), quote=True),
+            "intake_attributes": " ".join(
+                "data-intake-" + key + '="' + escape(web_base_url + intake[key], quote=True) + '"'
+                for key in OPERATIONS
+            ),
+            "provider": escape(document["repository"]["adapter"], quote=True),
+            "provider_label": "GitLab"
+            if document["repository"]["adapter"] == "gitlab"
+            else "GitHub",
+            "lookup_notice": "These are synthetic examples, not enterprise approvals."
+            if request.profile == "synthetic"
+            else "",
+            "lookup_records": escape(
+                json.dumps(lookup_records(catalogue), ensure_ascii=False, separators=(",", ":")),
+                quote=True,
+            ),
+            "proposal_fields": render_fields(
+                json.loads(
+                    _blob(root, request.source_commit, content_path + "/proposal-fields.json")
+                )
+            ),
+        },
+        "propose",
+    )
+    docs_links = (
+        '<div class="reference-grid"><a href="'
+        + escape(resolver.site("human_specification"), quote=True)
+        + '"><strong>Human specification</strong><span>Rationale and invariants</span></a><a href="'
+        + escape(resolver.site("machine_contract"), quote=True)
+        + '"><strong>Machine contract</strong><span>Compact executable context</span></a><a href="'
+        + escape(resolver.site("schemas_data") + "model.schema.json", quote=True)
+        + '"><strong>Model schema</strong><span>Canonical model shape</span></a><a href="'
+        + escape(resolver.site("schemas_data") + "offering.schema.json", quote=True)
+        + '"><strong>Offering schema</strong><span>Consumption approval shape</span></a></div><div class="clone-command"><span>Clean clone</span><code>git clone '
+        + escape(str(document["repository"]["web_base"]) + ".git")
+        + "</code></div>"
+    )
+    docs_content = _substitute(
+        templates["docs"],
+        {
+            "body": _markdown(_blob(root, request.source_commit, content_path + "/docs.md")),
+            "documentation_links": docs_links,
+            "proposal_url": escape(resolver.site("propose"), quote=True),
+            "overview_url": escape(resolver.site("overview"), quote=True),
+        },
+        "docs",
+    )
+    overview_content = _substitute(
+        templates["overview"],
+        {
+            "propose_url": escape(resolver.site("propose"), quote=True),
+            "spec_url": escape(resolver.site("human_specification"), quote=True),
+            "docs_url": escape(resolver.site("docs"), quote=True),
+            "requester_agent_url": escape(resolver.site("requester_agent"), quote=True),
+        },
+        "overview",
+    )
+    not_found_content = _substitute(
+        templates["404"], {"home_url": escape(resolver.site("home"), quote=True)}, "404"
+    )
     page_specs = {
         resolver.output_path("home"): ("home", "Modelo", home_content, "home"),
-        resolver.output_path("catalogue"): ("catalogue", "Catalogue", catalogue_content, "catalogue"),
+        resolver.output_path("catalogue"): (
+            "catalogue",
+            "Catalogue",
+            catalogue_content,
+            "catalogue",
+        ),
         resolver.output_path("changes"): ("changes", "Changes", history_content, "changes"),
         resolver.output_path("process"): ("process", "Process", process_content, "process"),
         resolver.output_path("propose"): ("propose", "Propose", propose_content, "propose"),
-        resolver.output_path("overview"): ("overview", "How Modelo works", overview_content, "overview"),
+        resolver.output_path("overview"): (
+            "overview",
+            "How Modelo works",
+            overview_content,
+            "overview",
+        ),
         resolver.output_path("docs"): ("docs", "Documentation", docs_content, "docs"),
-        resolver.output_path("not_found"): ("404", "Page not found", not_found_content, "not_found"),
+        resolver.output_path("not_found"): (
+            "404",
+            "Page not found",
+            not_found_content,
+            "not_found",
+        ),
     }
-    files = {path: _page(root, request.source_commit, templates_path, resolver, request, name, title, content, route) for path, (name, title, content, route) in page_specs.items()}
+    files = {
+        path: _page(
+            root,
+            request.source_commit,
+            templates_path,
+            resolver,
+            request,
+            name,
+            title,
+            content,
+            route,
+        )
+        for path, (name, title, content, route) in page_specs.items()
+    }
     for model in catalogue["models"]:
         rights_owner = catalogue["vendors"]["vendors"].get(model.get("rights_owner_vendor_id"), {})
-        model_refs = sorted({reference["id"] for record in (model, rights_owner) for reference in record.get("evidence_refs", {}).values()})
-        facts = '<dl class="fact-grid"><div><dt>Identifier</dt><dd><code>' + escape(model["id"]) + "</code></dd></div><div><dt>Vendor</dt><dd>" + escape(catalogue["vendors"]["vendors"].get(model.get("vendor_id"), {}).get("name", model.get("vendor_id", ""))) + "</dd></div><div><dt>Context window</dt><dd>" + (f'{model["context_window"]:,}' if model.get("context_window") else "Not stated") + "</dd></div><div><dt>Licence</dt><dd>" + escape(model.get("licensing", "Not stated")) + "</dd></div><div><dt>Capabilities</dt><dd>" + (_tags(model.get("capabilities", [])) or "Not stated") + "</dd></div><div><dt>Modalities</dt><dd>" + (_tags(model.get("modalities", [])) or "Not stated") + "</dd></div></dl>"
-        links = "".join('<a class="related-card" href="' + escape(resolver.site("offering", inference_service_id=o["inference_service_id"], offering_id=o["id"]), quote=True) + '"><span><strong>' + escape(o["id"]) + '</strong><small>' + escape(o["inference_service_id"]) + '</small></span><b aria-hidden="true">→</b></a>' for o in offerings_by_model.get(model["id"], [])) or '<p class="empty-state">No approved access is recorded for this model.</p>'
-        content = _substitute(templates["model"], {
-            "model_name": escape(model.get("name", model["id"])),
-            "model_description": escape(model.get("description", "No description published.")),
-            "model_facts": facts + _model_release_facts(model) + _organisation_facts("Rights owner", rights_owner) + ('<p><a rel="noopener noreferrer" href="' + escape(model["licence_uri"], quote=True) + '">Licence or usage terms</a></p>' if model.get("licence_uri") else ""), "offering_links": '<div class="related-grid">' + links + "</div>",
-            "model_status": '<span class="status-pill status-pill--' + escape(model.get("lifecycle", "unknown"), quote=True) + '">' + escape(model.get("lifecycle", "Unspecified").title()) + "</span>",
-            "evidence_summary": '<p class="evidence-count"><strong>' + str(len(model_refs)) + '</strong><span>evidence records</span></p><p>Expand an observation to inspect its retained values, source and retrieval details.</p>' + _supporting_evidence(model_refs, evidence),
-        }, "model")
-        files[resolver.output_path("model", model_id=model["id"])] = _page(root, request.source_commit, templates_path, resolver, request, "model", model.get("name", model["id"]), content, "model", {"model_id": model["id"]})
-    releases_url = str(document["repository"]["web_base"]).rstrip("/") + document["repository"]["web_routes"]["releases"]
+        model_refs = sorted(
+            {
+                reference["id"]
+                for record in (model, rights_owner)
+                for reference in record.get("evidence_refs", {}).values()
+            }
+        )
+        facts = (
+            '<dl class="fact-grid"><div><dt>Identifier</dt><dd><code>'
+            + escape(model["id"])
+            + "</code></dd></div><div><dt>Vendor</dt><dd>"
+            + escape(
+                catalogue["vendors"]["vendors"]
+                .get(model.get("vendor_id"), {})
+                .get("name", model.get("vendor_id", ""))
+            )
+            + "</dd></div><div><dt>Context window</dt><dd>"
+            + (f"{model['context_window']:,}" if model.get("context_window") else "Not stated")
+            + "</dd></div><div><dt>Licence</dt><dd>"
+            + escape(model.get("licensing", "Not stated"))
+            + "</dd></div><div><dt>Capabilities</dt><dd>"
+            + (_tags(model.get("capabilities", [])) or "Not stated")
+            + "</dd></div><div><dt>Modalities</dt><dd>"
+            + (_tags(model.get("modalities", [])) or "Not stated")
+            + "</dd></div></dl>"
+        )
+        links = (
+            "".join(
+                '<a class="related-card" href="'
+                + escape(
+                    resolver.site(
+                        "offering",
+                        inference_service_id=o["inference_service_id"],
+                        offering_id=o["id"],
+                    ),
+                    quote=True,
+                )
+                + '"><span><strong>'
+                + escape(o["id"])
+                + "</strong><small>"
+                + escape(o["inference_service_id"])
+                + '</small></span><b aria-hidden="true">→</b></a>'
+                for o in offerings_by_model.get(model["id"], [])
+            )
+            or '<p class="empty-state">No approved access is recorded for this model.</p>'
+        )
+        content = _substitute(
+            templates["model"],
+            {
+                "model_name": escape(model.get("name", model["id"])),
+                "model_description": escape(model.get("description", "No description published.")),
+                "model_facts": facts
+                + _model_release_facts(model)
+                + _organisation_facts("Rights owner", rights_owner)
+                + (
+                    '<p><a rel="noopener noreferrer" href="'
+                    + escape(model["licence_uri"], quote=True)
+                    + '">Licence or usage terms</a></p>'
+                    if model.get("licence_uri")
+                    else ""
+                ),
+                "offering_links": '<div class="related-grid">' + links + "</div>",
+                "model_status": '<span class="status-pill status-pill--'
+                + escape(model.get("lifecycle", "unknown"), quote=True)
+                + '">'
+                + escape(model.get("lifecycle", "Unspecified").title())
+                + "</span>",
+                "evidence_summary": '<p class="evidence-count"><strong>'
+                + str(len(model_refs))
+                + "</strong><span>evidence records</span></p><p>Expand an observation to inspect its retained values, source and retrieval details.</p>"
+                + _supporting_evidence(model_refs, evidence),
+            },
+            "model",
+        )
+        files[resolver.output_path("model", model_id=model["id"])] = _page(
+            root,
+            request.source_commit,
+            templates_path,
+            resolver,
+            request,
+            "model",
+            model.get("name", model["id"]),
+            content,
+            "model",
+            {"model_id": model["id"]},
+        )
+    releases_url = (
+        str(document["repository"]["web_base"]).rstrip("/")
+        + document["repository"]["web_routes"]["releases"]
+    )
     for offering in catalogue["offerings"]:
-        service = catalogue["inference_services"]["inference_services"][offering["inference_service_id"]]
+        service = catalogue["inference_services"]["inference_services"][
+            offering["inference_service_id"]
+        ]
         operator = catalogue["vendors"]["vendors"].get(service.get("operator_vendor_id"), {})
         if request.kind == "final":
-            approval = '<section class="coordinate-card"><span class="status-pill">Approved</span><h2>Approval coordinates</h2><dl><dt>Accepted source</dt><dd><code>' + escape(request.source_commit[:12]) + '</code></dd><dt>Accepted tree</dt><dd><code>' + escape(request.source_tree[:12]) + '</code></dd><dt>Merge</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True) + '"><code>' + escape(request.integration_commit[:12]) + '</code></a></dd></dl><p><a rel="noopener noreferrer" href="' + escape(releases_url, quote=True) + '">Find release receipts</a></p></section>'
+            approval = (
+                '<section class="coordinate-card"><span class="status-pill">Approved</span><h2>Approval coordinates</h2><dl><dt>Accepted source</dt><dd><code>'
+                + escape(request.source_commit[:12])
+                + "</code></dd><dt>Accepted tree</dt><dd><code>"
+                + escape(request.source_tree[:12])
+                + '</code></dd><dt>Merge</dt><dd><a rel="noopener noreferrer" href="'
+                + escape(
+                    resolver.repository_url("commit", commit_sha=request.integration_commit),
+                    quote=True,
+                )
+                + '"><code>'
+                + escape(request.integration_commit[:12])
+                + '</code></a></dd></dl><p><a rel="noopener noreferrer" href="'
+                + escape(releases_url, quote=True)
+                + '">Find release receipts</a></p></section>'
+            )
         elif request.kind == "validation":
-            approval = '<section class="coordinate-card"><span class="status-pill status-pill--validation">Validation</span><h2>Validation coordinates</h2><dl><dt>Source</dt><dd><code>' + escape(request.source_commit[:12]) + '</code></dd><dt>Tree</dt><dd><code>' + escape(request.source_tree[:12]) + '</code></dd><dt>Integration</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.integration_commit), quote=True) + '"><code>' + escape(request.integration_commit[:12]) + '</code></a></dd></dl><p>Validation is not approval.</p></section>'
+            approval = (
+                '<section class="coordinate-card"><span class="status-pill status-pill--validation">Validation</span><h2>Validation coordinates</h2><dl><dt>Source</dt><dd><code>'
+                + escape(request.source_commit[:12])
+                + "</code></dd><dt>Tree</dt><dd><code>"
+                + escape(request.source_tree[:12])
+                + '</code></dd><dt>Integration</dt><dd><a rel="noopener noreferrer" href="'
+                + escape(
+                    resolver.repository_url("commit", commit_sha=request.integration_commit),
+                    quote=True,
+                )
+                + '"><code>'
+                + escape(request.integration_commit[:12])
+                + "</code></a></dd></dl><p>Validation is not approval.</p></section>"
+            )
         else:
-            approval = '<section class="coordinate-card"><span class="status-pill status-pill--synthetic">Synthetic</span><h2>Demo provenance</h2><dl><dt>Source</dt><dd><a rel="noopener noreferrer" href="' + escape(resolver.repository_url("commit", commit_sha=request.source_commit), quote=True) + '"><code>' + escape(request.source_commit[:12]) + '</code></a></dd><dt>Tree</dt><dd><code>' + escape(request.source_tree[:12]) + '</code></dd></dl><p>Synthetic fixture only, not approved for enterprise use.</p></section>'
-        refs = sorted({reference["id"] for record in (offering, operator) for reference in record.get("evidence_refs", {}).values()})
+            approval = (
+                '<section class="coordinate-card"><span class="status-pill status-pill--synthetic">Synthetic</span><h2>Demo provenance</h2><dl><dt>Source</dt><dd><a rel="noopener noreferrer" href="'
+                + escape(
+                    resolver.repository_url("commit", commit_sha=request.source_commit), quote=True
+                )
+                + '"><code>'
+                + escape(request.source_commit[:12])
+                + "</code></a></dd><dt>Tree</dt><dd><code>"
+                + escape(request.source_tree[:12])
+                + "</code></dd></dl><p>Synthetic fixture only, not approved for enterprise use.</p></section>"
+            )
+        refs = sorted(
+            {
+                reference["id"]
+                for record in (offering, operator)
+                for reference in record.get("evidence_refs", {}).values()
+            }
+        )
         for route in offering["routes"]:
             binding = route["model_binding"]
             if binding["kind"] == "foundation-model":
@@ -729,60 +1448,175 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
         conditions = []
         for reference in offering.get("condition_refs", []):
             condition = condition_index[(reference["id"], reference["version"])]
-            conditions.append('<section><h3>' + escape(condition["title"]) + '</h3><p>'
-                + escape(condition["description"]) + '</p><p class="muted">Owner: '
-                + escape(condition["owner"]) + ' · <code>' + escape(condition["id"])
-                + '@' + str(condition["version"]) + '</code></p></section>')
-        content = _substitute(templates["offering"], {"offering_name": escape(offering["id"]), "approval": approval, "approval_rationale": escape(offering["approval_rationale"]), "approval_scope": _approval_scope(offering) + _organisation_facts("Service operator", operator), "route_table": _route_rows(offering, evidence), "pricing_table": _pricing_rows(offering), "conditions_evidence": ("".join(conditions) or '<p>No additional conditions: ' + escape(offering.get('no_conditions_rationale', 'Not stated')) + '</p>') + '<h3>Supporting evidence</h3><p>Expand an observation to inspect the retained proof.</p>' + _supporting_evidence(refs, evidence)}, "offering")
-        path = resolver.output_path("offering", inference_service_id=offering["inference_service_id"], offering_id=offering["id"])
-        files[path] = _page(root, request.source_commit, templates_path, resolver, request, "offering", offering["id"], content, "offering", {"inference_service_id": offering["inference_service_id"], "offering_id": offering["id"]})
-    files[resolver.output_path("asset_css")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/site.css")
-    files[resolver.output_path("asset_catalogue_js")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/catalogue.js")
-    files[resolver.output_path("asset_proposal_js")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/proposal.js")
+            conditions.append(
+                "<section><h3>"
+                + escape(condition["title"])
+                + "</h3><p>"
+                + escape(condition["description"])
+                + '</p><p class="muted">Owner: '
+                + escape(condition["owner"])
+                + " · <code>"
+                + escape(condition["id"])
+                + "@"
+                + str(condition["version"])
+                + "</code></p></section>"
+            )
+        content = _substitute(
+            templates["offering"],
+            {
+                "offering_name": escape(offering["id"]),
+                "approval": approval,
+                "approval_rationale": escape(offering["approval_rationale"]),
+                "approval_scope": _approval_scope(offering)
+                + _organisation_facts("Service operator", operator),
+                "route_table": _route_rows(offering, evidence),
+                "pricing_table": _pricing_rows(offering),
+                "conditions_evidence": (
+                    "".join(conditions)
+                    or "<p>No additional conditions: "
+                    + escape(offering.get("no_conditions_rationale", "Not stated"))
+                    + "</p>"
+                )
+                + "<h3>Supporting evidence</h3><p>Expand an observation to inspect the retained proof.</p>"
+                + _supporting_evidence(refs, evidence),
+            },
+            "offering",
+        )
+        path = resolver.output_path(
+            "offering",
+            inference_service_id=offering["inference_service_id"],
+            offering_id=offering["id"],
+        )
+        files[path] = _page(
+            root,
+            request.source_commit,
+            templates_path,
+            resolver,
+            request,
+            "offering",
+            offering["id"],
+            content,
+            "offering",
+            {
+                "inference_service_id": offering["inference_service_id"],
+                "offering_id": offering["id"],
+            },
+        )
+    files[resolver.output_path("asset_css")] = _blob(
+        root, request.source_commit, document["paths"]["site_assets"] + "/site.css"
+    )
+    files[resolver.output_path("asset_catalogue_js")] = _blob(
+        root, request.source_commit, document["paths"]["site_assets"] + "/catalogue.js"
+    )
+    files[resolver.output_path("asset_proposal_js")] = _blob(
+        root, request.source_commit, document["paths"]["site_assets"] + "/proposal.js"
+    )
     enhancement = document["site"]["progressive_enhancement"]
-    alpine = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/" + enhancement["runtime_source"])
+    alpine = _blob(
+        root,
+        request.source_commit,
+        document["paths"]["site_assets"] + "/" + enhancement["runtime_source"],
+    )
     if sha256_bytes(alpine) != enhancement["runtime_sha256"]:
         raise BuildError("vendored Alpine CSP runtime digest differs from modelo.yaml")
     files[resolver.output_path("asset_alpine")] = alpine
-    files[resolver.output_path("asset_third_party_notices")] = _blob(root, request.source_commit, document["paths"]["site_assets"] + "/" + enhancement["licence_source"])
+    files[resolver.output_path("asset_third_party_notices")] = _blob(
+        root,
+        request.source_commit,
+        document["paths"]["site_assets"] + "/" + enhancement["licence_source"],
+    )
     files[resolver.output_path("catalogue_data")] = catalogue_raw
     files[resolver.output_path("change_delta_data")] = delta_raw
-    files[resolver.output_path("human_specification")] = _blob(root, request.source_commit, document["paths"]["human_specification"])
-    files[resolver.output_path("machine_contract")] = _blob(root, request.source_commit, document["paths"]["machine_contract"])
+    files[resolver.output_path("human_specification")] = _blob(
+        root, request.source_commit, document["paths"]["human_specification"]
+    )
+    files[resolver.output_path("machine_contract")] = _blob(
+        root, request.source_commit, document["paths"]["machine_contract"]
+    )
     example_offering = catalogue["offerings"][0] if catalogue["offerings"] else None
-    example_model = next((item for item in catalogue["models"] if example_offering and item["id"] == example_offering["model_id"]), catalogue["models"][0] if catalogue["models"] else None)
-    example = {key: catalogue[key] for key in ("contract_version", "source_commit", "source_tree", "as_of", "profile")}
+    example_model = next(
+        (
+            item
+            for item in catalogue["models"]
+            if example_offering and item["id"] == example_offering["model_id"]
+        ),
+        catalogue["models"][0] if catalogue["models"] else None,
+    )
+    example = {
+        key: catalogue[key]
+        for key in ("contract_version", "source_commit", "source_tree", "as_of", "profile")
+    }
     example.update({"model": example_model, "offering": example_offering})
     adapter = document["repository"]["adapter"]
-    template_root = document["paths"][adapter + "_adapter"] + ("/ISSUE_TEMPLATE" if adapter == "github" else "/issue_templates")
-    template_names = (["model-request.yml"] + ["mac-" + key + ".yml" for key in OPERATIONS]) if adapter == "github" else (["Model-Request.md"] + ["MAC-" + key.title() + ".md" for key in OPERATIONS])
-    form_templates = {name: _blob(root, request.source_commit, template_root + "/" + name) for name in template_names}
-    guide = Template(_blob(root, request.source_commit, content_path + "/requester-agent.md").decode("utf-8"))
-    files[resolver.output_path("requester_agent")] = _substitute(guide, {
-        "inventory_url": resolver.site("catalogue_data"),
-        "bundle_url": resolver.site("proposal_schema_bundle_data"),
-        "git_host": adapter,
-        "form_markup": "\n\n".join("### " + name + "\n\n~~~~" + ("yaml" if adapter == "github" else "markdown") + "\n" + raw.decode("utf-8") + "\n~~~~" for name, raw in form_templates.items()),
-        "schemas_url": resolver.site("schemas_data").rstrip("/"),
-        "contract_url": resolver.site("machine_contract"),
-        "propose_url": resolver.site("propose"),
-        "request_url": resolver.repository_url("request_intake"),
-        "add_url": web_base_url + intake["add"],
-        "repository_url": web_base_url,
-        "inventory_example": json.dumps(example, ensure_ascii=False, indent=2),
-        "example_model_id": example_model["id"] if example_model else "No example model available",
-        "example_offering_id": example_offering["id"] if example_offering else "No matching example offering available",
-        "example_source_commit": catalogue["source_commit"],
-        "example_profile": catalogue["profile"],
-    }, "requester-agent").encode("utf-8")
+    template_root = document["paths"][adapter + "_adapter"] + (
+        "/ISSUE_TEMPLATE" if adapter == "github" else "/issue_templates"
+    )
+    template_names = (
+        (["model-request.yml"] + ["mac-" + key + ".yml" for key in OPERATIONS])
+        if adapter == "github"
+        else (["Model-Request.md"] + ["MAC-" + key.title() + ".md" for key in OPERATIONS])
+    )
+    form_templates = {
+        name: _blob(root, request.source_commit, template_root + "/" + name)
+        for name in template_names
+    }
+    guide = Template(
+        _blob(root, request.source_commit, content_path + "/requester-agent.md").decode("utf-8")
+    )
+    files[resolver.output_path("requester_agent")] = _substitute(
+        guide,
+        {
+            "inventory_url": resolver.site("catalogue_data"),
+            "bundle_url": resolver.site("proposal_schema_bundle_data"),
+            "git_host": adapter,
+            "form_markup": "\n\n".join(
+                "### "
+                + name
+                + "\n\n~~~~"
+                + ("yaml" if adapter == "github" else "markdown")
+                + "\n"
+                + raw.decode("utf-8")
+                + "\n~~~~"
+                for name, raw in form_templates.items()
+            ),
+            "schemas_url": resolver.site("schemas_data").rstrip("/"),
+            "contract_url": resolver.site("machine_contract"),
+            "propose_url": resolver.site("propose"),
+            "request_url": resolver.repository_url("request_intake"),
+            "add_url": web_base_url + intake["add"],
+            "repository_url": web_base_url,
+            "inventory_example": json.dumps(example, ensure_ascii=False, indent=2),
+            "example_model_id": example_model["id"]
+            if example_model
+            else "No example model available",
+            "example_offering_id": example_offering["id"]
+            if example_offering
+            else "No matching example offering available",
+            "example_source_commit": catalogue["source_commit"],
+            "example_profile": catalogue["profile"],
+        },
+        "requester-agent",
+    ).encode("utf-8")
     schemas_root = document["paths"]["schemas"]
-    schema_paths = str(_git(root, "ls-tree", "-r", "--name-only", request.source_commit, "--", schemas_root)).splitlines()
+    schema_paths = str(
+        _git(root, "ls-tree", "-r", "--name-only", request.source_commit, "--", schemas_root)
+    ).splitlines()
     if not schema_paths or any(not path.endswith(".json") for path in schema_paths):
         raise BuildError("committed schema inventory is empty or contains undeclared file types")
     for path in schema_paths:
         relative = PurePosixPath(path).relative_to(schemas_root)
-        files[(PurePosixPath(resolver.output_path("schemas_data")) / relative).as_posix()] = _blob(root, request.source_commit, path)
-    bundle_entries = {"schemas/" + PurePosixPath(path).relative_to(schemas_root).as_posix(): files[(PurePosixPath(resolver.output_path("schemas_data")) / PurePosixPath(path).relative_to(schemas_root)).as_posix()] for path in schema_paths}
+        files[(PurePosixPath(resolver.output_path("schemas_data")) / relative).as_posix()] = _blob(
+            root, request.source_commit, path
+        )
+    bundle_entries = {
+        "schemas/" + PurePosixPath(path).relative_to(schemas_root).as_posix(): files[
+            (
+                PurePosixPath(resolver.output_path("schemas_data"))
+                / PurePosixPath(path).relative_to(schemas_root)
+            ).as_posix()
+        ]
+        for path in schema_paths
+    }
     bundle_entries.update({"templates/" + name: raw for name, raw in form_templates.items()})
     bundle_entries["README.md"] = files[resolver.output_path("requester_agent")]
     bundle = io.BytesIO()
@@ -796,68 +1630,103 @@ def _site_files(root: Path, request: _SiteBuildRequest, catalogue_raw: bytes, de
     return files
 
 
-def _expected_paths(document: Mapping[str, Any], catalogue: Mapping[str, Any], schema_paths: Iterable[str]) -> set[str]:
+def _expected_paths(
+    document: Mapping[str, Any], catalogue: Mapping[str, Any], schema_paths: Iterable[str]
+) -> set[str]:
     fixed = set(document["build"]["final_fixed_files"])
     schemas_root = document["paths"]["schemas"]
     schema_route = document["site"]["data_routes"]["schemas"].lstrip("/")
-    fixed.update(schema_route + PurePosixPath(path).relative_to(schemas_root).as_posix() for path in schema_paths)
+    fixed.update(
+        schema_route + PurePosixPath(path).relative_to(schemas_root).as_posix()
+        for path in schema_paths
+    )
+
     def emitted(route: str, **values: str) -> str:
         for name, value in values.items():
             route = route.replace("{" + name + "}", value)
         return route.lstrip("/") + ("index.html" if route.endswith("/") else "")
+
     routes = document["site"]["routes"]
     fixed.update(emitted(routes["model"], model_id=item["id"]) for item in catalogue["models"])
     fixed.update(
         emitted(
-            routes["offering"], inference_service_id=item["inference_service_id"],
+            routes["offering"],
+            inference_service_id=item["inference_service_id"],
             offering_id=item["id"],
-        ) for item in catalogue["offerings"]
+        )
+        for item in catalogue["offerings"]
     )
     return fixed
 
 
 def _tree_inventory(path: Path) -> dict[str, dict[str, Any]]:
-    return {
-        relative: _entry(data, relative)
-        for relative, data in _walk_regular_tree(path).items()
-    }
+    return {relative: _entry(data, relative) for relative, data in _walk_regular_tree(path).items()}
 
 
 def build_final_site(request: FinalBuildRequest) -> FinalBuildResult:
-    return _build_site(_SiteBuildRequest(
-        kind="final", root=request.root, base_commit=request.base_commit,
-        source_commit=request.source_commit, source_tree=request.source_tree,
-        integration_commit=request.merge_commit, integration_tree=request.merge_tree,
-        as_of=request.as_of, source_date_epoch=request.source_date_epoch,
-        profile=request.profile, base_url=request.base_url, base_path=request.base_path,
-        output=request.output, mac_metadata=request.mac_metadata,
-        publication_capability=request.publication_capability,
-    ))
+    return _build_site(
+        _SiteBuildRequest(
+            kind="final",
+            root=request.root,
+            base_commit=request.base_commit,
+            source_commit=request.source_commit,
+            source_tree=request.source_tree,
+            integration_commit=request.merge_commit,
+            integration_tree=request.merge_tree,
+            as_of=request.as_of,
+            source_date_epoch=request.source_date_epoch,
+            profile=request.profile,
+            base_url=request.base_url,
+            base_path=request.base_path,
+            output=request.output,
+            mac_metadata=request.mac_metadata,
+            publication_capability=request.publication_capability,
+        )
+    )
 
 
 def build_validation_site(request: ValidationBuildRequest) -> FinalBuildResult:
-    return _build_site(_SiteBuildRequest(
-        kind="validation", root=request.root, base_commit=request.base_commit,
-        source_commit=request.source_commit, source_tree=request.source_tree,
-        integration_commit=request.validation_commit,
-        integration_tree=request.validation_tree, as_of=request.as_of,
-        source_date_epoch=request.source_date_epoch, profile=request.profile,
-        base_url=request.base_url, base_path=request.base_path, output=request.output,
-        mac_metadata=request.mac_metadata,
-        publication_capability=request.publication_capability,
-    ))
+    return _build_site(
+        _SiteBuildRequest(
+            kind="validation",
+            root=request.root,
+            base_commit=request.base_commit,
+            source_commit=request.source_commit,
+            source_tree=request.source_tree,
+            integration_commit=request.validation_commit,
+            integration_tree=request.validation_tree,
+            as_of=request.as_of,
+            source_date_epoch=request.source_date_epoch,
+            profile=request.profile,
+            base_url=request.base_url,
+            base_path=request.base_path,
+            output=request.output,
+            mac_metadata=request.mac_metadata,
+            publication_capability=request.publication_capability,
+        )
+    )
 
 
 def build_demo_site(request: DemoBuildRequest) -> FinalBuildResult:
-    return _build_site(_SiteBuildRequest(
-        kind="demo", root=request.root, base_commit=request.source_commit,
-        source_commit=request.source_commit, source_tree=request.source_tree,
-        integration_commit=request.source_commit, integration_tree=request.source_tree,
-        as_of=request.as_of, source_date_epoch=request.source_date_epoch,
-        profile="synthetic", base_url=request.base_url, base_path=request.base_path,
-        output=request.output, mac_metadata=None,
-        publication_capability="public-pages",
-    ))
+    return _build_site(
+        _SiteBuildRequest(
+            kind="demo",
+            root=request.root,
+            base_commit=request.source_commit,
+            source_commit=request.source_commit,
+            source_tree=request.source_tree,
+            integration_commit=request.source_commit,
+            integration_tree=request.source_tree,
+            as_of=request.as_of,
+            source_date_epoch=request.source_date_epoch,
+            profile="synthetic",
+            base_url=request.base_url,
+            base_path=request.base_path,
+            output=request.output,
+            mac_metadata=None,
+            publication_capability="public-pages",
+        )
+    )
 
 
 def _build_site(request: _SiteBuildRequest) -> FinalBuildResult:
@@ -871,14 +1740,17 @@ def _build_site(request: _SiteBuildRequest) -> FinalBuildResult:
     if request.publication_capability not in allowed_capabilities:
         raise BuildError("unknown publication capability")
     if request.profile == "private" and request.publication_capability not in {
-        "restricted-artifact", "access-controlled-pages"
+        "restricted-artifact",
+        "access-controlled-pages",
     }:
         raise BuildError("private publication requires an explicit restricted capability")
     if not request.base_url:
         raise BuildError(f"{request.kind} build requires an explicit canonical HTTPS base URL")
     base = _canonical_commit(root, request.base_commit, "base commit")
     source = _canonical_commit(root, request.source_commit, "source commit")
-    integration = _canonical_commit(root, request.integration_commit, f"{request.kind} integration commit")
+    integration = _canonical_commit(
+        root, request.integration_commit, f"{request.kind} integration commit"
+    )
     layout = with_snapshot(root, source, lambda snapshot: _layout(snapshot))
     document = _committed_yaml_config(root, source, "modelo.yaml")
     configured_output = {
@@ -892,34 +1764,54 @@ def _build_site(request: _SiteBuildRequest) -> FinalBuildResult:
     if str(_git(root, "rev-parse", f"{source}^{{tree}}")).strip() != request.source_tree:
         raise BuildError("source tree does not match source commit")
     actual_integration_tree = str(_git(root, "rev-parse", f"{integration}^{{tree}}")).strip()
-    if actual_integration_tree != request.integration_tree or request.integration_tree != request.source_tree:
+    if (
+        actual_integration_tree != request.integration_tree
+        or request.integration_tree != request.source_tree
+    ):
         coordinate = "merge tree" if request.kind == "final" else "validation tree"
-        raise BuildError(f"{coordinate} must equal both the explicit integration tree and source tree")
+        raise BuildError(
+            f"{coordinate} must equal both the explicit integration tree and source tree"
+        )
     if request.kind == "validation":
         parents = str(_git(root, "rev-list", "--parents", "-n", "1", integration)).split()
         if parents != [integration, base, source]:
-            raise BuildError("validation commit must have exact base and source parents in that order")
+            raise BuildError(
+                "validation commit must have exact base and source parents in that order"
+            )
     if str(_git(root, "rev-parse", "HEAD")).strip() != integration:
-        raise BuildError(f"checked-out HEAD differs from explicit {request.kind} integration commit")
+        raise BuildError(
+            f"checked-out HEAD differs from explicit {request.kind} integration commit"
+        )
     if str(_git(root, "status", "--porcelain=v1", "--untracked-files=all")).strip():
         raise BuildError("working tree is dirty")
-    if subprocess.run(["git", "merge-base", "--is-ancestor", base, integration], cwd=root).returncode:
-        raise BuildError(f"base commit is not an ancestor of {request.kind} integration commit")
+    try:
+        require_ancestor(root, base, integration)
+    except GitError as exc:
+        raise BuildError(
+            f"base commit is not an ancestor of {request.kind} integration commit"
+        ) from exc
     author_epoch = int(str(_git(root, "show", "-s", "--format=%at", source)).strip())
     if request.source_date_epoch != author_epoch:
         raise BuildError("source date epoch differs from accepted source commit author time")
     if request.kind == "demo":
         try:
-            configured_as_of = date.fromisoformat(document["publication"]["profiles"]["synthetic"]["as_of"])
+            configured_as_of = date.fromisoformat(
+                document["publication"]["profiles"]["synthetic"]["as_of"]
+            )
         except (KeyError, TypeError, ValueError) as exc:
             raise BuildError("configured synthetic fixture snapshot date is invalid") from exc
         if request.as_of != configured_as_of:
             raise BuildError("demo as-of must equal configured synthetic fixture snapshot date")
         catalogue = with_snapshot(
-            root, source,
+            root,
+            source,
             lambda snapshot: _projection_from_snapshot(
-                snapshot, request.profile, source, request.source_tree,
-                request.as_of, layout,
+                snapshot,
+                request.profile,
+                source,
+                request.source_tree,
+                request.as_of,
+                layout,
             ),
         )
         catalogue_raw = canonical_bytes(catalogue)
@@ -927,43 +1819,66 @@ def _build_site(request: _SiteBuildRequest) -> FinalBuildResult:
     else:
         if request.mac_metadata is None:
             raise BuildError(f"{request.kind} build requires validated MAC metadata")
-        catalogue_raw, delta_raw, catalogue = rebuild_candidate_inputs(BuildRequest(
-            root=root, kind="candidate", base_commit=base, source_commit=source,
-            source_tree=request.source_tree, as_of=request.as_of,
-            source_date_epoch=request.source_date_epoch, mac_metadata=request.mac_metadata,
-            profile=request.profile, base_url=None, base_path=request.base_path,
-            output=layout.candidate_root.as_posix(),
-        ))
+        catalogue_raw, delta_raw, catalogue = rebuild_candidate_inputs(
+            BuildRequest(
+                root=root,
+                kind="candidate",
+                base_commit=base,
+                source_commit=source,
+                source_tree=request.source_tree,
+                as_of=request.as_of,
+                source_date_epoch=request.source_date_epoch,
+                mac_metadata=request.mac_metadata,
+                profile=request.profile,
+                base_url=None,
+                base_path=request.base_path,
+                output=layout.candidate_root.as_posix(),
+            )
+        )
     files = _site_files(root, request, catalogue_raw, delta_raw, catalogue, document)
     schemas_root = document["paths"]["schemas"]
-    schema_paths = str(_git(root, "ls-tree", "-r", "--name-only", source, "--", schemas_root)).splitlines()
+    schema_paths = str(
+        _git(root, "ls-tree", "-r", "--name-only", source, "--", schemas_root)
+    ).splitlines()
     expected = _expected_paths(document, catalogue, schema_paths)
     if set(files) != expected:
-        missing = sorted(expected - set(files)); extra = sorted(set(files) - expected)
+        missing = sorted(expected - set(files))
+        extra = sorted(set(files) - expected)
         raise BuildError(f"final site inventory mismatch; missing={missing!r}; extra={extra!r}")
     if request.profile == "synthetic" and any(_PRIVATE_CANARY in data for data in files.values()):
         raise BuildError("synthetic publication contains a private leakage canary")
     entries = {path: _entry(data, path) for path, data in files.items()}
     manifest: dict[str, Any] = {
-        "contract_version": CONTRACT_VERSION, "kind": request.kind, "base_commit": base,
-        "source_commit": source, "source_tree": request.source_tree,
-        "as_of": request.as_of.isoformat(), "source_date_epoch": request.source_date_epoch,
-        "profile": request.profile, "base_url": request.base_url, "base_path": request.base_path,
+        "contract_version": CONTRACT_VERSION,
+        "kind": request.kind,
+        "base_commit": base,
+        "source_commit": source,
+        "source_tree": request.source_tree,
+        "as_of": request.as_of.isoformat(),
+        "source_date_epoch": request.source_date_epoch,
+        "profile": request.profile,
+        "base_url": request.base_url,
+        "base_path": request.base_path,
         "promotion_durability": "fsync-durable",
         "catalogue_path": layout.catalogue_path.as_posix(),
         "change_delta_path": layout.change_delta_path.as_posix(),
         "manifest_path": layout.manifest_path.as_posix(),
-        "digest_algorithm": "sha256", "publication_digest": publication_digest(files), "files": entries,
+        "digest_algorithm": "sha256",
+        "publication_digest": publication_digest(files),
+        "files": entries,
     }
     if request.kind == "validation":
-        manifest.update({
-            "validation_commit": integration,
-            "validation_tree": request.integration_tree,
-        })
+        manifest.update(
+            {
+                "validation_commit": integration,
+                "validation_tree": request.integration_tree,
+            }
+        )
     elif request.kind == "final":
         manifest.update({"merge_commit": integration, "merge_tree": request.integration_tree})
     findings = with_snapshot(
-        root, source,
+        root,
+        source,
         lambda snapshot: SchemaSet(snapshot, layout.schemas).validate(
             layout.build_manifest_schema, manifest, layout.manifest_path.as_posix()
         ),
@@ -974,8 +1889,7 @@ def _build_site(request: _SiteBuildRequest) -> FinalBuildResult:
     output = root.joinpath(*configured_output.parts)
     _publish(root, output, files, manifest, layout)
     expected_physical = {
-        (layout.publication_subdir / path).as_posix(): entry
-        for path, entry in entries.items()
+        (layout.publication_subdir / path).as_posix(): entry for path, entry in entries.items()
     }
     expected_physical[(layout.publication_subdir / layout.manifest_path).as_posix()] = _entry(
         manifest_raw, layout.manifest_path.as_posix()
@@ -987,8 +1901,10 @@ def _build_site(request: _SiteBuildRequest) -> FinalBuildResult:
 
 def _committed_yaml_config(root: Path, commit: str, path: str) -> dict[str, Any]:
     """Load configuration exclusively from one immutable Git blob."""
-    from modelo.loader import load_yaml_mapping
     from tempfile import TemporaryDirectory
+
+    from modelo.loader import load_yaml_mapping
+
     with TemporaryDirectory(prefix="modelo-config-") as raw:
         temporary = Path(raw)
         target = temporary / "config.yaml"

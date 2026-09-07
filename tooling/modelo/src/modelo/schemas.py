@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
 import re
+from datetime import date, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 from urllib.parse import urljoin, urlsplit
@@ -14,7 +14,6 @@ from referencing import Registry, Resource
 
 from modelo.diagnostics import Diagnostic, Severity
 from modelo.loader import strict_unique_json_pairs
-
 
 RFC3339 = re.compile(
     r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
@@ -41,7 +40,8 @@ def parse_rfc3339(value: str) -> datetime:
 
 def _pointer(parts: object) -> str:
     return "".join(
-        f"/{str(part).replace('~', '~0').replace('/', '~1')}" for part in parts  # type: ignore[arg-type]
+        f"/{str(part).replace('~', '~0').replace('/', '~1')}"
+        for part in parts  # type: ignore[arg-type]
     )
 
 
@@ -64,7 +64,9 @@ class SchemaSet:
             if path.is_symlink() or not path.is_file():
                 raise ValueError(f"schema is not a regular file: {path}")
             try:
-                document = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=strict_unique_json_pairs)
+                document = json.loads(
+                    path.read_text(encoding="utf-8"), object_pairs_hook=strict_unique_json_pairs
+                )
                 Draft202012Validator.check_schema(document)
                 identifier = document["$id"]
                 if identifier in identifiers:
@@ -178,7 +180,10 @@ class SchemaSet:
                 document
                 for name, document in self.documents.items()
                 if name == resource_name
-                or (".." in PurePosixPath(resource_name).parts and PurePosixPath(name).name == resource_basename)
+                or (
+                    ".." in PurePosixPath(resource_name).parts
+                    and PurePosixPath(name).name == resource_basename
+                )
             ]
             if len(matches) != 1:
                 raise ValueError(f"schema reference is not uniquely local: {reference}")

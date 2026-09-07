@@ -1,0 +1,34 @@
+name: Modelo quality report
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Local tools and UBS report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d  # v10.0.0
+        with:
+          version: 0.11.33
+          python-version: 3.12.13
+          enable-cache: false
+      - name: Run the same local quality command
+        run: uv run --locked modelo-local-ci lint
+      - name: Retain untrusted review evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: quality-${{ github.event.pull_request.head.sha || github.sha }}
+          path: dist/quality/
+          if-no-files-found: error
+          retention-days: 30

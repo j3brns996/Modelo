@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Install pinned uv and Python
-        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d  # v10.0.0
         with:
           version: 0.11.33
           python-version: 3.12.13
@@ -57,7 +57,7 @@ jobs:
             --comment-output "${COMMENT_OUTPUT}"
 
       - name: Update the generated block and one result comment
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8
         env:
           ISSUE_BODY_OUTPUT: ${{ runner.temp }}/modelo-issue-body.md
           COMMENT_OUTPUT: ${{ runner.temp }}/modelo-intake-comment.md

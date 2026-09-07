@@ -10,7 +10,6 @@ from typing import Any, Literal, Mapping
 
 import yaml
 
-
 CONFIG_VERSION = "0.1.0"
 CONTRACT_VERSION = CONFIG_VERSION
 MAX_BYTES = 131_072
@@ -183,9 +182,7 @@ def _parse(path: Path) -> Mapping[str, Any]:
         nodes = 0
         for token in yaml.scan(text):
             if isinstance(token, (yaml.tokens.AnchorToken, yaml.tokens.AliasToken)):
-                raise ConfigError(
-                    "YAML_ALIAS_OR_ANCHOR", "YAML aliases and anchors are forbidden"
-                )
+                raise ConfigError("YAML_ALIAS_OR_ANCHOR", "YAML aliases and anchors are forbidden")
             if isinstance(token, yaml.tokens.TagToken):
                 raise ConfigError("YAML_CUSTOM_TAG", "explicit YAML tags are forbidden")
             if isinstance(
@@ -292,7 +289,9 @@ def load_config(root: Path | None = None) -> ModeloConfig:
     repository = _mapping(document.get("repository"), "/repository")
     raw_paths = _mapping(document.get("paths"), "/paths")
     toolchain = _mapping(document.get("toolchain"), "/toolchain")
-    limits = _mapping(toolchain.get("bootstrap_config_limits"), "/toolchain/bootstrap_config_limits")
+    limits = _mapping(
+        toolchain.get("bootstrap_config_limits"), "/toolchain/bootstrap_config_limits"
+    )
     expected_limits = {"max_bytes": MAX_BYTES, "max_depth": MAX_DEPTH, "max_nodes": MAX_NODES}
     if dict(limits) != expected_limits:
         raise ConfigError(
@@ -307,7 +306,9 @@ def load_config(root: Path | None = None) -> ModeloConfig:
         if isinstance(value, str)
     }
     if len(paths) != len(raw_paths):
-        raise ConfigError("SCHEMA_VIOLATION", "all path values must be strings", json_pointer="/paths")
+        raise ConfigError(
+            "SCHEMA_VIOLATION", "all path values must be strings", json_pointer="/paths"
+        )
 
     version_file = _safe_relative_path(
         _string(project, "version_file", "/project"), "/project/version_file"
@@ -353,7 +354,9 @@ def load_config(root: Path | None = None) -> ModeloConfig:
 
     adapter = _string(repository, "adapter", "/repository")
     if adapter not in {"github", "gitlab"}:
-        raise ConfigError("SCHEMA_VIOLATION", "unsupported repository adapter", json_pointer="/repository/adapter")
+        raise ConfigError(
+            "SCHEMA_VIOLATION", "unsupported repository adapter", json_pointer="/repository/adapter"
+        )
     host = _string(repository, "host", "/repository")
     namespace = _string(repository, "namespace", "/repository")
     name = _string(repository, "name", "/repository")

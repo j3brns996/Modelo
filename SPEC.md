@@ -410,8 +410,8 @@ route has no browser runtime.
 The synthetic presentation is a product-quality demonstration rather than a
 minimal fixture dump: a shared responsive shell, guided landing journey,
 purpose-built model cards and structured model/offering/reference pages expose
-the governance model without changing any approval semantics. Its 22-model
-dataset includes 20 bounded official-documentation observations. Only facts
+the governance model without changing any approval semantics. Its dataset includes bounded official-documentation observations; the
+published catalogue reports the current counts. Only facts
 supported by each retained source are projected; missing routes, prices,
 licences or availability remain missing. Documentation presence never becomes
 enterprise approval.
@@ -825,10 +825,13 @@ limits are in `docs/authoring.md`.
 A dedupe key hashes a typed sorted identity reservation set, effective
 operation and purpose. An idempotency key hashes the full canonical intent.
 Both use RFC 8785 with hash fields omitted; idempotency also omits random
-`request_id`. Exact retries
-return the existing issue; a conflicting open reservation fails closed. Move
-reserves source and destination. A batch reserves at most 25 identities and has
-one source, observation scope, inference service and purpose. Candidate issue
+`request_id`. These keys correlate intent; they do not implement cross-issue
+reservations or exactly-once issue creation. Reprocessing one issue is
+idempotent; equivalent separate issues require triage. A move identifies source
+and destination. A batch identifies at most 25 subjects and has one source,
+observation scope, inference service and purpose. Current-base validation and
+serialised acceptance protect catalogue identities. See
+`docs/adr/0004-v1-simplification.md` for the explicit requirement change. Candidate issue
 evidence is never accepted catalogue evidence. See `docs/mac-contract.md`.
 
 ## Git-platform implementation
@@ -999,13 +1002,12 @@ evidence, but neither is a source of approval.
 
 ## Validation contract
 
-One change-aware command, `modelo check --base BASE --head HEAD --as-of DATE`,
-owns pre-merge technical acceptance. Its externally visible outcomes are:
-
-1. `schema-and-facts`: schema, path, reference and evidence validation;
-2. `tests`: unit and fixture tests;
-3. `build-and-site`: deterministic catalogue and static-site build with smoke tests;
-4. `receipt-and-clean-tree`: release-contract simulation and clean-tree verification.
+`modelo check --base BASE --head HEAD --as-of DATE` validates source schema,
+paths, references, evidence and Git changes. It does not run the test suite or
+publish a site. `modelo-local-ci verify` runs the repository's tests (including
+locked lint and UBS execution), then builds the package offline. Site and receipt
+failure paths are exercised by those tests. `modelo-local-ci lint` runs the same
+quality tools separately for fast feedback. Local results are non-accepting.
 
 The trusted final `modelo/check` job runs even when dependencies fail and
 explicitly rejects missing, skipped, neutral, cancelled, stale or failed
@@ -1029,8 +1031,9 @@ when Node is already available. It is retained as repeatable PR evidence but is
 not part of the locked Python build/runtime, is never fetched by CI and cannot
 substitute for the pinned controlled-browser or human T10 evidence.
 
-Lint, dependency lock, secret scanning and document-drift checks are internal
-stages of those outcomes, not eleven independently promised products. A control
+Locked lint, dependency checks, targeted credential validation and
+documentation tests support those outcomes. UBS findings require review; its
+heuristics are not comprehensive secret scanning. A control
 is blocking or it is explicitly outside the baseline; an advisory security gate
 must not be advertised as enforcement.
 
@@ -1118,7 +1121,7 @@ contract still exposes no Modelo application API.
 
 The detailed static-site, MAC, security and staged implementation contracts are
 `docs/site-contract.md`, `docs/mac-contract.md`,
-`docs/security-contract.md` and `docs/implementation-plan.md`. The dated
+`docs/security-contract.md` and `docs/IMPLEMENTATION-PLAN.MD`. The dated
 repository comparison is
 `docs/reviews/catalogue-repositories-2026-08-30.md`; the pinned Addy Osmani
 skills decision is `docs/reviews/agent-skills-2026-08-30.md`.

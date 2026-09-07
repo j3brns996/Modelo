@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import shutil
 import subprocess
@@ -8,11 +7,10 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from pathlib import Path
 
 import yaml
-
 from modelo.build import _layout
-
 
 ROOT = Path(__file__).resolve().parents[3]
 SKILLS = ROOT / ".agents/skills"
@@ -76,9 +74,7 @@ class SkillContractTests(unittest.TestCase):
             path = SKILLS / name / "SKILL.md"
             self.assertFalse(path.is_symlink())
             metadata, body = parse_skill(path)
-            self.assertEqual(
-                set(metadata), {"name", "description", "compatibility", "metadata"}
-            )
+            self.assertEqual(set(metadata), {"name", "description", "compatibility", "metadata"})
             self.assertEqual(metadata["name"], name)
             self.assertRegex(name, r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
             self.assertLessEqual(len(name), 64)
@@ -95,10 +91,22 @@ class SkillContractTests(unittest.TestCase):
 
     def test_skills_contain_no_installers_hooks_or_unsafe_commands(self) -> None:
         forbidden = (
-            "npx", "npm ", "pip install", "pipx", "curl ", "wget ",
-            "git push", "git merge", "git reset", "--force", "rm -rf",
-            "workflow_dispatch", "pull_request_target", "allowed-tools",
-            "addyosmani", "github.com/addyosmani",
+            "npx",
+            "npm ",
+            "pip install",
+            "pipx",
+            "curl ",
+            "wget ",
+            "git push",
+            "git merge",
+            "git reset",
+            "--force",
+            "rm -rf",
+            "workflow_dispatch",
+            "pull_request_target",
+            "allowed-tools",
+            "addyosmani",
+            "github.com/addyosmani",
         )
         for path in SKILLS.rglob("SKILL.md"):
             text = path.read_text(encoding="utf-8").lower()
@@ -115,14 +123,19 @@ class SkillContractTests(unittest.TestCase):
         self.assertEqual(referenced - configured, set())
         help_text = subprocess.run(
             [sys.executable, "-m", "modelo", "check", "--help"],
-            cwd=ROOT, text=True, capture_output=True, check=True,
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=True,
         ).stdout
         for flag in ("--base", "--head", "--as-of"):
             self.assertIn(flag, help_text)
 
     def test_skills_are_outside_runtime_build_and_wheel(self) -> None:
         layout = _layout(ROOT)
-        skills_path = Path(yaml.safe_load((ROOT / "modelo.yaml").read_text())["paths"]["open_skills"])
+        skills_path = Path(
+            yaml.safe_load((ROOT / "modelo.yaml").read_text())["paths"]["open_skills"]
+        )
         self.assertNotIn(skills_path.as_posix(), {path.as_posix() for path in layout.input_roots})
         for path in (ROOT / "tooling/modelo/src").rglob("*.py"):
             source = path.read_text(encoding="utf-8")
@@ -131,7 +144,10 @@ class SkillContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="modelo-skill-wheel-") as raw:
             subprocess.run(
                 ["uv", "build", "--offline", "--no-cache", "--wheel", "--out-dir", raw],
-                cwd=ROOT, text=True, capture_output=True, check=True,
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=True,
             )
             wheels = list(Path(raw).glob("*.whl"))
             self.assertEqual(len(wheels), 1)
@@ -145,7 +161,8 @@ class SkillContractTests(unittest.TestCase):
             for name in ("with", "without"):
                 target = temporary / name
                 shutil.copytree(
-                    ROOT, target,
+                    ROOT,
+                    target,
                     ignore=shutil.ignore_patterns(".git", ".venv", "dist", "__pycache__", "*.pyc"),
                 )
                 copies.append(target)
@@ -155,7 +172,10 @@ class SkillContractTests(unittest.TestCase):
                 output = target / "wheel-output"
                 subprocess.run(
                     ["uv", "build", "--offline", "--no-cache", "--wheel", "--out-dir", str(output)],
-                    cwd=target, text=True, capture_output=True, check=True,
+                    cwd=target,
+                    text=True,
+                    capture_output=True,
+                    check=True,
                 )
                 wheel = next(output.glob("*.whl"))
                 wheels.append(wheel.read_bytes())

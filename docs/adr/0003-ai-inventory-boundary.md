@@ -1,4 +1,4 @@
-# ADR 0003: Component registry, external AI-use inventory
+# Decision: Component registry, external AI-use inventory
 
 Status: proposed for human CODEOWNER review. Issue: #70. Owner: j3brns.
 
@@ -28,7 +28,9 @@ accepted Offering at a recorded Git/release revision and checks its provenance,
 Conditions and applicable route. A stale, missing or revoked reference requires
 review; a cached URN is not lasting consumption permission. External owners
 choose registration, reconciliation and escalation policies. Modelo does not
-own business purposes, owners, oversight or invocation telemetry.
+own application-specific business purposes, owners, oversight or invocation
+telemetry. Offering approval_owner and approved_use record component approval
+policy; they do not duplicate the external application-use inventory.
 
 ## Entity model
 

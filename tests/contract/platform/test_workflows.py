@@ -1,12 +1,30 @@
 from __future__ import annotations
 
-from pathlib import Path
 import re
+from pathlib import Path
 
 import yaml
 
-
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def test_quality_reports_are_untrusted_exact_head_artifacts_with_no_write_credentials():
+    raw = (ROOT / ".github/workflows/quality.yml").read_text(encoding="utf-8")
+    workflow = yaml.safe_load(raw)
+    assert "pull_request" in workflow[True]
+    assert "pull_request_target" not in workflow[True]
+    assert workflow["permissions"] == {"contents": "read"}
+    steps = workflow["jobs"]["quality"]["steps"]
+    assert steps[0]["with"]["persist-credentials"] is False
+    assert "github.event.pull_request.head.sha" in steps[0]["with"]["ref"]
+    assert any(step.get("run") == "uv run --locked modelo-local-ci lint" for step in steps)
+    upload = steps[-1]
+    assert upload["if"] == "always()"
+    assert upload["with"]["path"] == "dist/quality/"
+    assert "github.event.pull_request.head.sha" in upload["with"]["name"]
+    assert all(
+        re.fullmatch(r"[^@]+@[0-9a-f]{40}", step["uses"]) for step in steps if "uses" in step
+    )
 
 
 def test_github_trusted_workflow_is_pinned_read_only_and_node_free() -> None:
@@ -15,7 +33,9 @@ def test_github_trusted_workflow_is_pinned_read_only_and_node_free() -> None:
     document = yaml.safe_load(raw)
     assert "pull_request_target" in document[True]
     assert document["permissions"] == {
-        "contents": "read", "issues": "read", "pull-requests": "read"
+        "contents": "read",
+        "issues": "read",
+        "pull-requests": "read",
     }
     assert "npx" not in raw and "npm " not in raw and "actions/checkout" not in raw
     uses = re.findall(r"^\s*uses:\s*([^\s#]+)", raw, re.MULTILINE)
@@ -123,7 +143,9 @@ def test_github_issue_intake_uses_trusted_code_and_one_bounded_comment_writer() 
     # invalid legacy edit; comment handling must still complete in this run.
     comment_handling = script.index("if (existing)")
     final_body_guard = script.rindex(
-        "if (current.data.body !== issueBody)", 0, comment_handling,
+        "if (current.data.body !== issueBody)",
+        0,
+        comment_handling,
     )
     assert script.index("await github.rest.issues.update(") < final_body_guard
     assert final_body_guard < comment_handling
@@ -146,6 +168,15 @@ def test_gitlab_adapter_is_explicitly_fail_closed_until_rehearsed() -> None:
     document = yaml.safe_load(raw)
     assert "modelo/check" in document
     assert "npx" not in raw and "npm " not in raw
-    assert "gitlab-prepare" in raw
-    assert "modelo platform check" in raw
-    assert "pages:" in raw
+    assert "pages" not in document
+    import subprocess
+
+    result = subprocess.run(
+        ["bash", "-c", "\n".join(document["modelo/check"]["script"])],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    assert result.returncode == 1
+    assert "not activated" in result.stderr

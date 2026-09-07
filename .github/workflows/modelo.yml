@@ -22,7 +22,7 @@ jobs:
       kind: ${{ steps.classify.outputs.kind }}
     steps:
       - name: Install pinned uv and Python
-        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d  # v10.0.0
         with:
           version: 0.11.33
           python-version: 3.12.13
@@ -73,7 +73,7 @@ jobs:
 
       - name: Install pinned uv and Python
         if: needs.classify.outputs.kind == 'control-plane'
-        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d  # v10.0.0
         with:
           version: 0.11.33
           python-version: 3.12.13
@@ -112,7 +112,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Install pinned uv and Python
-        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d  # v10.0.0
         with:
           version: 0.11.33
           python-version: 3.12.13
@@ -157,7 +157,7 @@ jobs:
           case "${KIND}" in mac-data|control-plane) ;; *) exit 1 ;; esac
 
       - name: Install pinned uv and Python
-        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d  # v10.0.0
         with:
           version: 0.11.33
           python-version: 3.12.13
@@ -254,7 +254,7 @@ jobs:
             --output "${GITHUB_WORKSPACE}/validation/dist/receipts/control-check.json"
 
       - name: Upload exact validation evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: modelo-check-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: |

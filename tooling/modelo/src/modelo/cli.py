@@ -3,38 +3,42 @@
 from __future__ import annotations
 
 import argparse
+import json
 from datetime import date
 from importlib.metadata import version
-import json
-from pathlib import Path
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any, Sequence
 
-from modelo.config import ConfigError, load_config
-from modelo.loader import load_yaml_mapping
 from modelo.build import BuildError, BuildRequest, build_candidate, recover_candidate
+from modelo.config import ConfigError, load_config
 from modelo.diagnostics import Diagnostic, diagnostics_json
+from modelo.evidence import create_evidence_record
 from modelo.freshness import parse_as_of
-from modelo.site import DemoBuildRequest, FinalBuildRequest, build_demo_site, build_final_site
-from modelo.platform import (
-    TrustedCheckRequest, TrustedControlCheckRequest, run_trusted_check,
-    run_trusted_control_check,
-)
 from modelo.github_adapter import (
-    write_github_intake_outputs,
-    github_control_issue_reference, github_issue_reference, prepare_github,
+    github_control_issue_reference,
+    github_issue_reference,
+    prepare_github,
     prepare_github_control,
+    write_github_intake_outputs,
 )
 from modelo.gitlab_adapter import (
-    write_gitlab_intake_outputs,
-    gitlab_control_issue_reference, gitlab_issue_reference, prepare_gitlab,
+    gitlab_control_issue_reference,
+    gitlab_issue_reference,
+    prepare_gitlab,
     prepare_gitlab_control,
+    write_gitlab_intake_outputs,
 )
-from modelo.evidence import create_evidence_record
+from modelo.loader import load_yaml_mapping
 from modelo.mac import MacError, init_mac_payload
+from modelo.platform import (
+    TrustedCheckRequest,
+    TrustedControlCheckRequest,
+    run_trusted_check,
+    run_trusted_control_check,
+)
 from modelo.schemas import SchemaSet
+from modelo.site import DemoBuildRequest, FinalBuildRequest, build_demo_site, build_final_site
 from modelo.validators import CheckSystemError, check_repository
-
 
 UNAVAILABLE = "modelo: {command} is not implemented in the current repository slice"
 
@@ -42,9 +46,7 @@ UNAVAILABLE = "modelo: {command} is not implemented in the current repository sl
 def _read_json_file(path: Path, option: str) -> Any:
     try:
         if not path.is_file():
-            raise ValueError(
-                f"{option} JSON file does not exist or is not a regular file: {path}"
-            )
+            raise ValueError(f"{option} JSON file does not exist or is not a regular file: {path}")
         content = path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
         raise ValueError(f"cannot read {option} JSON file {path}: {exc}") from exc
@@ -89,10 +91,11 @@ def _emit_json(document: Any, output: Path | None) -> None:
         print(formatted, end="")
 
 
-
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="modelo", description="Modelo repository tooling")
-    parser.add_argument("--version", action="version", version=f"modelo {version('modelo-tooling')}")
+    parser.add_argument(
+        "--version", action="version", version=f"modelo {version('modelo-tooling')}"
+    )
     parser.add_argument("--root", type=Path, default=Path.cwd(), help=argparse.SUPPRESS)
     subparsers = parser.add_subparsers(dest="command")
 
@@ -129,20 +132,32 @@ def _parser() -> argparse.ArgumentParser:
         "site", help="print canonical site URL configuration"
     )
     config_site.add_argument("--format", choices=("json", "lines"), default="json")
-    platform = subparsers.add_parser("platform", help="run a trusted Git-provider adapter operation")
+    platform = subparsers.add_parser(
+        "platform", help="run a trusted Git-provider adapter operation"
+    )
     platform_subparsers = platform.add_subparsers(dest="platform_command", required=True)
-    platform_check = platform_subparsers.add_parser("check", help="assemble an exact-head check receipt")
+    platform_check = platform_subparsers.add_parser(
+        "check", help="assemble an exact-head check receipt"
+    )
     platform_check.add_argument("--context", type=Path, required=True)
     platform_check.add_argument("--mac-metadata", type=Path, required=True)
     platform_check.add_argument("--output", type=Path, required=True)
-    control_check = platform_subparsers.add_parser("control-check", help="assemble an exact-head control receipt")
+    control_check = platform_subparsers.add_parser(
+        "control-check", help="assemble an exact-head control receipt"
+    )
     control_check.add_argument("--context", type=Path, required=True)
     control_check.add_argument("--output", type=Path, required=True)
-    github_issue = platform_subparsers.add_parser("github-issue", help="extract the linked MAC issue")
+    github_issue = platform_subparsers.add_parser(
+        "github-issue", help="extract the linked MAC issue"
+    )
     github_issue.add_argument("--event", type=Path, required=True)
-    github_control_issue = platform_subparsers.add_parser("github-control-issue", help="extract the linked control issue")
+    github_control_issue = platform_subparsers.add_parser(
+        "github-control-issue", help="extract the linked control issue"
+    )
     github_control_issue.add_argument("--event", type=Path, required=True)
-    github_prepare = platform_subparsers.add_parser("github-prepare", help="prepare trusted GitHub inputs")
+    github_prepare = platform_subparsers.add_parser(
+        "github-prepare", help="prepare trusted GitHub inputs"
+    )
     github_prepare.add_argument("--event", type=Path, required=True)
     github_prepare.add_argument("--issue", type=Path, required=True)
     github_prepare.add_argument("--validation-sha", required=True)
@@ -150,7 +165,9 @@ def _parser() -> argparse.ArgumentParser:
     github_prepare.add_argument("--as-of", required=True)
     github_prepare.add_argument("--metadata-output", type=Path, required=True)
     github_prepare.add_argument("--context-output", type=Path, required=True)
-    github_control = platform_subparsers.add_parser("github-prepare-control", help="prepare trusted GitHub control inputs")
+    github_control = platform_subparsers.add_parser(
+        "github-prepare-control", help="prepare trusted GitHub control inputs"
+    )
     github_control.add_argument("--event", type=Path, required=True)
     github_control.add_argument("--issue", type=Path, required=True)
     github_control.add_argument("--validation-sha", required=True)
@@ -164,11 +181,17 @@ def _parser() -> argparse.ArgumentParser:
     github_intake.add_argument("--issue-body-output", type=Path, required=True)
     github_intake.add_argument("--comment-output", type=Path, required=True)
 
-    gitlab_issue = platform_subparsers.add_parser("gitlab-issue", help="extract the linked MAC issue from GitLab MR")
+    gitlab_issue = platform_subparsers.add_parser(
+        "gitlab-issue", help="extract the linked MAC issue from GitLab MR"
+    )
     gitlab_issue.add_argument("--event", type=Path, required=True)
-    gitlab_control_issue = platform_subparsers.add_parser("gitlab-control-issue", help="extract the linked control issue from GitLab MR")
+    gitlab_control_issue = platform_subparsers.add_parser(
+        "gitlab-control-issue", help="extract the linked control issue from GitLab MR"
+    )
     gitlab_control_issue.add_argument("--event", type=Path, required=True)
-    gitlab_prepare = platform_subparsers.add_parser("gitlab-prepare", help="prepare trusted GitLab inputs")
+    gitlab_prepare = platform_subparsers.add_parser(
+        "gitlab-prepare", help="prepare trusted GitLab inputs"
+    )
     gitlab_prepare.add_argument("--event", type=Path, required=True)
     gitlab_prepare.add_argument("--issue", type=Path, required=True)
     gitlab_prepare.add_argument("--validation-sha", required=True)
@@ -176,7 +199,9 @@ def _parser() -> argparse.ArgumentParser:
     gitlab_prepare.add_argument("--as-of", required=True)
     gitlab_prepare.add_argument("--metadata-output", type=Path, required=True)
     gitlab_prepare.add_argument("--context-output", type=Path, required=True)
-    gitlab_control = platform_subparsers.add_parser("gitlab-prepare-control", help="prepare trusted GitLab control inputs")
+    gitlab_control = platform_subparsers.add_parser(
+        "gitlab-prepare-control", help="prepare trusted GitLab control inputs"
+    )
     gitlab_control.add_argument("--event", type=Path, required=True)
     gitlab_control.add_argument("--issue", type=Path, required=True)
     gitlab_control.add_argument("--validation-sha", required=True)
@@ -219,9 +244,7 @@ def _parser() -> argparse.ArgumentParser:
     evidence_create.add_argument("--visibility", default="internal")
     evidence_create.add_argument("--output", type=Path)
 
-    mac_init = dev_subparsers.add_parser(
-        "mac-init", help="initialize a MAC payload"
-    )
+    mac_init = dev_subparsers.add_parser("mac-init", help="initialize a MAC payload")
     mac_init.add_argument("--operation", required=True)
     mac_init.add_argument("--purpose", required=True)
     mac_init.add_argument("--subjects", required=True)
@@ -234,7 +257,6 @@ def _parser() -> argparse.ArgumentParser:
     mac_init.add_argument("--output", type=Path)
 
     return parser
-
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -277,27 +299,43 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(site["base_path"])
                 print(synthetic_as_of)
             else:
-                print(json.dumps(
-                    {"base_path": site["base_path"], "base_url": site["base_url"], "synthetic_as_of": synthetic_as_of},
-                    ensure_ascii=False, sort_keys=True, separators=(",", ":"),
-                ))
+                print(
+                    json.dumps(
+                        {
+                            "base_path": site["base_path"],
+                            "base_url": site["base_url"],
+                            "synthetic_as_of": synthetic_as_of,
+                        },
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                )
             return 0
         except (ConfigError, KeyError, TypeError) as exc:
             parser.exit(2, f"modelo: {exc}\n")
     if arguments.command == "platform" and arguments.platform_command == "check":
         try:
-            run_trusted_check(TrustedCheckRequest(
-                root=arguments.root, context=arguments.context,
-                mac_metadata=arguments.mac_metadata, output=arguments.output,
-            ))
+            run_trusted_check(
+                TrustedCheckRequest(
+                    root=arguments.root,
+                    context=arguments.context,
+                    mac_metadata=arguments.mac_metadata,
+                    output=arguments.output,
+                )
+            )
             return 0
         except (ValueError, ConfigError, BuildError) as exc:
             parser.exit(2, f"modelo: {exc}\n")
     if arguments.command == "platform" and arguments.platform_command == "control-check":
         try:
-            run_trusted_control_check(TrustedControlCheckRequest(
-                root=arguments.root, context=arguments.context, output=arguments.output,
-            ))
+            run_trusted_control_check(
+                TrustedControlCheckRequest(
+                    root=arguments.root,
+                    context=arguments.context,
+                    output=arguments.output,
+                )
+            )
             return 0
         except (ValueError, ConfigError, BuildError) as exc:
             parser.exit(2, f"modelo: {exc}\n")
@@ -316,9 +354,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "platform" and arguments.platform_command == "github-prepare":
         try:
             prepare_github(
-                root=arguments.root, event_path=arguments.event, issue_path=arguments.issue,
-                validation_sha=arguments.validation_sha, validation_tree=arguments.validation_tree,
-                as_of=parse_as_of(arguments.as_of), metadata_output=arguments.metadata_output,
+                root=arguments.root,
+                event_path=arguments.event,
+                issue_path=arguments.issue,
+                validation_sha=arguments.validation_sha,
+                validation_tree=arguments.validation_tree,
+                as_of=parse_as_of(arguments.as_of),
+                metadata_output=arguments.metadata_output,
                 context_output=arguments.context_output,
             )
             return 0
@@ -327,9 +369,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "platform" and arguments.platform_command == "github-prepare-control":
         try:
             prepare_github_control(
-                root=arguments.root, event_path=arguments.event, issue_path=arguments.issue,
-                validation_sha=arguments.validation_sha, validation_tree=arguments.validation_tree,
-                as_of=parse_as_of(arguments.as_of), context_output=arguments.context_output,
+                root=arguments.root,
+                event_path=arguments.event,
+                issue_path=arguments.issue,
+                validation_sha=arguments.validation_sha,
+                validation_tree=arguments.validation_tree,
+                as_of=parse_as_of(arguments.as_of),
+                context_output=arguments.context_output,
             )
             return 0
         except (ValueError, BuildError) as exc:
@@ -361,9 +407,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "platform" and arguments.platform_command == "gitlab-prepare":
         try:
             prepare_gitlab(
-                root=arguments.root, event_path=arguments.event, issue_path=arguments.issue,
-                validation_sha=arguments.validation_sha, validation_tree=arguments.validation_tree,
-                as_of=parse_as_of(arguments.as_of), metadata_output=arguments.metadata_output,
+                root=arguments.root,
+                event_path=arguments.event,
+                issue_path=arguments.issue,
+                validation_sha=arguments.validation_sha,
+                validation_tree=arguments.validation_tree,
+                as_of=parse_as_of(arguments.as_of),
+                metadata_output=arguments.metadata_output,
                 context_output=arguments.context_output,
             )
             return 0
@@ -372,9 +422,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "platform" and arguments.platform_command == "gitlab-prepare-control":
         try:
             prepare_gitlab_control(
-                root=arguments.root, event_path=arguments.event, issue_path=arguments.issue,
-                validation_sha=arguments.validation_sha, validation_tree=arguments.validation_tree,
-                as_of=parse_as_of(arguments.as_of), context_output=arguments.context_output,
+                root=arguments.root,
+                event_path=arguments.event,
+                issue_path=arguments.issue,
+                validation_sha=arguments.validation_sha,
+                validation_tree=arguments.validation_tree,
+                as_of=parse_as_of(arguments.as_of),
+                context_output=arguments.context_output,
             )
             return 0
         except (ValueError, BuildError) as exc:
@@ -405,13 +459,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                     raise BuildError("demo build fixes publication capability to public Pages")
                 if arguments.profile != "synthetic":
                     raise BuildError("demo build fixes publication profile to synthetic")
-                build_demo_site(DemoBuildRequest(
-                    root=arguments.root, source_commit=arguments.source_commit,
-                    source_tree=arguments.source_tree, as_of=as_of,
-                    source_date_epoch=arguments.source_date_epoch,
-                    base_url=arguments.base_url, base_path=arguments.base_path,
-                    output=arguments.output,
-                ))
+                build_demo_site(
+                    DemoBuildRequest(
+                        root=arguments.root,
+                        source_commit=arguments.source_commit,
+                        source_tree=arguments.source_tree,
+                        as_of=as_of,
+                        source_date_epoch=arguments.source_date_epoch,
+                        base_url=arguments.base_url,
+                        base_path=arguments.base_path,
+                        output=arguments.output,
+                    )
+                )
                 return 0
             if arguments.kind == "final":
                 if arguments.no_base_url or not arguments.base_url:
@@ -419,25 +478,29 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if not arguments.merge_commit or not arguments.merge_tree:
                     raise BuildError("final build requires --merge-commit and --merge-tree")
                 if arguments.mac_metadata is None:
-                    raise BuildError("final build requires --mac-metadata to rebuild trusted candidate inputs")
+                    raise BuildError(
+                        "final build requires --mac-metadata to rebuild trusted candidate inputs"
+                    )
                 if arguments.publication_capability is None:
                     raise BuildError("final build requires --publication-capability")
-                build_final_site(FinalBuildRequest(
-                    root=arguments.root,
-                    base_commit=arguments.base_commit,
-                    source_commit=arguments.source_commit,
-                    source_tree=arguments.source_tree,
-                    merge_commit=arguments.merge_commit,
-                    merge_tree=arguments.merge_tree,
-                    as_of=as_of,
-                    source_date_epoch=arguments.source_date_epoch,
-                    profile=arguments.profile,
-                    base_url=arguments.base_url,
-                    base_path=arguments.base_path,
-                    output=arguments.output,
-                    mac_metadata=arguments.mac_metadata,
-                    publication_capability=arguments.publication_capability,
-                ))
+                build_final_site(
+                    FinalBuildRequest(
+                        root=arguments.root,
+                        base_commit=arguments.base_commit,
+                        source_commit=arguments.source_commit,
+                        source_tree=arguments.source_tree,
+                        merge_commit=arguments.merge_commit,
+                        merge_tree=arguments.merge_tree,
+                        as_of=as_of,
+                        source_date_epoch=arguments.source_date_epoch,
+                        profile=arguments.profile,
+                        base_url=arguments.base_url,
+                        base_path=arguments.base_path,
+                        output=arguments.output,
+                        mac_metadata=arguments.mac_metadata,
+                        publication_capability=arguments.publication_capability,
+                    )
+                )
                 return 0
             if arguments.merge_commit or arguments.merge_tree:
                 raise BuildError("candidate build does not accept merge coordinates")
@@ -445,20 +508,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise BuildError("candidate build does not accept --publication-capability")
             if arguments.mac_metadata is None:
                 raise BuildError("candidate build requires --mac-metadata")
-            build_candidate(BuildRequest(
-                root=arguments.root,
-                kind=arguments.kind,
-                base_commit=arguments.base_commit,
-                source_commit=arguments.source_commit,
-                source_tree=arguments.source_tree,
-                as_of=as_of,
-                source_date_epoch=arguments.source_date_epoch,
-                mac_metadata=arguments.mac_metadata,
-                profile=arguments.profile,
-                base_url=None if arguments.no_base_url else arguments.base_url,
-                base_path=arguments.base_path,
-                output=arguments.output,
-            ))
+            build_candidate(
+                BuildRequest(
+                    root=arguments.root,
+                    kind=arguments.kind,
+                    base_commit=arguments.base_commit,
+                    source_commit=arguments.source_commit,
+                    source_tree=arguments.source_tree,
+                    as_of=as_of,
+                    source_date_epoch=arguments.source_date_epoch,
+                    mac_metadata=arguments.mac_metadata,
+                    profile=arguments.profile,
+                    base_url=None if arguments.no_base_url else arguments.base_url,
+                    base_path=arguments.base_path,
+                    output=arguments.output,
+                )
+            )
             return 0
         except (ValueError, ConfigError, BuildError) as exc:
             parser.exit(2, f"modelo: {exc}\n")
@@ -474,18 +539,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "--sanitised-parameters": arguments.sanitised_parameters,
                 }
                 if arguments.source_type == "first-party-read-api":
-                    missing = [
-                        name for name, value in api_options.items() if value is None
-                    ]
+                    missing = [name for name, value in api_options.items() if value is None]
                     if missing:
                         raise ValueError(
                             "first-party-read-api requires API arguments together: "
                             + ", ".join(missing)
                         )
                 else:
-                    supplied = [
-                        name for name, value in api_options.items() if value is not None
-                    ]
+                    supplied = [name for name, value in api_options.items() if value is not None]
                     if supplied:
                         raise ValueError(
                             "documentation sources do not accept API-only arguments: "
@@ -500,9 +561,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     else None
                 )
                 sanitised_parameters = (
-                    _parse_json_arg(
-                        arguments.sanitised_parameters, "--sanitised-parameters"
-                    )
+                    _parse_json_arg(arguments.sanitised_parameters, "--sanitised-parameters")
                     if arguments.sanitised_parameters is not None
                     else None
                 )
@@ -557,7 +616,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 parser.exit(2, f"modelo: {exc}\n")
     parser.exit(2, f"{UNAVAILABLE.format(command=arguments.command)}\n")
     return 2
-
 
 
 def _render_text(diagnostic: Diagnostic) -> str:

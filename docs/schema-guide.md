@@ -1,4 +1,19 @@
-# Entity acceptance profile 0.2.0
+# Entity acceptance profile 0.3.0
+
+An accepted record passes configured path and filename checks, its closed JSON
+Schema, semantic references and evidence checks, and Git history rules.
+The [canonical entity contract](adr/0003-entity-contract.md) identifies the
+source schemas, keys and migration rules. `catalogue-output.schema.json` is the
+publication entry point and references those same schemas. Use the bundle from
+the publication's source commit; envelope and tool versions are separate.
+
+Offerings require `approval_owner`, `approved_use` and `approval_rationale`.
+They describe accountable role, permitted task/data/oversight and the policy
+reason for approval. Empty conditions require `no_conditions_rationale`.
+Optional `review_by` sets an inclusive review deadline; omission means
+event-triggered review. Application-specific ownership and use remain external.
+Policy fields do not require external fact evidence. Optional external facts
+remain unknown until evidenced; do not infer legal ownership from a brand name.
 
 Model means a canonical named ModelRelease. Existing internal IDs remain
 canonical; optional canonical_urn must equal the derived namespace and ID.

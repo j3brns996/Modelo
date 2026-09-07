@@ -5,7 +5,6 @@ import json
 import unittest
 from copy import deepcopy
 from pathlib import Path
-
 from uuid import UUID
 
 from modelo.mac import (
@@ -23,7 +22,6 @@ from modelo.mac import (
     validate_payload,
     with_computed_keys,
 )
-
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "tests/fixtures/mac"
@@ -43,7 +41,9 @@ class MacTests(unittest.TestCase):
             with self.subTest(operation=operation):
                 self.assertEqual(validate_payload(payload), payload)
                 self.assertEqual(payload["operation"], operation)
-                self.assertEqual(compute_keys(payload), (payload["dedupe_key"], payload["idempotency_key"]))
+                self.assertEqual(
+                    compute_keys(payload), (payload["dedupe_key"], payload["idempotency_key"])
+                )
                 self.assertRegex(payload_digest(payload), r"^sha256-[0-9a-f]{64}$")
 
     def test_github_and_gitlab_transports_round_trip_to_identical_objects(self) -> None:
@@ -55,11 +55,15 @@ class MacTests(unittest.TestCase):
                 self.assertEqual(extract_issue_payload(github), payload)
                 self.assertEqual(extract_issue_payload(gitlab), payload)
                 self.assertEqual(
-                    extract_adapter_issue_payload(render_adapter_issue_body(payload, "github"), "github"),
+                    extract_adapter_issue_payload(
+                        render_adapter_issue_body(payload, "github"), "github"
+                    ),
                     payload,
                 )
                 self.assertEqual(
-                    extract_adapter_issue_payload(render_adapter_issue_body(payload, "gitlab"), "gitlab"),
+                    extract_adapter_issue_payload(
+                        render_adapter_issue_body(payload, "gitlab"), "gitlab"
+                    ),
                     payload,
                 )
 
@@ -147,7 +151,9 @@ class MacTests(unittest.TestCase):
             "duplicate marker": body + "\n<!-- modelo:mac-payload:start -->\n",
             "wrong digest": body.replace(payload_digest(payload), "sha256-" + "f" * 64),
             "oversized": "x" * (MAX_BODY_BYTES + 1),
-            "duplicate key": body.replace('"schema_version": "0.1",', '"schema_version": "0.1",\n  "schema_version": "0.1",'),
+            "duplicate key": body.replace(
+                '"schema_version": "0.1",', '"schema_version": "0.1",\n  "schema_version": "0.1",'
+            ),
         }
         for name, candidate in cases.items():
             with self.subTest(name=name), self.assertRaises(MacError):
@@ -164,14 +170,12 @@ class MacTests(unittest.TestCase):
             native_body = render_adapter_issue_body(payload, adapter)
             source_marker = f"<!-- modelo:intake-source {source_digest} -->"
             generated = (
-                f"{human_source}\n\n{intake_start}\n{source_marker}\n"
-                f"{native_body}{intake_end}\n"
+                f"{human_source}\n\n{intake_start}\n{source_marker}\n{native_body}{intake_end}\n"
             )
             wrong_source_marker = "<!-- modelo:intake-source sha256:" + "f" * 64 + " -->"
             wrong_payload_digest = "sha256-" + "f" * 64
             reversed_markers = (
-                f"{human_source}\n\n{intake_end}\n{source_marker}\n"
-                f"{native_body}{intake_start}\n"
+                f"{human_source}\n\n{intake_end}\n{source_marker}\n{native_body}{intake_start}\n"
             )
             cases = {
                 "missing start marker": generated.replace(intake_start, "", 1),
@@ -183,7 +187,9 @@ class MacTests(unittest.TestCase):
                 "absent source digest": generated.replace(source_marker, "", 1),
                 "duplicate source digest": generated.replace(source_marker, source_marker * 2, 1),
                 "wrong source digest": generated.replace(source_marker, wrong_source_marker, 1),
-                "altered human source": generated.replace("A governed request", "An altered request", 1),
+                "altered human source": generated.replace(
+                    "A governed request", "An altered request", 1
+                ),
                 "wrong canonical digest": generated.replace(
                     payload_digest(payload), wrong_payload_digest, 1
                 ),
@@ -252,11 +258,13 @@ class MacTests(unittest.TestCase):
             subjects=[{"kind": "model", "identity": "test-model"}],
             requested_outcome="Add model record to catalogue",
             reason="New model model-v1 available",
-            candidate_evidence=[{
-                "uri": "https://example.invalid/doc",
-                "observed_at": "2026-09-01T00:00:00Z",
-                "digest": "sha256-" + "a" * 64,
-            }],
+            candidate_evidence=[
+                {
+                    "uri": "https://example.invalid/doc",
+                    "observed_at": "2026-09-01T00:00:00Z",
+                    "digest": "sha256-" + "a" * 64,
+                }
+            ],
             acceptance=["Model schema passes validation"],
         )
         self.assertEqual(payload["operation"], "add")

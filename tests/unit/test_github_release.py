@@ -3,7 +3,15 @@ from copy import deepcopy
 import pytest
 from modelo.build import BuildError
 from modelo.github_adapter import github_publication_capability
-from modelo.github_release import accepted_files, approved_review, capability_failures
+from modelo.github_release import _api, accepted_files, approved_review, capability_failures
+
+
+def test_provider_json_rejects_duplicate_keys(monkeypatch):
+    from modelo import github_release as adapter
+
+    monkeypatch.setattr(adapter, "_response", lambda endpoint, **kwargs: b'{"id": 1, "id": 2}')
+    with pytest.raises(BuildError, match="not JSON"):
+        _api("repos/example")
 
 
 def test_release_workflow_preserves_acceptance_and_credential_boundaries():

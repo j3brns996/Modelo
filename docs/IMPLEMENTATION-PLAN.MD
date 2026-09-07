@@ -472,6 +472,8 @@ tags are missing. No host protection setting has been changed. Release automatio
 also requires a scoped credential and actual independent human approval.
 
 PR [#94](https://github.com/j3brns996/Modelo/pull/94) contains the working delivery.
+Its body carries the required `modelo:control-issue` marker for issue #93;
+without that marker the trusted control-plane gate correctly rejected the PR.
 The native Linux quality run at `752760354363af10b12d662c49eb169eee255c29`
 passed Ruff, formatting, yamllint and UBS execution. UBS scanned 30 files and
 reported 28 critical, 183 warning and 594 informational matches. Independent

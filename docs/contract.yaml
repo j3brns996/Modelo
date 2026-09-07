@@ -4,9 +4,9 @@ contract:
   name: modelo
   version: "0.1.0"
   status: t8_premerge_t9_synthetic_pages_demo_and_functional_explorer_implemented_production_launch_slice_pending
-  implemented_slices: [T1, T2, T3, T4, T5, T6, T6-UX, T7, T7-UX, T8-premerge, T9, synthetic-pages-demo]
+  implemented_slices: [T1, T2, T3, T4, T5, T6, T6-UX, T7, T7-UX, T8-premerge, T8-postmerge-production-release-and-receipt, local-recovery, T9, synthetic-pages-demo]
   accepted_pre_t8_head: "8694053c3366e162e0da6991ad08729aa8c95ad5"
-  unimplemented_slices: [T8-postmerge-production-release-and-receipt, T10-remote-evidence]
+  unimplemented_slices: [T10-remote-evidence]
   executable_config: modelo.yaml
   implementation_plan_config_key: paths.implementation_plan
   drift_is_error: true

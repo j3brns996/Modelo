@@ -7,8 +7,8 @@ These rules apply to every agent and every repository path. More specific
 
 This repository contains the validator, deterministic candidate/final builders,
 static-site generator and trusted pre-merge GitHub adapter. A public synthetic
-Pages demo is live. Production post-merge publication, release, and receipt
-automation, plus the T10 rehearsal, remain absent. Do not add or merge
+Pages demo is live. Post-merge publication, release receipts and local recovery
+automation are implemented. Remote T10 acceptance remains pending. Do not add or merge
 production catalogue records until T10 passes remotely.
 
 ## Authority and workflow

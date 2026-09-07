@@ -6,8 +6,8 @@ decision. An offering links a model to a service, routes, and conditions for use
 Application owners remain responsible for their specific uses.
 
 **Current status:** the public site is a synthetic Pages demo, not enterprise approval.
-Pre-merge checks and demo publication work. Production release automation and
-the remote T10 rehearsal remain outstanding.
+Pre-merge checks and demo publication work. Post-merge release and recovery
+automation are implemented; remote T10 acceptance remains outstanding.
 Do not add real production catalogue data before T10 passes remotely.
 Agent approval is disabled.
 

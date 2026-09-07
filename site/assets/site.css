@@ -244,9 +244,8 @@ details p { max-width: 65ch; }
 .prose-card, .guide-section, .simple-request { max-width: var(--max); }
 .prose-card p, .guide-section p, .content-band p, .timeline p { max-width: var(--reading); }
 .simple-request form { max-width: 48rem; }
-.timeline article > p { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .timeline li { overflow-wrap: anywhere; }
-.timeline article > ul > li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timeline article > ul > li { white-space: normal; }
 .timeline details { margin-bottom: 1rem; }
 .site-nav { gap: .85rem; }
 .classic-diagram { margin: 1.5rem 0; }
@@ -256,3 +255,10 @@ details p { max-width: 65ch; }
 .diagram-line { fill: none; stroke: var(--accent); stroke-width: 1.5; }
 .diagram-text { font: 14px system-ui, sans-serif; fill: var(--ink); }
 .diagram-title { font: 600 16px system-ui, sans-serif; fill: var(--ink); }
+
+/* Keep prose, lists, and definitions on the same readable measure. */
+.prose-card > ul, .prose-card > ol, .prose-card > dl,
+.guide-section > ul, .guide-section > ol, .guide-section > dl,
+.timeline > ul, .timeline > ol { max-width: var(--reading); }
+table { table-layout: fixed; }
+th, td { overflow-wrap: anywhere; }

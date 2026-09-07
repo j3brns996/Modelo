@@ -1,13 +1,12 @@
 # Modelo
 
 Find a model, check its approved access routes, or request a catalogue change.
-Modelo records model facts, offering approvals, and the evidence behind each
-decision. An offering links a model to a service, routes, and conditions for use.
-Application owners remain responsible for their specific uses.
+Modelo records model facts, approved offerings, and the evidence for each
+decision. Application owners remain responsible for each use.
 
-**Current status:** the public site is a synthetic Pages demo, not enterprise approval.
-Pre-merge checks and demo publication work. Post-merge release and recovery
-automation are implemented; remote T10 acceptance remains outstanding.
+**Current status:** the public site is a synthetic Pages demo. It is not enterprise
+approval. Pre-merge checks, demo publication, release, and recovery automation
+work. Remote T10 acceptance remains outstanding.
 Do not add real production catalogue data before T10 passes remotely.
 Agent approval is disabled.
 
@@ -16,6 +15,8 @@ Agent approval is disabled.
 Concept illustration. Counts and status indicators are illustrative.
 
 ## Choose your next action
+
+Use this table to identify who acts, what they provide, and where the work ends.
 
 | Your role | Your action | Your agent's task |
 |---|---|---|
@@ -47,10 +48,19 @@ domicile, operator, and processing territory separately. A missing vendor or
 service needs a prerequisite proposal before an offering can reference it.
 
 Review the prepared answers, consider each human attestation, and submit through
-your normal GitHub or GitLab login. A request starts triage; it grants no approval.
+your normal GitHub or GitLab login. The request starts triage; it grants no
+approval.
 For a complete catalogue proposal, use the [detailed composer](https://j3brns996.github.io/Modelo/propose/#builder).
 
 ## Author and review records
+
+**Who:** requesters explain the need; authors prepare records; reviewers check
+evidence; maintainers control the repository. **What:** a model, an offering,
+and immutable evidence are separate records. **Why:** the catalogue records
+approved access without approving a business use. **When and where:** record
+the retrieval date, provider, operator, domicile, processing territory, and
+route. **How:** a linked issue starts the change, CI checks the exact commit,
+and protected-branch controls accept it.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing records. MAC means move,
 add, change, revoke, or batch. Start from a linked open MAC issue and use a topic

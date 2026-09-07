@@ -1052,8 +1052,13 @@ class FinalSiteTests(unittest.TestCase):
             "@media (max-width: 580px)",
             ".model-card {",
             ".fact-grid",
+            "table-layout: fixed",
+            ".timeline article > ul > li { white-space: normal; }",
+            ".prose-card > ul",
         ):
             self.assertIn(contract, css)
+        self.assertNotIn("-webkit-line-clamp", css)
+        self.assertNotIn("text-overflow: ellipsis", css)
         self.assertIn("textarea[data-proposal-summary]", css)
 
     def test_catalogue_uses_dedicated_human_readable_model_cards(self) -> None:

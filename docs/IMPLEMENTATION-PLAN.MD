@@ -192,7 +192,7 @@ claim a 1.0 release before those gates pass.
 |---|---|---|---|
 | W9: accepted release | Existing platform/receipt code, trusted evidence artifact, GitHub adapter, CLI and tests | Real receipt correlation, accepted metadata retention, independent provider review, exact squash parent/tree and private delivery enforcement | In progress |
 | W10: publication | GitHub release workflow, existing final builder and release assets | Build once; verify exact uploaded bytes and protected tag; reject collisions and incomplete retries | Implemented in PR #94; remote acceptance pending |
-| W11: recovery | Git and provider exports, dependency archive, recovery verification and runbook | Checksummed export with explicit historical gaps; offline restore; reject unsafe archives and missing durable release evidence | Implemented in PR #94; live export and offline proof in progress |
+| W11: recovery | Git and provider exports, dependency archive, recovery verification and runbook | Checksummed export with explicit historical gaps; offline restore; reject unsafe archives and missing durable release evidence | Offline installation, lint, UBS, 70-file rebuild equality and 21-ref GitLab restore verified; no released catalogue exists to rehearse |
 | W12: remote T10 | Isolated GitHub/GitLab rehearsal, reviewer identity, accessibility and licence evidence | Real positive and negative host tests; no fabricated approvals or launch claims | Identities and empty GitLab target supplied; licence deliberately undecided; host controls and rehearsal pending |
 
 Read-only CTO review found release correlations only in test helpers, omitted
@@ -485,6 +485,32 @@ The direct `modelo check` invocation at `9077993` reports missing production
 at baseline `bf853cd` reports the same three failures. Do not create production
 data or weaken checks to make this control-plane work pass. Trusted control-plane
 CI, schema fixtures and synthetic publication tests provide its acceptance path.
+
+### Recovery rehearsal evidence
+
+- Full Linux suite at `752760354363af10b12d662c49eb169eee255c29`: 456 tests
+  passed in 1,011.17 seconds. Later workflow, archive-bound and documentation
+  checks passed separately; exact-head remote CI remains the acceptance arbiter.
+- Real export source: `9077993687cf81a8cf37f2602489e236f1511c8c`. Archive:
+  `modelo-20260907-9077993.zip`, SHA-256
+  `ac669a0d8ab524e20f0705dcb6de49e5541d60c8500db632cc411a3b65d94512`.
+  The 51 MiB archive and detached checksum are retained outside temporary test
+  directories. It contains 93 issue records, 43 pull requests, 97 trusted runs
+  and no published releases.
+- Ran restore under Linux `unshare -Urn`, with networking disabled and a new
+  HOME. Supplied installed Python 3.12.13 and uv 0.11.33 as prerequisites.
+  Archived wheels installed offline; dependency checking, Ruff, yamllint and
+  pinned UBS passed. The restored synthetic build produced 70 files, all
+  byte-identical to the original source build. No warm UBS or package cache
+  was required. This proves synthetic recovery, not a production release restore.
+- Rechecked the GitLab target had no refs, pushed recovered branches and tags,
+  and compared every ref. All 21 refs matched. Default branch `main` resolves to
+  `bf853cd4fc53dd8fc6796d053d87139d68aadb24`; the recovered development branch
+  retains the export's source, not later PR amendments.
+- GitLab project `86156538` is private. The observed settings allow maintainer
+  pushes, do not require pipeline success or resolved discussions, do not require
+  CODEOWNER approval and contain no protected tags. No host control was changed.
+  Archived issues/reviews remain evidence files, not recreated GitLab objects.
 
 | Gate | Status |
 |---|---|

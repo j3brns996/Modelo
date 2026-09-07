@@ -83,7 +83,7 @@ def export_recovery(root: Path, output: Path) -> dict:
         raise BuildError("recovery requires complete Git history")
     if str(_git(root, "status", "--porcelain", "--untracked-files=all")).strip():
         raise BuildError("commit repository changes before recovery export")
-    if command(["uv", "--version"], root).strip() != "uv 0.11.33":
+    if command(["uv", "--version"], root).split()[:2] != ["uv", "0.11.33"]:
         raise BuildError("recovery requires pinned uv 0.11.33")
     source = str(_git(root, "rev-parse", "HEAD")).strip()
     python_pin = (
@@ -405,7 +405,7 @@ def _restore_snapshot(bundle: Path, expected_digest: str, output: Path) -> dict:
         output,
     )
     command(["git", "checkout", "--detach", source], output / "worktree")
-    if command(["uv", "--version"], output).strip() != "uv 0.11.33":
+    if command(["uv", "--version"], output).split()[:2] != ["uv", "0.11.33"]:
         raise BuildError("offline recovery requires pinned uv 0.11.33")
     command(
         ["uv", "venv", "--offline", "--python", manifest["python"], str(output / "environment")],

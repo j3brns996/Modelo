@@ -37,7 +37,7 @@ present. GitLab's checked-in job is deliberately fail-closed until a protected
 pipeline policy or equivalent is configured and rehearsed.
 
 Gate C remains mandatory: create `j3brns996/Modelo-rehearsal` from the exact
-bootstrap tree, override only the globally owned repository and Pages
+accepted implementation tree, override only the globally owned repository and Pages
 coordinates in `modelo.yaml`, and use it for sentinel records and destructive
 protection tests. Run one factual synthetic condition-add MAC through issue,
 PR, exact-head check, independent approval and squash merge. Retain
@@ -108,8 +108,8 @@ Retain archived GitHub host metadata and record GitLab capability differences.
 The GitHub reviewer identity is `j3brns`. The repository licence remains undecided
 at the owner's instruction.
 
-Production launch remains blocked until a further human-approved PR implements
-and tests all of the following. The public synthetic demo workflow does not
+Production launch remains blocked until the accepted implementation is remotely
+rehearsed and all of the following are verified. The public synthetic demo workflow does not
 satisfy these production items:
 
 - consume the accepted exact-head check receipt after merge;
